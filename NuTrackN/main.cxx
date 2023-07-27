@@ -1,4 +1,4 @@
-// Author: Sergey Linev, GSI  13/01/2021
+//// Author: Sergey Linev, GSI  13/01/2021
 
 /*************************************************************************
  * Copyright (C) 1995-2021, Rene Brun and Fons Rademakers.               *
@@ -37,7 +37,10 @@
 
 int main(int argc, char **argv)
 {
+    //Initializing the app
     TApplication rootapp("Simple Qt ROOT Application", &argc, argv);
+
+    //Looking for the visualization manager
  #if QT_VERSION < 0x050000
     if (!gGLManager) {
        TString x = "win32";
@@ -55,11 +58,15 @@ int main(int argc, char **argv)
     QMainCanvas m(0);
 
     m.resize(m.sizeHint());
+    //Sets the title of the application window
     m.setWindowTitle("Qt Example - Canvas");
+    //Sets the initial position of the application on the screen
     m.setGeometry( 100, 100, 699, 499 );
     m.show();
+    //Sets the initial size of the application window
     m.resize(700, 500);
 
+    //Closes the application when the window is closed
     QObject::connect( qApp, SIGNAL(lastWindowClosed()), qApp, SLOT(quit()) );
 
     return app.exec();

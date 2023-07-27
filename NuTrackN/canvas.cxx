@@ -31,6 +31,7 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    setAttribute(Qt::WA_NativeWindow, true);
    setUpdatesEnabled(kFALSE);
    setMouseTracking(kTRUE);
+   //Minimum size of the spectra
    setMinimumSize(300, 200);
 
    // register the QWidget in TVirtualX, giving its native window id
@@ -45,6 +46,7 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 {
    // Handle mouse move events.
 
+   //This tells the canvas to handle events when the mouse moves and any or none of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
    if (fCanvas) {
       if (e->buttons() & Qt::LeftButton) {
          fCanvas->HandleInput(kButton1Motion, e->x(), e->y());
@@ -63,6 +65,7 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
 {
    // Handle mouse button press events.
 
+    //This tells the canvas to handle events when any of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
@@ -88,6 +91,7 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 {
    // Handle mouse button release events.
 
+    //This tells the canvas to handle events when any of the mouse buttons are released. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
@@ -113,6 +117,7 @@ void QRootCanvas::resizeEvent( QResizeEvent *event )
 {
    // Handle resize events.
 
+    //Instructs the spectra what to do when the main window gets resized
    if (fCanvas) {
       fCanvas->SetCanvasSize(event->size().width(), event->size().height()); 
       fCanvas->Resize();
@@ -125,6 +130,7 @@ void QRootCanvas::paintEvent( QPaintEvent * )
 {
    // Handle paint events.
 
+    //Not sure what this does, I have checked the documentation but it is unclear to me
    if (fCanvas) {
       fCanvas->Resize();
       fCanvas->Update();
@@ -139,10 +145,15 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    // QMainCanvas constructor.
 
    QVBoxLayout *l = new QVBoxLayout(this);
+
+   //Adds the canvas to the window
    l->addWidget(canvas = new QRootCanvas(this));
+   //Adds the button to the window
    l->addWidget(b = new QPushButton("&Draw Histogram", this));
+   //When the button is pressed, execute function clicked1
    connect(b, SIGNAL(clicked()), this, SLOT(clicked1()));
    fRootTimer = new QTimer( this );
+   //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
 }
@@ -155,7 +166,6 @@ void QMainCanvas::clicked1()
    static TH1F *h1f = 0;
 
    // Create a one dimensional histogram (one float per bin)
-   // and fill it following the distribution in function sqroot.
    canvas->getCanvas()->Clear();
    canvas->getCanvas()->cd();
    canvas->getCanvas()->SetBorderMode(0);
@@ -167,6 +177,7 @@ void QMainCanvas::clicked1()
       h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
    }
    h1f->Reset();
+   //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
    h1f->SetFillStyle(3001);
 
@@ -187,6 +198,7 @@ void QMainCanvas::clicked1()
    for(int i=0;i<data.size();i++)
        h1f->AddBinContent(i,data[i]);
 
+   //Draws the spectrum and tells the canvas to update itself
    h1f->Draw();
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
@@ -202,6 +214,7 @@ void QMainCanvas::handle_root_events()
 //______________________________________________________________________________
 void QMainCanvas::changeEvent(QEvent * e)
 {
+    //Handles regular stuff like minimizing and maximizing the window
    if (e->type() == QEvent ::WindowStateChange) {
       QWindowStateChangeEvent * event = static_cast< QWindowStateChangeEvent * >( e );
       if (( event->oldState() & Qt::WindowMaximized ) ||
