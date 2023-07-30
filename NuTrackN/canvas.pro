@@ -1,5 +1,3 @@
-TEMPLATE = app
-
 QT += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
@@ -9,6 +7,7 @@ win32 {
 CONFIG += qt warn_on thread
 
 INCLUDEPATH += $(ROOTSYS)/include
+
 win32:LIBS += -L$(ROOTSYS)/lib -llibCore -llibCint -llibRIO -llibNet \
         -llibHist -llibGraf -llibGraf3d -llibGpad -llibTree \
         -llibRint -llibPostscript -llibMatrix -llibPhysics \
@@ -20,5 +19,5 @@ else:LIBS += -L$(ROOTSYS)/lib -lCore -lRIO -lNet \
 
 HEADERS += canvas.h
 SOURCES += canvas.cxx main.cxx
-
+LIBS += -lVc
 

@@ -17,6 +17,7 @@
 #include <TTimer.h>
 #include "canvas.h"
 
+
 //------------------------------------------------------------------------------
 
 //______________________________________________________________________________
@@ -161,7 +162,8 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
 {
-   // Handle the "Draw Histogram" button clicked() event.
+
+    // Handle the "Draw Histogram" button clicked() event.
 
    static TH1F *h1f = 0;
 
@@ -193,6 +195,7 @@ void QMainCanvas::clicked1()
    while (file.read(reinterpret_cast<char*>(&value), sizeof(value))) {
        data.push_back(value);
    }
+
 
    //write the data into the histogram
    for(int i=0;i<data.size();i++)
