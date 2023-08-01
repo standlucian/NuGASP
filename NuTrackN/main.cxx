@@ -33,6 +33,7 @@
 #include "TPluginManager.h"
 #include "TVirtualGL.h"
 #include "TVirtualX.h"
+#include "Design.h"
 
 
 int main(int argc, char **argv)

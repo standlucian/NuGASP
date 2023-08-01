@@ -17,7 +17,7 @@ else:LIBS += -L$(ROOTSYS)/lib -lCore -lRIO -lNet \
         -lRint -lPostscript -lMatrix -lPhysics \
         -lGui
 
-HEADERS += canvas.h
-SOURCES += canvas.cxx main.cxx
+HEADERS += canvas.h Design.h
+SOURCES += canvas.cxx main.cxx Design.cxx
 LIBS += -lVc
 

@@ -4,6 +4,7 @@
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QMouseEvent>
+#include <QPainter>
 
 #include <stdlib.h>
 
@@ -16,6 +17,7 @@
 #include <TFrame.h>
 #include <TTimer.h>
 #include "canvas.h"
+#include "Design.h"
 
 
 //------------------------------------------------------------------------------
@@ -130,8 +132,11 @@ void QRootCanvas::resizeEvent( QResizeEvent *event )
 void QRootCanvas::paintEvent( QPaintEvent * )
 {
    // Handle paint events.
+    QPainter painter(this);
+        painter.fillRect(rect(), Qt::blue);
 
-    //Not sure what this does, I have checked the documentation but it is unclear to me
+
+        //Not sure what this does, I have checked the documentation but it is unclear to me
    if (fCanvas) {
       fCanvas->Resize();
       fCanvas->Update();
@@ -171,8 +176,9 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->Clear();
    canvas->getCanvas()->cd();
    canvas->getCanvas()->SetBorderMode(0);
-   canvas->getCanvas()->SetFillColor(0);
+   canvas->getCanvas()->SetFillColor(kBlue);
    canvas->getCanvas()->SetGrid();
+   changeBackgroundColor(canvas->getCanvas());
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
    if (h1f == 0) {

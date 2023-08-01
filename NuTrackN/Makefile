@@ -53,9 +53,11 @@ OBJECTS_DIR   = ./
 ####### Files
 
 SOURCES       = canvas.cxx \
-		main.cxx moc_canvas.cpp
+		main.cxx \
+		Design.cxx moc_canvas.cpp
 OBJECTS       = canvas.o \
 		main.o \
+		Design.o \
 		moc_canvas.o
 DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/unix.conf \
@@ -146,8 +148,10 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/exceptions.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/yacc.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/lex.prf \
-		canvas.pro canvas.h canvas.cxx \
-		main.cxx
+		canvas.pro canvas.h \
+		Design.h canvas.cxx \
+		main.cxx \
+		Design.cxx
 QMAKE_TARGET  = canvas
 DESTDIR       = 
 TARGET        = canvas
@@ -355,8 +359,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.h $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.cxx main.cxx $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.h Design.h $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.cxx main.cxx Design.cxx $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -392,6 +396,58 @@ compiler_moc_header_make_all: moc_canvas.cpp
 compiler_moc_header_clean:
 	-$(DEL_FILE) moc_canvas.cpp
 moc_canvas.cpp: canvas.h \
+		$(ROOTSYS)/include/TCanvas.h \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
+		$(ROOTSYS)/include/ROOT/RConfig.hxx \
+		../../../../root/include/RVersion.h \
+		$(ROOTSYS)/include/RConfigure.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
+		$(ROOTSYS)/include/ROOT/RSpan.hxx \
+		$(ROOTSYS)/include/ROOT/span.hxx \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
 	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/cristian/Desktop/GitREPOS/NuGASP/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/cristian/Desktop/GitREPOS/NuGASP/NuTrackN -I'/home/cristian/Desktop/GitREPOS/NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
@@ -671,12 +727,14 @@ canvas.o: canvas.cxx $(ROOTSYS)/include/TCanvas.h \
 		../../../../root/include/TBox.h \
 		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
-		canvas.h
+		canvas.h \
+		Design.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o canvas.o canvas.cxx
 
 main.o: main.cxx canvas.h \
-		$(ROOTSYS)/include/THttpServer.h \
-		../../../../root/include/TNamed.h \
+		$(ROOTSYS)/include/TCanvas.h \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
 		../../../../root/include/TObject.h \
 		../../../../root/include/Rtypes.h \
 		../../../../root/include/RtypesCore.h \
@@ -693,21 +751,40 @@ main.o: main.cxx canvas.h \
 		../../../../root/include/TVirtualIsAProxy.h \
 		../../../../root/include/TStorage.h \
 		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
 		../../../../root/include/TString.h \
 		../../../../root/include/TMathBase.h \
 		../../../../root/include/ROOT/RStringView.hxx \
 		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
 		../../../../root/include/ROOT/libcpp_string_view.h \
 		../../../../root/include/ROOT/TypeTraits.hxx \
-		../../../../root/include/TList.h \
-		../../../../root/include/TSeqCollection.h \
-		../../../../root/include/TCollection.h \
-		../../../../root/include/TIterator.h \
 		../../../../root/include/TVirtualRWMutex.h \
 		../../../../root/include/TVirtualMutex.h \
 		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
+		$(ROOTSYS)/include/THttpServer.h \
 		../../../../root/include/THttpCallArg.h \
 		$(ROOTSYS)/include/TH1F.h \
 		../../../../root/include/TH1.h \
@@ -715,8 +792,6 @@ main.o: main.cxx canvas.h \
 		../../../../root/include/TAttAxis.h \
 		../../../../root/include/TArrayD.h \
 		../../../../root/include/TArray.h \
-		../../../../root/include/TAttLine.h \
-		../../../../root/include/TAttFill.h \
 		../../../../root/include/TAttMarker.h \
 		../../../../root/include/TArrayC.h \
 		../../../../root/include/TArrayS.h \
@@ -731,24 +806,6 @@ main.o: main.cxx canvas.h \
 		../../../../root/include/TH2.h \
 		../../../../root/include/TMatrixFBasefwd.h \
 		../../../../root/include/TMatrixDBasefwd.h \
-		$(ROOTSYS)/include/TCanvas.h \
-		../../../../root/include/TPad.h \
-		../../../../root/include/TVirtualPad.h \
-		../../../../root/include/TAttPad.h \
-		../../../../root/include/TQObject.h \
-		../../../../root/include/TVirtualQConnection.h \
-		../../../../root/include/TInterpreter.h \
-		../../../../root/include/TDataType.h \
-		../../../../root/include/TDictionary.h \
-		../../../../root/include/ESTLType.h \
-		../../../../root/include/TInterpreterValue.h \
-		../../../../root/include/TQClass.h \
-		../../../../root/include/TClass.h \
-		../../../../root/include/TObjArray.h \
-		../../../../root/include/GuiTypes.h \
-		../../../../root/include/Buttons.h \
-		../../../../root/include/TAttBBox2D.h \
-		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TF1.h \
 		../../../../root/include/RConfigure.h \
 		../../../../root/include/TFormula.h \
@@ -947,8 +1004,73 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TPluginManager.h \
 		$(ROOTSYS)/include/TVirtualGL.h \
 		../../../../root/include/GLConstants.h \
-		$(ROOTSYS)/include/TVirtualX.h
+		$(ROOTSYS)/include/TVirtualX.h \
+		Design.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cxx
+
+Design.o: Design.cxx canvas.h \
+		$(ROOTSYS)/include/TCanvas.h \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
+		$(ROOTSYS)/include/ROOT/RConfig.hxx \
+		../../../../root/include/RVersion.h \
+		$(ROOTSYS)/include/RConfigure.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
+		$(ROOTSYS)/include/ROOT/RSpan.hxx \
+		$(ROOTSYS)/include/ROOT/span.hxx \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
+		Design.h \
+		$(ROOTSYS)/include/TStyle.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TAttText.h \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TColor.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArray.h \
+		$(ROOTSYS)/include/TColor.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o Design.o Design.cxx
 
 moc_canvas.o: moc_canvas.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_canvas.o moc_canvas.cpp

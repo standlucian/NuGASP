@@ -5,6 +5,7 @@
 #include <QWidget>
 #include <iostream>
 #include <fstream>
+#include <TCanvas.h>
 
 class QPaintEvent;
 class QResizeEvent;
