@@ -145,6 +145,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
+
+   h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
+
 }
 
 //______________________________________________________________________________
@@ -160,9 +163,7 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetGrid();
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
-   if (h1f == 0) {
-      h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
-   }
+
    h1f->Reset();
    //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
