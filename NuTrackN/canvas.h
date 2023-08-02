@@ -32,9 +32,6 @@ class QPushButton;
 class QTimer;
 class TCanvas;
 
-//The histogram which is declared globally so every function can access it
-TH1F *h1f = 0;
-
 class QRootCanvas : public QWidget
 {
    Q_OBJECT
@@ -62,6 +59,8 @@ public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
+   //The histogram which is declared globally so every function can access it
+   TH1F *h1f;
 
 public slots:
    void clicked1();
