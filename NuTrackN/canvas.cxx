@@ -33,6 +33,8 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    setMouseTracking(kTRUE);
    //Minimum size of the spectra
    setMinimumSize(300, 200);
+   int t=1;
+
 
    // register the QWidget in TVirtualX, giving its native window id
    int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
