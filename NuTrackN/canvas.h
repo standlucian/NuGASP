@@ -13,6 +13,8 @@
 #include <QPaintEvent>
 #include <QResizeEvent>
 #include <QMouseEvent>
+#include <QAction>
+#include <QKeySequence>
 
 #include <stdlib.h>
 
@@ -24,6 +26,12 @@
 #include <TH1.h>
 #include <TFrame.h>
 #include <TTimer.h>
+
+#include <QLabel>
+#include <QPicture>
+#include <QPainter>
+
+#include <vector>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -65,13 +73,16 @@ public:
 public slots:
    void clicked1();
    void areaFunction();
+   void areaFunctionWithBackground();
    void handle_root_events();
 
 protected:
+   //virtual void paintEvent(QPaintEvent *event);
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
 };
+
 
 #endif
 

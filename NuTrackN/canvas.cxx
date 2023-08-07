@@ -3,7 +3,7 @@
 #include "canvas.h"
 
 //------------------------------------------------------------------------------
-
+Double_t m=0,n=0;
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
 {
@@ -141,11 +141,15 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Integral No Background", this));
    //Same as the previous line of code, it executes the function areaFunction when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunction()));
+   //Same as the previous line of code, it adds a button to the window
+   l->addWidget(b = new QPushButton("&Integral With Background", this));
+   //Same as the previous line of code, it executes the function areaFunction when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
+   //Same as the previous line of code, it adds a button to the window
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
-
    h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
 
 }
@@ -198,10 +202,51 @@ void QMainCanvas::areaFunction()
    //The area variable is the integral itsel and the error of intragral is the error which is calculated
    Double_t error_of_integral = 0, area = integral_no_background(h1f,error_of_integral,300,400);
    //The integral and error are written in the terminal
-   std::cout<<"Integral:"<<area<<" Error"<<error_of_integral<<std::endl;
+   std::cout<<"Integral:"<<area<<" Error:"<<error_of_integral<<std::endl;
    
 }
 
+void QMainCanvas::areaFunctionWithBackground()
+{
+   std::vector<Double_t> backgroundMarkers;
+   backgroundMarkers.push_back(7000);
+   backgroundMarkers.push_back(7020);
+   backgroundMarkers.push_back(8080);
+   backgroundMarkers.push_back(9000);
+   if(backgroundMarkers.size()%2==1)
+   {
+       std::cout<<"Background markers must be in pairs\n";
+   }
+   else
+   {
+       //Here are declared some variables which will be used to call the function from integral.cxx
+       //The area variable is the integral itsel and the error of intragral is the error which is calculated
+       Double_t error_of_integral = 0, area = integral_background(h1f,error_of_integral,300,400,backgroundMarkers,m,n);
+       //The integral and error are written in the terminal
+       std::cout<<"Integral:"<<area<<" Reduced chi2:"<<error_of_integral<<std::endl;
+       static TH1F* line;
+       line = new TH1F("line","Line", 10240, 0, 10);
+       //update();
+       line->Reset();
+       //This sets the color of the spectrum
+       //line->setColorStyle(kYellow);
+       line->SetFillStyle(0);
+       for(int i=0;i<10240;i++)
+           line->AddBinContent(i,m*i+n);
+       line->Draw("same");
+       canvas->getCanvas()->Modified();
+       canvas->getCanvas()->Update();
+   }
+}
+/*
+void QMainCanvas::paintEvent(QPaintEvent *event)
+{
+    QPainter p(this);
+    p.setPen(QPen(Qt::red, 10, Qt::SolidLine, Qt::RoundCap));
+    p.drawLine(0, m*0+n, 10240, 10240*m+n);
+    p.end(); // Don't forget this line!
+}
+*/
 //______________________________________________________________________________
 void QMainCanvas::handle_root_events()
 {
