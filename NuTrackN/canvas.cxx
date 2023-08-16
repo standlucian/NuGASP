@@ -3,7 +3,8 @@
 #include "canvas.h"
 
 //------------------------------------------------------------------------------
-Double_t m=0,n=0;
+//These are some global variables for the integral function which are the parameters for the best fitted line of the background
+Double_t slope=0,addition=0;
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
 {
@@ -143,7 +144,7 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunction()));
    //Same as the previous line of code, it adds a button to the window
    l->addWidget(b = new QPushButton("&Integral With Background", this));
-   //Same as the previous line of code, it executes the function areaFunction when the button is clicked
+   //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
    //Same as the previous line of code, it adds a button to the window
    fRootTimer = new QTimer( this );
@@ -198,55 +199,36 @@ void QMainCanvas::clicked1()
 
 void QMainCanvas::areaFunction()
 {
-   //Here are declared some variables which will be used to call the function from integral.cxx
-   //The area variable is the integral itsel and the error of intragral is the error which is calculated
-   Double_t error_of_integral = 0, area = integral_no_background(h1f,error_of_integral,300,400);
-   //The integral and error are written in the terminal
-   std::cout<<"Integral:"<<area<<" Error:"<<error_of_integral<<std::endl;
-   
+   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
+   //If the background markers vector is empty we will just do a common integral with no background
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   //The vector is populated with 4 markers
+   integral_markers.push_back(300);
+   integral_markers.push_back(400);
+   integral_markers.push_back(500);
+   integral_markers.push_back(600);
+   //The integral function is called which will perform two integrals with no background since the background_markers vector is empty, in this case the best fitted line is y=0
+   integral_function(h1f,integral_markers,background_markers,slope,addition);
 }
 
 void QMainCanvas::areaFunctionWithBackground()
 {
-   std::vector<Double_t> backgroundMarkers;
-   backgroundMarkers.push_back(7000);
-   backgroundMarkers.push_back(7020);
-   backgroundMarkers.push_back(8080);
-   backgroundMarkers.push_back(9000);
-   if(backgroundMarkers.size()%2==1)
-   {
-       std::cout<<"Background markers must be in pairs\n";
-   }
-   else
-   {
-       //Here are declared some variables which will be used to call the function from integral.cxx
-       //The area variable is the integral itsel and the error of intragral is the error which is calculated
-       Double_t error_of_integral = 0, area = integral_background(h1f,error_of_integral,300,400,backgroundMarkers,m,n);
-       //The integral and error are written in the terminal
-       std::cout<<"Integral:"<<area<<" Reduced chi2:"<<error_of_integral<<std::endl;
-       static TH1F* line;
-       line = new TH1F("line","Line", 10240, 0, 10);
-       //update();
-       line->Reset();
-       //This sets the color of the spectrum
-       //line->setColorStyle(kYellow);
-       line->SetFillStyle(0);
-       for(int i=0;i<10240;i++)
-           line->AddBinContent(i,m*i+n);
-       line->Draw("same");
-       canvas->getCanvas()->Modified();
-       canvas->getCanvas()->Update();
-   }
+   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   //The vectors are populated acordingly
+   integral_markers.push_back(300);
+   integral_markers.push_back(400);
+   //The background markers are overlapping(used to test the function that checks for overlaps)
+   background_markers.push_back(7000);
+   background_markers.push_back(7020);
+   background_markers.push_back(7010);
+   background_markers.push_back(7030);
+   //The integral function is called which will perform a single integral with a background and will also reutrn the equation of the best fotted line y=slope*x+addition
+   integral_function(h1f,integral_markers,background_markers,slope,addition);
 }
-/*
-void QMainCanvas::paintEvent(QPaintEvent *event)
-{
-    QPainter p(this);
-    p.setPen(QPen(Qt::red, 10, Qt::SolidLine, Qt::RoundCap));
-    p.drawLine(0, m*0+n, 10240, 10240*m+n);
-    p.end(); // Don't forget this line!
-}
-*/
+
 //______________________________________________________________________________
 void QMainCanvas::handle_root_events()
 {
