@@ -1,24 +1,10 @@
-#include <QPushButton>
-#include <QLayout>
-#include <QTimer>
-#include <QPaintEvent>
-#include <QResizeEvent>
-#include <QMouseEvent>
 
-#include <stdlib.h>
 
-#include <TCanvas.h>
-#include <TVirtualX.h>
-#include <TSystem.h>
-#include <TFormula.h>
-#include <TF1.h>
-#include <TH1.h>
-#include <TFrame.h>
-#include <TTimer.h>
 #include "canvas.h"
 
 //------------------------------------------------------------------------------
-
+//These are some global variables for the integral function which are the parameters for the best fitted line of the background
+Double_t slope=0,addition=0;
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
 {
@@ -33,8 +19,6 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    setMouseTracking(kTRUE);
    //Minimum size of the spectra
    setMinimumSize(300, 200);
-   int t=1;
-
 
    // register the QWidget in TVirtualX, giving its native window id
    int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
@@ -154,18 +138,27 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Draw Histogram", this));
    //When the button is pressed, execute function clicked1
    connect(b, SIGNAL(clicked()), this, SLOT(clicked1()));
+   //Same as the previous line of code, it adds a button to the window
+   l->addWidget(b = new QPushButton("&Integral No Background", this));
+   //Same as the previous line of code, it executes the function areaFunction when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(areaFunction()));
+   //Same as the previous line of code, it adds a button to the window
+   l->addWidget(b = new QPushButton("&Integral With Background", this));
+   //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
+   //Same as the previous line of code, it adds a button to the window
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
+   h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
+
 }
 
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
 {
    // Handle the "Draw Histogram" button clicked() event.
-
-   static TH1F *h1f = 0;
 
    // Create a one dimensional histogram (one float per bin)
    canvas->getCanvas()->Clear();
@@ -175,9 +168,7 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetGrid();
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
-   if (h1f == 0) {
-      h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
-   }
+
    h1f->Reset();
    //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
@@ -204,6 +195,38 @@ void QMainCanvas::clicked1()
    h1f->Draw();
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::areaFunction()
+{
+   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
+   //If the background markers vector is empty we will just do a common integral with no background
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   //The vector is populated with 4 markers
+   integral_markers.push_back(300);
+   integral_markers.push_back(400);
+   integral_markers.push_back(500);
+   integral_markers.push_back(600);
+   //The integral function is called which will perform two integrals with no background since the background_markers vector is empty, in this case the best fitted line is y=0
+   integral_function(h1f,integral_markers,background_markers,slope,addition);
+}
+
+void QMainCanvas::areaFunctionWithBackground()
+{
+   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   //The vectors are populated acordingly
+   integral_markers.push_back(300);
+   integral_markers.push_back(400);
+   //The background markers are overlapping(used to test the function that checks for overlaps)
+   background_markers.push_back(7000);
+   background_markers.push_back(7020);
+   background_markers.push_back(7010);
+   background_markers.push_back(7030);
+   //The integral function is called which will perform a single integral with a background and will also reutrn the equation of the best fotted line y=slope*x+addition
+   integral_function(h1f,integral_markers,background_markers,slope,addition);
 }
 
 //______________________________________________________________________________
