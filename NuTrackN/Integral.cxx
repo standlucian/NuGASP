@@ -19,7 +19,7 @@ bool overlapping_markers(std::vector<Double_t> markers)
     std::vector<bool> vector_of_ocupation;
     vector_of_ocupation.resize(10240,false);
     //We go through all the markers and check the space between them
-    for(Int_t iterat=0;iterat<=markers.size();iterat+=2)
+    for(unsigned long int iterat=0;iterat<=markers.size();iterat+=2)
     {
         for(Double_t space_between_markers=markers[iterat];space_between_markers<=markers[iterat+1];++space_between_markers)
         {
@@ -49,7 +49,7 @@ void get_best_fitted_line(TH1F *histogram,std::vector<Double_t> background_marke
     //medium_value is the medium value of the line,observed value, expected value and reduced_chi2 are used to calculate the reduced chi2 which tells us how good is the line we chose
     Double_t x_medium=0,y_medium=0,number_of_variators=0,top_fraction=0,bottom_fraction=0,medium_value=0,observed_value,expected_value,reduced_chi2;
     //First we calculate the medium values for the x and y axis and also we calculate the number of points in between the markers
-    for(Int_t iterat=0;iterat<=background_markers.size();iterat+=2)
+    for(unsigned long int iterat=0;iterat<=background_markers.size();iterat+=2)
     {
         for(Double_t space_between_markers=background_markers[iterat];space_between_markers<=background_markers[iterat+1];++space_between_markers)
         {
@@ -62,7 +62,7 @@ void get_best_fitted_line(TH1F *histogram,std::vector<Double_t> background_marke
     x_medium/=number_of_variators;
     y_medium/=number_of_variators;
     //We calculate the top of the fraction and the bottom of the fraction that will give us the slope. The method is form a website which gives an example of calculating a slope
-    for(Int_t iterat=0;iterat<=background_markers.size();iterat+=2)
+    for(unsigned long int iterat=0;iterat<=background_markers.size();iterat+=2)
     {
         for(Double_t space_between_markers=background_markers[iterat];space_between_markers<=background_markers[iterat+1];++space_between_markers)
         {
@@ -74,7 +74,10 @@ void get_best_fitted_line(TH1F *histogram,std::vector<Double_t> background_marke
     slope=top_fraction/bottom_fraction;
     addition=y_medium-slope*x_medium;
     //Here we calculate the reduced chi2. We want the reduced chi2 to be around 1
-    for(Int_t iterat=0;iterat<=background_markers.size();iterat+=2)
+
+    reduced_chi2=0;
+
+    for(unsigned long int iterat=0;iterat<=background_markers.size();iterat+=2)
     {
         for(Double_t space_between_markers=background_markers[iterat];space_between_markers<=background_markers[iterat+1];++space_between_markers)
         {
@@ -138,7 +141,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
         if(integral_markers.size()%2==0)
         {
             //Then we get the markers by pairs and feed them in the function above that calculates the integral with no background
-            for(Int_t iterator1=0;iterator1<integral_markers.size();iterator1+=2)
+            for(unsigned long int iterator1=0;iterator1<integral_markers.size();iterator1+=2)
             {
                 area=integral_no_background(histogram,error,integral_markers[iterator1],integral_markers[iterator1+1]);
                 //We check if the two markers are ordered apropietly if they are not we switch them. This is done so our for function can go from lowest to highest.

@@ -54,10 +54,12 @@ OBJECTS_DIR   = ./
 
 SOURCES       = canvas.cxx \
 		main.cxx \
-		Integral.cxx moc_canvas.cpp
+		Integral.cxx \
+		tracknhistogram.cpp moc_canvas.cpp
 OBJECTS       = canvas.o \
 		main.o \
 		Integral.o \
+		tracknhistogram.o \
 		moc_canvas.o
 DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/unix.conf \
@@ -149,9 +151,11 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/yacc.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/lex.prf \
 		canvas.pro canvas.h \
-		Integral.h canvas.cxx \
+		Integral.h \
+		tracknhistogram.h canvas.cxx \
 		main.cxx \
-		Integral.cxx
+		Integral.cxx \
+		tracknhistogram.cpp
 QMAKE_TARGET  = canvas
 DESTDIR       = 
 TARGET        = canvas
@@ -359,8 +363,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.h Integral.h $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.cxx main.cxx Integral.cxx $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.h Integral.h tracknhistogram.h $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.cxx main.cxx Integral.cxx tracknhistogram.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -396,9 +400,8 @@ compiler_moc_header_make_all: moc_canvas.cpp
 compiler_moc_header_clean:
 	-$(DEL_FILE) moc_canvas.cpp
 moc_canvas.cpp: canvas.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../root_install/include/TH1.h \
+		tracknhistogram.h \
+		$(ROOTSYS)/include/TH1.h \
 		../../../root_install/include/TAxis.h \
 		../../../root_install/include/TNamed.h \
 		../../../root_install/include/TObject.h \
@@ -438,7 +441,9 @@ moc_canvas.cpp: canvas.h \
 		../../../root_install/include/TVectorFfwd.h \
 		../../../root_install/include/TVectorDfwd.h \
 		../../../root_install/include/TFitResultPtr.h \
-		$(ROOTSYS)/include/TH1.h \
+		Integral.h \
+		$(ROOTSYS)/include/TH1F.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
 		../../../root_install/include/TPad.h \
 		../../../root_install/include/TVirtualPad.h \
@@ -513,9 +518,8 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 ####### Compile
 
 canvas.o: canvas.cxx canvas.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../root_install/include/TH1.h \
+		tracknhistogram.h \
+		$(ROOTSYS)/include/TH1.h \
 		../../../root_install/include/TAxis.h \
 		../../../root_install/include/TNamed.h \
 		../../../root_install/include/TObject.h \
@@ -555,7 +559,9 @@ canvas.o: canvas.cxx canvas.h \
 		../../../root_install/include/TVectorFfwd.h \
 		../../../root_install/include/TVectorDfwd.h \
 		../../../root_install/include/TFitResultPtr.h \
-		$(ROOTSYS)/include/TH1.h \
+		Integral.h \
+		$(ROOTSYS)/include/TH1F.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
 		../../../root_install/include/TPad.h \
 		../../../root_install/include/TVirtualPad.h \
@@ -612,9 +618,8 @@ canvas.o: canvas.cxx canvas.h \
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o canvas.o canvas.cxx
 
 main.o: main.cxx canvas.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../root_install/include/TH1.h \
+		tracknhistogram.h \
+		$(ROOTSYS)/include/TH1.h \
 		../../../root_install/include/TAxis.h \
 		../../../root_install/include/TNamed.h \
 		../../../root_install/include/TObject.h \
@@ -654,7 +659,9 @@ main.o: main.cxx canvas.h \
 		../../../root_install/include/TVectorFfwd.h \
 		../../../root_install/include/TVectorDfwd.h \
 		../../../root_install/include/TFitResultPtr.h \
-		$(ROOTSYS)/include/TH1.h \
+		Integral.h \
+		$(ROOTSYS)/include/TH1F.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
 		../../../root_install/include/TPad.h \
 		../../../root_install/include/TVirtualPad.h \
@@ -772,6 +779,49 @@ Integral.o: Integral.cxx Integral.h \
 		../../../root_install/include/TFitResultPtr.h \
 		$(ROOTSYS)/include/TH1.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o Integral.o Integral.cxx
+
+tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
+		$(ROOTSYS)/include/TH1.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
+		$(ROOTSYS)/include/ROOT/RConfig.hxx \
+		../../../root_install/include/RVersion.h \
+		$(ROOTSYS)/include/RConfigure.h \
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tracknhistogram.o tracknhistogram.cpp
 
 moc_canvas.o: moc_canvas.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_canvas.o moc_canvas.cpp

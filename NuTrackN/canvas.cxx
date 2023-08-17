@@ -31,7 +31,7 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
    if (fCanvas) {
       if (e->buttons() & Qt::LeftButton) {
          fCanvas->HandleInput(kButton1Motion, e->x(), e->y());
-      } else if (e->buttons() & Qt::MidButton) {
+      } else if (e->buttons() & Qt::MiddleButton) {
          fCanvas->HandleInput(kButton2Motion, e->x(), e->y());
       } else if (e->buttons() & Qt::RightButton) {
          fCanvas->HandleInput(kButton3Motion, e->x(), e->y());
@@ -52,7 +52,7 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
          case Qt::LeftButton :
             fCanvas->HandleInput(kButton1Down, e->x(), e->y());
             break;
-         case Qt::MidButton :
+         case Qt::MiddleButton :
             fCanvas->HandleInput(kButton2Down, e->x(), e->y());
             break;
          case Qt::RightButton :
@@ -78,7 +78,7 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
          case Qt::LeftButton :
             fCanvas->HandleInput(kButton1Up, e->x(), e->y());
             break;
-         case Qt::MidButton :
+         case Qt::MiddleButton :
             fCanvas->HandleInput(kButton2Up, e->x(), e->y());
             break;
          case Qt::RightButton :
@@ -91,6 +91,18 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
             break;
       }
    }
+}
+
+//______________________________________________________________________________
+
+void QRootCanvas::keyPressEvent(QKeyEvent *event)
+{
+    printf("\nkey event in board: %i", event->key());
+}
+
+void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
+{
+    printf("\nkey event in board: %i", event->key());
 }
 
 //______________________________________________________________________________
@@ -146,8 +158,7 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
-   h1f = new TH1F("h1f","Test random numbers", 10240, 0, 10);
-
+   h1f = new TracknHistogram("h1f","Test random numbers", 10240, 0, 10);
 }
 
 //______________________________________________________________________________
@@ -183,7 +194,7 @@ void QMainCanvas::clicked1()
    }
 
    //write the data into the histogram
-   for(int i=0;i<data.size();i++)
+   for(unsigned long int i=0;i<data.size();i++)
        h1f->AddBinContent(i,data[i]);
 
    //Draws the spectrum and tells the canvas to update itself

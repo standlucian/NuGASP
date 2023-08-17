@@ -5,6 +5,7 @@
 #include <QWidget>
 #include <iostream>
 #include <fstream>
+#include <tracknhistogram.h>
 
 #include "Integral.h"
 #include <QPushButton>
@@ -23,7 +24,6 @@
 #include <TSystem.h>
 #include <TFormula.h>
 #include <TF1.h>
-#include <TH1.h>
 #include <TFrame.h>
 #include <TTimer.h>
 
@@ -55,6 +55,8 @@ protected:
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
    virtual void    mouseReleaseEvent( QMouseEvent *e );
+   virtual void    keyPressEvent(QKeyEvent *event);
+   virtual void    keyReleaseEvent(QKeyEvent *event);
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
 };
@@ -68,7 +70,7 @@ public:
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
    //The histogram which is declared globally so every function can access it
-   TH1F *h1f;
+   TracknHistogram *h1f;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
 
