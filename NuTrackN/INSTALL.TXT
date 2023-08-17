@@ -1,0 +1,8 @@
+Requires
+QT5
+Root
+
+Then, in terminal
+qmake
+make -j4
+./canvas
