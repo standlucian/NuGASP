@@ -1,10 +1,5 @@
-
-
 #include "canvas.h"
 
-//------------------------------------------------------------------------------
-//These are some global variables for the integral function which are the parameters for the best fitted line of the background
-Double_t slope=0,addition=0;
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
 {

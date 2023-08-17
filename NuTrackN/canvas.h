@@ -69,6 +69,8 @@ public:
    virtual void changeEvent(QEvent * e);
    //The histogram which is declared globally so every function can access it
    TH1F *h1f;
+   //These are some global variables for the integral function which are the parameters for the best fitted line of the background
+   Double_t slope=0,addition=0;
 
 public slots:
    void clicked1();
