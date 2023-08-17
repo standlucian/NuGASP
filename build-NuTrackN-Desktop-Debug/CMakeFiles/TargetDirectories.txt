@@ -1,4 +1,0 @@
-/home/lucian/Desktop/NuTrackN/build-NuTrackN-Desktop-Debug/CMakeFiles/NuTrackN.dir
-/home/lucian/Desktop/NuTrackN/build-NuTrackN-Desktop-Debug/CMakeFiles/edit_cache.dir
-/home/lucian/Desktop/NuTrackN/build-NuTrackN-Desktop-Debug/CMakeFiles/rebuild_cache.dir
-/home/lucian/Desktop/NuTrackN/build-NuTrackN-Desktop-Debug/CMakeFiles/NuTrackN_autogen.dir
