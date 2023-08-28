@@ -20,6 +20,8 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    // create the ROOT TCanvas, giving as argument the QWidget registered id
    fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
    TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
+
+   setFocusPolicy(Qt::StrongFocus);
 }
 
 //______________________________________________________________________________
@@ -76,6 +78,11 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
+            //If the left button is released AND the Ctrl key is pressed, call the autofit function (to be implemented)
+            if(controlKeyIsPressed)
+            {
+                emit autoFitRequested(e->x(),e->y());
+            }
             fCanvas->HandleInput(kButton1Up, e->x(), e->y());
             break;
          case Qt::MiddleButton :
@@ -97,12 +104,64 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
-    printf("\nkey event in board: %i", event->key());
+    //Checks if any of the top keys (C, M, Z) was pressed just before
+    if(cKeyWasPressed)
+    {
+        switch(event->key())
+        {
+            case Qt::Key_I:
+                //If I key is pressed after C, call integration without background
+                emit requestIntegrationNoBackground();
+                break;
+            case Qt::Key_J:
+                //If J key is pressed after C, call integration with background
+                emit requestIntegrationWithBackground();
+                break;
+            case Qt::Key_C:
+                //if the C key is pressed after C, do nothing
+                break;
+            default:
+                cKeyWasPressed=0;
+                std::cout<<"Pressing the C key has called but no valid command arrived after it"<<std::endl;
+                break;
+        }
+    }
+    else
+    {
+        //Looks at what key was pressed and does different things depending on what was pressed
+        switch(event->key())
+        {
+            case Qt::Key_Control:
+                //If control is pressed, mark that down to later check if the mouse is clicked at the same time
+                controlKeyIsPressed=1;
+                break;
+            case Qt::Key_C:
+                //if the C key is pressed, mark that down and prepare to execute a command
+                cKeyWasPressed=1;
+                break;
+            case Qt::Key_Return:
+                //Pentru Petre
+                break;
+            default:
+                QWidget::keyPressEvent(event);
+                break;
+        }
+    }
 }
 
 void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
 {
-    printf("\nkey event in board: %i", event->key());
+    //Looks at what key was released and does different things depending on what was released
+    switch(event->key())
+    {
+        case Qt::Key_Control:
+            //If control is released, mark that down so no check is done with the mouse
+            controlKeyIsPressed=0;
+            break;
+        default:
+            QWidget::keyReleaseEvent(event);
+            break;
+    }
 }
 
 //______________________________________________________________________________
@@ -153,12 +212,23 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Integral With Background", this));
    //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
-   //Same as the previous line of code, it adds a button to the window
+
+   //connects the keyboard command C+I to the areaFunction;
+   connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
+
+   //connects the keyboard command C+J to the areaFunction;
+   connect(canvas,SIGNAL(requestIntegrationWithBackground()), this, SLOT(areaFunctionWithBackground()));
+
+   //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
+   connect(canvas,SIGNAL(autoFitRequested(int, int)), this, SLOT(autoFit(int, int)));
+
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
    fRootTimer->start( 20 );
-   h1f = new TracknHistogram("h1f","Test random numbers", 10240, 0, 10);
+
+   //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
+   h1f = new TracknHistogram("h1f","Test random numbers", 10240, 0, 10240);
 }
 
 //______________________________________________________________________________
@@ -172,8 +242,6 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetBorderMode(0);
    canvas->getCanvas()->SetFillColor(0);
    canvas->getCanvas()->SetGrid();
-
-   //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
 
    h1f->Reset();
    //This sets the color of the spectrum
@@ -233,6 +301,53 @@ void QMainCanvas::areaFunctionWithBackground()
    background_markers.push_back(7030);
    //The integral function is called which will perform a single integral with a background and will also reutrn the equation of the best fotted line y=slope*x+addition
    integral_function(h1f,integral_markers,background_markers,slope,addition);
+}
+
+//______________________________________________________________________________
+
+void QMainCanvas::autoFit(int x, int y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX, binC, sum;
+    float xPos, yPos;
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+    std::cout<<objectInfo<<std::endl;
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    xPos=std::stof(temp);
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    yPos=std::stof(temp);
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Cut the next section, which is the value in the bin that was clicked
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binC=std::stoi(temp);
+
+    //Cut the next section, which represents the sum of all bins shown on the screen until the bin on which it was clicked
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(")");
+    temp=objectInfo.substr(from+1,to-from-1);
+    sum=std::stoi(temp);
 }
 
 //______________________________________________________________________________

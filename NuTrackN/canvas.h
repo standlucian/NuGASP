@@ -48,6 +48,8 @@ public:
    QRootCanvas( QWidget *parent = 0);
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
+   bool controlKeyIsPressed=0;
+   bool cKeyWasPressed=0;
 
 protected:
    TCanvas        *fCanvas;
@@ -59,6 +61,11 @@ protected:
    virtual void    keyReleaseEvent(QKeyEvent *event);
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
+
+signals:
+   void requestIntegrationNoBackground();
+   void requestIntegrationWithBackground();
+   void autoFitRequested(int, int);
 };
 
 class QMainCanvas : public QWidget
@@ -79,6 +86,7 @@ public slots:
    void areaFunction();
    void areaFunctionWithBackground();
    void handle_root_events();
+   void autoFit(int, int);
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);

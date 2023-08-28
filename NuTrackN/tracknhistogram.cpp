@@ -6,6 +6,11 @@ TracknHistogram::TracknHistogram(const char *name,const char *title,Int_t nbins,
 
 }
 
+void TracknHistogram::ExecuteEvent(Int_t event, Int_t px, Int_t py)
+{
+    TH1F::ExecuteEvent(event, px, py);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 /// Execute action corresponding to one event.
 ///
