@@ -5,9 +5,7 @@
 #include <QResizeEvent>
 #include <QMouseEvent>
 #include <QPainter>
-
 #include <stdlib.h>
-
 #include <TCanvas.h>
 #include <TVirtualX.h>
 #include <TSystem.h>
@@ -18,8 +16,6 @@
 #include <TTimer.h>
 #include "canvas.h"
 #include "Design.h"
-
-
 //------------------------------------------------------------------------------
 
 //______________________________________________________________________________
@@ -116,6 +112,7 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 }
 
 //______________________________________________________________________________
+
 void QRootCanvas::resizeEvent( QResizeEvent *event )
 {
    // Handle resize events.
@@ -129,6 +126,7 @@ void QRootCanvas::resizeEvent( QResizeEvent *event )
 }
 
 //______________________________________________________________________________
+
 void QRootCanvas::paintEvent( QPaintEvent * )
 {
    // Handle paint events.
@@ -146,6 +144,7 @@ void QRootCanvas::paintEvent( QPaintEvent * )
 //------------------------------------------------------------------------------
 
 //______________________________________________________________________________
+
 QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 {
    // QMainCanvas constructor.
@@ -178,7 +177,8 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetBorderMode(0);
    canvas->getCanvas()->SetFillColor(kBlue);
    canvas->getCanvas()->SetGrid();
-   changeBackgroundColor(canvas->getCanvas());
+
+   changeBackgroundColor(canvas->getCanvas());//this function adds a grid to the canvas, and changes the color to light gray
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
    if (h1f == 0) {
