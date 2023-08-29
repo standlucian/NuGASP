@@ -139,6 +139,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 //if the C key is pressed, mark that down and prepare to execute a command
                 cKeyWasPressed=1;
                 break;
+            case Qt::Key_Equal:
+                //if the = key is pressed, clear the screen of everything except the histogram
+                emit requestClearTheScreen();
+            break;
             case Qt::Key_Return:
                 //Pentru Petre
                 break;
@@ -222,6 +226,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
    connect(canvas,SIGNAL(autoFitRequested(int, int)), this, SLOT(autoFit(int, int)));
 
+   //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
+   connect(canvas,SIGNAL(requestClearTheScreen()), this, SLOT(clearTheScreen()));
+
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
    QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
@@ -262,8 +269,8 @@ void QMainCanvas::clicked1()
    }
 
    //write the data into the histogram
-   for(unsigned long int i=0;i<data.size();i++)
-       h1f->AddBinContent(i,data[i]);
+   for(unsigned long int i=1;i<=data.size();i++)
+       h1f->AddBinContent(i,data[i-1]);
 
    //Draws the spectrum and tells the canvas to update itself
    h1f->Draw();
@@ -309,11 +316,12 @@ void QMainCanvas::autoFit(int x, int y)
 {
     std::string objectInfo, temp;
     int from, to, binX, binC, sum;
-    float xPos, yPos;
+    Double_t xPos, yPos;
+    Double_t gaussianHeight, gaussianCenter, gaussianSigma, bkgSlope, bkg0, gaussianFWHM, gaussianCenterError, gaussianIntegral, gaussianIntegralError, gaussianFWHMError;
+    std::ostringstream tempStringStream;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
     objectInfo=h1f->GetObjectInfo(x,y);
-    std::cout<<objectInfo<<std::endl;
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -348,7 +356,151 @@ void QMainCanvas::autoFit(int x, int y)
     to=objectInfo.find(")");
     temp=objectInfo.substr(from+1,to-from-1);
     sum=std::stoi(temp);
+
+    //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
+    TFormula *gaussianWithBackground = new TFormula("gaussianWithBackground","[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
+    TF1 *gaussianWithBackgroundFunction = new TF1("gaussianWithBackgroundFunction","gaussianWithBackground",binX-20,binX+20);
+
+    //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
+    TFormula *background = new TFormula("background","[0]*x+[1]");
+    TF1 *backgroundFunction = new TF1("backgroundFunction","background",binX-20,binX+20);
+
+    TLatex *gaussianCenterMarkerText = new TLatex();
+
+    //Declaring the initial values for the 5 parameters to be fit
+    gaussianWithBackgroundFunction->SetParameter(0,binC);
+    gaussianWithBackgroundFunction->SetParameter(1,binX);
+    gaussianWithBackgroundFunction->SetParameter(2,4.);
+    gaussianWithBackgroundFunction->SetParameter(3,0.);
+    gaussianWithBackgroundFunction->SetParameter(4,findMinValueInInterval(binX-20,binX+20));
+
+    //Fitting the histogram with the Gaussian function with background and putting the results in a special format
+    //Fit options are Q - quiet; M - improved fitting; R-respect range from function
+    TFitResultPtr fitResult = h1f->Fit(gaussianWithBackgroundFunction,"QMRS", "same");
+
+    //Read the background parameters and feed them into the background function for use in finding the integral!
+    bkgSlope=gaussianWithBackgroundFunction->GetParameter(3);
+    bkg0=gaussianWithBackgroundFunction->GetParameter(4);
+    backgroundFunction->FixParameter(0,bkgSlope);
+    backgroundFunction->FixParameter(1,bkg0);
+
+    //Extract the Full Width Half Maximum (FWHM, related to the width of the Gaussian) and calculate the integral and integral error
+    gaussianSigma=gaussianWithBackgroundFunction->GetParameter(2);
+    gaussianFWHM=gaussianSigma*2.3548;
+    gaussianIntegral=gaussianWithBackgroundFunction->Integral(binX-20,binX+20)-backgroundFunction->Integral(binX-20,binX+20);
+    gaussianIntegralError=gaussianWithBackgroundFunction->IntegralError(binX-20,binX+20,fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
+
+    //If the FWHM is more than a sixth of the region we use for the autofit (41 bins), then redo the fitting in a region that is six times bigger than the FWHM
+    //Reobtain the FWHM, integral and integral error, because the region changed
+    if(gaussianFWHM>41./6)
+    {
+        gaussianWithBackgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
+        backgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
+
+        fitResult = h1f->Fit(gaussianWithBackgroundFunction,"QMRS", "");
+
+        gaussianSigma=gaussianWithBackgroundFunction->GetParameter(2);
+        gaussianFWHM=gaussianSigma*2.3548;
+        gaussianIntegral=gaussianWithBackgroundFunction->Integral(binX-gaussianFWHM*3,binX+gaussianFWHM*3)-backgroundFunction->Integral(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
+        gaussianIntegralError=gaussianWithBackgroundFunction->IntegralError(binX-gaussianFWHM*3,binX+gaussianFWHM*3,fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
+    }
+
+    //Obtain the Gaussian's maximum, center (with error), FWHM error
+    gaussianHeight=gaussianWithBackgroundFunction->GetParameter(0);
+    gaussianCenter=gaussianWithBackgroundFunction->GetParameter(1);
+    gaussianCenterError=gaussianWithBackgroundFunction->GetParError(1);
+    gaussianFWHMError=gaussianWithBackgroundFunction->GetParError(2)*2.3548;
+
+    //Create the text to be shown in screen showing the Gaussian center and add it to the list of objects to be later deleted
+    char buffer[8];
+    snprintf(buffer, sizeof buffer, "%f", gaussianCenter);
+    listOfObjectsDrawnOnScreen.Add(gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer));
+
+    //Draw the fitted function, so it remains on screen regardless of how many other fits are made
+    gaussianWithBackgroundFunction->Draw("same");
+
+    //A background function is made to show the subtracted background
+    backgroundFunction->SetLineColor(kBlue);
+    backgroundFunction->Draw("same");
+
+    //Updating the canvas, so all the changes appear
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Writing the obtained data on screen, in a fixed format, so everything aligns nicely
+    //First (fixed) row
+    std::cout<<std::left;
+    std::cout<<std::setw(10);
+    std::cout<<"Peak#";
+    std::cout<<std::setw(10);
+    std::cout<<"Channel";
+    std::cout<<std::setw(15);
+    std::cout<<"Energy";
+    std::cout<<std::setw(25);
+    std::cout<<"Area";
+    std::cout<<std::setw(10);
+    std::cout<<"Width"<<std::endl;
+
+    //Second row that contains variable numbers
+    std::cout<<std::setw(10);
+    std::cout<<"1";
+    std::cout<<std::setw(10);
+    std::cout << std::fixed;
+    std::cout<<std::setprecision(2)<<gaussianCenter;
+    std::cout<<std::setw(15);
+    tempStringStream<< std::fixed<<std::setprecision(2)<<gaussianCenter<<"("<<std::setprecision(0)<<ceil(gaussianCenterError*100)<<")";
+    temp=tempStringStream.str();
+    std::cout<<temp;
+    tempStringStream.str(std::string());
+    tempStringStream<< std::fixed<<std::setprecision(0)<<gaussianIntegral<<"("<<round(gaussianIntegralError)<<")";
+    temp=tempStringStream.str();
+    std::cout<<std::setw(25);
+    std::cout<<temp;
+    tempStringStream.str(std::string());
+    tempStringStream<< std::fixed<<std::setprecision(2)<<gaussianFWHM<<"("<<std::setprecision(0)<<ceil(gaussianFWHMError*100)<<")";
+    temp=tempStringStream.str();
+    std::cout<<std::setw(10);
+    std::cout<<temp<<std::endl;
+
+    //Make list of objects that have been drawn to delete them later
+    listOfObjectsDrawnOnScreen.Add(gaussianWithBackgroundFunction);
+    listOfObjectsDrawnOnScreen.Add(backgroundFunction);
 }
+
+//______________________________________________________________________________
+Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFinish)
+{
+    int minValueFound=h1f->GetBinContent(intervalStart);
+
+    for(int i=intervalStart+1; i<=intervalFinish; i++)
+    {
+        if(h1f->GetBinContent(i)<minValueFound)
+            minValueFound=h1f->GetBinContent(i);
+    }
+    return minValueFound;
+}
+
+//______________________________________________________________________________
+void QMainCanvas::clearTheScreen()
+{
+    //Get a list of all the functions on the histogram and delete all except the first (which is the histogram itself)
+
+    while(h1f->GetListOfFunctions()->GetSize()>1)
+    {
+        h1f->GetListOfFunctions()->RemoveLast();
+    }
+
+    //Get a list of all the functions drawn on screen and delete all of them!
+    while(listOfObjectsDrawnOnScreen.GetSize())
+    {
+         listOfObjectsDrawnOnScreen.Last()->Delete();
+         listOfObjectsDrawnOnScreen.RemoveLast();
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
 
 //______________________________________________________________________________
 void QMainCanvas::handle_root_events()

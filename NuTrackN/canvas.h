@@ -5,6 +5,10 @@
 #include <QWidget>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
+#include <stdlib.h>
+#include <sstream>
+#include <vector>
 #include <tracknhistogram.h>
 
 #include "Integral.h"
@@ -17,21 +21,20 @@
 #include <QAction>
 #include <QKeySequence>
 
-#include <stdlib.h>
-
 #include <TCanvas.h>
 #include <TVirtualX.h>
 #include <TSystem.h>
 #include <TFormula.h>
 #include <TF1.h>
+#include <TFormula.h>
 #include <TFrame.h>
 #include <TTimer.h>
+#include <TFitResult.h>
+#include <TLatex.h>
 
 #include <QLabel>
 #include <QPicture>
 #include <QPainter>
-
-#include <vector>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -48,6 +51,7 @@ public:
    QRootCanvas( QWidget *parent = 0);
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
+
    bool controlKeyIsPressed=0;
    bool cKeyWasPressed=0;
 
@@ -66,6 +70,7 @@ signals:
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void autoFitRequested(int, int);
+   void requestClearTheScreen();
 };
 
 class QMainCanvas : public QWidget
@@ -76,10 +81,13 @@ public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
+   Double_t findMinValueInInterval(int, int);
+
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
+
 
 public slots:
    void clicked1();
@@ -87,12 +95,14 @@ public slots:
    void areaFunctionWithBackground();
    void handle_root_events();
    void autoFit(int, int);
+   void clearTheScreen();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
+   TList listOfObjectsDrawnOnScreen;
 };
 
 
