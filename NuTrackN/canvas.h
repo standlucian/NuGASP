@@ -31,6 +31,7 @@
 #include <TTimer.h>
 #include <TFitResult.h>
 #include <TLatex.h>
+#include <TLine.h>
 
 #include <QLabel>
 #include <QPicture>
@@ -52,11 +53,9 @@ public:
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
 
-   bool controlKeyIsPressed=0;
-   bool cKeyWasPressed=0;
-
 protected:
    TCanvas        *fCanvas;
+   Int_t xMousePosition, yMousePosition;
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
@@ -66,11 +65,24 @@ protected:
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
 
+   bool controlKeyIsPressed=0;
+   bool cKeyWasPressed=0;
+   bool zKeyWasPressed=0;
+   bool mKeyWasPressed=0;
+
 signals:
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void autoFitRequested(int, int);
    void requestClearTheScreen();
+   void addBackgroundMarkerRequested(Int_t, Int_t);
+   void requestDeleteBackgroundMarkers();
+   void requestDeleteAllMarkers();
+   void requestShowBackgroundMarkers();
+   void requestShowAllMarkers();
+   void requestAddRangeMarker(Int_t, Int_t);
+   void requestDeleteRangeMarkers();
+   void requestShowRangeMarkers();
 };
 
 class QMainCanvas : public QWidget
@@ -96,6 +108,14 @@ public slots:
    void handle_root_events();
    void autoFit(int, int);
    void clearTheScreen();
+   void addBackgroundMarker(Int_t, Int_t);
+   void deleteBackgroundMarkers();
+   void deleteAllMarkers();
+   void showBackgroundMarkers();
+   void showAllMarkers();
+   void addRangeMarker(Int_t, Int_t);
+   void deleteRangeMarkers();
+   void showRangeMarkers();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -103,6 +123,10 @@ protected:
    QPushButton    *b;
    QTimer         *fRootTimer;
    TList listOfObjectsDrawnOnScreen;
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   std::vector<Double_t> range_markers;
+   Float_t maxValueInHistogram;
 };
 
 

@@ -39,6 +39,8 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
          fCanvas->HandleInput(kButton3Motion, e->x(), e->y());
       } else {
          fCanvas->HandleInput(kMouseMotion, e->x(), e->y());
+         xMousePosition=e->x();
+         yMousePosition=e->y();
       }
    }
 }
@@ -121,10 +123,60 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 //if the C key is pressed after C, do nothing
                 break;
             default:
-                cKeyWasPressed=0;
-                std::cout<<"Pressing the C key has called but no valid command arrived after it"<<std::endl;
+                std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
                 break;
         }
+        cKeyWasPressed=0;
+    }
+    else if(zKeyWasPressed)
+    {
+        switch(event->key())
+        {
+            case Qt::Key_B:
+                //If B key is pressed after Z, call delete background markers
+                emit requestDeleteBackgroundMarkers();
+                break;
+            case Qt::Key_R:
+                //If B key is pressed after Z, call delete background markers
+                emit requestDeleteRangeMarkers();
+                break;
+            case Qt::Key_A:
+                //If A key is pressed after Z, call delete all markers
+                emit requestDeleteAllMarkers();
+                break;
+            case Qt::Key_Z:
+                //if the Z key is pressed after Z, do nothing
+                break;
+            default:
+                std::cout<<"Waited for delete command after Z was pressed but no valid command arrived after it"<<std::endl;
+                break;
+        }
+        zKeyWasPressed=0;
+    }
+    else if(mKeyWasPressed)
+    {
+        switch(event->key())
+        {
+            case Qt::Key_B:
+                //If B key is pressed after M, call show background markers
+                emit requestShowBackgroundMarkers();
+                break;
+            case Qt::Key_R:
+                //If B key is pressed after Z, call delete background markers
+                emit requestShowRangeMarkers();
+                break;
+            case Qt::Key_A:
+                //If A key is pressed after M, call show all markers
+                emit requestShowAllMarkers();
+                break;
+            case Qt::Key_M:
+                //if the M key is pressed after M, do nothing
+                break;
+            default:
+                std::cout<<"Waited for show command after M was pressed but no valid command arrived after it"<<std::endl;
+                break;
+        }
+        mKeyWasPressed=0;
     }
     else
     {
@@ -138,6 +190,22 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_C:
                 //if the C key is pressed, mark that down and prepare to execute a command
                 cKeyWasPressed=1;
+                break;
+            case Qt::Key_Z:
+                //if the C key is pressed, mark that down and prepare to execute a command
+                zKeyWasPressed=1;
+                break;
+            case Qt::Key_M:
+                //if the C key is pressed, mark that down and prepare to execute a command
+                mKeyWasPressed=1;
+                break;
+            case Qt::Key_B:
+                //if the B key is pressed, add a background marker on screen and remember the background position
+                emit addBackgroundMarkerRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_R:
+                //if the R key is pressed, add a range marker on screen and remember the range position
+                emit requestAddRangeMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Equal:
                 //if the = key is pressed, clear the screen of everything except the histogram
@@ -226,8 +294,32 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
    connect(canvas,SIGNAL(autoFitRequested(int, int)), this, SLOT(autoFit(int, int)));
 
-   //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
+   //connects the keyboard command = to clearing the screen;
    connect(canvas,SIGNAL(requestClearTheScreen()), this, SLOT(clearTheScreen()));
+
+   //connects the keyboard command B to adding the background markers;
+   connect(canvas,SIGNAL(addBackgroundMarkerRequested(Int_t, Int_t)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
+
+   //connects the keyboard command Z+B to clearing the background markers;
+   connect(canvas,SIGNAL(requestDeleteBackgroundMarkers()), this, SLOT(deleteBackgroundMarkers()));
+
+   //connects the keyboard command Z+A to clearing all markers;
+   connect(canvas,SIGNAL(requestDeleteAllMarkers()), this, SLOT(deleteAllMarkers()));
+
+   //connects the keyboard command M+B to clearing the background markers;
+   connect(canvas,SIGNAL(requestShowBackgroundMarkers()), this, SLOT(showBackgroundMarkers()));
+
+   //connects the keyboard command M+A to clearing all markers;
+   connect(canvas,SIGNAL(requestShowAllMarkers()), this, SLOT(showAllMarkers()));
+
+   //connects the keyboard command R to adding a range marker;
+   connect(canvas,SIGNAL(requestAddRangeMarker(Int_t, Int_t)), this, SLOT(addRangeMarker(Int_t, Int_t)));
+
+   //connects the keyboard command Z+R to clearing the range markers;
+   connect(canvas,SIGNAL(requestDeleteRangeMarkers()), this, SLOT(deleteRangeMarkers()));
+
+   //connects the keyboard command M+R to clearing the range markers;
+   connect(canvas,SIGNAL(requestShowRangeMarkers()), this, SLOT(showRangeMarkers()));
 
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
@@ -272,6 +364,8 @@ void QMainCanvas::clicked1()
    for(unsigned long int i=1;i<=data.size();i++)
        h1f->AddBinContent(i,data[i-1]);
 
+   maxValueInHistogram=h1f->GetBinContent(h1f->GetMaximumBin());
+
    //Draws the spectrum and tells the canvas to update itself
    h1f->Draw();
    canvas->getCanvas()->Modified();
@@ -282,8 +376,7 @@ void QMainCanvas::areaFunction()
 {
    //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
    //If the background markers vector is empty we will just do a common integral with no background
-   std::vector<Double_t> integral_markers;
-   std::vector<Double_t> background_markers;
+
    //The vector is populated with 4 markers
    integral_markers.push_back(300);
    integral_markers.push_back(400);
@@ -296,8 +389,6 @@ void QMainCanvas::areaFunction()
 void QMainCanvas::areaFunctionWithBackground()
 {
    //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
-   std::vector<Double_t> integral_markers;
-   std::vector<Double_t> background_markers;
    //The vectors are populated acordingly
    integral_markers.push_back(300);
    integral_markers.push_back(400);
@@ -481,6 +572,48 @@ Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFini
 }
 
 //______________________________________________________________________________
+void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the background marker vector
+    background_markers.push_back(binX);
+
+    //Create a blue background line and add it to the screen
+    TLine *backgroundLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    backgroundLine->SetLineColor(kBlue);
+    backgroundLine->SetLineWidth(2);
+
+    backgroundLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(backgroundLine);
+}
+
+//______________________________________________________________________________
 void QMainCanvas::clearTheScreen()
 {
     //Get a list of all the functions on the histogram and delete all except the first (which is the histogram itself)
@@ -501,6 +634,108 @@ void QMainCanvas::clearTheScreen()
     canvas->getCanvas()->Update();
 }
 
+//______________________________________________________________________________
+void QMainCanvas::deleteBackgroundMarkers()
+{
+    background_markers.clear();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::deleteAllMarkers()
+{
+    deleteBackgroundMarkers();
+    deleteRangeMarkers();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::showBackgroundMarkers()
+{
+    for(uint i=0;i<background_markers.size();i++)
+    {
+        TLine *backgroundLine = new TLine(background_markers[i]-0.5, 0., background_markers[i]-0.5, maxValueInHistogram*1.05);
+        backgroundLine->SetLineColor(kBlue);
+        backgroundLine->SetLineWidth(2);
+
+        backgroundLine->Draw("same");
+
+        listOfObjectsDrawnOnScreen.Add(backgroundLine);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::showAllMarkers()
+{
+    showBackgroundMarkers();
+    showRangeMarkers();
+}
+
+void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the background marker vector
+    range_markers.push_back(binX);
+
+    //Create a blue background line and add it to the screen
+    TLine *rangeLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    rangeLine->SetLineColor(kYellow);
+    rangeLine->SetLineWidth(2);
+
+    rangeLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(rangeLine);
+}
+
+//______________________________________________________________________________
+void QMainCanvas::deleteRangeMarkers()
+{
+    range_markers.clear();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::showRangeMarkers()
+{
+    for(uint i=0;i<range_markers.size();i++)
+    {
+        TLine *rangeLine = new TLine(range_markers[i]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+        rangeLine->SetLineColor(kYellow);
+        rangeLine->SetLineWidth(2);
+
+        rangeLine->Draw("same");
+
+        listOfObjectsDrawnOnScreen.Add(rangeLine);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
 
 //______________________________________________________________________________
 void QMainCanvas::handle_root_events()
