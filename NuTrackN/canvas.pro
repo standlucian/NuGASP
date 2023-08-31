@@ -18,7 +18,9 @@ else:LIBS += -L$(ROOTSYS)/lib -lCore -lRIO -lNet \
         -lRint -lPostscript -lMatrix -lPhysics \
         -lGui
 
-HEADERS += canvas.h Integral.h
-SOURCES += canvas.cxx main.cxx Integral.cxx
+HEADERS += canvas.h Integral.h \
+    tracknhistogram.h
+SOURCES += canvas.cxx main.cxx Integral.cxx \
+    tracknhistogram.cpp
 
 
