@@ -32,6 +32,7 @@
 #include <TFitResult.h>
 #include <TLatex.h>
 #include <TLine.h>
+#include <TMatrixD.h>
 
 #include <QLabel>
 #include <QPicture>
@@ -83,6 +84,10 @@ signals:
    void requestAddRangeMarker(Int_t, Int_t);
    void requestDeleteRangeMarkers();
    void requestShowRangeMarkers();
+   void requestAddGaussMarker(Int_t, Int_t);
+   void requestDeleteGaussMarkers();
+   void requestShowGaussMarkers();
+   void requestFitGauss();
 };
 
 class QMainCanvas : public QWidget
@@ -116,9 +121,18 @@ public slots:
    void addRangeMarker(Int_t, Int_t);
    void deleteRangeMarkers();
    void showRangeMarkers();
+   void addGaussMarker(Int_t, Int_t);
+   void deleteGaussMarkers();
+   void showGaussMarkers();
+   void fitGauss();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
+   void checkBackgrounds();
+   bool checkRanges();
+   bool checkGauss();
+   void fitBackground();
+
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
@@ -126,7 +140,10 @@ protected:
    std::vector<Double_t> integral_markers;
    std::vector<Double_t> background_markers;
    std::vector<Double_t> range_markers;
+   std::vector<Double_t> gauss_markers;
    Float_t maxValueInHistogram;
+   double_t backgroundA0, backgroundA1;
+   TMatrixD *backgroundCovarianceMatrix;
 };
 
 

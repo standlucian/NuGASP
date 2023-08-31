@@ -119,6 +119,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 //If J key is pressed after C, call integration with background
                 emit requestIntegrationWithBackground();
                 break;
+            case Qt::Key_V:
+                //If V key is pressed after C, call fitting with Gaussian functions
+                emit requestFitGauss();
+                break;
             case Qt::Key_C:
                 //if the C key is pressed after C, do nothing
                 break;
@@ -139,6 +143,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_R:
                 //If B key is pressed after Z, call delete background markers
                 emit requestDeleteRangeMarkers();
+                break;
+            case Qt::Key_G:
+                //If B key is pressed after Z, call delete background markers
+                emit requestDeleteGaussMarkers();
                 break;
             case Qt::Key_A:
                 //If A key is pressed after Z, call delete all markers
@@ -164,6 +172,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_R:
                 //If B key is pressed after Z, call delete background markers
                 emit requestShowRangeMarkers();
+                break;
+            case Qt::Key_G:
+                //If B key is pressed after Z, call delete background markers
+                emit requestShowGaussMarkers();
                 break;
             case Qt::Key_A:
                 //If A key is pressed after M, call show all markers
@@ -206,6 +218,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_R:
                 //if the R key is pressed, add a range marker on screen and remember the range position
                 emit requestAddRangeMarker(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_G:
+                //if the G key is pressed, add a Gauss marker on screen and remember the Gauss position
+                emit requestAddGaussMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Equal:
                 //if the = key is pressed, clear the screen of everything except the histogram
@@ -320,6 +336,18 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 
    //connects the keyboard command M+R to clearing the range markers;
    connect(canvas,SIGNAL(requestShowRangeMarkers()), this, SLOT(showRangeMarkers()));
+
+   //connects the keyboard command G to adding a Gauss marker;
+   connect(canvas,SIGNAL(requestAddGaussMarker(Int_t, Int_t)), this, SLOT(addGaussMarker(Int_t, Int_t)));
+
+   //connects the keyboard command Z+G to clearing the Gauss markers;
+   connect(canvas,SIGNAL(requestDeleteGaussMarkers()), this, SLOT(deleteGaussMarkers()));
+
+   //connects the keyboard command M+G to clearing the Gauss markers;
+   connect(canvas,SIGNAL(requestShowGaussMarkers()), this, SLOT(showGaussMarkers()));
+
+   //connects the keyboard command C+V to fitting the Gauss Functions;
+   connect(canvas,SIGNAL(requestFitGauss()), this, SLOT(fitGauss()));
 
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
@@ -514,7 +542,7 @@ void QMainCanvas::autoFit(int x, int y)
     backgroundFunction->SetLineColor(kBlue);
     backgroundFunction->Draw("same");
 
-    //Updating the canvas, so all the changes appear
+    //Updating the canvas, so all the changes appearh1f->AddBinContent(i,data[i-1]);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
@@ -606,11 +634,31 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 
     backgroundLine->Draw("same");
 
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
-
     //Add the line to the list of things put on the screen, so it can be deleted
     listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+    if(background_markers.size()%2==0)
+    {
+        TLine *bottomBackgroundLine = new TLine(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, 0);
+        bottomBackgroundLine->SetLineColor(kBlue);
+        bottomBackgroundLine->SetLineWidth(2);
+
+        bottomBackgroundLine->Draw("same");
+
+        //Add the line to the list of things put on the screen, so it can be deleted
+        listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
+
+        TBox *backgroundArea = new TBox(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        backgroundArea->SetFillColor(kBlue);
+        backgroundArea->SetFillStyle(3545);
+        backgroundArea->Draw("same");
+
+        //Add the line to the list of things put on the screen, so it can be deleted
+        listOfObjectsDrawnOnScreen.Add(backgroundArea);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
 //______________________________________________________________________________
@@ -645,6 +693,7 @@ void QMainCanvas::deleteAllMarkers()
 {
     deleteBackgroundMarkers();
     deleteRangeMarkers();
+    deleteGaussMarkers();
 }
 
 //______________________________________________________________________________
@@ -659,6 +708,26 @@ void QMainCanvas::showBackgroundMarkers()
         backgroundLine->Draw("same");
 
         listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+        if(i%2)
+        {
+            TLine *bottomBackgroundLine = new TLine(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, 0);
+            bottomBackgroundLine->SetLineColor(kBlue);
+            bottomBackgroundLine->SetLineWidth(2);
+
+            bottomBackgroundLine->Draw("same");
+
+            //Add the line to the list of things put on the screen, so it can be deleted
+            listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
+
+            TBox *backgroundArea = new TBox(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, maxValueInHistogram*1.05);
+            backgroundArea->SetFillColor(kBlue);
+            backgroundArea->SetFillStyle(3545);
+            backgroundArea->Draw("same");
+
+            //Add the line to the list of things put on the screen, so it can be deleted
+            listOfObjectsDrawnOnScreen.Add(backgroundArea);
+        }
     }
 
     canvas->getCanvas()->Modified();
@@ -670,8 +739,10 @@ void QMainCanvas::showAllMarkers()
 {
     showBackgroundMarkers();
     showRangeMarkers();
+    showGaussMarkers();
 }
 
+//______________________________________________________________________________
 void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 {
     std::string objectInfo, temp;
@@ -706,11 +777,31 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 
     rangeLine->Draw("same");
 
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
-
     //Add the line to the list of things put on the screen, so it can be deleted
     listOfObjectsDrawnOnScreen.Add(rangeLine);
+
+    if(range_markers.size()%2==0)
+    {
+        TLine *bottomRangeLine = new TLine(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, 0);
+        bottomRangeLine->SetLineColor(kYellow);
+        bottomRangeLine->SetLineWidth(2);
+
+        bottomRangeLine->Draw("same");
+
+        //Add the line to the list of things put on the screen, so it can be deleted
+        listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
+
+        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        backgroundArea->SetFillColor(kYellow);
+        backgroundArea->SetFillStyle(3545);
+        backgroundArea->Draw("same");
+
+        //Add the line to the list of things put on the screen, so it can be deleted
+        listOfObjectsDrawnOnScreen.Add(backgroundArea);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
 //______________________________________________________________________________
@@ -731,7 +822,235 @@ void QMainCanvas::showRangeMarkers()
         rangeLine->Draw("same");
 
         listOfObjectsDrawnOnScreen.Add(rangeLine);
+
+        if(i%2)
+        {
+            TLine *bottomRangeLine = new TLine(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, 0);
+            bottomRangeLine->SetLineColor(kYellow);
+            bottomRangeLine->SetLineWidth(2);
+
+            bottomRangeLine->Draw("same");
+            //Add the line to the list of things put on the screen, so it can be deleted
+            listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
+
+            TBox *backgroundArea = new TBox(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+            backgroundArea->SetFillColor(kYellow);
+            backgroundArea->SetFillStyle(3545);
+            backgroundArea->Draw("same");
+
+            //Add the line to the list of things put on the screen, so it can be deleted
+            listOfObjectsDrawnOnScreen.Add(backgroundArea);
+        }
     }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the background marker vector
+    gauss_markers.push_back(binX);
+
+    //Create a blue background line and add it to the screen
+    TLine *gaussLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    gaussLine->SetLineColor(kPink);
+    gaussLine->SetLineWidth(2);
+
+    gaussLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(gaussLine);
+}
+
+//______________________________________________________________________________
+void QMainCanvas::deleteGaussMarkers()
+{
+    gauss_markers.clear();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::showGaussMarkers()
+{
+    for(uint i=0;i<gauss_markers.size();i++)
+    {
+        TLine *gaussLine = new TLine(gauss_markers[i]-0.5, 0., gauss_markers[i]-0.5, maxValueInHistogram*1.05);
+        gaussLine->SetLineColor(kPink);
+        gaussLine->SetLineWidth(2);
+
+        gaussLine->Draw("same");
+
+        listOfObjectsDrawnOnScreen.Add(gaussLine);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//______________________________________________________________________________
+void QMainCanvas::fitGauss()
+{
+    bool goodRanges, goodGauss;
+
+    checkBackgrounds();
+    goodRanges=checkRanges();
+    if(goodRanges)
+        goodGauss=checkGauss();
+
+    clearTheScreen();
+    showBackgroundMarkers();
+    showRangeMarkers();
+    showGaussMarkers();
+
+    if(goodRanges&&goodGauss)
+    {
+        fitBackground();
+    }
+}
+
+//______________________________________________________________________________
+void QMainCanvas::checkBackgrounds()
+{
+    if(background_markers.size())
+    {
+        if(background_markers.size()%2)
+        {
+            std::cout<<"There is an odd number of background markers, "<<background_markers.size()<<", so the last one, at "<<background_markers[background_markers.size()-1]<<", was removed"<<std::endl;
+            background_markers.pop_back();
+        }
+
+        if(overlapping_markers(background_markers))
+        {
+            std::cout<<"The background markers shown below produced regions which overlapped"<<std::endl;
+            for(int i=0;i<background_markers.size()/2;i++)
+            {
+                std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
+            }
+
+            std::cout<<"Thus, we have reordered them in order to produce non-overlapping regions, as seen below:"<<std::endl;
+            sort(background_markers.begin(),background_markers.end());
+
+            for(int i=0;i<background_markers.size()/2;i++)
+            {
+                std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
+            }
+        }
+
+        sort(background_markers.begin(),background_markers.end());
+    }
+}
+
+//______________________________________________________________________________
+bool QMainCanvas::checkRanges()
+{
+    if(range_markers.size()<2)
+    {
+        std::cout<<"There are fewer than 2 range markers added, namely "<<range_markers.size()<<", and the fitting procedure cannot run"<<std::endl;
+        return 0;
+    }
+    else if(range_markers.size()>2)
+    {
+        std::cout<<"There are more than 2 range markers added, namely "<<range_markers.size()<<". Only the first 2 markers will be used, namely "<<range_markers[0]<<"-"<<range_markers[1]<<std::endl;
+
+        for(uint i=2;i<=range_markers.size();i++)
+            range_markers.pop_back();
+        return 1;
+    }
+
+    sort(range_markers.begin(),range_markers.end());
+
+    return 1;
+}
+
+//______________________________________________________________________________
+bool QMainCanvas::checkGauss()
+{
+    for(int i=0;i<gauss_markers.size();i++)
+        if(gauss_markers[i]<range_markers[0]||gauss_markers[i]>range_markers[1])
+        {
+            std::cout<<"The peak center marker at "<<gauss_markers[i]<<" is not within the designated fit region "<<range_markers[0]<<"-"<<range_markers[1]<<" and has been removed"<<std::endl;
+            gauss_markers.erase(gauss_markers.begin()+i);
+            i--;
+        }
+
+    if(gauss_markers.size()==0)
+    {
+        std::cout<<"There are no valid markers for any peak centers to fit! The program will not run!"<<std::endl;
+        return 0;
+    }
+
+    return 1;
+}
+
+//______________________________________________________________________________
+void QMainCanvas::fitBackground()
+{
+    Double_t minimum=maxValueInHistogram, localMinimum;
+    TracknHistogram *tempHist = new TracknHistogram("tempHist","", 10240, 0, 10240);
+
+    for(uint i=0;i<background_markers.size()/2;i++)
+    {
+        for(uint j=background_markers[2*i];j<=background_markers[2*i+1];j++)
+            tempHist->AddBinContent(j,h1f->GetBinContent(j));
+
+        localMinimum=findMinValueInInterval(background_markers[2*i],background_markers[2*i+1]);
+
+        if(localMinimum<minimum)
+            minimum=localMinimum;
+    }
+
+    //Declaring a new formula which is a simple background, and making it a Root function. Define a range on which it is applied
+    TFormula *background = new TFormula("background","[0]*x+[1]");
+    TF1 *backgroundFunction = new TF1("backgroundFunction","background",0, 10240);
+
+    backgroundFunction->SetParameter(0,0.);
+    backgroundFunction->SetParameter(1,minimum);
+
+    TFitResultPtr fitResult = tempHist->Fit(backgroundFunction,"QMSW", "same");
+
+    backgroundA0=backgroundFunction->GetParameter(1);
+    backgroundA1=backgroundFunction->GetParameter(0);
+    TMatrixD tempMatrix=fitResult->GetCovarianceMatrix();
+
+    backgroundCovarianceMatrix=&tempMatrix;
+
+    std::cout<<backgroundCovarianceMatrix->GetNoElements()<<std::endl;
+
+    tempHist->Delete();
+
+    TLine *backgroundLine = new TLine(background_markers[0]-0.5, backgroundA1*(background_markers[0]-0.5)+backgroundA0, background_markers[background_markers.size()-1]-0.5, backgroundA1*(background_markers[background_markers.size()-1]-0.5)+backgroundA0);
+    backgroundLine->SetLineColor(kBlue);
+    backgroundLine->SetLineWidth(2);
+
+    backgroundLine->Draw("same");
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
