@@ -5,6 +5,10 @@
 #include <QWidget>
 #include <iostream>
 #include <fstream>
+#include <iomanip>
+#include <stdlib.h>
+#include <sstream>
+#include <vector>
 #include <tracknhistogram.h>
 
 #include "Integral.h"
@@ -17,21 +21,21 @@
 #include <QAction>
 #include <QKeySequence>
 
-#include <stdlib.h>
-
 #include <TCanvas.h>
 #include <TVirtualX.h>
 #include <TSystem.h>
 #include <TFormula.h>
 #include <TF1.h>
+#include <TFormula.h>
 #include <TFrame.h>
 #include <TTimer.h>
+#include <TFitResult.h>
+#include <TLatex.h>
+#include <TLine.h>
 
 #include <QLabel>
 #include <QPicture>
 #include <QPainter>
-
-#include <vector>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -51,6 +55,7 @@ public:
 
 protected:
    TCanvas        *fCanvas;
+   Int_t xMousePosition, yMousePosition;
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
@@ -59,6 +64,25 @@ protected:
    virtual void    keyReleaseEvent(QKeyEvent *event);
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
+
+   bool controlKeyIsPressed=0;
+   bool cKeyWasPressed=0;
+   bool zKeyWasPressed=0;
+   bool mKeyWasPressed=0;
+
+signals:
+   void requestIntegrationNoBackground();
+   void requestIntegrationWithBackground();
+   void autoFitRequested(int, int);
+   void requestClearTheScreen();
+   void addBackgroundMarkerRequested(Int_t, Int_t);
+   void requestDeleteBackgroundMarkers();
+   void requestDeleteAllMarkers();
+   void requestShowBackgroundMarkers();
+   void requestShowAllMarkers();
+   void requestAddRangeMarker(Int_t, Int_t);
+   void requestDeleteRangeMarkers();
+   void requestShowRangeMarkers();
 };
 
 class QMainCanvas : public QWidget
@@ -69,22 +93,40 @@ public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
+   Double_t findMinValueInInterval(int, int);
+
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
+
 
 public slots:
    void clicked1();
    void areaFunction();
    void areaFunctionWithBackground();
    void handle_root_events();
+   void autoFit(int, int);
+   void clearTheScreen();
+   void addBackgroundMarker(Int_t, Int_t);
+   void deleteBackgroundMarkers();
+   void deleteAllMarkers();
+   void showBackgroundMarkers();
+   void showAllMarkers();
+   void addRangeMarker(Int_t, Int_t);
+   void deleteRangeMarkers();
+   void showRangeMarkers();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
+   TList listOfObjectsDrawnOnScreen;
+   std::vector<Double_t> integral_markers;
+   std::vector<Double_t> background_markers;
+   std::vector<Double_t> range_markers;
+   Float_t maxValueInHistogram;
 };
 
 
