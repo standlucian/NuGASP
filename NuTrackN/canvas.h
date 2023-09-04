@@ -42,10 +42,7 @@ public:
 
 public slots:
    void clicked1();
-   void ClickedFindPeak();
    void handle_root_events();
-<<<<<<< Updated upstream
-=======
    void autoFit(int, int);
    void clearTheScreen();
    void addBackgroundMarker(Int_t, Int_t);
@@ -57,7 +54,6 @@ public slots:
    void deleteRangeMarkers();
    void showRangeMarkers();
    void ClickedFindPeak();
->>>>>>> Stashed changes
 
 protected:
    QRootCanvas    *canvas;
