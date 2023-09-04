@@ -273,7 +273,7 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Adds the canvas to the window
    l->addWidget(canvas = new QRootCanvas(this));
    //Adds the button to the window
-   l->addWidget(b = new QPushButton("&Draw Histogram", this));
+   l->addWidget(b = new QPushButton("&Select your file", this));
    //When the button is pressed, execute function clicked1
    connect(b, SIGNAL(clicked()), this, SLOT(clicked1()));
    //Same as the previous line of code, it adds a button to the window
@@ -333,7 +333,7 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
 {
-   // Handle the "Draw Histogram" button clicked() event.
+    // Handle the "Draw Histogram" button clicked() event.
 
    // Create a one dimensional histogram (one float per bin)
    canvas->getCanvas()->Clear();
@@ -346,9 +346,12 @@ void QMainCanvas::clicked1()
    //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
    h1f->SetFillStyle(3001);
-
-   //opens a fixed file from the folder
-   std::ifstream file("testSpectra", std::ios::in);
+   
+   // This opens a dialog to select a file for reading
+   QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
+   // Casts a QT string to C++ string
+   std::string SpectrumName = fileName.toStdString();
+   std::ifstream file(SpectrumName, std::ios::in);
    if (!file) {
       std::cerr << "Error: could not open file" << std::endl;
    }
