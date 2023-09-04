@@ -4,6 +4,9 @@
 
 #include <QWidget>
 #include <iostream>
+#include <QFileDialog>
+#include <QDataStream>
+#include <QFile>
 #include <fstream>
 #include <iomanip>
 #include <stdlib.h>
