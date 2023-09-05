@@ -53,9 +53,13 @@ OBJECTS_DIR   = ./
 ####### Files
 
 SOURCES       = canvas.cxx \
-		main.cxx moc_canvas.cpp
+		main.cxx \
+		Integral.cxx \
+		tracknhistogram.cpp moc_canvas.cpp
 OBJECTS       = canvas.o \
 		main.o \
+		Integral.o \
+		tracknhistogram.o \
 		moc_canvas.o
 DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/common/unix.conf \
@@ -140,8 +144,12 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/exceptions.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/yacc.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/lex.prf \
-		canvas.pro canvas.h canvas.cxx \
-		main.cxx
+		canvas.pro canvas.h \
+		Integral.h \
+		tracknhistogram.h canvas.cxx \
+		main.cxx \
+		Integral.cxx \
+		tracknhistogram.cpp
 QMAKE_TARGET  = canvas
 DESTDIR       = 
 TARGET        = canvas
@@ -337,8 +345,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.h $(DISTDIR)/
-	$(COPY_FILE) --parents canvas.cxx main.cxx $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.h Integral.h tracknhistogram.h $(DISTDIR)/
+	$(COPY_FILE) --parents canvas.cxx main.cxx Integral.cxx tracknhistogram.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -506,6 +514,94 @@ main.o: main.cxx canvas.h \
 		../../../root/root_build/root_install/include/GLConstants.h \
 		$(ROOTSYS)/include/TVirtualX.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cxx
+
+Integral.o: Integral.cxx Integral.h \
+		$(ROOTSYS)/include/TH1F.h \
+		../../../root/root_build/root_install/include/TH1.h \
+		../../../root/root_build/root_install/include/TAxis.h \
+		../../../root/root_build/root_install/include/TNamed.h \
+		../../../root/root_build/root_install/include/TObject.h \
+		../../../root/root_build/root_install/include/Rtypes.h \
+		../../../root/root_build/root_install/include/RtypesCore.h \
+		$(ROOTSYS)/include/ROOT/RConfig.hxx \
+		../../../root/root_build/root_install/include/RVersion.h \
+		$(ROOTSYS)/include/RConfigure.h \
+		../../../root/root_build/root_install/include/DllImport.h \
+		../../../root/root_build/root_install/include/strtok.h \
+		../../../root/root_build/root_install/include/strlcpy.h \
+		../../../root/root_build/root_install/include/snprintf.h \
+		../../../root/root_build/root_install/include/TGenericClassInfo.h \
+		../../../root/root_build/root_install/include/TSchemaHelper.h \
+		../../../root/root_build/root_install/include/TIsAProxy.h \
+		../../../root/root_build/root_install/include/TVirtualIsAProxy.h \
+		../../../root/root_build/root_install/include/TStorage.h \
+		../../../root/root_build/root_install/include/TVersionCheck.h \
+		../../../root/root_build/root_install/include/TString.h \
+		../../../root/root_build/root_install/include/TMathBase.h \
+		../../../root/root_build/root_install/include/ROOT/RStringView.hxx \
+		../../../root/root_build/root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root/root_build/root_install/include/ROOT/libcpp_string_view.h \
+		../../../root/root_build/root_install/include/ROOT/TypeTraits.hxx \
+		../../../root/root_build/root_install/include/TAttAxis.h \
+		../../../root/root_build/root_install/include/TArrayD.h \
+		../../../root/root_build/root_install/include/TArray.h \
+		../../../root/root_build/root_install/include/TAttLine.h \
+		../../../root/root_build/root_install/include/TAttFill.h \
+		../../../root/root_build/root_install/include/TAttMarker.h \
+		../../../root/root_build/root_install/include/TArrayC.h \
+		../../../root/root_build/root_install/include/TArrayS.h \
+		../../../root/root_build/root_install/include/TArrayI.h \
+		../../../root/root_build/root_install/include/TArrayF.h \
+		../../../root/root_build/root_install/include/Foption.h \
+		../../../root/root_build/root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root/root_build/root_install/include/TVectorFfwd.h \
+		../../../root/root_build/root_install/include/TVectorDfwd.h \
+		../../../root/root_build/root_install/include/TFitResultPtr.h \
+		$(ROOTSYS)/include/TH1.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o Integral.o Integral.cxx
+
+tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
+		$(ROOTSYS)/include/TH1.h \
+		../../../root/root_build/root_install/include/TAxis.h \
+		../../../root/root_build/root_install/include/TNamed.h \
+		../../../root/root_build/root_install/include/TObject.h \
+		../../../root/root_build/root_install/include/Rtypes.h \
+		../../../root/root_build/root_install/include/RtypesCore.h \
+		$(ROOTSYS)/include/ROOT/RConfig.hxx \
+		../../../root/root_build/root_install/include/RVersion.h \
+		$(ROOTSYS)/include/RConfigure.h \
+		../../../root/root_build/root_install/include/DllImport.h \
+		../../../root/root_build/root_install/include/strtok.h \
+		../../../root/root_build/root_install/include/strlcpy.h \
+		../../../root/root_build/root_install/include/snprintf.h \
+		../../../root/root_build/root_install/include/TGenericClassInfo.h \
+		../../../root/root_build/root_install/include/TSchemaHelper.h \
+		../../../root/root_build/root_install/include/TIsAProxy.h \
+		../../../root/root_build/root_install/include/TVirtualIsAProxy.h \
+		../../../root/root_build/root_install/include/TStorage.h \
+		../../../root/root_build/root_install/include/TVersionCheck.h \
+		../../../root/root_build/root_install/include/TString.h \
+		../../../root/root_build/root_install/include/TMathBase.h \
+		../../../root/root_build/root_install/include/ROOT/RStringView.hxx \
+		../../../root/root_build/root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root/root_build/root_install/include/ROOT/libcpp_string_view.h \
+		../../../root/root_build/root_install/include/ROOT/TypeTraits.hxx \
+		../../../root/root_build/root_install/include/TAttAxis.h \
+		../../../root/root_build/root_install/include/TArrayD.h \
+		../../../root/root_build/root_install/include/TArray.h \
+		../../../root/root_build/root_install/include/TAttLine.h \
+		../../../root/root_build/root_install/include/TAttFill.h \
+		../../../root/root_build/root_install/include/TAttMarker.h \
+		../../../root/root_build/root_install/include/TArrayC.h \
+		../../../root/root_build/root_install/include/TArrayS.h \
+		../../../root/root_build/root_install/include/TArrayI.h \
+		../../../root/root_build/root_install/include/TArrayF.h \
+		../../../root/root_build/root_install/include/Foption.h \
+		../../../root/root_build/root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root/root_build/root_install/include/TVectorFfwd.h \
+		../../../root/root_build/root_install/include/TVectorDfwd.h \
+		../../../root/root_build/root_install/include/TFitResultPtr.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tracknhistogram.o tracknhistogram.cpp
 
 moc_canvas.o: moc_canvas.cpp 
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o moc_canvas.o moc_canvas.cpp
