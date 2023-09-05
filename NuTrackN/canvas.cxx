@@ -285,9 +285,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
    //Adds the button "Find peak by energy" to the window
-   l->addWidget(FindPeak = new QPushButton("&Find Peak", this));
+   l->addWidget(b = new QPushButton("&Find Peak", this));
    //When the button is pressed, execute function clicked
-   connect(FindPeak, SIGNAL(clicked()), this, SLOT(FindPeakFunction()));
+   connect(b, SIGNAL(clicked()), this, SLOT(FindPeakFunction()));
 
    //connects the keyboard command C+I to the areaFunction;
    connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));

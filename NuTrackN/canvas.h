@@ -53,12 +53,11 @@ public slots:
    void addRangeMarker(Int_t, Int_t);
    void deleteRangeMarkers();
    void showRangeMarkers();
-   void ClickedFindPeak();
+   void FindPeakFunction();
 
 protected:
    QRootCanvas    *canvas;
    QPushButton    *b;
-   QPushButton    *FindPeak;
    QTimer         *fRootTimer;
 };
 
