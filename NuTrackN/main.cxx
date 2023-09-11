@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 
     m.resize(m.sizeHint());
     //Sets the title of the application window
-    m.setWindowTitle("Qt Example - 2Canvas");
+    m.setWindowTitle("Qt Example - Canvas");
     //Sets the initial position of the application on the screen
     m.setGeometry( 100, 100, 699, 499 );
     m.show();

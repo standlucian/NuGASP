@@ -35,6 +35,7 @@
 #include <TLatex.h>
 #include <TLine.h>
 #include <TMatrixD.h>
+#include <TLine.h>
 
 #include <QLabel>
 #include <QPicture>

@@ -744,32 +744,50 @@ void QMainCanvas::showRangeMarkers()
 //_______________________________________________________________________________
 void QMainCanvas::FindPeakFunction()
 {
-    double inputEnergy;
-    int numBinsX = h1f->GetXaxis()->GetNbins();
-        int nearestBin = -1;
-        double minDistance = DBL_MAX;
+    double energy;
+    std::cout << "Input Energy: ";
+    std::cin>>energy;
+    int closestBin = -1;
+    double BinValue = -1.0;
 
-        // Find the bin with the nearest energy to the input energy
-        for (int bin = 1; bin <= numBinsX; ++bin)
-        {
-            double binCenter = h1f->GetXaxis()->GetBinCenter(bin);
-            double distance = fabs(binCenter - inputEnergy);
+    //This loop iterates through each bin in the histogram h1f. Here, we compare the center value of the current bin (binCenter), which is the x-coordinate, with the entered energy.
+    for (int bin = 1; bin <= h1f->GetNbinsX(); bin++) {
+          double binCenter = h1f->GetBinCenter(bin);
+          if (closestBin == -1 || std::abs(binCenter - energy) < std::abs(BinValue - energy)) {
+              closestBin = bin;
+              BinValue = binCenter;
+          }
+      }
 
-            if (distance < minDistance)
-            {
-                minDistance = distance;
-                nearestBin = bin;
-            }
-        }
 
-        double nearestBinCenter = h1f->GetXaxis()->GetBinCenter(nearestBin);
-        double nearestBinContent = h1f->GetBinContent(nearestBin);
+      // Checking if the bin is in our histogram
+      if (closestBin != -1)
+      {
+          // Get the y-axis value (bin content) of the closest bin
+          double closestBinContent = h1f->GetBinContent(closestBin);
 
-        // Print the results
-        std::cout << "Input Energy: " << inputEnergy << std::endl;
-        std::cout << "Nearest Bin Center: " << nearestBinCenter << " (Bin " << nearestBin << ")" << std::endl;
-        std::cout << "Nearest Bin Content: " << nearestBinContent << std::endl;
+          // Create a vertical line for the entered energy
+          TLine *line = new TLine(BinValue+0.5, 0.0, BinValue+0.5, h1f->GetBinContent(closestBin));
+          line->SetLineColor(kRed);
 
+          // Calculate the range for zooming
+          double zoomWidth = 10.0;
+          double xMin = BinValue - zoomWidth / 2.0;
+          double xMax = BinValue + zoomWidth / 2.0;
+
+          h1f->GetXaxis()->SetRangeUser(xMin, xMax);
+          h1f->GetYaxis()->SetRangeUser(0, closestBinContent+3.0);
+
+          // Adding the marker over the histogram
+          line->Draw("same");
+
+          canvas->getCanvas()->Modified();
+          canvas->getCanvas()->Update();
+      }
+
+      else {
+          std::cout << "The selected energy is not included in this histogram." << std::endl;
+      }
 }
 
 //______________________________________________________________________________
