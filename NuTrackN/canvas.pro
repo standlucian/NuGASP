@@ -12,11 +12,11 @@ INCLUDEPATH += $(ROOTSYS)/include
 win32:LIBS += -L$(ROOTSYS)/lib -llibCore -llibCint -llibRIO -llibNet \
         -llibHist -llibGraf -llibGraf3d -llibGpad -llibTree \
         -llibRint -llibPostscript -llibMatrix -llibPhysics \
-        -llibGui -llibRGL 
+        -llibGui -llibRGL -llibMathCore
 else:LIBS += -L$(ROOTSYS)/lib -lCore -lRIO -lNet \
         -lHist -lGraf -lGraf3d -lGpad -lTree \
         -lRint -lPostscript -lMatrix -lPhysics \
-        -lGui
+        -lGui -lMathCore
 
 HEADERS += canvas.h Integral.h \
     tracknhistogram.h

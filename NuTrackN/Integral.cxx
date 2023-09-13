@@ -21,7 +21,7 @@ bool overlapping_markers(std::vector<Double_t> markers)
     //We go through all the markers and check the space between them
     for(unsigned long int iterat=0;iterat<=markers.size();iterat+=2)
     {
-        for(Double_t space_between_markers=markers[iterat];space_between_markers<=markers[iterat+1];++space_between_markers)
+        for(Double_t space_between_markers=markers[iterat];space_between_markers<markers[iterat+1];++space_between_markers)
         {
             //We look if the space we are on right now has already been filled if it has we have an overlap and return true if not we fill it
             if(vector_of_ocupation[space_between_markers]==true)

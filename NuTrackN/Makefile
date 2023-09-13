@@ -37,10 +37,10 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = canvas1.0.0
-DISTDIR = /home/tucan/Documents/GitHub/NuGASP/NuTrackN/.tmp/canvas1.0.0
+DISTDIR = /home/lucian/Desktop/NuGASP/NuTrackN/.tmp/canvas1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1
-LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
+LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lMathCore -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
 AR            = ar cqs
 RANLIB        = 
 SED           = sed
@@ -402,120 +402,129 @@ compiler_moc_header_clean:
 moc_canvas.cpp: canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../../root/root-6.28.04-install/include/TAxis.h \
-		../../../../root/root-6.28.04-install/include/TNamed.h \
-		../../../../root/root-6.28.04-install/include/TObject.h \
-		../../../../root/root-6.28.04-install/include/Rtypes.h \
-		../../../../root/root-6.28.04-install/include/RtypesCore.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../../root/root-6.28.04-install/include/RVersion.h \
+		../../../root_install/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/strtok.h \
-		../../../../root/root-6.28.04-install/include/strlcpy.h \
-		../../../../root/root-6.28.04-install/include/snprintf.h \
-		../../../../root/root-6.28.04-install/include/TGenericClassInfo.h \
-		../../../../root/root-6.28.04-install/include/TSchemaHelper.h \
-		../../../../root/root-6.28.04-install/include/TIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TVirtualIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TStorage.h \
-		../../../../root/root-6.28.04-install/include/TVersionCheck.h \
-		../../../../root/root-6.28.04-install/include/TString.h \
-		../../../../root/root-6.28.04-install/include/TMathBase.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RStringView.hxx \
-		../../../../root/root-6.28.04-install/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/TypeTraits.hxx \
-		../../../../root/root-6.28.04-install/include/TAttAxis.h \
-		../../../../root/root-6.28.04-install/include/TArrayD.h \
-		../../../../root/root-6.28.04-install/include/TArray.h \
-		../../../../root/root-6.28.04-install/include/TAttLine.h \
-		../../../../root/root-6.28.04-install/include/TAttFill.h \
-		../../../../root/root-6.28.04-install/include/TAttMarker.h \
-		../../../../root/root-6.28.04-install/include/TArrayC.h \
-		../../../../root/root-6.28.04-install/include/TArrayS.h \
-		../../../../root/root-6.28.04-install/include/TArrayI.h \
-		../../../../root/root-6.28.04-install/include/TArrayF.h \
-		../../../../root/root-6.28.04-install/include/Foption.h \
-		../../../../root/root-6.28.04-install/include/ROOT/EExecutionPolicy.hxx \
-		../../../../root/root-6.28.04-install/include/TVectorFfwd.h \
-		../../../../root/root-6.28.04-install/include/TVectorDfwd.h \
-		../../../../root/root-6.28.04-install/include/TFitResultPtr.h \
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../../root/root-6.28.04-install/include/TH1.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../../root/root-6.28.04-install/include/TPad.h \
-		../../../../root/root-6.28.04-install/include/TVirtualPad.h \
-		../../../../root/root-6.28.04-install/include/TAttPad.h \
-		../../../../root/root-6.28.04-install/include/TQObject.h \
-		../../../../root/root-6.28.04-install/include/TList.h \
-		../../../../root/root-6.28.04-install/include/TSeqCollection.h \
-		../../../../root/root-6.28.04-install/include/TCollection.h \
-		../../../../root/root-6.28.04-install/include/TIterator.h \
-		../../../../root/root-6.28.04-install/include/TVirtualRWMutex.h \
-		../../../../root/root-6.28.04-install/include/TVirtualMutex.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RRangeCast.hxx \
+		../../../root_install/include/TPad.h \
+		../../../root_install/include/TVirtualPad.h \
+		../../../root_install/include/TAttPad.h \
+		../../../root_install/include/TQObject.h \
+		../../../root_install/include/TList.h \
+		../../../root_install/include/TSeqCollection.h \
+		../../../root_install/include/TCollection.h \
+		../../../root_install/include/TIterator.h \
+		../../../root_install/include/TVirtualRWMutex.h \
+		../../../root_install/include/TVirtualMutex.h \
+		../../../root_install/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../../root/root-6.28.04-install/include/TVirtualQConnection.h \
-		../../../../root/root-6.28.04-install/include/TInterpreter.h \
-		../../../../root/root-6.28.04-install/include/TDataType.h \
-		../../../../root/root-6.28.04-install/include/TDictionary.h \
-		../../../../root/root-6.28.04-install/include/ESTLType.h \
-		../../../../root/root-6.28.04-install/include/TInterpreterValue.h \
-		../../../../root/root-6.28.04-install/include/TQClass.h \
-		../../../../root/root-6.28.04-install/include/TClass.h \
-		../../../../root/root-6.28.04-install/include/TObjArray.h \
-		../../../../root/root-6.28.04-install/include/GuiTypes.h \
-		../../../../root/root-6.28.04-install/include/Buttons.h \
-		../../../../root/root-6.28.04-install/include/TAttBBox2D.h \
-		../../../../root/root-6.28.04-install/include/TAttCanvas.h \
+		../../../root_install/include/TVirtualQConnection.h \
+		../../../root_install/include/TInterpreter.h \
+		../../../root_install/include/TDataType.h \
+		../../../root_install/include/TDictionary.h \
+		../../../root_install/include/ESTLType.h \
+		../../../root_install/include/TInterpreterValue.h \
+		../../../root_install/include/TQClass.h \
+		../../../root_install/include/TClass.h \
+		../../../root_install/include/TObjArray.h \
+		../../../root_install/include/GuiTypes.h \
+		../../../root_install/include/Buttons.h \
+		../../../root_install/include/TAttBBox2D.h \
+		../../../root_install/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../../root/root-6.28.04-install/include/TAttText.h \
+		../../../root_install/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../../root/root-6.28.04-install/include/TInetAddress.h \
-		../../../../root/root-6.28.04-install/include/TTimer.h \
-		../../../../root/root-6.28.04-install/include/TSysEvtHandler.h \
-		../../../../root/root-6.28.04-install/include/TTime.h \
+		../../../root_install/include/TInetAddress.h \
+		../../../root_install/include/TTimer.h \
+		../../../root_install/include/TSysEvtHandler.h \
+		../../../root_install/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TBits.h \
+		../../../root_install/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../../root/root-6.28.04-install/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TMethodCall.h \
-		../../../../root/root-6.28.04-install/include/TF1AbsComposition.h \
-		../../../../root/root-6.28.04-install/include/TMath.h \
-		../../../../root/root-6.28.04-install/include/TError.h \
+		../../../root_install/include/RConfigure.h \
+		../../../root_install/include/TFormula.h \
+		../../../root_install/include/TMethodCall.h \
+		../../../root_install/include/TF1AbsComposition.h \
+		../../../root_install/include/TMath.h \
+		../../../root_install/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/Math/Types.h \
-		../../../../root/root-6.28.04-install/include/Math/ParamFunctor.h \
+		../../../root_install/include/Math/Types.h \
+		../../../root_install/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../../root/root-6.28.04-install/include/TWbox.h \
-		../../../../root/root-6.28.04-install/include/TBox.h \
-		../../../../root/root-6.28.04-install/include/TColor.h \
+		../../../root_install/include/TWbox.h \
+		../../../root_install/include/TBox.h \
+		../../../root_install/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../../root/root-6.28.04-install/include/Fit/FitResult.h \
+		../../../root_install/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTBase.h \
-		../../../../root/root-6.28.04-install/include/TMatrixFBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSymfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtilsfwd.h \
+		../../../root_install/include/TMatrixDSym.h \
+		../../../root_install/include/TMatrixTSym.h \
+		../../../root_install/include/TMatrixTBase.h \
+		../../../root_install/include/TMatrixFBasefwd.h \
+		../../../root_install/include/TMatrixDBasefwd.h \
+		../../../root_install/include/TMatrixTUtils.h \
+		../../../root_install/include/TMatrixDSymfwd.h \
+		../../../root_install/include/TMatrixDUtils.h \
+		../../../root_install/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../../root/root-6.28.04-install/include/TText.h \
+		../../../root_install/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../root_install/include/TMatrixT.h \
+		../../../root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
-	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/tucan/Documents/GitHub/NuGASP/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/tucan/Documents/GitHub/NuGASP/NuTrackN -I'/home/tucan/Documents/GitHub/NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/lucian/Desktop/NuGASP/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/lucian/Desktop/NuGASP/NuTrackN -I'/home/lucian/Desktop/NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -536,337 +545,355 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 canvas.o: canvas.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../../root/root-6.28.04-install/include/TAxis.h \
-		../../../../root/root-6.28.04-install/include/TNamed.h \
-		../../../../root/root-6.28.04-install/include/TObject.h \
-		../../../../root/root-6.28.04-install/include/Rtypes.h \
-		../../../../root/root-6.28.04-install/include/RtypesCore.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../../root/root-6.28.04-install/include/RVersion.h \
+		../../../root_install/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/strtok.h \
-		../../../../root/root-6.28.04-install/include/strlcpy.h \
-		../../../../root/root-6.28.04-install/include/snprintf.h \
-		../../../../root/root-6.28.04-install/include/TGenericClassInfo.h \
-		../../../../root/root-6.28.04-install/include/TSchemaHelper.h \
-		../../../../root/root-6.28.04-install/include/TIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TVirtualIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TStorage.h \
-		../../../../root/root-6.28.04-install/include/TVersionCheck.h \
-		../../../../root/root-6.28.04-install/include/TString.h \
-		../../../../root/root-6.28.04-install/include/TMathBase.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RStringView.hxx \
-		../../../../root/root-6.28.04-install/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/TypeTraits.hxx \
-		../../../../root/root-6.28.04-install/include/TAttAxis.h \
-		../../../../root/root-6.28.04-install/include/TArrayD.h \
-		../../../../root/root-6.28.04-install/include/TArray.h \
-		../../../../root/root-6.28.04-install/include/TAttLine.h \
-		../../../../root/root-6.28.04-install/include/TAttFill.h \
-		../../../../root/root-6.28.04-install/include/TAttMarker.h \
-		../../../../root/root-6.28.04-install/include/TArrayC.h \
-		../../../../root/root-6.28.04-install/include/TArrayS.h \
-		../../../../root/root-6.28.04-install/include/TArrayI.h \
-		../../../../root/root-6.28.04-install/include/TArrayF.h \
-		../../../../root/root-6.28.04-install/include/Foption.h \
-		../../../../root/root-6.28.04-install/include/ROOT/EExecutionPolicy.hxx \
-		../../../../root/root-6.28.04-install/include/TVectorFfwd.h \
-		../../../../root/root-6.28.04-install/include/TVectorDfwd.h \
-		../../../../root/root-6.28.04-install/include/TFitResultPtr.h \
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../../root/root-6.28.04-install/include/TH1.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../../root/root-6.28.04-install/include/TPad.h \
-		../../../../root/root-6.28.04-install/include/TVirtualPad.h \
-		../../../../root/root-6.28.04-install/include/TAttPad.h \
-		../../../../root/root-6.28.04-install/include/TQObject.h \
-		../../../../root/root-6.28.04-install/include/TList.h \
-		../../../../root/root-6.28.04-install/include/TSeqCollection.h \
-		../../../../root/root-6.28.04-install/include/TCollection.h \
-		../../../../root/root-6.28.04-install/include/TIterator.h \
-		../../../../root/root-6.28.04-install/include/TVirtualRWMutex.h \
-		../../../../root/root-6.28.04-install/include/TVirtualMutex.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RRangeCast.hxx \
+		../../../root_install/include/TPad.h \
+		../../../root_install/include/TVirtualPad.h \
+		../../../root_install/include/TAttPad.h \
+		../../../root_install/include/TQObject.h \
+		../../../root_install/include/TList.h \
+		../../../root_install/include/TSeqCollection.h \
+		../../../root_install/include/TCollection.h \
+		../../../root_install/include/TIterator.h \
+		../../../root_install/include/TVirtualRWMutex.h \
+		../../../root_install/include/TVirtualMutex.h \
+		../../../root_install/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../../root/root-6.28.04-install/include/TVirtualQConnection.h \
-		../../../../root/root-6.28.04-install/include/TInterpreter.h \
-		../../../../root/root-6.28.04-install/include/TDataType.h \
-		../../../../root/root-6.28.04-install/include/TDictionary.h \
-		../../../../root/root-6.28.04-install/include/ESTLType.h \
-		../../../../root/root-6.28.04-install/include/TInterpreterValue.h \
-		../../../../root/root-6.28.04-install/include/TQClass.h \
-		../../../../root/root-6.28.04-install/include/TClass.h \
-		../../../../root/root-6.28.04-install/include/TObjArray.h \
-		../../../../root/root-6.28.04-install/include/GuiTypes.h \
-		../../../../root/root-6.28.04-install/include/Buttons.h \
-		../../../../root/root-6.28.04-install/include/TAttBBox2D.h \
-		../../../../root/root-6.28.04-install/include/TAttCanvas.h \
+		../../../root_install/include/TVirtualQConnection.h \
+		../../../root_install/include/TInterpreter.h \
+		../../../root_install/include/TDataType.h \
+		../../../root_install/include/TDictionary.h \
+		../../../root_install/include/ESTLType.h \
+		../../../root_install/include/TInterpreterValue.h \
+		../../../root_install/include/TQClass.h \
+		../../../root_install/include/TClass.h \
+		../../../root_install/include/TObjArray.h \
+		../../../root_install/include/GuiTypes.h \
+		../../../root_install/include/Buttons.h \
+		../../../root_install/include/TAttBBox2D.h \
+		../../../root_install/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../../root/root-6.28.04-install/include/TAttText.h \
+		../../../root_install/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../../root/root-6.28.04-install/include/TInetAddress.h \
-		../../../../root/root-6.28.04-install/include/TTimer.h \
-		../../../../root/root-6.28.04-install/include/TSysEvtHandler.h \
-		../../../../root/root-6.28.04-install/include/TTime.h \
+		../../../root_install/include/TInetAddress.h \
+		../../../root_install/include/TTimer.h \
+		../../../root_install/include/TSysEvtHandler.h \
+		../../../root_install/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TBits.h \
+		../../../root_install/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../../root/root-6.28.04-install/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TMethodCall.h \
-		../../../../root/root-6.28.04-install/include/TF1AbsComposition.h \
-		../../../../root/root-6.28.04-install/include/TMath.h \
-		../../../../root/root-6.28.04-install/include/TError.h \
+		../../../root_install/include/RConfigure.h \
+		../../../root_install/include/TFormula.h \
+		../../../root_install/include/TMethodCall.h \
+		../../../root_install/include/TF1AbsComposition.h \
+		../../../root_install/include/TMath.h \
+		../../../root_install/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/Math/Types.h \
-		../../../../root/root-6.28.04-install/include/Math/ParamFunctor.h \
+		../../../root_install/include/Math/Types.h \
+		../../../root_install/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../../root/root-6.28.04-install/include/TWbox.h \
-		../../../../root/root-6.28.04-install/include/TBox.h \
-		../../../../root/root-6.28.04-install/include/TColor.h \
+		../../../root_install/include/TWbox.h \
+		../../../root_install/include/TBox.h \
+		../../../root_install/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../../root/root-6.28.04-install/include/Fit/FitResult.h \
+		../../../root_install/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTBase.h \
-		../../../../root/root-6.28.04-install/include/TMatrixFBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSymfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtilsfwd.h \
+		../../../root_install/include/TMatrixDSym.h \
+		../../../root_install/include/TMatrixTSym.h \
+		../../../root_install/include/TMatrixTBase.h \
+		../../../root_install/include/TMatrixFBasefwd.h \
+		../../../root_install/include/TMatrixDBasefwd.h \
+		../../../root_install/include/TMatrixTUtils.h \
+		../../../root_install/include/TMatrixDSymfwd.h \
+		../../../root_install/include/TMatrixDUtils.h \
+		../../../root_install/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../../root/root-6.28.04-install/include/TText.h \
-		$(ROOTSYS)/include/TLine.h
+		../../../root_install/include/TText.h \
+		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../root_install/include/TMatrixT.h \
+		../../../root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o canvas.o canvas.cxx
 
 main.o: main.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../../root/root-6.28.04-install/include/TAxis.h \
-		../../../../root/root-6.28.04-install/include/TNamed.h \
-		../../../../root/root-6.28.04-install/include/TObject.h \
-		../../../../root/root-6.28.04-install/include/Rtypes.h \
-		../../../../root/root-6.28.04-install/include/RtypesCore.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../../root/root-6.28.04-install/include/RVersion.h \
+		../../../root_install/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/strtok.h \
-		../../../../root/root-6.28.04-install/include/strlcpy.h \
-		../../../../root/root-6.28.04-install/include/snprintf.h \
-		../../../../root/root-6.28.04-install/include/TGenericClassInfo.h \
-		../../../../root/root-6.28.04-install/include/TSchemaHelper.h \
-		../../../../root/root-6.28.04-install/include/TIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TVirtualIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TStorage.h \
-		../../../../root/root-6.28.04-install/include/TVersionCheck.h \
-		../../../../root/root-6.28.04-install/include/TString.h \
-		../../../../root/root-6.28.04-install/include/TMathBase.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RStringView.hxx \
-		../../../../root/root-6.28.04-install/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/TypeTraits.hxx \
-		../../../../root/root-6.28.04-install/include/TAttAxis.h \
-		../../../../root/root-6.28.04-install/include/TArrayD.h \
-		../../../../root/root-6.28.04-install/include/TArray.h \
-		../../../../root/root-6.28.04-install/include/TAttLine.h \
-		../../../../root/root-6.28.04-install/include/TAttFill.h \
-		../../../../root/root-6.28.04-install/include/TAttMarker.h \
-		../../../../root/root-6.28.04-install/include/TArrayC.h \
-		../../../../root/root-6.28.04-install/include/TArrayS.h \
-		../../../../root/root-6.28.04-install/include/TArrayI.h \
-		../../../../root/root-6.28.04-install/include/TArrayF.h \
-		../../../../root/root-6.28.04-install/include/Foption.h \
-		../../../../root/root-6.28.04-install/include/ROOT/EExecutionPolicy.hxx \
-		../../../../root/root-6.28.04-install/include/TVectorFfwd.h \
-		../../../../root/root-6.28.04-install/include/TVectorDfwd.h \
-		../../../../root/root-6.28.04-install/include/TFitResultPtr.h \
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../../root/root-6.28.04-install/include/TH1.h \
+		../../../root_install/include/TH1.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../../root/root-6.28.04-install/include/TPad.h \
-		../../../../root/root-6.28.04-install/include/TVirtualPad.h \
-		../../../../root/root-6.28.04-install/include/TAttPad.h \
-		../../../../root/root-6.28.04-install/include/TQObject.h \
-		../../../../root/root-6.28.04-install/include/TList.h \
-		../../../../root/root-6.28.04-install/include/TSeqCollection.h \
-		../../../../root/root-6.28.04-install/include/TCollection.h \
-		../../../../root/root-6.28.04-install/include/TIterator.h \
-		../../../../root/root-6.28.04-install/include/TVirtualRWMutex.h \
-		../../../../root/root-6.28.04-install/include/TVirtualMutex.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RRangeCast.hxx \
+		../../../root_install/include/TPad.h \
+		../../../root_install/include/TVirtualPad.h \
+		../../../root_install/include/TAttPad.h \
+		../../../root_install/include/TQObject.h \
+		../../../root_install/include/TList.h \
+		../../../root_install/include/TSeqCollection.h \
+		../../../root_install/include/TCollection.h \
+		../../../root_install/include/TIterator.h \
+		../../../root_install/include/TVirtualRWMutex.h \
+		../../../root_install/include/TVirtualMutex.h \
+		../../../root_install/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../../root/root-6.28.04-install/include/TVirtualQConnection.h \
-		../../../../root/root-6.28.04-install/include/TInterpreter.h \
-		../../../../root/root-6.28.04-install/include/TDataType.h \
-		../../../../root/root-6.28.04-install/include/TDictionary.h \
-		../../../../root/root-6.28.04-install/include/ESTLType.h \
-		../../../../root/root-6.28.04-install/include/TInterpreterValue.h \
-		../../../../root/root-6.28.04-install/include/TQClass.h \
-		../../../../root/root-6.28.04-install/include/TClass.h \
-		../../../../root/root-6.28.04-install/include/TObjArray.h \
-		../../../../root/root-6.28.04-install/include/GuiTypes.h \
-		../../../../root/root-6.28.04-install/include/Buttons.h \
-		../../../../root/root-6.28.04-install/include/TAttBBox2D.h \
-		../../../../root/root-6.28.04-install/include/TAttCanvas.h \
+		../../../root_install/include/TVirtualQConnection.h \
+		../../../root_install/include/TInterpreter.h \
+		../../../root_install/include/TDataType.h \
+		../../../root_install/include/TDictionary.h \
+		../../../root_install/include/ESTLType.h \
+		../../../root_install/include/TInterpreterValue.h \
+		../../../root_install/include/TQClass.h \
+		../../../root_install/include/TClass.h \
+		../../../root_install/include/TObjArray.h \
+		../../../root_install/include/GuiTypes.h \
+		../../../root_install/include/Buttons.h \
+		../../../root_install/include/TAttBBox2D.h \
+		../../../root_install/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../../root/root-6.28.04-install/include/TAttText.h \
+		../../../root_install/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../../root/root-6.28.04-install/include/TInetAddress.h \
-		../../../../root/root-6.28.04-install/include/TTimer.h \
-		../../../../root/root-6.28.04-install/include/TSysEvtHandler.h \
-		../../../../root/root-6.28.04-install/include/TTime.h \
+		../../../root_install/include/TInetAddress.h \
+		../../../root_install/include/TTimer.h \
+		../../../root_install/include/TSysEvtHandler.h \
+		../../../root_install/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TBits.h \
+		../../../root_install/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../../root/root-6.28.04-install/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/TFormula.h \
-		../../../../root/root-6.28.04-install/include/TMethodCall.h \
-		../../../../root/root-6.28.04-install/include/TF1AbsComposition.h \
-		../../../../root/root-6.28.04-install/include/TMath.h \
-		../../../../root/root-6.28.04-install/include/TError.h \
+		../../../root_install/include/RConfigure.h \
+		../../../root_install/include/TFormula.h \
+		../../../root_install/include/TMethodCall.h \
+		../../../root_install/include/TF1AbsComposition.h \
+		../../../root_install/include/TMath.h \
+		../../../root_install/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/Math/Types.h \
-		../../../../root/root-6.28.04-install/include/Math/ParamFunctor.h \
+		../../../root_install/include/Math/Types.h \
+		../../../root_install/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../../root/root-6.28.04-install/include/TWbox.h \
-		../../../../root/root-6.28.04-install/include/TBox.h \
-		../../../../root/root-6.28.04-install/include/TColor.h \
+		../../../root_install/include/TWbox.h \
+		../../../root_install/include/TBox.h \
+		../../../root_install/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../../root/root-6.28.04-install/include/Fit/FitResult.h \
+		../../../root_install/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTSym.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTBase.h \
-		../../../../root/root-6.28.04-install/include/TMatrixFBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDBasefwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixTUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDSymfwd.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtils.h \
-		../../../../root/root-6.28.04-install/include/TMatrixDUtilsfwd.h \
+		../../../root_install/include/TMatrixDSym.h \
+		../../../root_install/include/TMatrixTSym.h \
+		../../../root_install/include/TMatrixTBase.h \
+		../../../root_install/include/TMatrixFBasefwd.h \
+		../../../root_install/include/TMatrixDBasefwd.h \
+		../../../root_install/include/TMatrixTUtils.h \
+		../../../root_install/include/TMatrixDSymfwd.h \
+		../../../root_install/include/TMatrixDUtils.h \
+		../../../root_install/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../../root/root-6.28.04-install/include/TText.h \
+		../../../root_install/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../root_install/include/TMatrixT.h \
+		../../../root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h \
 		$(ROOTSYS)/include/THttpServer.h \
-		../../../../root/root-6.28.04-install/include/THttpCallArg.h \
+		../../../root_install/include/THttpCallArg.h \
 		$(ROOTSYS)/include/TH2I.h \
-		../../../../root/root-6.28.04-install/include/TH2.h \
+		../../../root_install/include/TH2.h \
 		$(ROOTSYS)/include/TApplication.h \
-		../../../../root/root-6.28.04-install/include/TApplicationImp.h \
+		../../../root_install/include/TApplicationImp.h \
 		$(ROOTSYS)/include/TROOT.h \
-		../../../../root/root-6.28.04-install/include/TDirectory.h \
-		../../../../root/root-6.28.04-install/include/TUUID.h \
-		../../../../root/root-6.28.04-install/include/TBuffer.h \
-		../../../../root/root-6.28.04-install/include/Bytes.h \
-		../../../../root/root-6.28.04-install/include/Byteswap.h \
+		../../../root_install/include/TDirectory.h \
+		../../../root_install/include/TUUID.h \
+		../../../root_install/include/TBuffer.h \
+		../../../root_install/include/Bytes.h \
+		../../../root_install/include/Byteswap.h \
 		$(ROOTSYS)/include/TStyle.h \
 		$(ROOTSYS)/include/TPluginManager.h \
 		$(ROOTSYS)/include/TVirtualGL.h \
-		../../../../root/root-6.28.04-install/include/GLConstants.h
+		../../../root_install/include/GLConstants.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cxx
 
 Integral.o: Integral.cxx Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../../root/root-6.28.04-install/include/TH1.h \
-		../../../../root/root-6.28.04-install/include/TAxis.h \
-		../../../../root/root-6.28.04-install/include/TNamed.h \
-		../../../../root/root-6.28.04-install/include/TObject.h \
-		../../../../root/root-6.28.04-install/include/Rtypes.h \
-		../../../../root/root-6.28.04-install/include/RtypesCore.h \
+		../../../root_install/include/TH1.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../../root/root-6.28.04-install/include/RVersion.h \
+		../../../root_install/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/strtok.h \
-		../../../../root/root-6.28.04-install/include/strlcpy.h \
-		../../../../root/root-6.28.04-install/include/snprintf.h \
-		../../../../root/root-6.28.04-install/include/TGenericClassInfo.h \
-		../../../../root/root-6.28.04-install/include/TSchemaHelper.h \
-		../../../../root/root-6.28.04-install/include/TIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TVirtualIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TStorage.h \
-		../../../../root/root-6.28.04-install/include/TVersionCheck.h \
-		../../../../root/root-6.28.04-install/include/TString.h \
-		../../../../root/root-6.28.04-install/include/TMathBase.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RStringView.hxx \
-		../../../../root/root-6.28.04-install/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/TypeTraits.hxx \
-		../../../../root/root-6.28.04-install/include/TAttAxis.h \
-		../../../../root/root-6.28.04-install/include/TArrayD.h \
-		../../../../root/root-6.28.04-install/include/TArray.h \
-		../../../../root/root-6.28.04-install/include/TAttLine.h \
-		../../../../root/root-6.28.04-install/include/TAttFill.h \
-		../../../../root/root-6.28.04-install/include/TAttMarker.h \
-		../../../../root/root-6.28.04-install/include/TArrayC.h \
-		../../../../root/root-6.28.04-install/include/TArrayS.h \
-		../../../../root/root-6.28.04-install/include/TArrayI.h \
-		../../../../root/root-6.28.04-install/include/TArrayF.h \
-		../../../../root/root-6.28.04-install/include/Foption.h \
-		../../../../root/root-6.28.04-install/include/ROOT/EExecutionPolicy.hxx \
-		../../../../root/root-6.28.04-install/include/TVectorFfwd.h \
-		../../../../root/root-6.28.04-install/include/TVectorDfwd.h \
-		../../../../root/root-6.28.04-install/include/TFitResultPtr.h \
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h \
 		$(ROOTSYS)/include/TH1.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o Integral.o Integral.cxx
 
 tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../../root/root-6.28.04-install/include/TAxis.h \
-		../../../../root/root-6.28.04-install/include/TNamed.h \
-		../../../../root/root-6.28.04-install/include/TObject.h \
-		../../../../root/root-6.28.04-install/include/Rtypes.h \
-		../../../../root/root-6.28.04-install/include/RtypesCore.h \
+		../../../root_install/include/TAxis.h \
+		../../../root_install/include/TNamed.h \
+		../../../root_install/include/TObject.h \
+		../../../root_install/include/Rtypes.h \
+		../../../root_install/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../../root/root-6.28.04-install/include/RVersion.h \
+		../../../root_install/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../../root/root-6.28.04-install/include/DllImport.h \
-		../../../../root/root-6.28.04-install/include/strtok.h \
-		../../../../root/root-6.28.04-install/include/strlcpy.h \
-		../../../../root/root-6.28.04-install/include/snprintf.h \
-		../../../../root/root-6.28.04-install/include/TGenericClassInfo.h \
-		../../../../root/root-6.28.04-install/include/TSchemaHelper.h \
-		../../../../root/root-6.28.04-install/include/TIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TVirtualIsAProxy.h \
-		../../../../root/root-6.28.04-install/include/TStorage.h \
-		../../../../root/root-6.28.04-install/include/TVersionCheck.h \
-		../../../../root/root-6.28.04-install/include/TString.h \
-		../../../../root/root-6.28.04-install/include/TMathBase.h \
-		../../../../root/root-6.28.04-install/include/ROOT/RStringView.hxx \
-		../../../../root/root-6.28.04-install/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/libcpp_string_view.h \
-		../../../../root/root-6.28.04-install/include/ROOT/TypeTraits.hxx \
-		../../../../root/root-6.28.04-install/include/TAttAxis.h \
-		../../../../root/root-6.28.04-install/include/TArrayD.h \
-		../../../../root/root-6.28.04-install/include/TArray.h \
-		../../../../root/root-6.28.04-install/include/TAttLine.h \
-		../../../../root/root-6.28.04-install/include/TAttFill.h \
-		../../../../root/root-6.28.04-install/include/TAttMarker.h \
-		../../../../root/root-6.28.04-install/include/TArrayC.h \
-		../../../../root/root-6.28.04-install/include/TArrayS.h \
-		../../../../root/root-6.28.04-install/include/TArrayI.h \
-		../../../../root/root-6.28.04-install/include/TArrayF.h \
-		../../../../root/root-6.28.04-install/include/Foption.h \
-		../../../../root/root-6.28.04-install/include/ROOT/EExecutionPolicy.hxx \
-		../../../../root/root-6.28.04-install/include/TVectorFfwd.h \
-		../../../../root/root-6.28.04-install/include/TVectorDfwd.h \
-		../../../../root/root-6.28.04-install/include/TFitResultPtr.h
+		../../../root_install/include/DllImport.h \
+		../../../root_install/include/strtok.h \
+		../../../root_install/include/strlcpy.h \
+		../../../root_install/include/snprintf.h \
+		../../../root_install/include/TGenericClassInfo.h \
+		../../../root_install/include/TSchemaHelper.h \
+		../../../root_install/include/TIsAProxy.h \
+		../../../root_install/include/TVirtualIsAProxy.h \
+		../../../root_install/include/TStorage.h \
+		../../../root_install/include/TVersionCheck.h \
+		../../../root_install/include/TString.h \
+		../../../root_install/include/TMathBase.h \
+		../../../root_install/include/ROOT/RStringView.hxx \
+		../../../root_install/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../root_install/include/ROOT/libcpp_string_view.h \
+		../../../root_install/include/ROOT/TypeTraits.hxx \
+		../../../root_install/include/TAttAxis.h \
+		../../../root_install/include/TArrayD.h \
+		../../../root_install/include/TArray.h \
+		../../../root_install/include/TAttLine.h \
+		../../../root_install/include/TAttFill.h \
+		../../../root_install/include/TAttMarker.h \
+		../../../root_install/include/TArrayC.h \
+		../../../root_install/include/TArrayS.h \
+		../../../root_install/include/TArrayI.h \
+		../../../root_install/include/TArrayF.h \
+		../../../root_install/include/Foption.h \
+		../../../root_install/include/ROOT/EExecutionPolicy.hxx \
+		../../../root_install/include/TVectorFfwd.h \
+		../../../root_install/include/TVectorDfwd.h \
+		../../../root_install/include/TFitResultPtr.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tracknhistogram.o tracknhistogram.cpp
 
 moc_canvas.o: moc_canvas.cpp 
