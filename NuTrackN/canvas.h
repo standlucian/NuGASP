@@ -2,7 +2,6 @@
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 
-#include <QWidget>
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -10,8 +9,9 @@
 #include <sstream>
 #include <vector>
 #include <tracknhistogram.h>
-
 #include "Integral.h"
+
+#include <QWidget>
 #include <QPushButton>
 #include <QLayout>
 #include <QTimer>
@@ -20,6 +20,9 @@
 #include <QMouseEvent>
 #include <QAction>
 #include <QKeySequence>
+#include <QFileDialog>
+#include <QDataStream>
+#include <QFile>
 
 #include <TCanvas.h>
 #include <TVirtualX.h>
@@ -33,6 +36,7 @@
 #include <TLatex.h>
 #include <TLine.h>
 #include <TMatrixD.h>
+#include <Math/Minimizer.h>
 
 #include <QLabel>
 #include <QPicture>
@@ -99,6 +103,7 @@ public:
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
    Double_t findMinValueInInterval(int, int);
+   Double_t findMaxValueInInterval(int, int);
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
@@ -143,6 +148,7 @@ protected:
    std::vector<Double_t> gauss_markers;
    Float_t maxValueInHistogram;
    double_t backgroundA0, backgroundA1;
+   double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
 };
 

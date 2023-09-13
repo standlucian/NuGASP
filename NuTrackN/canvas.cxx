@@ -289,7 +289,7 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Adds the canvas to the window
    l->addWidget(canvas = new QRootCanvas(this));
    //Adds the button to the window
-   l->addWidget(b = new QPushButton("&Draw Histogram", this));
+   l->addWidget(b = new QPushButton("&Select your file", this));
    //When the button is pressed, execute function clicked1
    connect(b, SIGNAL(clicked()), this, SLOT(clicked1()));
    //Same as the previous line of code, it adds a button to the window
@@ -375,8 +375,11 @@ void QMainCanvas::clicked1()
    h1f->SetFillColor(kViolet + 2);
    h1f->SetFillStyle(3001);
 
-   //opens a fixed file from the folder
-   std::ifstream file("testSpectra", std::ios::in);
+   // This opens a dialog to select a file for reading
+   QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
+   // Casts a QT string to C++ string
+   std::string SpectrumName = fileName.toStdString();
+   std::ifstream file(SpectrumName, std::ios::in);
    if (!file) {
       std::cerr << "Error: could not open file" << std::endl;
    }
@@ -434,8 +437,8 @@ void QMainCanvas::areaFunctionWithBackground()
 void QMainCanvas::autoFit(int x, int y)
 {
     std::string objectInfo, temp;
-    int from, to, binX, binC, sum;
-    Double_t xPos, yPos;
+    int from, to, binX, binC;//, sum;
+    //Double_t xPos, yPos;
     Double_t gaussianHeight, gaussianCenter, gaussianSigma, bkgSlope, bkg0, gaussianFWHM, gaussianCenterError, gaussianIntegral, gaussianIntegralError, gaussianFWHMError;
     std::ostringstream tempStringStream;
 
@@ -446,14 +449,14 @@ void QMainCanvas::autoFit(int x, int y)
     from=objectInfo.find("=");
     to=objectInfo.find(" ");
     temp=objectInfo.substr(from+1,to-from-2);
-    xPos=std::stof(temp);
+    //xPos=std::stof(temp);
 
     //Cut the next section, which represents the position on the y Axis of the click
     objectInfo=objectInfo.substr(to+1);
     from=objectInfo.find("=");
     to=objectInfo.find(" ");
     temp=objectInfo.substr(from+1,to-from-2);
-    yPos=std::stof(temp);
+    //yPos=std::stof(temp);
 
     //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
     objectInfo=objectInfo.substr(to+1);
@@ -474,7 +477,7 @@ void QMainCanvas::autoFit(int x, int y)
     from=objectInfo.find("=");
     to=objectInfo.find(")");
     temp=objectInfo.substr(from+1,to-from-1);
-    sum=std::stoi(temp);
+    //sum=std::stoi(temp);
 
     //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
     TFormula *gaussianWithBackground = new TFormula("gaussianWithBackground","[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
@@ -542,7 +545,7 @@ void QMainCanvas::autoFit(int x, int y)
     backgroundFunction->SetLineColor(kBlue);
     backgroundFunction->Draw("same");
 
-    //Updating the canvas, so all the changes appearh1f->AddBinContent(i,data[i-1]);
+    //Updating the canvas, so all the changes appear
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
@@ -597,6 +600,19 @@ Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFini
             minValueFound=h1f->GetBinContent(i);
     }
     return minValueFound;
+}
+
+//______________________________________________________________________________
+Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFinish)
+{
+    int maxValueFound=h1f->GetBinContent(intervalStart);
+
+    for(int i=intervalStart+1; i<=intervalFinish; i++)
+    {
+        if(h1f->GetBinContent(i)>maxValueFound)
+            maxValueFound=h1f->GetBinContent(i);
+    }
+    return maxValueFound;
 }
 
 //______________________________________________________________________________
@@ -916,39 +932,196 @@ void QMainCanvas::showGaussMarkers()
 //______________________________________________________________________________
 void QMainCanvas::fitGauss()
 {
-    bool goodRanges, goodGauss;
+    bool goodRanges, goodGauss=0;
+    std::string temp;
+    std::ostringstream tempStringStream;
+    double maxValue, fitIntegralError;
 
+    //Checking to see if the backgrounds are fine, not overlapping, not odd numbered, and fixes the background if needed
     checkBackgrounds();
+
+    //Checks if the range is fine, that there are only two markers, orders them
     goodRanges=checkRanges();
+
+    //Checks if the gauss markers are fine and inside the range
     if(goodRanges)
         goodGauss=checkGauss();
 
+    //Clears the screen of all previous markers
     clearTheScreen();
+
+    //Adds the background, range and gauss markers back
     showBackgroundMarkers();
     showRangeMarkers();
     showGaussMarkers();
 
     if(goodRanges&&goodGauss)
     {
+        //Find the maximum value in the interval to use as a limit for fitting
+        maxValue=findMaxValueInInterval(range_markers[0],range_markers[1]);
+
+        //Fit the background from the background markers
         fitBackground();
+
+        //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
+        TFormula *background = new TFormula("background","[0]*x+[1]");
+        TFormula *gaussian = new TFormula("gaussian","[0]*exp(-(x-[1])^2/(2*[2]))");
+
+        //Declaring the background function
+        TF1 *backgroundFunction = new TF1("backgroundFunction","background",range_markers[0],range_markers[1]);
+
+        //Declaring the full function that will be used for fitting, initially with just the background
+        TF1* fullFunction = new TF1("fullFunction","backgroundFunction", range_markers[0],range_markers[1]);
+
+        for(uint i=0;i<gauss_markers.size();i++)
+        {
+            //Adding a new Gaussian function to the full function for every Gauss marker
+            fullFunction = new TF1("fullFunction","fullFunction+gaussian", range_markers[0],range_markers[1]);
+        }
+
+        //Fixing the background parameters that have been obtained from the background fit. These should NOT vary!
+        fullFunction->FixParameter(0, backgroundA1);
+        fullFunction->FixParameter(1, backgroundA0);
+
+        //For every gauss marker, setting the values of the 3 parameters (height, position, width) and their limits
+        for(uint i=0;i<gauss_markers.size();i++)
+        {
+            fullFunction->SetParameter(2+i*3,h1f->GetBinContent(gauss_markers[i]-1));
+            fullFunction->SetParLimits(2+i*3,0,maxValue*1.1);
+            fullFunction->SetParameter(3+i*3,gauss_markers[i]-1);
+            fullFunction->SetParLimits(3+i*3,range_markers[0],range_markers[1]);
+            fullFunction->SetParameter(4+i*3,3.);
+            fullFunction->SetParLimits(4+i*3,0.4,abs(range_markers[1]-range_markers[0])*4);
+        }
+
+        //std::cout<<fullFunction->GetFormula()->GetExpFormula()<<std::endl;
+
+        //Fitting the histogram with the Gaussian function with background and putting the results in a special format
+        //Fit options are Q - quiet; M - Minuit; R-respect range from function
+        TFitResultPtr fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+
+
+        //If the fit fails (fitResult=4), then change some minimizer options and try again
+        if((int) fitResult==4)
+        {
+            ROOT::Math::MinimizerOptions::SetDefaultStrategy(2);
+            ROOT::Math::MinimizerOptions::SetDefaultTolerance(0.1);
+            ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(10000000);
+
+            fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+            //ROOT::Math::MinimizerOptions::SetDefaultStrategy(1);
+
+
+            //If it still fails, set different tolerance and try again
+            if((int) fitResult==4)
+            {
+                ROOT::Math::MinimizerOptions::SetDefaultTolerance(1);
+
+                fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+
+                //If it still fails, set different tolerance and try again
+                if((int) fitResult==4)
+                {
+                    ROOT::Math::MinimizerOptions::SetDefaultTolerance(10);
+
+                    fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+
+                    //If it still fails, tell the user it has failed
+                    if((int) fitResult==4)
+                    {
+                        std::cout<<"The fit has failed to converge despite our best attempts. Some errors will not be calculated."<<std::endl;
+                    }
+                }
+            }
+
+            //Reset the minimizer options
+            ROOT::Math::MinimizerOptions::SetDefaultStrategy(1);
+            ROOT::Math::MinimizerOptions::SetDefaultTolerance(0.01);
+            ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(1630);
+        }
+
+
+        //Writing the obtained data on screen, in a fixed format, so everything aligns nicely
+        //First (fixed) row
+        std::cout<<std::left;
+        std::cout<<std::setw(10);
+        std::cout<<"Peak#";
+        std::cout<<std::setw(10);
+        std::cout<<"Channel";
+        std::cout<<std::setw(15);
+        std::cout<<"Energy";
+        std::cout<<std::setw(25);
+        std::cout<<"Area";
+        std::cout<<std::setw(10);
+        std::cout<<"Width"<<std::endl;
+
+        for(uint i=0;i<gauss_markers.size();i++)
+        {
+            //Second row that contains variable numbers
+            std::cout<<std::setw(10);
+            std::cout<<i+1;
+            std::cout<<std::setw(10);
+            std::cout << std::fixed;
+            std::cout<<std::setprecision(2)<<fullFunction->GetParameter(3+i*3);
+            std::cout<<std::setw(15);
+            tempStringStream.str(std::string());
+            tempStringStream<< std::fixed<<std::setprecision(2)<<fullFunction->GetParameter(3+i*3)<<"("<<std::setprecision(0)<<ceil(fullFunction->GetParError(3+i*3)*100)<<")";
+            temp=tempStringStream.str();
+            std::cout<<temp;
+            tempStringStream.str(std::string());
+
+            //Creating a fake Gauss function to obtain the integral and integral error
+            TF1* tempGaussFunction = new TF1("tempGaussFunction","gaussian", range_markers[0],range_markers[1]);
+            tempGaussFunction->SetParameter(0,fullFunction->GetParameter(2+i*3));
+            tempGaussFunction->SetParError(0,fullFunction->GetParError(2+i*3));
+            tempGaussFunction->SetParameter(1,fullFunction->GetParameter(3+i*3));
+            tempGaussFunction->SetParError(1,fullFunction->GetParError(3+i*3));
+            tempGaussFunction->SetParameter(2,fullFunction->GetParameter(4+i*3));
+            tempGaussFunction->SetParError(2,fullFunction->GetParError(4+i*3));
+
+            //Getting the full covariance matrix and then cutting it for just our Gauss fit parameters
+            TMatrixDSym covMatrix=fitResult->GetCovarianceMatrix();
+            TMatrixDSym tempMatrix=fitResult->GetCovarianceMatrix().GetSub(2+i*3,4+i*3,2+i*3,4+i*3);
+
+            //Obtaining the integral error. This will fail if the fit did not converge!
+            fitIntegralError=tempGaussFunction->IntegralError(range_markers[0],range_markers[1],tempGaussFunction->GetParameters(),tempMatrix.GetMatrixArray());
+
+            //The peak error is the quadratic sum of the Gauss integral error and the background integral error
+            tempStringStream<< std::fixed<<std::setprecision(0)<<tempGaussFunction->Integral(range_markers[0],range_markers[1])<<"("<<round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2)))<<")";
+            temp=tempStringStream.str();
+            std::cout<<std::setw(25);
+            std::cout<<temp;
+            tempStringStream.str(std::string());
+            tempStringStream<< std::fixed<<std::setprecision(2)<<fullFunction->GetParameter(4+i*3)*2.3548<<"("<<std::setprecision(0)<<ceil(fullFunction->GetParError(4+i*3)*2.3548*100)<<")";
+            temp=tempStringStream.str();
+            std::cout<<std::setw(10);
+            std::cout<<temp<<std::endl;
+        }
     }
+
+    //Tell the canvas that stuff got modified
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
 //______________________________________________________________________________
 void QMainCanvas::checkBackgrounds()
 {
+    //Check that background markers exists
     if(background_markers.size())
     {
+        //If there is an odd number of background markers, delete the last one added
         if(background_markers.size()%2)
         {
             std::cout<<"There is an odd number of background markers, "<<background_markers.size()<<", so the last one, at "<<background_markers[background_markers.size()-1]<<", was removed"<<std::endl;
             background_markers.pop_back();
         }
 
+        //If the background markers overlap (meaning they define areas that overlap), then sort them so they don't overlap anymore
         if(overlapping_markers(background_markers))
         {
             std::cout<<"The background markers shown below produced regions which overlapped"<<std::endl;
-            for(int i=0;i<background_markers.size()/2;i++)
+            for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
             }
@@ -956,24 +1129,24 @@ void QMainCanvas::checkBackgrounds()
             std::cout<<"Thus, we have reordered them in order to produce non-overlapping regions, as seen below:"<<std::endl;
             sort(background_markers.begin(),background_markers.end());
 
-            for(int i=0;i<background_markers.size()/2;i++)
+            for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
             }
         }
-
-        sort(background_markers.begin(),background_markers.end());
     }
 }
 
 //______________________________________________________________________________
 bool QMainCanvas::checkRanges()
 {
+    //Check that there are no fewer than 2 range markers. If there are, tell the user the ranges are not good and exit the fit
     if(range_markers.size()<2)
     {
         std::cout<<"There are fewer than 2 range markers added, namely "<<range_markers.size()<<", and the fitting procedure cannot run"<<std::endl;
         return 0;
     }
+    //Check that there are no more than 2 range markers. If there are, delete all but the first 2
     else if(range_markers.size()>2)
     {
         std::cout<<"There are more than 2 range markers added, namely "<<range_markers.size()<<". Only the first 2 markers will be used, namely "<<range_markers[0]<<"-"<<range_markers[1]<<std::endl;
@@ -983,6 +1156,7 @@ bool QMainCanvas::checkRanges()
         return 1;
     }
 
+    //Sort the range markers just to be sure
     sort(range_markers.begin(),range_markers.end());
 
     return 1;
@@ -991,7 +1165,8 @@ bool QMainCanvas::checkRanges()
 //______________________________________________________________________________
 bool QMainCanvas::checkGauss()
 {
-    for(int i=0;i<gauss_markers.size();i++)
+    //Check that all the gauss markers are inside the range area, otherwise delete them
+    for(uint i=0;i<gauss_markers.size();i++)
         if(gauss_markers[i]<range_markers[0]||gauss_markers[i]>range_markers[1])
         {
             std::cout<<"The peak center marker at "<<gauss_markers[i]<<" is not within the designated fit region "<<range_markers[0]<<"-"<<range_markers[1]<<" and has been removed"<<std::endl;
@@ -999,6 +1174,7 @@ bool QMainCanvas::checkGauss()
             i--;
         }
 
+    //If there are no valid gauss markers left, tell the user and exit the fit
     if(gauss_markers.size()==0)
     {
         std::cout<<"There are no valid markers for any peak centers to fit! The program will not run!"<<std::endl;
@@ -1012,8 +1188,11 @@ bool QMainCanvas::checkGauss()
 void QMainCanvas::fitBackground()
 {
     Double_t minimum=maxValueInHistogram, localMinimum;
+
+    //Create another, temporary histogram
     TracknHistogram *tempHist = new TracknHistogram("tempHist","", 10240, 0, 10240);
 
+    //Add only the background ranges to the temp histogram
     for(uint i=0;i<background_markers.size()/2;i++)
     {
         for(uint j=background_markers[2*i];j<=background_markers[2*i+1];j++)
@@ -1029,21 +1208,26 @@ void QMainCanvas::fitBackground()
     TFormula *background = new TFormula("background","[0]*x+[1]");
     TF1 *backgroundFunction = new TF1("backgroundFunction","background",0, 10240);
 
+    //Setting the two parameters before the fit
     backgroundFunction->SetParameter(0,0.);
     backgroundFunction->SetParameter(1,minimum);
 
+    //Fitting the background
     TFitResultPtr fitResult = tempHist->Fit(backgroundFunction,"QMSW", "same");
 
+    //Obtaining the fit parameters, the background integral over the fit range, the integral error, and the covariance matrix
     backgroundA0=backgroundFunction->GetParameter(1);
     backgroundA1=backgroundFunction->GetParameter(0);
+    backgroundIntegral=backgroundFunction->Integral(range_markers[0],range_markers[1]);
+    backgroundIntegralError=backgroundFunction->IntegralError(range_markers[0],range_markers[1],fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
+
     TMatrixD tempMatrix=fitResult->GetCovarianceMatrix();
 
     backgroundCovarianceMatrix=&tempMatrix;
 
-    std::cout<<backgroundCovarianceMatrix->GetNoElements()<<std::endl;
-
     tempHist->Delete();
 
+    //Draw a line to show the background
     TLine *backgroundLine = new TLine(background_markers[0]-0.5, backgroundA1*(background_markers[0]-0.5)+backgroundA0, background_markers[background_markers.size()-1]-0.5, backgroundA1*(background_markers[background_markers.size()-1]-0.5)+backgroundA0);
     backgroundLine->SetLineColor(kBlue);
     backgroundLine->SetLineWidth(2);
