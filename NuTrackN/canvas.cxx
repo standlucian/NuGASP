@@ -106,8 +106,29 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
-    //Checks if any of the top keys (C, M, Z) was pressed just before
-    if(cKeyWasPressed)
+    //Checks if any of the top keys (CTRL,C, M, Z) was pressed just before
+    if(controlKeyIsPressed)
+    {
+        switch(event->key())
+        {
+        case Qt::Key_C:
+        case Qt::Key_Z:
+        case Qt::Key_Y:
+            //if either the C,Z or Y key was pressed after the CTRL key then the program will attempt to quit asking the user if they intended it or not
+            QMessageBox::StandardButton quiting;
+            quiting=QMessageBox::question(this,"Quit","Are you sure you want to quit?",QMessageBox::Yes|QMessageBox::No);
+            if(quiting==QMessageBox::Yes)
+            {
+                emit killSwitch();
+            }
+            break;
+        default:
+            std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
+            break;
+        }
+        controlKeyIsPressed=0;
+    }
+    else if(cKeyWasPressed)
     {
         switch(event->key())
         {
@@ -136,6 +157,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
     {
         switch(event->key())
         {
+            case Qt::Key_I:
+                //If I key is pressed after Z, call delete integral markers
+                emit requestDeleteIntegralMarkers();
+                break;
             case Qt::Key_B:
                 //If B key is pressed after Z, call delete background markers
                 emit requestDeleteBackgroundMarkers();
@@ -165,6 +190,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
     {
         switch(event->key())
         {
+            case Qt::Key_I:
+                //If I key is pressed after M, call show integral markers
+                emit requestShowIntegralMarkers();
+                break;
             case Qt::Key_B:
                 //If B key is pressed after M, call show background markers
                 emit requestShowBackgroundMarkers();
@@ -210,6 +239,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_M:
                 //if the C key is pressed, mark that down and prepare to execute a command
                 mKeyWasPressed=1;
+                break;
+            case Qt::Key_I:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_B:
                 //if the B key is pressed, add a background marker on screen and remember the background position
@@ -277,6 +310,24 @@ void QRootCanvas::paintEvent( QPaintEvent * )
    }
 }
 
+//______________________________________________________________________________
+void QMainCanvas::closeEvent(QCloseEvent *e)
+{
+    //This function is called when then app is attempting to close
+    //A window is created which asks the user if he is sure he wants to quit
+    QMessageBox::StandardButton quiting;
+    quiting=QMessageBox::question(this,"Quit","Are you sure you want to quit?",QMessageBox::Yes|QMessageBox::No);
+    //If the answers if yes the app proceeds to close, otherwise it does not
+    if(quiting==QMessageBox::Yes)
+    {
+        e->accept();
+    }
+    else
+    {
+        e->ignore();
+    }
+}
+
 //------------------------------------------------------------------------------
 
 //______________________________________________________________________________
@@ -316,14 +367,23 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard command B to adding the background markers;
    connect(canvas,SIGNAL(addBackgroundMarkerRequested(Int_t, Int_t)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
 
+   //connects the keyboard command I to adding the background markers;
+   connect(canvas,SIGNAL(addIntegralMarkerRequested(Int_t, Int_t)), this, SLOT(addIntegralMarker(Int_t, Int_t)));
+
    //connects the keyboard command Z+B to clearing the background markers;
    connect(canvas,SIGNAL(requestDeleteBackgroundMarkers()), this, SLOT(deleteBackgroundMarkers()));
+
+   //connects the keyboard command Z+I to clearing the integral markers;
+   connect(canvas,SIGNAL(requestDeleteIntegralMarkers()), this, SLOT(deleteIntegralMarkers()));
 
    //connects the keyboard command Z+A to clearing all markers;
    connect(canvas,SIGNAL(requestDeleteAllMarkers()), this, SLOT(deleteAllMarkers()));
 
    //connects the keyboard command M+B to clearing the background markers;
    connect(canvas,SIGNAL(requestShowBackgroundMarkers()), this, SLOT(showBackgroundMarkers()));
+
+   //connects the keyboard command M+I to clearing the integral markers;
+   connect(canvas,SIGNAL(requestShowIntegralMarkers()), this, SLOT(showIntegralMarkers()));
 
    //connects the keyboard command M+A to clearing all markers;
    connect(canvas,SIGNAL(requestShowAllMarkers()), this, SLOT(showAllMarkers()));
@@ -348,6 +408,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 
    //connects the keyboard command C+V to fitting the Gauss Functions;
    connect(canvas,SIGNAL(requestFitGauss()), this, SLOT(fitGauss()));
+
+   //connects the keyboard commands CTRL+C/Z/Y to quitting the app
+   connect(canvas,SIGNAL(killSwitch()), qApp, SLOT(quit()));
 
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
@@ -405,31 +468,28 @@ void QMainCanvas::clicked1()
 
 void QMainCanvas::areaFunction()
 {
-   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
-   //If the background markers vector is empty we will just do a common integral with no background
-
-   //The vector is populated with 4 markers
-   integral_markers.push_back(300);
-   integral_markers.push_back(400);
-   integral_markers.push_back(500);
-   integral_markers.push_back(600);
-   //The integral function is called which will perform two integrals with no background since the background_markers vector is empty, in this case the best fitted line is y=0
-   integral_function(h1f,integral_markers,background_markers,slope,addition);
+   //A stand in vector for the markers is used to call the integral function so it perform an integral with no background
+   //Regardles of there are backgrounds or not
+   std::vector<Double_t> placeholder_background_markers;
+   integral_function(h1f,integral_markers,placeholder_background_markers,slope,addition);
 }
 
 void QMainCanvas::areaFunctionWithBackground()
 {
-   //For the function that calculates the integral we must give it some vectors of markers for the integral itself and the background
-   //The vectors are populated acordingly
-   integral_markers.push_back(300);
-   integral_markers.push_back(400);
-   //The background markers are overlapping(used to test the function that checks for overlaps)
-   background_markers.push_back(7000);
-   background_markers.push_back(7020);
-   background_markers.push_back(7010);
-   background_markers.push_back(7030);
-   //The integral function is called which will perform a single integral with a background and will also reutrn the equation of the best fotted line y=slope*x+addition
+   //The integral function is used with the background markers and the integral markers to perform an integral with backgorund
+   //The function also returns the slope of the background
    integral_function(h1f,integral_markers,background_markers,slope,addition);
+   //Draw a line to show the background
+   TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
+   backgroundLine->SetLineColor(kBlue);
+   backgroundLine->SetLineWidth(2);
+
+   backgroundLine->Draw("same");
+   //Add the line to the list of things put on the screen, so it can be deleted
+   listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+   canvas->getCanvas()->Modified();
+   canvas->getCanvas()->Update();
 }
 
 //______________________________________________________________________________
@@ -677,6 +737,49 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     canvas->getCanvas()->Update();
 }
 
+void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the integral marker vector
+    integral_markers.push_back((Double_t)binX);
+    //std::cout<<(Double_t)binX<<std::endl;
+
+    //Create a yellow integral line and add it to the screen
+    TLine *integralLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    integralLine->SetLineColor(kYellow);
+    integralLine->SetLineWidth(2);
+
+    integralLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(integralLine);
+}
+
+
 //______________________________________________________________________________
 void QMainCanvas::clearTheScreen()
 {
@@ -704,10 +807,16 @@ void QMainCanvas::deleteBackgroundMarkers()
     background_markers.clear();
 }
 
+void QMainCanvas::deleteIntegralMarkers()
+{
+    integral_markers.clear();
+}
+
 //______________________________________________________________________________
 void QMainCanvas::deleteAllMarkers()
 {
     deleteBackgroundMarkers();
+    deleteIntegralMarkers();
     deleteRangeMarkers();
     deleteGaussMarkers();
 }
@@ -750,10 +859,28 @@ void QMainCanvas::showBackgroundMarkers()
     canvas->getCanvas()->Update();
 }
 
+void QMainCanvas::showIntegralMarkers()
+{
+    for(uint i=0;i<integral_markers.size();i++)
+    {
+        TLine *integralLine = new TLine(integral_markers[i]-0.5, 0., integral_markers[i]-0.5, maxValueInHistogram*1.05);
+        integralLine->SetLineColor(kRed);
+        integralLine->SetLineWidth(2);
+
+        integralLine->Draw("same");
+
+        listOfObjectsDrawnOnScreen.Add(integralLine);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
 //______________________________________________________________________________
 void QMainCanvas::showAllMarkers()
 {
     showBackgroundMarkers();
+    showIntegralMarkers();
     showRangeMarkers();
     showGaussMarkers();
 }

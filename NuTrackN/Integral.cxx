@@ -93,7 +93,7 @@ void get_best_fitted_line(TH1F *histogram,std::vector<Double_t> background_marke
     reduced_chi2/=number_of_variators;
     medium_value/=number_of_variators;
     //We output the medium value and Reduced chi2 to the screen so the user can see
-    std::cout<<"Medium value:"<<medium_value<<"  Reduced chi2:"<<reduced_chi2<<std::endl;
+    //std::cout<<"Medium value:"<<medium_value<<"  Reduced chi2:"<<reduced_chi2<<std::endl;
 }
 
 //This is a function that switches the values between to variables
@@ -109,7 +109,9 @@ void switch_values(Double_t &value1,Double_t &value2)
 void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,std::vector<Double_t> background_markers,Double_t &slope,Double_t &addition)
 {
     //We declare the error of the integral and the area which will be used later on
-    Double_t error=0,area=0;
+    Double_t error=0,area=0,middle_of_integration=0,width_of_integral=0;
+    std::string temp;
+    std::ostringstream tempStringStream;
     //We set the line to pe y=0 as if having no background
     slope=0;
     addition=0;
@@ -139,7 +141,21 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
     {
         //We also chek if the markers are in pairs if they are not we tell the user to put them in pairs if they are we proceed
         if(integral_markers.size()%2==0)
-        {
+        {        
+            //First (fixed) row
+            std::cout<<std::left;
+            std::cout<<std::setw(10);
+            std::cout<<"Integral#";
+            std::cout<<std::setw(10);
+            std::cout<<"Channel";
+            std::cout<<std::setw(15);
+            std::cout<<"Energy";
+            std::cout<<std::setw(25);
+            std::cout<<"Area";
+            std::cout<<std::setw(10);
+            std::cout<<"Width"<<std::endl;
+
+
             //Then we get the markers by pairs and feed them in the function above that calculates the integral with no background
             for(unsigned long int iterator1=0;iterator1<integral_markers.size();iterator1+=2)
             {
@@ -154,11 +170,32 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
                 {
                     area-=(slope*iterator2+addition);
                 }
-                //Here we check if we have more than 2 markers so to know if we should start numbering the integrals
-                if(integral_markers.size()>2)
-                    std::cout<<"Integral #"<<iterator1/2+1<<":"<<area<<" Error of integral:"<<error<<std::endl;
-                else
-                    std::cout<<"Integral:"<<area<<" Error of integral:"<<error<<std::endl;
+                //Here we calculate sove values for the output
+                //The output is similar to the auto fit output so for more informations check that
+                middle_of_integration=(integral_markers[iterator1]+integral_markers[iterator1+1])/2;
+                width_of_integral=integral_markers[iterator1+1]-integral_markers[iterator1];
+                //Second row that contains variable numbers
+                std::cout<<std::setw(10);
+                std::cout<<iterator1/2+1;
+                std::cout<<std::setw(10);
+                std::cout << std::fixed;
+                std::cout<<std::setprecision(2)<<middle_of_integration;
+                std::cout<<std::setw(15);
+                tempStringStream<<std::fixed<<std::setprecision(2)<<middle_of_integration<<"("<<std::setprecision(0)<<ceil(sqrt(middle_of_integration))<<")";
+                temp=tempStringStream.str();
+                std::cout<<temp;
+                tempStringStream.str(std::string());
+                std::cout<<std::setw(25);
+                tempStringStream<<std::fixed<<std::setprecision(0)<<area<<"("<<std::setprecision(0)<<round(error)<<")";
+                temp=tempStringStream.str();
+                std::cout<<temp;
+                tempStringStream.str(std::string());
+                std::cout<<std::setw(10);
+                tempStringStream<<std::fixed<<std::setprecision(2)<<width_of_integral<<"("<<std::setprecision(0)<<ceil(sqrt(width_of_integral))<<")"<<std::endl;
+                temp=tempStringStream.str();
+                std::cout<<temp;
+                tempStringStream.str(std::string());
+
             }
             //We put a new line so that the comand prompt is cleaner
             std::cout<<std::endl;

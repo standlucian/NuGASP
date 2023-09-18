@@ -44,6 +44,9 @@
 #include <QLabel>
 #include <QPicture>
 #include <QPainter>
+#include <QMessageBox>
+#include <QApplication>
+#include <QCloseEvent>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -84,9 +87,12 @@ signals:
    void autoFitRequested(int, int);
    void requestClearTheScreen();
    void addBackgroundMarkerRequested(Int_t, Int_t);
+   void addIntegralMarkerRequested(Int_t, Int_t);
    void requestDeleteBackgroundMarkers();
+   void requestDeleteIntegralMarkers();
    void requestDeleteAllMarkers();
    void requestShowBackgroundMarkers();
+   void requestShowIntegralMarkers();
    void requestShowAllMarkers();
    void requestAddRangeMarker(Int_t, Int_t);
    void requestDeleteRangeMarkers();
@@ -95,6 +101,7 @@ signals:
    void requestDeleteGaussMarkers();
    void requestShowGaussMarkers();
    void requestFitGauss();
+   void killSwitch();
 };
 
 class QMainCanvas : public QWidget
@@ -105,6 +112,7 @@ public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
+   virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
 
@@ -122,9 +130,12 @@ public slots:
    void autoFit(int, int);
    void clearTheScreen();
    void addBackgroundMarker(Int_t, Int_t);
+   void addIntegralMarker(Int_t, Int_t);
    void deleteBackgroundMarkers();
+   void deleteIntegralMarkers();
    void deleteAllMarkers();
    void showBackgroundMarkers();
+   void showIntegralMarkers();
    void showAllMarkers();
    void addRangeMarker(Int_t, Int_t);
    void deleteRangeMarkers();
