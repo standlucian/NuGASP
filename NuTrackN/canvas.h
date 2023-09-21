@@ -2,16 +2,19 @@
 #ifndef EXAMPLE_H
 #define EXAMPLE_H
 
-#include <QWidget>
 #include <iostream>
+#include <QFileDialog>
+#include <QDataStream>
+#include <QFile>
 #include <fstream>
 #include <iomanip>
 #include <stdlib.h>
 #include <sstream>
 #include <vector>
 #include <tracknhistogram.h>
-
 #include "Integral.h"
+
+#include <QWidget>
 #include <QPushButton>
 #include <QLayout>
 #include <QTimer>
@@ -20,6 +23,9 @@
 #include <QMouseEvent>
 #include <QAction>
 #include <QKeySequence>
+#include <QFileDialog>
+#include <QDataStream>
+#include <QFile>
 
 #include <TCanvas.h>
 #include <TVirtualX.h>
@@ -32,10 +38,15 @@
 #include <TFitResult.h>
 #include <TLatex.h>
 #include <TLine.h>
+#include <TMatrixD.h>
+#include <Math/Minimizer.h>
 
 #include <QLabel>
 #include <QPicture>
 #include <QPainter>
+#include <QMessageBox>
+#include <QApplication>
+#include <QCloseEvent>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -86,6 +97,11 @@ signals:
    void requestAddRangeMarker(Int_t, Int_t);
    void requestDeleteRangeMarkers();
    void requestShowRangeMarkers();
+   void requestAddGaussMarker(Int_t, Int_t);
+   void requestDeleteGaussMarkers();
+   void requestShowGaussMarkers();
+   void requestFitGauss();
+   void killSwitch();
 };
 
 class QMainCanvas : public QWidget
@@ -96,7 +112,9 @@ public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas() {}
    virtual void changeEvent(QEvent * e);
+   virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
+   Double_t findMaxValueInInterval(int, int);
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
@@ -122,9 +140,18 @@ public slots:
    void addRangeMarker(Int_t, Int_t);
    void deleteRangeMarkers();
    void showRangeMarkers();
+   void addGaussMarker(Int_t, Int_t);
+   void deleteGaussMarkers();
+   void showGaussMarkers();
+   void fitGauss();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
+   void checkBackgrounds();
+   bool checkRanges();
+   bool checkGauss();
+   void fitBackground();
+
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
@@ -132,7 +159,11 @@ protected:
    std::vector<Double_t> integral_markers;
    std::vector<Double_t> background_markers;
    std::vector<Double_t> range_markers;
+   std::vector<Double_t> gauss_markers;
    Float_t maxValueInHistogram;
+   double_t backgroundA0, backgroundA1;
+   double_t backgroundIntegral, backgroundIntegralError;
+   TMatrixD *backgroundCovarianceMatrix;
 };
 
 

@@ -37,10 +37,10 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = canvas1.0.0
-DISTDIR = /home/raul/Documents/GitHub/Copie\ NuGASP/NuTrackN/.tmp/canvas1.0.0
+DISTDIR = /home/raul/Documents/GitHub/NuGASP/NuTrackN/.tmp/canvas1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1
-LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
+LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lMathCore -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
 AR            = ar cqs
 RANLIB        = 
 SED           = sed
@@ -513,9 +513,18 @@ moc_canvas.cpp: canvas.h \
 		$(ROOTSYS)/include/TLatex.h \
 		../../../../Desktop/root_install/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../../Desktop/root_install/include/TMatrixT.h \
+		../../../../Desktop/root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
-	/usr/lib/qt5/bin/moc $(DEFINES) --include '/home/raul/Documents/GitHub/Copie NuGASP/NuTrackN/moc_predefs.h' -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I'/home/raul/Documents/GitHub/Copie NuGASP/NuTrackN' -I'/home/raul/Documents/GitHub/Copie NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/raul/Documents/GitHub/NuGASP/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/raul/Documents/GitHub/NuGASP/NuTrackN -I'/home/raul/Documents/GitHub/NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -646,7 +655,16 @@ canvas.o: canvas.cxx canvas.h \
 		../../../../Desktop/root_install/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
 		../../../../Desktop/root_install/include/TText.h \
-		$(ROOTSYS)/include/TLine.h
+		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../../Desktop/root_install/include/TMatrixT.h \
+		../../../../Desktop/root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o canvas.o canvas.cxx
 
 main.o: main.cxx canvas.h \
@@ -763,6 +781,15 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TLatex.h \
 		../../../../Desktop/root_install/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
+		$(ROOTSYS)/include/TMatrixD.h \
+		../../../../Desktop/root_install/include/TMatrixT.h \
+		../../../../Desktop/root_install/include/TMatrixDfwd.h \
+		$(ROOTSYS)/include/Math/Minimizer.h \
+		$(ROOTSYS)/include/Math/IFunction.h \
+		$(ROOTSYS)/include/Math/MinimizerOptions.h \
+		$(ROOTSYS)/include/Math/Util.h \
+		$(ROOTSYS)/include/Math/Error.h \
+		$(ROOTSYS)/include/TError.h \
 		$(ROOTSYS)/include/THttpServer.h \
 		../../../../Desktop/root_install/include/THttpCallArg.h \
 		$(ROOTSYS)/include/TH2I.h \

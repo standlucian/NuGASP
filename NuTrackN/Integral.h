@@ -4,7 +4,10 @@
 #include "TH1.h"
 #include <vector>
 #include <algorithm>
-#include<iostream>
+#include <iostream>
+#include <iomanip>
+#include <cmath>
+#include <string>
 
 Double_t integral_no_background(TH1F *histogram,Double_t &error, Double_t pozition_marker_left, Double_t pozition_marker_right);
 
