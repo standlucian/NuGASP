@@ -22,6 +22,15 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
 
    setFocusPolicy(Qt::StrongFocus);
+   TLatex l;
+    l.SetTextSize(0.15);
+    l.SetTextAlign(22);
+    l.SetTextColor(kBlack);
+    l.DrawLatex(0.5, 0.5, "Hello, world !");
+
+
+
+
 }
 
 //______________________________________________________________________________
@@ -49,7 +58,6 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 void QRootCanvas::mousePressEvent( QMouseEvent *e )
 {
    // Handle mouse button press events.
-
     //This tells the canvas to handle events when any of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
    if (fCanvas) {
       switch (e->button()) {
@@ -219,6 +227,17 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         mKeyWasPressed=0;
     }
+    else if(fKeyWasPressed)
+    {
+        switch(event->key())
+        {
+            case Qt::Key_F:
+                //If I key is pressed after M, call show integral markers
+                emit fullscreen();
+                break;
+        }
+        fKeyWasPressed=0;
+    }
     else
     {
         //Looks at what key was pressed and does different things depending on what was pressed
@@ -240,9 +259,32 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 //if the C key is pressed, mark that down and prepare to execute a command
                 mKeyWasPressed=1;
                 break;
+            case Qt::Key_F:
+                //if the C key is pressed, mark that down and prepare to execute a command
+                fKeyWasPressed=1;
+                break;
             case Qt::Key_I:
                 //if the I key is pressed, add an integral marker on screen and remember the integral position
                 emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
+            case Qt::Key_Space:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit addSpaceBarMarkerRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_Right:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateplusTheScreen();
+                break;
+            case Qt::Key_Left:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateminusTheScreen();
+                break;
+            case Qt::Key_Down:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslatedownTheScreen();
+                break;
+            case Qt::Key_Up:
+                //if the I key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateupTheScreen();
                 break;
             case Qt::Key_B:
                 //if the B key is pressed, add a background marker on screen and remember the background position
@@ -259,6 +301,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_Equal:
                 //if the = key is pressed, clear the screen of everything except the histogram
                 emit requestClearTheScreen();
+            break;
+            case Qt::Key_E:
+                //if the = key is pressed, clear the screen of everything except the histogram
+                emit requestZoomTheScreen();
             break;
             case Qt::Key_Return:
                 //Pentru Petre
@@ -351,6 +397,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Integral With Background", this));
    //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
+      l->addWidget(b = new QPushButton("&Cal2P", this));
+   //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(Cal2pMain()));
 
    //connects the keyboard command C+I to the areaFunction;
    connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
@@ -367,8 +416,26 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard command B to adding the background markers;
    connect(canvas,SIGNAL(addBackgroundMarkerRequested(Int_t, Int_t)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
 
+   //connects the keyboard command space bar to adding the background markers;
+   connect(canvas,SIGNAL(addSpaceBarMarkerRequested(Int_t, Int_t)), this, SLOT(addSpaceBarMarker(Int_t, Int_t)));
+
    //connects the keyboard command I to adding the background markers;
    connect(canvas,SIGNAL(addIntegralMarkerRequested(Int_t, Int_t)), this, SLOT(addIntegralMarker(Int_t, Int_t)));
+
+   //connects the keyboard command E to adding the background markers;
+   connect(canvas,SIGNAL(requestZoomTheScreen()), this, SLOT(zoomTheScreen()));
+
+   //connects the keyboard command > to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateplusTheScreen()), this, SLOT(translateplusTheScreen()));
+
+   //connects the keyboard command < to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateminusTheScreen()), this, SLOT(translateminusTheScreen()));
+
+   //connects the keyboard command T to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslatedownTheScreen()), this, SLOT(translatedownTheScreen()));
+
+   //connects the keyboard command T to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateupTheScreen()), this, SLOT(translateupTheScreen()));
 
    //connects the keyboard command Z+B to clearing the background markers;
    connect(canvas,SIGNAL(requestDeleteBackgroundMarkers()), this, SLOT(deleteBackgroundMarkers()));
@@ -387,6 +454,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 
    //connects the keyboard command M+A to clearing all markers;
    connect(canvas,SIGNAL(requestShowAllMarkers()), this, SLOT(showAllMarkers()));
+
+   //connects the keyboard command F+S to clearing all markers;
+   connect(canvas,SIGNAL(fullscreen()), this, SLOT(zoomOut()));
 
    //connects the keyboard command R to adding a range marker;
    connect(canvas,SIGNAL(requestAddRangeMarker(Int_t, Int_t)), this, SLOT(addRangeMarker(Int_t, Int_t)));
@@ -442,6 +512,7 @@ void QMainCanvas::clicked1()
    QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
    // Casts a QT string to C++ string
    std::string SpectrumName = fileName.toStdString();
+   std::cout<<"numele fisierului"<<SpectrumName;
    std::ifstream file(SpectrumName, std::ios::in);
    if (!file) {
       std::cerr << "Error: could not open file" << std::endl;
@@ -490,6 +561,20 @@ void QMainCanvas::areaFunctionWithBackground()
 
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
+}
+
+
+void QMainCanvas::Cal2pMain() {
+    bool ok;
+    double energie1 = QInputDialog::getDouble(this, QString::number(puncte_calib2p[puncte_calib2p.size()-2])+" no. channal", tr("First Energy:"), 0, -10000, 10000, 2, &ok);
+    if (!ok)
+        return;
+
+    double energie2 = QInputDialog::getDouble(this, QString::number(puncte_calib2p[puncte_calib2p.size()-1])+" no. channal", tr("Second Energy"), 0, -10000, 10000, 2, &ok);
+    if (!ok)
+        return;
+
+    CalibrareIn2P(puncte_calib2p, energie1, energie2);
 }
 
 //______________________________________________________________________________
@@ -643,6 +728,7 @@ void QMainCanvas::autoFit(int x, int y)
     temp=tempStringStream.str();
     std::cout<<std::setw(10);
     std::cout<<temp<<std::endl;
+    puncte_calib2p.push_back(gaussianCenter);
 
     //Make list of objects that have been drawn to delete them later
     listOfObjectsDrawnOnScreen.Add(gaussianWithBackgroundFunction);
@@ -737,6 +823,7 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     canvas->getCanvas()->Update();
 }
 
+
 void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
 {
     std::string objectInfo, temp;
@@ -779,6 +866,83 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
     listOfObjectsDrawnOnScreen.Add(integralLine);
 }
 
+void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+    // Crearea unui canvas
+
+
+
+    // Crearea unei histograme noi și scalarea conținutului
+    /*TH1F *h2 = (TH1F*)h1f->Clone("h2");
+    for (int bin = 1; bin <= h2->GetNbinsX(); ++bin) {
+        h2->SetBinContent(bin, h1f->GetBinContent(bin) /1.0);
+    }
+
+    // Draw the scaled histogram
+    h2->Draw();
+
+    // Adjust the Y-axis to fit the scaled histogram visually
+    h2->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() *2.0);
+
+
+
+    // Update the canvas
+        canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update(); */
+
+
+
+
+
+
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the integral marker vector
+    spacebar_markers.push_back((Double_t)binX);
+    //std::cout<<(Double_t)binX<<std::endl;
+
+    //Create a yellow integral line and add it to the screen
+    TLine *spacebarLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    spacebarLine->SetLineColor(kCyan);
+    spacebarLine->SetLineWidth(2);
+
+    spacebarLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(spacebarLine);
+
+
+   //h1f->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
+   std::cout<<"valoarea de start este la "<<binX<<"\n";
+   zoom_markers.push_back(binX);
+
+   //canvas->getCanvas()->Modified();
+   //canvas->getCanvas()->Update();
+
+}
+
 
 //______________________________________________________________________________
 void QMainCanvas::clearTheScreen()
@@ -799,6 +963,107 @@ void QMainCanvas::clearTheScreen()
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::zoomTheScreen()
+{
+    int i= zoom_markers.size();
+    std::cout<<"dimensiunea vectorului este "<<i<<"\n";
+    int x1,x2;
+    if(i>=2){
+    std::cout<<zoom_markers[i-1]<<"\n";
+    std::cout<<zoom_markers[i-2]<<"\n";
+    if(zoom_markers[i-2]<zoom_markers[i-1]){
+    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
+    if(zoom_markers[i-1]<zoom_markers[i-2]){
+    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
+    if(i<=1){
+        std::cout<<"AI nev de doi space\n";}
+        clearTheScreen();
+  canvas->getCanvas()->Modified();
+  canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::zoomOut()
+{
+ h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() );
+ h1f->GetXaxis()->SetRangeUser(0, h1f->GetMaximum() );
+ h1f->GetXaxis()->UnZoom();
+  h1f->GetYaxis()->UnZoom();
+  canvas->getCanvas()->Modified();
+  canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::translateplusTheScreen()
+{
+
+    int k= zoom_markers.size();
+    if(k>1){
+    zoom_markers[k-1]=zoom_markers[k-1]+10;
+    zoom_markers[k-2]=zoom_markers[k-2]+10;
+    zoomTheScreen();
+
+    }
+
+
+}
+
+void QMainCanvas::translateminusTheScreen()
+{
+
+    int k= zoom_markers.size();
+    if(k>1){
+    zoom_markers[k-1]=zoom_markers[k-1]-10;
+    zoom_markers[k-2]=zoom_markers[k-2]-10;
+    zoomTheScreen();
+
+    }
+
+
+}
+
+void QMainCanvas::translatedownTheScreen()
+{
+
+    // for (int bin = 1; bin <= h1f->GetNbinsX(); ++bin) {
+        //h1f->SetBinContent(bin, h1f->GetBinContent(bin) /1.0);
+    //}
+
+    // Draw the scaled histogram
+    //h1f->Draw();
+
+    // Adjust the Y-axis to fit the scaled histogram visually
+    //h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() *1.05);
+    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() * 1.05);
+
+
+
+    // Update the canvas
+        canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+}
+
+void QMainCanvas::translateupTheScreen()
+{
+
+    // for (int bin = 1; bin <= h1f->GetNbinsX(); ++bin) {
+        //h1f->SetBinContent(bin, h1f->GetBinContent(bin) /1.0);
+    //}
+
+    // Draw the scaled histogram
+    //h1f->Draw();
+
+    // Adjust the Y-axis to fit the scaled histogram visually
+    //h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() *1.05);
+    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() / 1.05);
+
+
+
+    // Update the canvas
+        canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
 }
 
 //______________________________________________________________________________

@@ -13,6 +13,9 @@
 #include <vector>
 #include <tracknhistogram.h>
 #include "Integral.h"
+#include "calib.h"
+#include "mydialog.h"
+
 
 #include <QWidget>
 #include <QPushButton>
@@ -26,6 +29,15 @@
 #include <QFileDialog>
 #include <QDataStream>
 #include <QFile>
+#include <QLineEdit>
+#include <QApplication>
+#include <QDialog>
+#include <QVBoxLayout>
+#include <QLabel>
+#include <QLineEdit>
+#include <QInputDialog>
+
+
 
 #include <TCanvas.h>
 #include <TVirtualX.h>
@@ -40,6 +52,9 @@
 #include <TLine.h>
 #include <TMatrixD.h>
 #include <Math/Minimizer.h>
+#include "TPolyLine.h"
+#include "TEllipse.h"
+
 
 #include <QLabel>
 #include <QPicture>
@@ -80,14 +95,21 @@ protected:
    bool cKeyWasPressed=0;
    bool zKeyWasPressed=0;
    bool mKeyWasPressed=0;
+   bool fKeyWasPressed=0;
 
 signals:
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void autoFitRequested(int, int);
    void requestClearTheScreen();
+   void requestZoomTheScreen();
+   void requesttranslateplusTheScreen();
+   void requesttranslateminusTheScreen();
+   void requesttranslatedownTheScreen();
+   void requesttranslateupTheScreen();
    void addBackgroundMarkerRequested(Int_t, Int_t);
    void addIntegralMarkerRequested(Int_t, Int_t);
+   void addSpaceBarMarkerRequested(Int_t, Int_t);
    void requestDeleteBackgroundMarkers();
    void requestDeleteIntegralMarkers();
    void requestDeleteAllMarkers();
@@ -102,6 +124,7 @@ signals:
    void requestShowGaussMarkers();
    void requestFitGauss();
    void killSwitch();
+   void fullscreen();
 };
 
 class QMainCanvas : public QWidget
@@ -129,8 +152,14 @@ public slots:
    void handle_root_events();
    void autoFit(int, int);
    void clearTheScreen();
+   void zoomTheScreen();
+   void translateplusTheScreen();
+   void translateminusTheScreen();
+   void translatedownTheScreen();
+   void translateupTheScreen();
    void addBackgroundMarker(Int_t, Int_t);
    void addIntegralMarker(Int_t, Int_t);
+   void addSpaceBarMarker(Int_t, Int_t);
    void deleteBackgroundMarkers();
    void deleteIntegralMarkers();
    void deleteAllMarkers();
@@ -144,6 +173,8 @@ public slots:
    void deleteGaussMarkers();
    void showGaussMarkers();
    void fitGauss();
+   void Cal2pMain();
+   void zoomOut();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -157,10 +188,13 @@ protected:
    QTimer         *fRootTimer;
    TList listOfObjectsDrawnOnScreen;
    std::vector<Double_t> integral_markers;
+   std::vector<Double_t> zoom_markers;
+   std::vector<Double_t> spacebar_markers;
    std::vector<Double_t> background_markers;
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
    Float_t maxValueInHistogram;
+   std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
