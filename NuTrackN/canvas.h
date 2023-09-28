@@ -151,6 +151,7 @@ protected:
    bool checkRanges();
    bool checkGauss();
    void fitBackground();
+   double findBestIntegralLimit(int, double, double);
 
    QRootCanvas    *canvas;
    QPushButton    *b;

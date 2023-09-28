@@ -911,7 +911,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
     binX=std::stoi(temp);
 
     //Add the position to the background marker vector
-    range_markers.push_back(binX);
+    range_markers.push_back(binX-0.5);
 
     //Create a blue background line and add it to the screen
     TLine *rangeLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
@@ -925,7 +925,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 
     if(range_markers.size()%2==0)
     {
-        TLine *bottomRangeLine = new TLine(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, 0);
+        TLine *bottomRangeLine = new TLine(range_markers[range_markers.size()-2], 0., binX-0.5, 0);
         bottomRangeLine->SetLineColor(kYellow);
         bottomRangeLine->SetLineWidth(2);
 
@@ -934,7 +934,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
         //Add the line to the list of things put on the screen, so it can be deleted
         listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2], 0., binX-0.5, maxValueInHistogram*1.05);
         backgroundArea->SetFillColor(kYellow);
         backgroundArea->SetFillStyle(3545);
         backgroundArea->Draw("same");
@@ -968,7 +968,7 @@ void QMainCanvas::showRangeMarkers()
 
         if(i%2)
         {
-            TLine *bottomRangeLine = new TLine(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, 0);
+            TLine *bottomRangeLine = new TLine(range_markers[i-1], 0., range_markers[i], 0);
             bottomRangeLine->SetLineColor(kYellow);
             bottomRangeLine->SetLineWidth(2);
 
@@ -976,7 +976,7 @@ void QMainCanvas::showRangeMarkers()
             //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-            TBox *backgroundArea = new TBox(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+            TBox *backgroundArea = new TBox(range_markers[i-1], 0., range_markers[i], maxValueInHistogram*1.05);
             backgroundArea->SetFillColor(kYellow);
             backgroundArea->SetFillStyle(3545);
             backgroundArea->Draw("same");
@@ -1016,7 +1016,7 @@ void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
     binX=std::stoi(temp);
 
     //Add the position to the background marker vector
-    gauss_markers.push_back(binX);
+    gauss_markers.push_back(binX-0.5);
 
     //Create a blue background line and add it to the screen
     TLine *gaussLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
@@ -1043,7 +1043,7 @@ void QMainCanvas::showGaussMarkers()
 {
     for(uint i=0;i<gauss_markers.size();i++)
     {
-        TLine *gaussLine = new TLine(gauss_markers[i]-0.5, 0., gauss_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *gaussLine = new TLine(gauss_markers[i], 0., gauss_markers[i], maxValueInHistogram*1.05);
         gaussLine->SetLineColor(kPink);
         gaussLine->SetLineWidth(2);
 
@@ -1062,7 +1062,7 @@ void QMainCanvas::fitGauss()
     bool goodRanges, goodGauss=0;
     std::string temp;
     std::ostringstream tempStringStream;
-    double maxValue, fitIntegralError;
+    double maxValue, fitIntegralError, leftIntegralLimit, rightIntegralLimit;
 
     //Checking to see if the backgrounds are fine, not overlapping, not odd numbered, and fixes the background if needed
     checkBackgrounds();
@@ -1206,6 +1206,11 @@ void QMainCanvas::fitGauss()
             tempGaussFunction->SetParameter(2,fullFunction->GetParameter(4+i*3));
             tempGaussFunction->SetParError(2,fullFunction->GetParError(4+i*3));
 
+            leftIntegralLimit=findBestIntegralLimit(range_markers[0],fullFunction->GetParameter(3+i*3),fullFunction->GetParameter(4+i*3));
+            rightIntegralLimit=findBestIntegralLimit(range_markers[1],fullFunction->GetParameter(3+i*3),fullFunction->GetParameter(4+i*3));
+
+            std::cout<<leftIntegralLimit<<" "<<rightIntegralLimit<<std::endl;
+
             //Getting the full covariance matrix and then cutting it for just our Gauss fit parameters
             TMatrixDSym covMatrix=fitResult->GetCovarianceMatrix();
             TMatrixDSym tempMatrix=fitResult->GetCovarianceMatrix().GetSub(2+i*3,4+i*3,2+i*3,4+i*3);
@@ -1229,6 +1234,22 @@ void QMainCanvas::fitGauss()
     //Tell the canvas that stuff got modified
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+}
+
+//______________________________________________________________________________
+double QMainCanvas::findBestIntegralLimit(int rangeLimit, double peakCenter, double peakSigma)
+{
+
+    std::cout<<rangeLimit<<" "<<peakCenter<<" "<<peakSigma<<std::endl;
+    if(abs(rangeLimit-peakCenter)<3*peakSigma/2)
+        return rangeLimit;
+    else
+    {
+        if(rangeLimit<peakCenter)
+            return (peakCenter-3*peakSigma/2);
+        else
+            return (peakCenter+3*peakSigma/2);
+    }
 }
 
 //______________________________________________________________________________
