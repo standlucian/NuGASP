@@ -958,7 +958,7 @@ void QMainCanvas::showRangeMarkers()
 {
     for(uint i=0;i<range_markers.size();i++)
     {
-        TLine *rangeLine = new TLine(range_markers[i]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *rangeLine = new TLine(range_markers[i], 0., range_markers[i], maxValueInHistogram*1.05);
         rangeLine->SetLineColor(kYellow);
         rangeLine->SetLineWidth(2);
 
@@ -1062,7 +1062,7 @@ void QMainCanvas::fitGauss()
     bool goodRanges, goodGauss=0;
     std::string temp;
     std::ostringstream tempStringStream;
-    double maxValue, fitIntegralError, leftIntegralLimit, rightIntegralLimit;
+    double maxValue, fitIntegralError, leftIntegralLimit, rightIntegralLimit, limitedBackgroundIntegralError;
 
     //Checking to see if the backgrounds are fine, not overlapping, not odd numbered, and fixes the background if needed
     checkBackgrounds();
@@ -1095,7 +1095,7 @@ void QMainCanvas::fitGauss()
         TFormula *gaussian = new TFormula("gaussian","[0]*exp(-(x-[1])^2/(2*[2]))");
 
         //Declaring the background function
-        TF1 *backgroundFunction = new TF1("backgroundFunction","background",range_markers[0],range_markers[1]);
+        TF1 *backgroundFunction = new TF1("backgroundFunction","background",range_markers[0],range_markers[1]);    
 
         //Declaring the full function that will be used for fitting, initially with just the background
         TF1* fullFunction = new TF1("fullFunction","backgroundFunction", range_markers[0],range_markers[1]);
@@ -1199,6 +1199,7 @@ void QMainCanvas::fitGauss()
 
             //Creating a fake Gauss function to obtain the integral and integral error
             TF1* tempGaussFunction = new TF1("tempGaussFunction","gaussian", range_markers[0],range_markers[1]);
+            TF1 *tempBackgroundFunction = new TF1("tempBackgroundFunction","background",range_markers[0],range_markers[1]);
             tempGaussFunction->SetParameter(0,fullFunction->GetParameter(2+i*3));
             tempGaussFunction->SetParError(0,fullFunction->GetParError(2+i*3));
             tempGaussFunction->SetParameter(1,fullFunction->GetParameter(3+i*3));
@@ -1206,20 +1207,24 @@ void QMainCanvas::fitGauss()
             tempGaussFunction->SetParameter(2,fullFunction->GetParameter(4+i*3));
             tempGaussFunction->SetParError(2,fullFunction->GetParError(4+i*3));
 
+            tempBackgroundFunction->SetParameter(0,backgroundA1);
+            tempBackgroundFunction->SetParError(0,backgroundA1Error);
+            tempBackgroundFunction->SetParameter(1,backgroundA0);
+            tempBackgroundFunction->SetParError(1,backgroundA0Error);
+
             leftIntegralLimit=findBestIntegralLimit(range_markers[0],fullFunction->GetParameter(3+i*3),fullFunction->GetParameter(4+i*3));
             rightIntegralLimit=findBestIntegralLimit(range_markers[1],fullFunction->GetParameter(3+i*3),fullFunction->GetParameter(4+i*3));
-
-            std::cout<<leftIntegralLimit<<" "<<rightIntegralLimit<<std::endl;
 
             //Getting the full covariance matrix and then cutting it for just our Gauss fit parameters
             TMatrixDSym covMatrix=fitResult->GetCovarianceMatrix();
             TMatrixDSym tempMatrix=fitResult->GetCovarianceMatrix().GetSub(2+i*3,4+i*3,2+i*3,4+i*3);
 
             //Obtaining the integral error. This will fail if the fit did not converge!
-            fitIntegralError=tempGaussFunction->IntegralError(range_markers[0],range_markers[1],tempGaussFunction->GetParameters(),tempMatrix.GetMatrixArray());
+            fitIntegralError=tempGaussFunction->IntegralError(leftIntegralLimit,rightIntegralLimit,tempGaussFunction->GetParameters(),tempMatrix.GetMatrixArray());
+            limitedBackgroundIntegralError=tempBackgroundFunction->IntegralError(leftIntegralLimit,rightIntegralLimit,backgroundFitResult->GetParams(),backgroundFitResult->GetCovarianceMatrix().GetMatrixArray());
 
             //The peak error is the quadratic sum of the Gauss integral error and the background integral error
-            tempStringStream<< std::fixed<<std::setprecision(0)<<tempGaussFunction->Integral(range_markers[0],range_markers[1])<<"("<<round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2)))<<")";
+            tempStringStream<< std::fixed<<std::setprecision(0)<<tempGaussFunction->Integral(leftIntegralLimit,rightIntegralLimit)<<"("<<round(sqrt(pow(fitIntegralError,2)+pow(limitedBackgroundIntegralError,2)))<<")";
             temp=tempStringStream.str();
             std::cout<<std::setw(25);
             std::cout<<temp;
@@ -1239,16 +1244,14 @@ void QMainCanvas::fitGauss()
 //______________________________________________________________________________
 double QMainCanvas::findBestIntegralLimit(int rangeLimit, double peakCenter, double peakSigma)
 {
-
-    std::cout<<rangeLimit<<" "<<peakCenter<<" "<<peakSigma<<std::endl;
-    if(abs(rangeLimit-peakCenter)<3*peakSigma/2)
+    if(abs(rangeLimit-peakCenter)<3*peakSigma)
         return rangeLimit;
     else
     {
         if(rangeLimit<peakCenter)
-            return (peakCenter-3*peakSigma/2);
+            return (peakCenter-3*peakSigma);
         else
-            return (peakCenter+3*peakSigma/2);
+            return (peakCenter+3*peakSigma);
     }
 }
 
@@ -1361,17 +1364,19 @@ void QMainCanvas::fitBackground()
     backgroundFunction->SetParameter(1,minimum);
 
     //Fitting the background
-    TFitResultPtr fitResult = tempHist->Fit(backgroundFunction,"QMSW", "same");
+    backgroundFitResult = tempHist->Fit(backgroundFunction,"QMSRL", "same");
 
     //Obtaining the fit parameters, the background integral over the fit range, the integral error, and the covariance matrix
     backgroundA0=backgroundFunction->GetParameter(1);
+    backgroundA0Error=backgroundFunction->GetParError(1);
     backgroundA1=backgroundFunction->GetParameter(0);
+    backgroundA1Error=backgroundFunction->GetParError(0);
     backgroundIntegral=backgroundFunction->Integral(range_markers[0],range_markers[1]);
-    backgroundIntegralError=backgroundFunction->IntegralError(range_markers[0],range_markers[1],fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
+    backgroundIntegralError=backgroundFunction->IntegralError(range_markers[0],range_markers[1],backgroundFitResult->GetParams(),backgroundFitResult->GetCovarianceMatrix().GetMatrixArray());
 
-    TMatrixD tempMatrix=fitResult->GetCovarianceMatrix();
-
-    backgroundCovarianceMatrix=&tempMatrix;
+    TMatrixD tempMatrix=backgroundFitResult->GetCovarianceMatrix();
+    backgroundCovarianceMatrix.Clear();
+    backgroundCovarianceMatrix=tempMatrix;
 
     tempHist->Delete();
 

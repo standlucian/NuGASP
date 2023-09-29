@@ -162,9 +162,10 @@ protected:
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
    Float_t maxValueInHistogram;
-   double_t backgroundA0, backgroundA1;
+   double_t backgroundA0, backgroundA1, backgroundA0Error, backgroundA1Error;
    double_t backgroundIntegral, backgroundIntegralError;
-   TMatrixD *backgroundCovarianceMatrix;
+   TMatrixD backgroundCovarianceMatrix;
+   TFitResultPtr backgroundFitResult;
 };
 
 
