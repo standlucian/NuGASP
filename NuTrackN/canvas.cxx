@@ -1,4 +1,5 @@
 #include "canvas.h"
+#include "Design.h"
 
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
@@ -432,7 +433,7 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetBorderMode(0);
    canvas->getCanvas()->SetFillColor(0);
    canvas->getCanvas()->SetGrid();
-
+   changeBackgroundColor(canvas->getCanvas());
    h1f->Reset();
    //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
