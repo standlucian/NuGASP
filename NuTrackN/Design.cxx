@@ -14,8 +14,8 @@ setReadOnly(false);//this allows the user to insert text into the command prompt
 availableText=this->toPlainText();//we set the available text to basically empty when the commandPrompt object is created
 connect(this,&QPlainTextEdit::copyAvailable,this,&CommandPrompt::allowUserToCopyText);//connects the signal that will be sent when the user selects and deselects text (check the slot function for further information
 connect(this, &CommandPrompt::textChanged,this, &CommandPrompt::handleTextChanges);//this sends signals every time a key is pressed in the command prompt (because Enter signal iss not availabile) and it handles the text accordingly
+connect(this,&CommandPrompt::cursorPositionChanged,this, &CommandPrompt::handleCursorMoved);
 };
-
 
 void CommandPrompt::setMainCanvas(QMainCanvas* m)//setter for the mainCanvas variable; this allows class usage from any file without passing the QMainCanvas m to the ClassInstance getter
 {
@@ -32,6 +32,7 @@ void CommandPrompt::allowUserToCopyText(bool yes) //slot function used to allow 
     if(yes) //we check if the signal copyAvailabile with bool value "yes" is true or false. if it is true, the user has made a selection and we restrict the ability to modify the terminal text
         {
             setReadOnly(true);//disallow the user to moify text
+            copyAvailabile = true;
 
         }
         else //if the signal is false, that means the text was deselected. we allow the user to modigy text, but we move the text cursor to the end to make sure the already outputted terminal text stays intact
@@ -42,7 +43,7 @@ void CommandPrompt::allowUserToCopyText(bool yes) //slot function used to allow 
             QTextCursor cursor = this->textCursor();//create a cursor object and set it at the end
             cursor.movePosition(QTextCursor::End);
             setTextCursor(cursor);//updates the cursor in QPlainTextEdit to the value of the created cursor (at the end)
-
+            copyAvailabile=false;
             // Reconnect the copyAvailable signal
             connect(this, &QPlainTextEdit::copyAvailable, this, &CommandPrompt::allowUserToCopyText);
 
@@ -50,6 +51,24 @@ void CommandPrompt::allowUserToCopyText(bool yes) //slot function used to allow 
 
 
 
+}
+
+void CommandPrompt::handleCursorMoved()
+{
+    QTextCursor cursor = this->textCursor();//create a cursor object and set it at the end
+
+
+
+    if(!cursor.atEnd())
+    {
+        setReadOnly(true);
+    }
+    else
+    {
+        if(copyAvailabile)
+            setReadOnly(true);//if cursor is at the end but user has made a selection we still dont let him modify
+        else setReadOnly(false); //if no selection is made we let the user modify onlyy when the cursor is at the end
+    }
 }
 
 
@@ -97,6 +116,7 @@ void CommandPrompt::handleTextChanges() // handles the text each time the text c
     }
 
 };
+
 
 
 CommandPrompt* CommandPrompt::getInstance() // getter for the class instance

@@ -33,7 +33,7 @@ private:
     void setAvailableText(QString string);
 
     bool commandPromptHasFocus; // bool to check if command  prompt has focus, currently not in use
-    bool b;
+    bool copyAvailabile;
     std::string command; //  should have been used to be returned by getUserInput()
     QString availableText;
 protected:
@@ -43,6 +43,8 @@ protected:
 public slots:
         void handleTextChanges();
         void allowUserToCopyText(bool yes);
+        void handleCursorMoved();
+
 
 
 };

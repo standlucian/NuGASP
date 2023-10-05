@@ -26,6 +26,8 @@
 #include <QFileDialog>
 #include <QDataStream>
 #include <QFile>
+#include <QtMath>
+
 
 #include <TCanvas.h>
 #include <TVirtualX.h>
@@ -40,6 +42,7 @@
 #include <TLine.h>
 #include <TMatrixD.h>
 #include <Math/Minimizer.h>
+
 
 #include <QLabel>
 #include <QPicture>
