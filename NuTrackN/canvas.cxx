@@ -219,7 +219,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             default:
                 std::cout<<"Waited for show command after M was pressed but no valid command arrived after it"<<std::endl;
-                CommandPrompt::getInstance()->insertPlainText("Waited for show command after M was pressed but no valid command arrived after it\n");
+                CommandPrompt::getInstance()->appendPlainText("Waited for show command after M was pressed but no valid command arrived after it\n");
                 break;
         }
         mKeyWasPressed=0;
@@ -629,7 +629,7 @@ void QMainCanvas::autoFit(int x, int y)
         .arg(energyLabel)
         .arg(areaLabel)
         .arg(widthLabel);
-    CommandPrompt::getInstance()->appendPlainText(headerRow + '\n');
+    CommandPrompt::getInstance()->appendPlainText(headerRow);
 
     std::cout<<std::left;
     std::cout<<std::setw(10);
@@ -645,9 +645,6 @@ void QMainCanvas::autoFit(int x, int y)
 
 
     //Second row that contains variable numbers
-
-
-
     std::cout<<std::setw(10);
     std::cout<<"1";
     std::cout<<std::setw(10);
@@ -1198,7 +1195,7 @@ void QMainCanvas::fitGauss()
                     if((int) fitResult==4)
                     {
                         std::cout<<"The fit has failed to converge despite our best attempts. Some errors will not be calculated."<<std::endl;
-                        CommandPrompt::getInstance()->insertPlainText("The fit has failed to converge despite our best attempts. Some errors will not be calculated.\n");
+                        CommandPrompt::getInstance()->appendPlainText("The fit has failed to converge despite our best attempts. Some errors will not be calculated.\n");
                     }
                 }
             }
@@ -1236,7 +1233,7 @@ void QMainCanvas::fitGauss()
             .arg(energyLabel)
             .arg(areaLabel)
             .arg(widthLabel);
-        CommandPrompt::getInstance()->appendPlainText(headerRow + '\n');
+        CommandPrompt::getInstance()->appendPlainText(headerRow);
 
         for(uint i=0;i<gauss_markers.size();i++)
         {
@@ -1279,7 +1276,25 @@ void QMainCanvas::fitGauss()
             temp=tempStringStream.str();
             std::cout<<std::setw(10);
             std::cout<<temp<<std::endl;
+
+            QString numberStr = QString("%1").arg(i+1, 0, ' ');
+            QString gaussianCenterStr = QString("%1").arg(fullFunction->GetParameter(3+i*3),0, ' ', 2);
+            QString energyStr = QString("%1(%2)").arg(fullFunction->GetParameter(3+i*3), 0, ' ', 2).arg(ceil(fullFunction->GetParError(3+i*3)*100), 0, ' ',0);
+            QString gaussianIntegralStr = QString("%1(%2)").arg(tempGaussFunction->Integral(range_markers[0],range_markers[1]), 0, ' ', 0).arg(round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2))), 0, ' ',0);
+            QString gaussianFWHMStr = QString("%1(%2)").arg(fullFunction->GetParameter(4+i*3)*2.3548, 0, ' ', 2).arg(ceil(fullFunction->GetParError(4+i*3)*2.3548*100), 0, ' ',0);
+
+
+            QString dataRow = QString("%1%2%3%4%5")
+                .arg(numberStr,-20,QChar(' '))
+                .arg(gaussianCenterStr, -17, QChar(' '))
+                .arg(energyStr, -18, QChar(' '))
+                .arg(gaussianIntegralStr, -23, QChar(' '))
+                .arg(gaussianFWHMStr, 0, QChar(' '));
+
+            // Insert data row into QPlainTextEdit
+            CommandPrompt::getInstance()->appendPlainText(dataRow);
         }
+        CommandPrompt::getInstance()->appendPlainText("");
     }
 
     //Tell the canvas that stuff got modified
@@ -1297,7 +1312,7 @@ void QMainCanvas::checkBackgrounds()
         if(background_markers.size()%2)
         {
             std::cout<<"There is an odd number of background markers, "<<background_markers.size()<<", so the last one, at "<<background_markers[background_markers.size()-1]<<", was removed"<<std::endl;
-            CommandPrompt::getInstance()->insertPlainText("There is an odd number of background markers, "+ QString::number(background_markers.size())+", so the last one, at " + QString::number(background_markers[background_markers.size()-1]) + ", was removed \n");
+            CommandPrompt::getInstance()->appendPlainText("There is an odd number of background markers, "+ QString::number(background_markers.size())+", so the last one, at " + QString::number(background_markers[background_markers.size()-1]) + ", was removed \n");
             background_markers.pop_back();
         }
 
@@ -1305,21 +1320,21 @@ void QMainCanvas::checkBackgrounds()
         if(overlapping_markers(background_markers))
         {
             std::cout<<"The background markers shown below produced regions which overlapped"<<std::endl;
-            CommandPrompt::getInstance()->insertPlainText("The background markers shown below produced regions wwhich overlapped\n");
+            CommandPrompt::getInstance()->appendPlainText("The background markers shown below produced regions wwhich overlapped\n");
             for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
-                CommandPrompt::getInstance()->insertPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
             }
 
             std::cout<<"Thus, we have reordered them in order to produce non-overlapping regions, as seen below:"<<std::endl;
-            CommandPrompt::getInstance()->insertPlainText("Thus, we have reordered them in order to produce non-overlapping regions, as seen below:\n");
+            CommandPrompt::getInstance()->appendPlainText("Thus, we have reordered them in order to produce non-overlapping regions, as seen below:\n");
             sort(background_markers.begin(),background_markers.end());
 
             for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
-                CommandPrompt::getInstance()->insertPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
             }
         }
     }
@@ -1332,14 +1347,14 @@ bool QMainCanvas::checkRanges()
     if(range_markers.size()<2)
     {
         std::cout<<"There are fewer than 2 range markers added, namely "<<range_markers.size()<<", and the fitting procedure cannot run"<<std::endl;
-        CommandPrompt::getInstance()->insertPlainText("There are fewer than 2 range markers added, namely "+QString::number(range_markers.size()) +", and the fitting procedure cannot run\n");
+        CommandPrompt::getInstance()->appendPlainText("There are fewer than 2 range markers added, namely "+QString::number(range_markers.size()) +", and the fitting procedure cannot run\n");
         return 0;
     }
     //Check that there are no more than 2 range markers. If there are, delete all but the first 2
     else if(range_markers.size()>2)
     {
         std::cout<<"There are more than 2 range markers added, namely "<<range_markers.size()<<". Only the first 2 markers will be used, namely "<<range_markers[0]<<"-"<<range_markers[1]<<std::endl;
-        CommandPrompt::getInstance()->insertPlainText("There are more than 2 range markers added, namely "+QString::number(range_markers.size()) +". Only the first 2 markers will be used, namely "+ QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"\n");
+        CommandPrompt::getInstance()->appendPlainText("There are more than 2 range markers added, namely "+QString::number(range_markers.size()) +". Only the first 2 markers will be used, namely "+ QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"\n");
 
         for(uint i=2;i<=range_markers.size();i++)
             range_markers.pop_back();
@@ -1361,7 +1376,7 @@ bool QMainCanvas::checkGauss()
         {
             std::cout<<"The peak center marker at "<<gauss_markers[i]<<" is not within the designated fit region "<<range_markers[0]<<"-"<<range_markers[1]<<" and has been removed"<<std::endl;
 
-            CommandPrompt::getInstance()->insertPlainText("The peak center marker at "+QString::number(gauss_markers[i])+" is not within the designated fit region " + QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"and has been removed\n");
+            CommandPrompt::getInstance()->appendPlainText("The peak center marker at "+QString::number(gauss_markers[i])+" is not within the designated fit region " + QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"and has been removed\n");
 
             gauss_markers.erase(gauss_markers.begin()+i);
             i--;
@@ -1371,7 +1386,7 @@ bool QMainCanvas::checkGauss()
     if(gauss_markers.size()==0)
     {
         std::cout<<"There are no valid markers for any peak centers to fit! The program will not run!"<<std::endl;
-        CommandPrompt::getInstance()->insertPlainText("There are no valid markers for any peak centers to fit! The program will not run!\n");
+        CommandPrompt::getInstance()->appendPlainText("There are no valid markers for any peak centers to fit! The program will not run!\n");
         return 0;
     }
 

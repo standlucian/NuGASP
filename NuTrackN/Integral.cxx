@@ -125,7 +125,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
             //We check if some of the background markers are overlapping, if they are we invert them when we sort them but we still infrom the user of this
             if(overlapping_markers(background_markers)==true)
             {
-                CommandPrompt::getInstance()->insertPlainText("Some markers are overlapping, so the overlaapping markers were inverted.\n");
+                CommandPrompt::getInstance()->appendPlainText("Some markers are overlapping, so the overlaapping markers were inverted.\n");
                 std::cout<<"Some markers are overlapping, so the overlapping markers were inverted.\n";
             }
             //the function from above is called which gives us the slope and the addition of the line basically the equation of the best fitted line
@@ -133,7 +133,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
         }
         else
         {
-            CommandPrompt::getInstance()->insertPlainText("Background markers have to  be in multiples of 2 \n\n");
+            CommandPrompt::getInstance()->appendPlainText("Background markers have to  be in multiples of 2 \n\n");
             std::cout<<"Background markers have to be in multiples of 2\n\n";
             return;
         }
@@ -171,7 +171,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
                 .arg(energyLabel)
                 .arg(areaLabel)
                 .arg(widthLabel);
-            CommandPrompt::getInstance()->insertPlainText(headerRow + '\n');
+            CommandPrompt::getInstance()->appendPlainText(headerRow);
 
 
             //Then we get the markers by pairs and feed them in the function above that calculates the integral with no background
@@ -233,16 +233,16 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
                     .arg(gaussianFWHMStr, 0, QChar(' '));
 
                 // Insert data row into QPlainTextEdit
-                CommandPrompt::getInstance()->insertPlainText(dataRow + '\n');
+                CommandPrompt::getInstance()->appendPlainText(dataRow);
 
             }
             //We put a new line so that the comand prompt is cleaner
             std::cout<<std::endl;
-            CommandPrompt::getInstance()->insertPlainText("\n");
+            CommandPrompt::getInstance()->appendPlainText("");
         }
         else
         {
-            CommandPrompt::getInstance()->insertPlainText("Integral  markers have ti be in multiples of 2 \n\n");
+            CommandPrompt::getInstance()->appendPlainText("Integral  markers have to be in multiples of 2 \n\n");
             std::cout<<"Integral markers have to be in multiples of 2\n\n";
             return;
         }
@@ -250,7 +250,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
     else
     {
         std::cout<<"Place markers for the integral to be calculated\n";
-        CommandPrompt::getInstance()->insertPlainText("Place markers for the integral to be calculated\n");
+        CommandPrompt::getInstance()->appendPlainText("Place markers for the integral to be calculated\n");
         return;
     }
 }
