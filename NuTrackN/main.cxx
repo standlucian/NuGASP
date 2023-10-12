@@ -16,6 +16,7 @@
 #include <qtimer.h>
 
 #include "canvas.h"
+#include "Design.h"
 #include <stdlib.h>
 #include <iostream>
 #include <fstream>
@@ -65,7 +66,7 @@ int main(int argc, char **argv)
     m.show();
     //Sets the initial size of the application window
     m.resize(700, 500);
-
+    addCommandPrompt(&m);
     //Closes the application when the window is closed
     QObject::connect( qApp, SIGNAL(lastWindowClosed()), qApp, SLOT(quit()) );
 
