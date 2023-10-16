@@ -174,11 +174,11 @@ void changeBackgroundColor(TCanvas* canvas) {
 
     if (canvas) {
             //canvas->SetFillColor(kRed);
-            canvas->SetFillColor(TColor::GetColor("#919191"));//set the color of the baackground, in hexa color code
+            //canvas->SetFillColor(TColor::GetColor("#919191"));//set the color of the baackground, in hexa color code
 
-            TStyle* style = gStyle; // Get the current style
-            style->SetGridColor(kGray); // Set grid color to gray
-            style->SetGridStyle(3); // Set grid line style
+            //TStyle* style = gStyle; // Get the current style
+            //style->SetGridColor(kGray); // Set grid color to gray
+            //style->SetGridStyle(3); // Set grid line style
 
     }
 };

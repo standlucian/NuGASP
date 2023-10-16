@@ -13,6 +13,8 @@
 #include <vector>
 #include <tracknhistogram.h>
 #include "Integral.h"
+#include "calib.h"
+
 
 #include <QWidget>
 #include <QPushButton>
@@ -27,6 +29,11 @@
 #include <QDataStream>
 #include <QFile>
 #include <QtMath>
+#include <QInputDialog>
+#include <QFormLayout>
+#include <QDialogButtonBox>
+#include <QWheelEvent>
+
 
 
 #include <TCanvas.h>
@@ -78,12 +85,14 @@ protected:
    virtual void    keyReleaseEvent(QKeyEvent *event);
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
+   virtual void    wheelEvent(QWheelEvent *e);
+   
 
    bool controlKeyIsPressed=0;
    bool cKeyWasPressed=0;
    bool zKeyWasPressed=0;
    bool mKeyWasPressed=0;
-
+   bool fKeyWasPressed=0;
 signals:
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
@@ -105,6 +114,13 @@ signals:
    void requestShowGaussMarkers();
    void requestFitGauss();
    void killSwitch();
+   void addSpaceBarMarkerRequested(Int_t, Int_t);
+   void requestZoomTheScreen();
+   void requesttranslateplusTheScreen();
+   void requesttranslateminusTheScreen();
+   void requesttranslatedownTheScreen();
+   void requesttranslateupTheScreen();
+   void fullscreen();
 };
 
 class QMainCanvas : public QWidget
@@ -147,6 +163,14 @@ public slots:
    void deleteGaussMarkers();
    void showGaussMarkers();
    void fitGauss();
+   void Cal2pMain();
+   void zoomTheScreen();
+   void translateplusTheScreen();
+   void translateminusTheScreen();
+   void translatedownTheScreen();
+   void translateupTheScreen();
+   void zoomOut();
+   void addSpaceBarMarker(Int_t, Int_t);
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -161,9 +185,12 @@ protected:
    TList listOfObjectsDrawnOnScreen;
    std::vector<Double_t> integral_markers;
    std::vector<Double_t> background_markers;
+   std::vector<Double_t> spacebar_markers;
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
+   std::vector<Double_t> zoom_markers;
    Float_t maxValueInHistogram;
+   std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
