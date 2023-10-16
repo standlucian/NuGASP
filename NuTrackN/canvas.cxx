@@ -59,10 +59,10 @@ void QRootCanvas::wheelEvent(QWheelEvent *e)
     if (fCanvas) {
         if (e->delta() > 0) { // Wheel scrolled up
             fCanvas->HandleInput(kWheelUp, e->x(), e->y());
-            emit requesttranslateupTheScreen();
+            emit requesttranslatedownTheScreen();
         } else if (e->delta() < 0) { // Wheel scrolled down
             fCanvas->HandleInput(kWheelDown, e->x(), e->y());
-            emit requesttranslatedownTheScreen();
+            emit requesttranslateupTheScreen();
         }
 
         // Save the x and y positions of the mouse when the wheel is scrolled.
