@@ -37,7 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = canvas1.0.0
-DISTDIR = /home/andrei/Desktop/andrei_Ctin/NuTrackN/.tmp/canvas1.0.0
+DISTDIR = /home/cristian/Desktop/NewRepo/NuGASP/NuTrackN/.tmp/canvas1.0.0
 LINK          = g++
 LFLAGS        = -Wl,-O1
 LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lMathCore -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
@@ -103,8 +103,16 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_platformcompositor_support_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioning.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioningquick.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qml.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlmodels.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmltest.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlworkerscript.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quick.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quickwidgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_service_support_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql_private.pri \
@@ -112,6 +120,10 @@ DIST          = /usr/lib/x86_64-linux-gnu/qt5/mkspecs/features/spec_pre.prf \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_testlib_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_theme_support_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_vulkan_support_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webchannel.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webengine.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginecore.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginewidgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_xcb_qpa_lib_private.pri \
@@ -201,8 +213,16 @@ Makefile: canvas.pro /usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++/qmake.conf 
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_platformcompositor_support_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioning.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioningquick.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qml.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlmodels.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmltest.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlworkerscript.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quick.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quickwidgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_service_support_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql_private.pri \
@@ -210,6 +230,10 @@ Makefile: canvas.pro /usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++/qmake.conf 
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_testlib_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_theme_support_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_vulkan_support_private.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webchannel.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webengine.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginecore.pri \
+		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginewidgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets_private.pri \
 		/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_xcb_qpa_lib_private.pri \
@@ -280,8 +304,16 @@ Makefile: canvas.pro /usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++/qmake.conf 
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_openglextensions_private.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_platformcompositor_support_private.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioning.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_positioningquick.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_printsupport_private.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qml.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlmodels.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmltest.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_qmlworkerscript.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quick.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_quickwidgets.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_service_support_private.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_sql_private.pri:
@@ -289,6 +321,10 @@ Makefile: canvas.pro /usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++/qmake.conf 
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_testlib_private.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_theme_support_private.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_vulkan_support_private.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webchannel.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webengine.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginecore.pri:
+/usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_webenginewidgets.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_widgets_private.pri:
 /usr/lib/x86_64-linux-gnu/qt5/mkspecs/modules/qt_lib_xcb_qpa_lib_private.pri:
@@ -374,121 +410,287 @@ compiler_moc_header_clean:
 moc_canvas.cpp: canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
+		../../../../root/include/TH1.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -497,7 +699,7 @@ moc_canvas.cpp: canvas.h \
 		$(ROOTSYS)/include/TError.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
-	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/andrei/Desktop/andrei_Ctin/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/andrei/Desktop/andrei_Ctin/NuTrackN -I'/home/andrei/Desktop/andrei_Ctin/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
+	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/cristian/Desktop/NewRepo/NuGASP/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/cristian/Desktop/NewRepo/NuGASP/NuTrackN -I'/home/cristian/Desktop/NewRepo/NuGASP/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -518,121 +720,287 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 canvas.o: canvas.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
+		../../../../root/include/TH1.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -647,121 +1015,287 @@ canvas.o: canvas.cxx canvas.h \
 main.o: main.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
+		../../../../root/include/TH1.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -772,141 +1306,307 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TStyle.h \
 		$(ROOTSYS)/include/TColor.h \
 		$(ROOTSYS)/include/THttpServer.h \
-		../../../software/root-6.26.10/buildroot/include/THttpCallArg.h \
+		../../../../root/include/THttpCallArg.h \
 		$(ROOTSYS)/include/TH2I.h \
-		../../../software/root-6.26.10/buildroot/include/TH2.h \
+		../../../../root/include/TH2.h \
 		$(ROOTSYS)/include/TApplication.h \
-		../../../software/root-6.26.10/buildroot/include/TApplicationImp.h \
+		../../../../root/include/TApplicationImp.h \
 		$(ROOTSYS)/include/TROOT.h \
-		../../../software/root-6.26.10/buildroot/include/TDirectory.h \
-		../../../software/root-6.26.10/buildroot/include/TUUID.h \
-		../../../software/root-6.26.10/buildroot/include/TBuffer.h \
-		../../../software/root-6.26.10/buildroot/include/Bytes.h \
-		../../../software/root-6.26.10/buildroot/include/Byteswap.h \
+		../../../../root/include/TDirectory.h \
+		../../../../root/include/TUUID.h \
+		../../../../root/include/TBuffer.h \
+		../../../../root/include/Bytes.h \
+		../../../../root/include/Byteswap.h \
 		$(ROOTSYS)/include/TPluginManager.h \
 		$(ROOTSYS)/include/TVirtualGL.h \
-		../../../software/root-6.26.10/buildroot/include/GLConstants.h
+		../../../../root/include/GLConstants.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cxx
 
 Integral.o: Integral.cxx Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TH1.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		$(ROOTSYS)/include/TH1.h \
 		Design.h \
 		canvas.h \
 		tracknhistogram.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -919,123 +1619,289 @@ Integral.o: Integral.cxx Integral.h \
 
 calib.o: calib.cxx calib.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TH1.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		$(ROOTSYS)/include/TH1.h \
 		Design.h \
 		canvas.h \
 		tracknhistogram.h \
 		Integral.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -1048,165 +1914,331 @@ calib.o: calib.cxx calib.h \
 
 tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tracknhistogram.o tracknhistogram.cpp
 
 Design.o: Design.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
+		../../../../root/include/TAxis.h \
+		../../../../root/include/TNamed.h \
+		../../../../root/include/TObject.h \
+		../../../../root/include/Rtypes.h \
+		../../../../root/include/RtypesCore.h \
 		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
+		../../../../root/include/RVersion.h \
 		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
+		../../../../root/include/DllImport.h \
+		../../../../root/include/strtok.h \
+		../../../../root/include/strlcpy.h \
+		../../../../root/include/snprintf.h \
+		../../../../root/include/TGenericClassInfo.h \
+		../../../../root/include/TSchemaHelper.h \
+		../../../../root/include/TIsAProxy.h \
+		../../../../root/include/TVirtualIsAProxy.h \
+		../../../../root/include/TStorage.h \
+		../../../../root/include/TVersionCheck.h \
+		../../../../root/include/TString.h \
+		../../../../root/include/TMathBase.h \
+		../../../../root/include/ROOT/RStringView.hxx \
+		../../../../root/include/ROOT/RWrap_libcpp_string_view.h \
+		../../../../root/include/ROOT/libcpp_string_view.h \
+		../../../../root/include/ROOT/TypeTraits.hxx \
+		../../../../root/include/TAttAxis.h \
+		../../../../root/include/TArrayD.h \
+		../../../../root/include/TArray.h \
+		../../../../root/include/TAttLine.h \
+		../../../../root/include/TAttFill.h \
+		../../../../root/include/TAttMarker.h \
+		../../../../root/include/TArrayC.h \
+		../../../../root/include/TArrayS.h \
+		../../../../root/include/TArrayI.h \
+		../../../../root/include/TArrayF.h \
+		../../../../root/include/Foption.h \
+		../../../../root/include/ROOT/EExecutionPolicy.hxx \
+		../../../../root/include/TVectorFfwd.h \
+		../../../../root/include/TVectorDfwd.h \
+		../../../../root/include/TFitResultPtr.h \
 		Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
+		../../../../root/include/TH1.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
+		../../../../root/include/TPad.h \
+		../../../../root/include/TVirtualPad.h \
+		../../../../root/include/TAttPad.h \
+		../../../../root/include/TQObject.h \
+		../../../../root/include/TList.h \
+		../../../../root/include/TSeqCollection.h \
+		../../../../root/include/TCollection.h \
+		../../../../root/include/TIterator.h \
+		../../../../root/include/TVirtualRWMutex.h \
+		../../../../root/include/TVirtualMutex.h \
+		../../../../root/include/ROOT/RRangeCast.hxx \
 		$(ROOTSYS)/include/ROOT/RSpan.hxx \
 		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
+		../../../../root/include/TVirtualQConnection.h \
+		../../../../root/include/TInterpreter.h \
+		../../../../root/include/TDataType.h \
+		../../../../root/include/TDictionary.h \
+		../../../../root/include/ESTLType.h \
+		../../../../root/include/TInterpreterValue.h \
+		../../../../root/include/TQClass.h \
+		../../../../root/include/TClass.h \
+		../../../../root/include/TObjArray.h \
+		../../../../root/include/GuiTypes.h \
+		../../../../root/include/Buttons.h \
+		../../../../root/include/TAttBBox2D.h \
+		../../../../root/include/TAttCanvas.h \
 		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
+		../../../../root/include/TAttText.h \
 		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
+		../../../../root/include/TInetAddress.h \
+		../../../../root/include/TTimer.h \
+		../../../../root/include/TSysEvtHandler.h \
+		../../../../root/include/TTime.h \
 		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
+		../../../../root/include/TBits.h \
 		$(ROOTSYS)/include/Math/Types.h \
+		$(ROOTSYS)/include/Vc/Vc \
+		../../../../root/include/Vc/vector.h \
+		../../../../root/include/Vc/scalar/vector.h \
+		../../../../root/include/Vc/scalar/types.h \
+		../../../../root/include/Vc/common/types.h \
+		../../../../root/include/Vc/global.h \
+		../../../../root/include/Vc/fwddecl.h \
+		../../../../root/include/Vc/version.h \
+		../../../../root/include/Vc/traits/type_traits.h \
+		../../../../root/include/Vc/traits/decay.h \
+		../../../../root/include/Vc/traits/has_no_allocated_data.h \
+		../../../../root/include/Vc/traits/has_contiguous_storage.h \
+		../../../../root/include/Vc/traits/is_functor_argument_immutable.h \
+		../../../../root/include/Vc/traits/is_output_iterator.h \
+		../../../../root/include/Vc/traits/is_index_sequence.h \
+		../../../../root/include/Vc/common/indexsequence.h \
+		../../../../root/include/Vc/traits/is_implicit_cast_allowed.h \
+		../../../../root/include/Vc/traits/has_subscript_operator.h \
+		../../../../root/include/Vc/traits/has_multiply_operator.h \
+		../../../../root/include/Vc/traits/has_addition_operator.h \
+		../../../../root/include/Vc/traits/has_equality_operator.h \
+		../../../../root/include/Vc/traits/entry_type_of.h \
+		../../../../root/include/Vc/common/permutation.h \
+		../../../../root/include/Vc/common/macros.h \
+		../../../../root/include/Vc/common/vector.h \
+		../../../../root/include/Vc/common/elementreference.h \
+		../../../../root/include/Vc/common/vectorabi.h \
+		../../../../root/include/Vc/common/simdarrayfwd.h \
+		../../../../root/include/Vc/sse/types.h \
+		../../../../root/include/Vc/avx/types.h \
+		../../../../root/include/Vc/avx/macros.h \
+		../../../../root/include/Vc/common/utility.h \
+		../../../../root/include/Vc/common/vectortraits.h \
+		../../../../root/include/Vc/common/loadstoreflags.h \
+		../../../../root/include/Vc/common/writemaskedvector.h \
+		../../../../root/include/Vc/common/detail.h \
+		../../../../root/include/Vc/common/loadinterface.h \
+		../../../../root/include/Vc/common/storeinterface.h \
+		../../../../root/include/Vc/common/gatherinterface.h \
+		../../../../root/include/Vc/common/gatherinterface_deprecated.h \
+		../../../../root/include/Vc/common/scatterinterface.h \
+		../../../../root/include/Vc/common/scatterinterface_deprecated.h \
+		../../../../root/include/Vc/common/mask.h \
+		../../../../root/include/Vc/common/memoryfwd.h \
+		../../../../root/include/Vc/scalar/detail.h \
+		../../../../root/include/Vc/scalar/macros.h \
+		../../../../root/include/Vc/scalar/mask.h \
+		../../../../root/include/Vc/common/generalinterface.h \
+		../../../../root/include/Vc/scalar/vector.tcc \
+		../../../../root/include/Vc/common/data.h \
+		../../../../root/include/Vc/common/where.h \
+		../../../../root/include/Vc/common/transpose.h \
+		../../../../root/include/Vc/scalar/operators.h \
+		../../../../root/include/Vc/scalar/simd_cast.h \
+		../../../../root/include/Vc/common/simd_cast.h \
+		../../../../root/include/Vc/scalar/type_traits.h \
+		../../../../root/include/Vc/sse/vector.h \
+		../../../../root/include/Vc/sse/intrinsics.h \
+		../../../../root/include/Vc/common/storage.h \
+		../../../../root/include/Vc/common/aliasingentryhelper.h \
+		../../../../root/include/Vc/common/maskbool.h \
+		../../../../root/include/Vc/avx/intrinsics.h \
+		../../../../root/include/Vc/common/fix_clang_emmintrin.h \
+		../../../../root/include/Vc/avx/const_data.h \
+		../../../../root/include/Vc/sse/const_data.h \
+		../../../../root/include/Vc/sse/macros.h \
+		../../../../root/include/Vc/sse/debug.h \
+		../../../../root/include/Vc/sse/shuffle.h \
+		../../../../root/include/Vc/sse/vectorhelper.h \
+		../../../../root/include/Vc/sse/vectorhelper.tcc \
+		../../../../root/include/Vc/sse/mask.h \
+		../../../../root/include/Vc/sse/detail.h \
+		../../../../root/include/Vc/sse/casts.h \
+		../../../../root/include/Vc/sse/mask.tcc \
+		../../../../root/include/Vc/sse/vector.tcc \
+		../../../../root/include/Vc/common/x86_prefetches.h \
+		../../../../root/include/Vc/sse/limits.h \
+		../../../../root/include/Vc/common/bitscanintrinsics.h \
+		../../../../root/include/Vc/common/set.h \
+		../../../../root/include/Vc/common/gatherimplementation.h \
+		../../../../root/include/Vc/common/scatterimplementation.h \
+		../../../../root/include/Vc/sse/simd_cast.h \
+		../../../../root/include/Vc/avx/casts.h \
+		../../../../root/include/Vc/avx/shuffle.h \
+		../../../../root/include/Vc/avx/vector.h \
+		../../../../root/include/Vc/avx/vectorhelper.h \
+		../../../../root/include/Vc/avx/mask.h \
+		../../../../root/include/Vc/avx/detail.h \
+		../../../../root/include/Vc/avx/mask.tcc \
+		../../../../root/include/Vc/avx/vector.tcc \
+		../../../../root/include/Vc/avx/limits.h \
+		../../../../root/include/Vc/avx/const.h \
+		../../../../root/include/Vc/avx/simd_cast.h \
+		../../../../root/include/Vc/common/operators.h \
+		../../../../root/include/Vc/common/simdarray.h \
+		../../../../root/include/Vc/common/simdarrayhelper.h \
+		../../../../root/include/Vc/common/simdmaskarray.h \
+		../../../../root/include/Vc/common/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/interleave.h \
+		../../../../root/include/Vc/common/alignedbase.h \
+		../../../../root/include/Vc/scalar/helperimpl.h \
+		../../../../root/include/Vc/scalar/math.h \
+		../../../../root/include/Vc/scalar/simd_cast_caller.tcc \
+		../../../../root/include/Vc/sse/helperimpl.h \
+		../../../../root/include/Vc/sse/deinterleave.tcc \
+		../../../../root/include/Vc/sse/prefetches.tcc \
+		../../../../root/include/Vc/sse/math.h \
+		../../../../root/include/Vc/sse/const.h \
+		../../../../root/include/Vc/sse/simd_cast_caller.tcc \
+		../../../../root/include/Vc/avx/helperimpl.h \
+		../../../../root/include/Vc/avx/deinterleave.tcc \
+		../../../../root/include/Vc/avx/math.h \
+		../../../../root/include/Vc/avx/simd_cast_caller.tcc \
+		../../../../root/include/Vc/common/math.h \
+		../../../../root/include/Vc/common/trigonometric.h \
+		../../../../root/include/Vc/common/const.h \
+		../../../../root/include/Vc/common/logarithm.h \
+		../../../../root/include/Vc/common/exponential.h \
+		../../../../root/include/Vc/common/vectortuple.h \
+		../../../../root/include/Vc/common/iif.h \
+		../../../../root/include/Vc/type_traits \
+		../../../../root/include/Vc/IO \
+		../../../../root/include/Vc/Memory \
+		../../../../root/include/Vc/common/memory.h \
+		../../../../root/include/Vc/common/memorybase.h \
+		../../../../root/include/Vc/common/malloc.h \
+		../../../../root/include/Vc/common/interleavedmemory.h \
+		../../../../root/include/Vc/common/make_unique.h \
+		../../../../root/include/Vc/Utils \
+		../../../../root/include/Vc/common/deinterleave.h \
+		../../../../root/include/Vc/common/makeContainer.h \
+		../../../../root/include/Vc/Allocator \
+		../../../../root/include/Vc/algorithm \
+		../../../../root/include/Vc/common/algorithms.h \
+		../../../../root/include/Vc/common/simdize.h \
+		../../../../root/include/Vc/iterators \
+		../../../../root/include/Vc/common/iterators.h \
+		../../../../root/include/Vc/simdize \
+		../../../../root/include/Vc/array \
+		../../../../root/include/Vc/common/subscript.h \
+		../../../../root/include/Vc/span \
+		../../../../root/include/Vc/common/span.h \
+		../../../../root/include/Vc/vector \
+		$(ROOTSYS)/include/VecCore/VecCore \
+		../../../../root/include/VecCore/Version.h \
+		../../../../root/include/VecCore/Assert.h \
+		../../../../root/include/VecCore/Common.h \
+		../../../../root/include/VecCore/CUDA.h \
+		../../../../root/include/VecCore/SIMD.h \
+		../../../../root/include/VecCore/Types.h \
+		../../../../root/include/VecCore/Backend/Interface.h \
+		../../../../root/include/VecCore/Backend/Implementation.h \
+		../../../../root/include/VecCore/Limits.h \
+		../../../../root/include/VecCore/Backend/Deprecated.h \
+		../../../../root/include/VecCore/Backend/Scalar.h \
+		../../../../root/include/VecCore/Backend/ScalarWrapper.h \
+		../../../../root/include/VecCore/Backend/SIMDSizes.h \
+		../../../../root/include/VecCore/Backend/Vc.h \
+		../../../../root/include/VecCore/Backend/VcScalar.h \
+		../../../../root/include/VecCore/Backend/VcVector.h \
+		../../../../root/include/VecCore/Backend/VcSimdArray.h \
+		../../../../root/include/VecCore/Backend/UMESimd.h \
+		../../../../root/include/VecCore/Backend/UMESimdCommon.h \
+		../../../../root/include/VecCore/Backend/UMESimdArray.h \
+		../../../../root/include/VecCore/VecMath.h \
+		../../../../root/include/VecCore/Utilities.h \
 		$(ROOTSYS)/include/RtypesCore.h \
 		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
+		../../../../root/include/RConfigure.h \
+		../../../../root/include/TFormula.h \
+		../../../../root/include/TMethodCall.h \
+		../../../../root/include/TF1AbsComposition.h \
+		../../../../root/include/TMath.h \
+		../../../../root/include/TError.h \
 		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
+		../../../../root/include/Math/Types.h \
+		../../../../root/include/Math/ParamFunctor.h \
 		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
+		../../../../root/include/TWbox.h \
+		../../../../root/include/TBox.h \
+		../../../../root/include/TColor.h \
 		$(ROOTSYS)/include/TTimer.h \
 		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
+		../../../../root/include/Fit/FitResult.h \
 		$(ROOTSYS)/include/Math/IFunctionfwd.h \
 		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
+		../../../../root/include/TMatrixDSym.h \
+		../../../../root/include/TMatrixTSym.h \
+		../../../../root/include/TMatrixTBase.h \
+		../../../../root/include/TMatrixFBasefwd.h \
+		../../../../root/include/TMatrixDBasefwd.h \
+		../../../../root/include/TMatrixTUtils.h \
+		../../../../root/include/TMatrixDSymfwd.h \
+		../../../../root/include/TMatrixDUtils.h \
+		../../../../root/include/TMatrixDUtilsfwd.h \
 		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
+		../../../../root/include/TText.h \
 		$(ROOTSYS)/include/TLine.h \
 		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
+		../../../../root/include/TMatrixT.h \
+		../../../../root/include/TMatrixDfwd.h \
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \

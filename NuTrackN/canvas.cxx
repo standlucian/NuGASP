@@ -813,10 +813,10 @@ void QMainCanvas::autoFit(int x, int y)
     //Writing the obtained data on screen, in a fixed format, so everything aligns nicely
     //First (fixed) row
 
-    QString peakLabel = QString("%1").arg("Peak#",-15,QChar(' '));
-    QString channelLabel = QString("%1").arg("Channel",-15, QChar(' '));
-    QString energyLabel = QString("%1").arg("Energy",-20, QChar(' '));
-    QString areaLabel = QString("%1").arg("Area",-35, QChar(' '));
+    QString peakLabel = QString("%1").arg("Peak#",-10,QChar(' '));
+    QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+    QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+    QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
     QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
 
     QString headerRow = QString("%1%2%3%4%5")
@@ -870,11 +870,11 @@ void QMainCanvas::autoFit(int x, int y)
 
 
     QString dataRow = QString("%1%2%3%4%5")
-        .arg(numberStr,-20,QChar(' '))
-        .arg(gaussianCenterStr, -17, QChar(' '))
-        .arg(energyStr, -18, QChar(' '))
-        .arg(gaussianIntegralStr, -23, QChar(' '))
-        .arg(gaussianFWHMStr, 0, QChar(' '));
+        .arg(numberStr,-10,QChar(' '))
+        .arg(gaussianCenterStr, -10, QChar(' '))
+        .arg(energyStr, -15, QChar(' '))
+        .arg(gaussianIntegralStr, -25, QChar(' '))
+        .arg(gaussianFWHMStr, -10, QChar(' '));
 
     // Insert data row into QPlainTextEdit
     CommandPrompt::getInstance()->appendPlainText(dataRow + '\n');
@@ -1487,10 +1487,10 @@ void QMainCanvas::fitGauss()
         std::cout<<std::setw(10);
         std::cout<<"Width"<<std::endl;
 
-        QString peakLabel = QString("%1").arg("Peak#",-15,QChar(' '));
-        QString channelLabel = QString("%1").arg("Channel",-15, QChar(' '));
-        QString energyLabel = QString("%1").arg("Energy",-20, QChar(' '));
-        QString areaLabel = QString("%1").arg("Area",-35, QChar(' '));
+        QString peakLabel = QString("%1").arg("Peak#",-10,QChar(' '));
+        QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+        QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+        QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
         QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
 
         QString headerRow = QString("%1%2%3%4%5")
@@ -1551,11 +1551,11 @@ void QMainCanvas::fitGauss()
 
 
             QString dataRow = QString("%1%2%3%4%5")
-                .arg(numberStr,-20,QChar(' '))
-                .arg(gaussianCenterStr, -17, QChar(' '))
-                .arg(energyStr, -18, QChar(' '))
-                .arg(gaussianIntegralStr, -23, QChar(' '))
-                .arg(gaussianFWHMStr, 0, QChar(' '));
+                .arg(numberStr,-10,QChar(' '))
+                .arg(gaussianCenterStr, -10, QChar(' '))
+                .arg(energyStr, -15, QChar(' '))
+                .arg(gaussianIntegralStr, -25, QChar(' '))
+                .arg(gaussianFWHMStr, -10, QChar(' '));
 
             // Insert data row into QPlainTextEdit
             CommandPrompt::getInstance()->appendPlainText(dataRow);

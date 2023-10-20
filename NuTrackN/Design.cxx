@@ -12,10 +12,19 @@ CommandPrompt::CommandPrompt(QMainCanvas *m):QPlainTextEdit(m) //constructor for
 setPlaceholderText("Enter your command here:"); //This text will be temporarly displayed before the user enters text
 setReadOnly(false);//this allows the user to insert text into the command prompt
 availableText=this->toPlainText();//we set the available text to basically empty when the commandPrompt object is created
+QFont font("Consolas",8);
+this->setFont(font);
+
+
 connect(this,&QPlainTextEdit::copyAvailable,this,&CommandPrompt::allowUserToCopyText);//connects the signal that will be sent when the user selects and deselects text (check the slot function for further information
 connect(this, &CommandPrompt::textChanged,this, &CommandPrompt::handleTextChanges);//this sends signals every time a key is pressed in the command prompt (because Enter signal iss not availabile) and it handles the text accordingly
 connect(this,&CommandPrompt::cursorPositionChanged,this, &CommandPrompt::handleCursorMoved);
+
+
 };
+
+
+
 
 void CommandPrompt::setMainCanvas(QMainCanvas* m)//setter for the mainCanvas variable; this allows class usage from any file without passing the QMainCanvas m to the ClassInstance getter
 {

@@ -159,10 +159,10 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
             std::cout<<std::setw(10);
             std::cout<<"Width"<<std::endl;
 
-            QString peakLabel = QString("%1").arg("Integral#",-15,QChar(' '));
-            QString channelLabel = QString("%1").arg("Channel",-16, QChar(' '));
-            QString energyLabel = QString("%1").arg("Energy",-26, QChar(' '));
-            QString areaLabel = QString("%1").arg("Area",-30, QChar(' '));
+            QString peakLabel = QString("%1").arg("Integral#",-10,QChar(' '));
+            QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+            QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+            QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
             QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
 
             QString headerRow = QString("%1%2%3%4%5")
@@ -220,17 +220,17 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
 
                 QString numberStr = QString("%1").arg(QString::number(iterator1/2+1), 0, QChar(' '));
                 QString gaussianCenterStr = QString("%1").arg(middle_of_integration,0, ' ', 2);
-                QString energyStr = QString("%1(%2)").arg(middle_of_integration, 0, ' ', 2).arg(qCeil(sqrt(middle_of_integration) * 100), 0, ' ',0);
+                QString energyStr = QString("%1(%2)").arg(middle_of_integration, 0, ' ', 2).arg(qCeil(sqrt(middle_of_integration)), 0, ' ',0);
                 QString gaussianIntegralStr = QString("%1(%2)").arg(area, 0, ' ', 0).arg(qRound(error), 0, ' ',0);
-                QString gaussianFWHMStr = QString("%1(%2)").arg(width_of_integral, 0, ' ', 2).arg(qCeil(sqrt(width_of_integral) * 100), 0, ' ',0);
+                QString gaussianFWHMStr = QString("%1(%2)").arg(width_of_integral, 0, ' ', 2).arg(qCeil(sqrt(width_of_integral)), 0, ' ',0);
 
 
                 QString dataRow = QString("%1%2%3%4%5")
-                    .arg(numberStr,-22,QChar(' '))
-                    .arg(gaussianCenterStr, -17, QChar(' '))
-                    .arg(energyStr, -18, QChar(' '))
-                    .arg(gaussianIntegralStr, -23, QChar(' '))
-                    .arg(gaussianFWHMStr, 0, QChar(' '));
+                    .arg(numberStr,-10,QChar(' '))
+                    .arg(gaussianCenterStr, -10, QChar(' '))
+                    .arg(energyStr, -15, QChar(' '))
+                    .arg(gaussianIntegralStr, -25, QChar(' '))
+                    .arg(gaussianFWHMStr, -10, QChar(' '));
 
                 // Insert data row into QPlainTextEdit
                 CommandPrompt::getInstance()->appendPlainText(dataRow);
