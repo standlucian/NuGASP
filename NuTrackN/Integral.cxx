@@ -1,4 +1,5 @@
 #include "Integral.h"
+#include "Design.h"
 
 
 //This function has as parameters the histogram, an error which will be returned and the marker positions in which the integral will be calculated
@@ -124,6 +125,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
             //We check if some of the background markers are overlapping, if they are we invert them when we sort them but we still infrom the user of this
             if(overlapping_markers(background_markers)==true)
             {
+                CommandPrompt::getInstance()->appendPlainText("Some markers are overlapping, so the overlaapping markers were inverted.\n");
                 std::cout<<"Some markers are overlapping, so the overlapping markers were inverted.\n";
             }
             //the function from above is called which gives us the slope and the addition of the line basically the equation of the best fitted line
@@ -131,6 +133,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
         }
         else
         {
+            CommandPrompt::getInstance()->appendPlainText("Background markers have to  be in multiples of 2 \n\n");
             std::cout<<"Background markers have to be in multiples of 2\n\n";
             return;
         }
@@ -143,6 +146,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
         if(integral_markers.size()%2==0)
         {        
             //First (fixed) row
+
             std::cout<<std::left;
             std::cout<<std::setw(10);
             std::cout<<"Integral#";
@@ -154,6 +158,20 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
             std::cout<<"Area";
             std::cout<<std::setw(10);
             std::cout<<"Width"<<std::endl;
+
+            QString peakLabel = QString("%1").arg("Integral#",-10,QChar(' '));
+            QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+            QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+            QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
+            QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
+
+            QString headerRow = QString("%1%2%3%4%5")
+                .arg(peakLabel)
+                .arg(channelLabel)
+                .arg(energyLabel)
+                .arg(areaLabel)
+                .arg(widthLabel);
+            CommandPrompt::getInstance()->appendPlainText(headerRow);
 
 
             //Then we get the markers by pairs and feed them in the function above that calculates the integral with no background
@@ -184,24 +202,47 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
                 tempStringStream<<std::fixed<<std::setprecision(2)<<middle_of_integration<<"("<<std::setprecision(0)<<ceil(sqrt(middle_of_integration))<<")";
                 temp=tempStringStream.str();
                 std::cout<<temp;
+
                 tempStringStream.str(std::string());
                 std::cout<<std::setw(25);
                 tempStringStream<<std::fixed<<std::setprecision(0)<<area<<"("<<std::setprecision(0)<<round(error)<<")";
                 temp=tempStringStream.str();
                 std::cout<<temp;
+
                 tempStringStream.str(std::string());
                 std::cout<<std::setw(10);
                 tempStringStream<<std::fixed<<std::setprecision(2)<<width_of_integral<<"("<<std::setprecision(0)<<ceil(sqrt(width_of_integral))<<")"<<std::endl;
                 temp=tempStringStream.str();
                 std::cout<<temp;
+
                 tempStringStream.str(std::string());
+
+
+                QString numberStr = QString("%1").arg(QString::number(iterator1/2+1), 0, QChar(' '));
+                QString gaussianCenterStr = QString("%1").arg(middle_of_integration,0, ' ', 2);
+                QString energyStr = QString("%1(%2)").arg(middle_of_integration, 0, ' ', 2).arg(qCeil(sqrt(middle_of_integration)), 0, ' ',0);
+                QString gaussianIntegralStr = QString("%1(%2)").arg(area, 0, ' ', 0).arg(qRound(error), 0, ' ',0);
+                QString gaussianFWHMStr = QString("%1(%2)").arg(width_of_integral, 0, ' ', 2).arg(qCeil(sqrt(width_of_integral)), 0, ' ',0);
+
+
+                QString dataRow = QString("%1%2%3%4%5")
+                    .arg(numberStr,-10,QChar(' '))
+                    .arg(gaussianCenterStr, -10, QChar(' '))
+                    .arg(energyStr, -15, QChar(' '))
+                    .arg(gaussianIntegralStr, -25, QChar(' '))
+                    .arg(gaussianFWHMStr, -10, QChar(' '));
+
+                // Insert data row into QPlainTextEdit
+                CommandPrompt::getInstance()->appendPlainText(dataRow);
 
             }
             //We put a new line so that the comand prompt is cleaner
             std::cout<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("");
         }
         else
         {
+            CommandPrompt::getInstance()->appendPlainText("Integral  markers have to be in multiples of 2 \n\n");
             std::cout<<"Integral markers have to be in multiples of 2\n\n";
             return;
         }
@@ -209,6 +250,7 @@ void integral_function(TH1F *histogram,std::vector<Double_t> integral_markers,st
     else
     {
         std::cout<<"Place markers for the integral to be calculated\n";
+        CommandPrompt::getInstance()->appendPlainText("Place markers for the integral to be calculated\n");
         return;
     }
 }

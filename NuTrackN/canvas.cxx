@@ -1,4 +1,5 @@
 #include "canvas.h"
+#include "Design.h"
 
 //______________________________________________________________________________
 QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
@@ -22,6 +23,11 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
 
    setFocusPolicy(Qt::StrongFocus);
+   TLatex l;
+   l.SetTextSize(0.15);
+   l.SetTextAlign(22);
+   l.SetTextColor(kBlack);
+   l.DrawLatex(0.5, 0.5, "NuTrackN");
 }
 
 //______________________________________________________________________________
@@ -44,7 +50,26 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
       }
    }
 }
+void QRootCanvas::wheelEvent(QWheelEvent *e)
+{
+    // Handle mouse wheel events.
 
+    // This tells the canvas to handle events when the mouse wheel is scrolled.
+    // These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
+    if (fCanvas) {
+        if (e->delta() > 0) { // Wheel scrolled up
+            fCanvas->HandleInput(kWheelUp, e->x(), e->y());
+            emit requesttranslatedownTheScreen();
+        } else if (e->delta() < 0) { // Wheel scrolled down
+            fCanvas->HandleInput(kWheelDown, e->x(), e->y());
+            emit requesttranslateupTheScreen();
+        }
+
+        // Save the x and y positions of the mouse when the wheel is scrolled.
+        xMousePosition = e->x();
+        yMousePosition = e->y();
+    }
+}
 //______________________________________________________________________________
 void QRootCanvas::mousePressEvent( QMouseEvent *e )
 {
@@ -104,6 +129,8 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 
 //______________________________________________________________________________
 
+
+
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
     //Checks if any of the top keys (CTRL,C, M, Z) was pressed just before
@@ -124,6 +151,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             break;
         default:
             std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("Waited for execute command after C was pressed but no valid command arrived after it\n");
             break;
         }
         controlKeyIsPressed=0;
@@ -149,6 +177,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             default:
                 std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for execute command after C was pressed but no valid command arrived after it\n");
                 break;
         }
         cKeyWasPressed=0;
@@ -182,6 +211,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             default:
                 std::cout<<"Waited for delete command after Z was pressed but no valid command arrived after it"<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for delete command after Z was pressed but no valid command arrived after it\n");
                 break;
         }
         zKeyWasPressed=0;
@@ -215,15 +245,32 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             default:
                 std::cout<<"Waited for show command after M was pressed but no valid command arrived after it"<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for show command after M was pressed but no valid command arrived after it\n");
                 break;
         }
         mKeyWasPressed=0;
+    }
+        else if(fKeyWasPressed)
+    {
+        switch(event->key())
+        {
+            case Qt::Key_F:
+                //If I key is pressed after M, call show integral markers
+                emit fullscreen();
+                break;
+        }
+        fKeyWasPressed=0;
     }
     else
     {
         //Looks at what key was pressed and does different things depending on what was pressed
         switch(event->key())
         {
+            case Qt::Key_H:
+            case Qt::Key_Question:
+                //If shift is pressed, mark that down to later check if the / is pressed at the same time
+                emit requestHelp();
+                break;
             case Qt::Key_Control:
                 //If control is pressed, mark that down to later check if the mouse is clicked at the same time
                 controlKeyIsPressed=1;
@@ -244,6 +291,30 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 //if the I key is pressed, add an integral marker on screen and remember the integral position
                 emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
                 break;
+                case Qt::Key_Space:
+                //if the [SpaceBar] key is pressed, add an zoom marker on screen and remember the zoom position
+                emit addSpaceBarMarkerRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_F:
+                //if the F key is pressed, mark that down and prepare to execute a command
+                fKeyWasPressed=1;
+                break;
+            case Qt::Key_Right:
+                //if the > key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateplusTheScreen();
+                break;
+            case Qt::Key_Left:
+                //if the < key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateminusTheScreen();
+                break;
+            case Qt::Key_Down:
+                //if the v key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslatedownTheScreen();
+                break;
+            case Qt::Key_Up:
+                //if the ^ key is pressed, add an integral marker on screen and remember the integral position
+                emit requesttranslateupTheScreen();
+                break;
             case Qt::Key_B:
                 //if the B key is pressed, add a background marker on screen and remember the background position
                 emit addBackgroundMarkerRequested(xMousePosition, yMousePosition);
@@ -263,9 +334,14 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_Return:
                 //Pentru Petre
                 break;
+            case Qt::Key_E:
+                //if the E key is pressed, zoom the region between the spacebar markers
+                emit requestZoomTheScreen();
+            break;
             default:
                 QWidget::keyPressEvent(event);
                 break;
+
         }
     }
 }
@@ -351,6 +427,12 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Integral With Background", this));
    //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
+   l->addWidget(b = new QPushButton("&Cal2P", this));
+   //Same as the previous line of code, it executes the function Cal2pMain when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(Cal2pMain()));
+
+
+
 
    //connects the keyboard command C+I to the areaFunction;
    connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
@@ -370,6 +452,24 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard command I to adding the background markers;
    connect(canvas,SIGNAL(addIntegralMarkerRequested(Int_t, Int_t)), this, SLOT(addIntegralMarker(Int_t, Int_t)));
 
+   //connects the keyboard command E ;
+   connect(canvas,SIGNAL(requestZoomTheScreen()), this, SLOT(zoomTheScreen()));
+
+   //connects the keyboard command > to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateplusTheScreen()), this, SLOT(translateplusTheScreen()));
+
+   //connects the keyboard command < to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateminusTheScreen()), this, SLOT(translateminusTheScreen()));
+
+   //connects the keyboard command V to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslatedownTheScreen()), this, SLOT(translatedownTheScreen()));
+
+   //connects the keyboard command ^ to adding the background markers;
+   connect(canvas,SIGNAL(requesttranslateupTheScreen()), this, SLOT(translateupTheScreen()));
+
+   //connects the keyboard command F+S to clearing all markers;
+   connect(canvas,SIGNAL(fullscreen()), this, SLOT(zoomOut()));
+
    //connects the keyboard command Z+B to clearing the background markers;
    connect(canvas,SIGNAL(requestDeleteBackgroundMarkers()), this, SLOT(deleteBackgroundMarkers()));
 
@@ -387,6 +487,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 
    //connects the keyboard command M+A to clearing all markers;
    connect(canvas,SIGNAL(requestShowAllMarkers()), this, SLOT(showAllMarkers()));
+
+    //connects the keyboard command space bar to adding the background markers;
+   connect(canvas,SIGNAL(addSpaceBarMarkerRequested(Int_t, Int_t)), this, SLOT(addSpaceBarMarker(Int_t, Int_t)));
 
    //connects the keyboard command R to adding a range marker;
    connect(canvas,SIGNAL(requestAddRangeMarker(Int_t, Int_t)), this, SLOT(addRangeMarker(Int_t, Int_t)));
@@ -409,8 +512,13 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard command C+V to fitting the Gauss Functions;
    connect(canvas,SIGNAL(requestFitGauss()), this, SLOT(fitGauss()));
 
+   //connects the keyboard key ? to listing the commands
+   connect(canvas,SIGNAL(requestHelp()),this,SLOT(offerHelp()));
+
    //connects the keyboard commands CTRL+C/Z/Y to quitting the app
    connect(canvas,SIGNAL(killSwitch()), qApp, SLOT(quit()));
+
+
 
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
@@ -432,7 +540,7 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->SetBorderMode(0);
    canvas->getCanvas()->SetFillColor(0);
    canvas->getCanvas()->SetGrid();
-
+   changeBackgroundColor(canvas->getCanvas());
    h1f->Reset();
    //This sets the color of the spectrum
    h1f->SetFillColor(kViolet + 2);
@@ -466,6 +574,107 @@ void QMainCanvas::clicked1()
    canvas->getCanvas()->Update();
 }
 
+void QMainCanvas::Cal2pMain() {
+    if(puncte_calib2p.size() > 1) {
+        QDialog dialog(this);
+        dialog.setWindowTitle("Two point calibration");
+        dialog.setStyleSheet("background-color: #708090;");
+        QFormLayout form(&dialog);
+
+        // Add the first energy input
+        QLineEdit *energy1LineEdit = new QLineEdit(&dialog);
+        energy1LineEdit->setStyleSheet("background-color: white;");
+        form.addRow(QString::number(puncte_calib2p[puncte_calib2p.size() - 2]) + " no. channel (First Energy):", energy1LineEdit);
+
+
+        // Add the second energy input
+        QLineEdit *energy2LineEdit = new QLineEdit(&dialog);
+        energy2LineEdit->setStyleSheet("background-color: white;");
+        form.addRow(QString::number(puncte_calib2p[puncte_calib2p.size() - 1]) + " no. channel (Second Energy):", energy2LineEdit);
+
+        // Add Ok and Cancel buttons
+        QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &dialog);
+        form.addRow(&buttonBox);
+
+        QObject::connect(&buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
+        QObject::connect(&buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
+
+        // Muta dialogul in pozitia dorita pe ecran
+        dialog.move(100, 500); // Coordonatele x și y pot fi ajustate conform necesităților
+
+        if (dialog.exec() == QDialog::Accepted) {
+            bool ok1, ok2;
+            double energie1 = energy1LineEdit->text().toDouble(&ok1);
+            double energie2 = energy2LineEdit->text().toDouble(&ok2);
+
+            if(ok1 && ok2 && energie1 > 0 && energie2 > 0) {
+                CalibrareIn2P(puncte_calib2p, energie1, energie2);
+            } else {
+                if(ok1 && ok2 && energie1 < 0 || energie2 < 0) {
+                    std::cout << "The energy values ​​must be positive\n";
+                    CommandPrompt::getInstance()->appendPlainText("The energy values ​​must be positive\n");
+                } else {
+                    std::cout << "The fields must be filled\n";
+                    CommandPrompt::getInstance()->appendPlainText("The fields must be filled\n");
+                }
+            }
+        }
+    } else {
+        std::cout << "Two markers are needed to calibrate in two points\n";
+        CommandPrompt::getInstance()->appendPlainText("Two markers are needed to calibrate in two points\n");
+    }
+}
+
+
+void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
+{
+    std::string objectInfo, temp;
+    int from, to, binX;
+    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+    objectInfo=h1f->GetObjectInfo(x,y);
+
+    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the position on the y Axis of the click
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+
+    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
+    objectInfo=objectInfo.substr(to+1);
+    from=objectInfo.find("=");
+    to=objectInfo.find(" ");
+    temp=objectInfo.substr(from+1,to-from-2);
+    binX=std::stoi(temp);
+
+    //Add the position to the integral marker vector
+    spacebar_markers.push_back((Double_t)binX);
+    //std::cout<<(Double_t)binX<<std::endl;
+
+    //Create a yellow integral line and add it to the screen
+    TLine *spacebarLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    spacebarLine->SetLineColor(kCyan);
+    spacebarLine->SetLineWidth(2);
+
+    spacebarLine->Draw("same");
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    //Add the line to the list of things put on the screen, so it can be deleted
+    listOfObjectsDrawnOnScreen.Add(spacebarLine);
+
+
+   //h1f->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
+   zoom_markers.push_back(binX);
+
+   //canvas->getCanvas()->Modified();
+   //canvas->getCanvas()->Update();
+
+}
+
 void QMainCanvas::areaFunction()
 {
    //A stand in vector for the markers is used to call the integral function so it perform an integral with no background
@@ -478,18 +687,27 @@ void QMainCanvas::areaFunctionWithBackground()
 {
    //The integral function is used with the background markers and the integral markers to perform an integral with backgorund
    //The function also returns the slope of the background
-   integral_function(h1f,integral_markers,background_markers,slope,addition);
-   //Draw a line to show the background
-   TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
-   backgroundLine->SetLineColor(kBlue);
-   backgroundLine->SetLineWidth(2);
+    if(background_markers.size()==0)
+    {
+        CommandPrompt::getInstance()->appendPlainText("There are no background markers, so an integral with background can not be performed\n");
+        std::cout<<"There are no background markers, so an integral with background can not be performed\n";
+    }
+    else
+    {
 
-   backgroundLine->Draw("same");
-   //Add the line to the list of things put on the screen, so it can be deleted
-   listOfObjectsDrawnOnScreen.Add(backgroundLine);
+       integral_function(h1f,integral_markers,background_markers,slope,addition);
+       //Draw a line to show the background
+       TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
+       backgroundLine->SetLineColor(kBlue);
+       backgroundLine->SetLineWidth(2);
 
-   canvas->getCanvas()->Modified();
-   canvas->getCanvas()->Update();
+       backgroundLine->Draw("same");
+       //Add the line to the list of things put on the screen, so it can be deleted
+       listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+       canvas->getCanvas()->Modified();
+       canvas->getCanvas()->Update();
+    }
 }
 
 //______________________________________________________________________________
@@ -611,6 +829,21 @@ void QMainCanvas::autoFit(int x, int y)
 
     //Writing the obtained data on screen, in a fixed format, so everything aligns nicely
     //First (fixed) row
+
+    QString peakLabel = QString("%1").arg("Peak#",-10,QChar(' '));
+    QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+    QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+    QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
+    QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
+
+    QString headerRow = QString("%1%2%3%4%5")
+        .arg(peakLabel)
+        .arg(channelLabel)
+        .arg(energyLabel)
+        .arg(areaLabel)
+        .arg(widthLabel);
+    CommandPrompt::getInstance()->appendPlainText(headerRow);
+
     std::cout<<std::left;
     std::cout<<std::setw(10);
     std::cout<<"Peak#";
@@ -622,6 +855,8 @@ void QMainCanvas::autoFit(int x, int y)
     std::cout<<"Area";
     std::cout<<std::setw(10);
     std::cout<<"Width"<<std::endl;
+    puncte_calib2p.push_back(gaussianCenter);
+
 
     //Second row that contains variable numbers
     std::cout<<std::setw(10);
@@ -643,6 +878,23 @@ void QMainCanvas::autoFit(int x, int y)
     temp=tempStringStream.str();
     std::cout<<std::setw(10);
     std::cout<<temp<<std::endl;
+
+    QString numberStr = QString("%1").arg("1", 0, ' ');
+    QString gaussianCenterStr = QString("%1").arg(gaussianCenter,0, ' ', 2);
+    QString energyStr = QString("%1(%2)").arg(gaussianCenter, 0, ' ', 2).arg(qCeil(gaussianCenterError * 100), 0, ' ',0);
+    QString gaussianIntegralStr = QString("%1(%2)").arg(gaussianIntegral, 0, ' ', 0).arg(qRound(gaussianIntegralError), 0, ' ',0);
+    QString gaussianFWHMStr = QString("%1(%2)").arg(gaussianFWHM, 0, ' ', 2).arg(qCeil(gaussianFWHMError * 100), 0, ' ',0);
+
+
+    QString dataRow = QString("%1%2%3%4%5")
+        .arg(numberStr,-10,QChar(' '))
+        .arg(gaussianCenterStr, -10, QChar(' '))
+        .arg(energyStr, -15, QChar(' '))
+        .arg(gaussianIntegralStr, -25, QChar(' '))
+        .arg(gaussianFWHMStr, -10, QChar(' '));
+
+    // Insert data row into QPlainTextEdit
+    CommandPrompt::getInstance()->appendPlainText(dataRow + '\n');
 
     //Make list of objects that have been drawn to delete them later
     listOfObjectsDrawnOnScreen.Add(gaussianWithBackgroundFunction);
@@ -799,6 +1051,75 @@ void QMainCanvas::clearTheScreen()
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+}
+void QMainCanvas::zoomTheScreen()
+{
+    //Zoom the histogram in the region delimited by spacebar markers
+    int i= zoom_markers.size();
+    int x1,x2;
+    if(i>=2){
+    if(zoom_markers[i-2]<zoom_markers[i-1]){
+    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
+    if(zoom_markers[i-1]<zoom_markers[i-2]){
+    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
+    if(i<=1){
+        std::cout<<"AI nev de doi space\n";}
+  clearTheScreen();
+  canvas->getCanvas()->Modified();
+  canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::zoomOut()
+{
+  //Zoom out the histogram in its initial scale
+  h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() );
+  h1f->GetXaxis()->SetRangeUser(0, h1f->GetMaximum() );
+  h1f->GetXaxis()->UnZoom();
+  h1f->GetYaxis()->UnZoom();
+  canvas->getCanvas()->Modified();
+  canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::translateplusTheScreen()
+{
+    //Translates the zoom in the positive(right) direction of the abscissa
+    int k= zoom_markers.size();
+    if(k>1){
+    zoom_markers[k-1]=zoom_markers[k-1]+fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    zoom_markers[k-2]=zoom_markers[k-2]+fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    zoomTheScreen();
+    showAllMarkers();
+    }
+}
+
+void QMainCanvas::translateminusTheScreen()
+{
+    //Translates the zoom in the negative(left) direction of the abscissa
+    int k= zoom_markers.size();
+    if(k>1){
+    zoom_markers[k-1]=zoom_markers[k-1]-fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    zoom_markers[k-2]=zoom_markers[k-2]-fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    zoomTheScreen();
+    showAllMarkers();
+    }
+}
+
+void QMainCanvas::translatedownTheScreen()
+{
+    //Increases the scale of the ordinate
+    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() * 1.05);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+}
+
+void QMainCanvas::translateupTheScreen()
+{
+    //Decreases the scale of the ordinate
+    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() / 1.05);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
 }
 
 //______________________________________________________________________________
@@ -1157,6 +1478,7 @@ void QMainCanvas::fitGauss()
                     if((int) fitResult==4)
                     {
                         std::cout<<"The fit has failed to converge despite our best attempts. Some errors will not be calculated."<<std::endl;
+                        CommandPrompt::getInstance()->appendPlainText("The fit has failed to converge despite our best attempts. Some errors will not be calculated.\n");
                     }
                 }
             }
@@ -1181,6 +1503,20 @@ void QMainCanvas::fitGauss()
         std::cout<<"Area";
         std::cout<<std::setw(10);
         std::cout<<"Width"<<std::endl;
+
+        QString peakLabel = QString("%1").arg("Peak#",-10,QChar(' '));
+        QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
+        QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
+        QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
+        QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
+
+        QString headerRow = QString("%1%2%3%4%5")
+            .arg(peakLabel)
+            .arg(channelLabel)
+            .arg(energyLabel)
+            .arg(areaLabel)
+            .arg(widthLabel);
+        CommandPrompt::getInstance()->appendPlainText(headerRow);
 
         for(uint i=0;i<gauss_markers.size();i++)
         {
@@ -1223,7 +1559,25 @@ void QMainCanvas::fitGauss()
             temp=tempStringStream.str();
             std::cout<<std::setw(10);
             std::cout<<temp<<std::endl;
+
+            QString numberStr = QString("%1").arg(i+1, 0, ' ');
+            QString gaussianCenterStr = QString("%1").arg(fullFunction->GetParameter(3+i*3),0, ' ', 2);
+            QString energyStr = QString("%1(%2)").arg(fullFunction->GetParameter(3+i*3), 0, ' ', 2).arg(ceil(fullFunction->GetParError(3+i*3)*100), 0, ' ',0);
+            QString gaussianIntegralStr = QString("%1(%2)").arg(tempGaussFunction->Integral(range_markers[0],range_markers[1]), 0, ' ', 0).arg(round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2))), 0, ' ',0);
+            QString gaussianFWHMStr = QString("%1(%2)").arg(fullFunction->GetParameter(4+i*3)*2.3548, 0, ' ', 2).arg(ceil(fullFunction->GetParError(4+i*3)*2.3548*100), 0, ' ',0);
+
+
+            QString dataRow = QString("%1%2%3%4%5")
+                .arg(numberStr,-10,QChar(' '))
+                .arg(gaussianCenterStr, -10, QChar(' '))
+                .arg(energyStr, -15, QChar(' '))
+                .arg(gaussianIntegralStr, -25, QChar(' '))
+                .arg(gaussianFWHMStr, -10, QChar(' '));
+
+            // Insert data row into QPlainTextEdit
+            CommandPrompt::getInstance()->appendPlainText(dataRow);
         }
+        CommandPrompt::getInstance()->appendPlainText("");
     }
 
     //Tell the canvas that stuff got modified
@@ -1241,6 +1595,7 @@ void QMainCanvas::checkBackgrounds()
         if(background_markers.size()%2)
         {
             std::cout<<"There is an odd number of background markers, "<<background_markers.size()<<", so the last one, at "<<background_markers[background_markers.size()-1]<<", was removed"<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("There is an odd number of background markers, "+ QString::number(background_markers.size())+", so the last one, at " + QString::number(background_markers[background_markers.size()-1]) + ", was removed \n");
             background_markers.pop_back();
         }
 
@@ -1248,17 +1603,21 @@ void QMainCanvas::checkBackgrounds()
         if(overlapping_markers(background_markers))
         {
             std::cout<<"The background markers shown below produced regions which overlapped"<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("The background markers shown below produced regions wwhich overlapped\n");
             for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
             }
 
             std::cout<<"Thus, we have reordered them in order to produce non-overlapping regions, as seen below:"<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("Thus, we have reordered them in order to produce non-overlapping regions, as seen below:\n");
             sort(background_markers.begin(),background_markers.end());
 
             for(uint i=0;i<background_markers.size()/2;i++)
             {
                 std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
             }
         }
     }
@@ -1271,12 +1630,14 @@ bool QMainCanvas::checkRanges()
     if(range_markers.size()<2)
     {
         std::cout<<"There are fewer than 2 range markers added, namely "<<range_markers.size()<<", and the fitting procedure cannot run"<<std::endl;
+        CommandPrompt::getInstance()->appendPlainText("There are fewer than 2 range markers added, namely "+QString::number(range_markers.size()) +", and the fitting procedure cannot run\n");
         return 0;
     }
     //Check that there are no more than 2 range markers. If there are, delete all but the first 2
     else if(range_markers.size()>2)
     {
         std::cout<<"There are more than 2 range markers added, namely "<<range_markers.size()<<". Only the first 2 markers will be used, namely "<<range_markers[0]<<"-"<<range_markers[1]<<std::endl;
+        CommandPrompt::getInstance()->appendPlainText("There are more than 2 range markers added, namely "+QString::number(range_markers.size()) +". Only the first 2 markers will be used, namely "+ QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"\n");
 
         for(uint i=2;i<=range_markers.size();i++)
             range_markers.pop_back();
@@ -1297,6 +1658,9 @@ bool QMainCanvas::checkGauss()
         if(gauss_markers[i]<range_markers[0]||gauss_markers[i]>range_markers[1])
         {
             std::cout<<"The peak center marker at "<<gauss_markers[i]<<" is not within the designated fit region "<<range_markers[0]<<"-"<<range_markers[1]<<" and has been removed"<<std::endl;
+
+            CommandPrompt::getInstance()->appendPlainText("The peak center marker at "+QString::number(gauss_markers[i])+" is not within the designated fit region " + QString::number(range_markers[0])+"-"+QString ::number(range_markers[1])+"and has been removed\n");
+
             gauss_markers.erase(gauss_markers.begin()+i);
             i--;
         }
@@ -1305,6 +1669,7 @@ bool QMainCanvas::checkGauss()
     if(gauss_markers.size()==0)
     {
         std::cout<<"There are no valid markers for any peak centers to fit! The program will not run!"<<std::endl;
+        CommandPrompt::getInstance()->appendPlainText("There are no valid markers for any peak centers to fit! The program will not run!\n");
         return 0;
     }
 
@@ -1390,4 +1755,53 @@ void QMainCanvas::changeEvent(QEvent * e)
          }
       }
    }
+}
+
+void QMainCanvas::offerHelp()
+{
+    CommandPrompt::getInstance()->appendPlainText(" **********************  COMMAND-LIST  *********************\n\n");
+    CommandPrompt::getInstance()->appendPlainText(" spacebar               Place a Marker on the position of the cursor\n");
+    CommandPrompt::getInstance()->appendPlainText(" AJ AG                  Automatic CJ, CG  at marker position\n");
+    CommandPrompt::getInstance()->appendPlainText(" B G I R S W            Insert a marker of type Backgorund, G, Integral, Range, S  or W\n");
+    CommandPrompt::getInstance()->appendPlainText(" CB CI CJ MI MJ         Background, Integration(CI without background, CJ with), CB+CI\n");
+    CommandPrompt::getInstance()->appendPlainText(" CG CV MG MV            Gaussfit, CB+CG. Show markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" CP MP                  Automatic peak search. Show peaks\n");
+    CommandPrompt::getInstance()->appendPlainText(" Dn Cn Mn Zn n          Define, Execute, Show, Erase command string n=1...9\n");
+    CommandPrompt::getInstance()->appendPlainText(" DD                     Change the display parameters\n");
+    CommandPrompt::getInstance()->appendPlainText(" DE                     Define how to do efficiency correction\n");
+    CommandPrompt::getInstance()->appendPlainText(" DG                     Define peak width (individual/common) for fit\n");
+    CommandPrompt::getInstance()->appendPlainText(" DK AK                  Energy and Width calibration\n");
+    CommandPrompt::getInstance()->appendPlainText(" DF DL                  Define output file for Area calculations\n");
+    CommandPrompt::getInstance()->appendPlainText(" DT CT AT               Recalibration using Trackfit\n");
+    CommandPrompt::getInstance()->appendPlainText(" DW CW                  Define, Estract cuts from compressed matrix\n");
+    CommandPrompt::getInstance()->appendPlainText(" DQ                     Define matrix and background subtraction mode\n");
+    CommandPrompt::getInstance()->appendPlainText(" E                      Expand/Zoom between last two Markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" X                      Expand around current cursor position\n");
+    CommandPrompt::getInstance()->appendPlainText(" FF FX FY               Full display Full_x Full_y\n");
+    CommandPrompt::getInstance()->appendPlainText(" SX SY                  same X or Y scale for all windows\n");
+    CommandPrompt::getInstance()->appendPlainText(" FO FU                  Set Y-maximum or Y-minimum by marker\n");
+    CommandPrompt::getInstance()->appendPlainText(" H ?                    Help (this list)\n");
+    CommandPrompt::getInstance()->appendPlainText(" K                      Energy calibration from previous 2 energies\n");
+    CommandPrompt::getInstance()->appendPlainText(" L                      Change the histogram Linear/Logaritmic\n");
+    CommandPrompt::getInstance()->appendPlainText(" N                      Input new spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" DN MN ZN               Define display behaviour at input of new spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" OS                     Write out current spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" O=                     Postscript plot of current display\n");
+    CommandPrompt::getInstance()->appendPlainText(" P                      Insert a peak by energy\n");
+    CommandPrompt::getInstance()->appendPlainText(" Q                      Display projection of compressed matrix\n");
+    CommandPrompt::getInstance()->appendPlainText(" V                      Marker writing also counts in channel\n");
+    CommandPrompt::getInstance()->appendPlainText(" MZ                     Draw a line at zero counts\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZA                     Delete all B/G/I markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZB ZI ZJ ZG ZV         Delete corresponding type of markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZF ZL                  Close output file for Area calculations\n");
+    CommandPrompt::getInstance()->appendPlainText(" DP MP ZP               Define, Show, Delete peaks in buffer\n");
+    CommandPrompt::getInstance()->appendPlainText(" + -                    Insert/delete a peak by marker\n");
+    CommandPrompt::getInstance()->appendPlainText(" =                      Repeat the display\n");
+    CommandPrompt::getInstance()->appendPlainText(" < >                    Shift display 3/4 to Left, Rigth\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_RIGHTARROW         Increase # of windows adding one column more\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_LEFTARROW          Decrease # of windows deleting last column\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_UPARROW            Increase # of windows adding one row more\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_DOWNARROW          Decrease # of windows deleting last row\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_C CTL_Y CTL_Z      Close the program\n");
+    CommandPrompt::getInstance()->appendPlainText(" _________________________________________________________\n\n");
 }
