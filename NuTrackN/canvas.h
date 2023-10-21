@@ -121,6 +121,7 @@ signals:
    void requesttranslatedownTheScreen();
    void requesttranslateupTheScreen();
    void fullscreen();
+   void requestHelp();
 };
 
 class QMainCanvas : public QWidget
@@ -171,6 +172,7 @@ public slots:
    void translateupTheScreen();
    void zoomOut();
    void addSpaceBarMarker(Int_t, Int_t);
+   void offerHelp();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);

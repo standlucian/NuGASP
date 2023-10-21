@@ -266,6 +266,11 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         //Looks at what key was pressed and does different things depending on what was pressed
         switch(event->key())
         {
+            case Qt::Key_H:
+            case Qt::Key_Question:
+                //If shift is pressed, mark that down to later check if the / is pressed at the same time
+                emit requestHelp();
+                break;
             case Qt::Key_Control:
                 //If control is pressed, mark that down to later check if the mouse is clicked at the same time
                 controlKeyIsPressed=1;
@@ -507,6 +512,9 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //connects the keyboard command C+V to fitting the Gauss Functions;
    connect(canvas,SIGNAL(requestFitGauss()), this, SLOT(fitGauss()));
 
+   //connects the keyboard key ? to listing the commands
+   connect(canvas,SIGNAL(requestHelp()),this,SLOT(offerHelp()));
+
    //connects the keyboard commands CTRL+C/Z/Y to quitting the app
    connect(canvas,SIGNAL(killSwitch()), qApp, SLOT(quit()));
 
@@ -679,18 +687,27 @@ void QMainCanvas::areaFunctionWithBackground()
 {
    //The integral function is used with the background markers and the integral markers to perform an integral with backgorund
    //The function also returns the slope of the background
-   integral_function(h1f,integral_markers,background_markers,slope,addition);
-   //Draw a line to show the background
-   TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
-   backgroundLine->SetLineColor(kBlue);
-   backgroundLine->SetLineWidth(2);
+    if(background_markers.size()==0)
+    {
+        CommandPrompt::getInstance()->appendPlainText("There are no background markers, so an integral with background can not be performed\n");
+        std::cout<<"There are no background markers, so an integral with background can not be performed\n";
+    }
+    else
+    {
 
-   backgroundLine->Draw("same");
-   //Add the line to the list of things put on the screen, so it can be deleted
-   listOfObjectsDrawnOnScreen.Add(backgroundLine);
+       integral_function(h1f,integral_markers,background_markers,slope,addition);
+       //Draw a line to show the background
+       TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
+       backgroundLine->SetLineColor(kBlue);
+       backgroundLine->SetLineWidth(2);
 
-   canvas->getCanvas()->Modified();
-   canvas->getCanvas()->Update();
+       backgroundLine->Draw("same");
+       //Add the line to the list of things put on the screen, so it can be deleted
+       listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+       canvas->getCanvas()->Modified();
+       canvas->getCanvas()->Update();
+    }
 }
 
 //______________________________________________________________________________
@@ -1738,4 +1755,53 @@ void QMainCanvas::changeEvent(QEvent * e)
          }
       }
    }
+}
+
+void QMainCanvas::offerHelp()
+{
+    CommandPrompt::getInstance()->appendPlainText(" **********************  COMMAND-LIST  *********************\n\n");
+    CommandPrompt::getInstance()->appendPlainText(" spacebar               Place a Marker on the position of the cursor\n");
+    CommandPrompt::getInstance()->appendPlainText(" AJ AG                  Automatic CJ, CG  at marker position\n");
+    CommandPrompt::getInstance()->appendPlainText(" B G I R S W            Insert a marker of type Backgorund, G, Integral, Range, S  or W\n");
+    CommandPrompt::getInstance()->appendPlainText(" CB CI CJ MI MJ         Background, Integration(CI without background, CJ with), CB+CI\n");
+    CommandPrompt::getInstance()->appendPlainText(" CG CV MG MV            Gaussfit, CB+CG. Show markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" CP MP                  Automatic peak search. Show peaks\n");
+    CommandPrompt::getInstance()->appendPlainText(" Dn Cn Mn Zn n          Define, Execute, Show, Erase command string n=1...9\n");
+    CommandPrompt::getInstance()->appendPlainText(" DD                     Change the display parameters\n");
+    CommandPrompt::getInstance()->appendPlainText(" DE                     Define how to do efficiency correction\n");
+    CommandPrompt::getInstance()->appendPlainText(" DG                     Define peak width (individual/common) for fit\n");
+    CommandPrompt::getInstance()->appendPlainText(" DK AK                  Energy and Width calibration\n");
+    CommandPrompt::getInstance()->appendPlainText(" DF DL                  Define output file for Area calculations\n");
+    CommandPrompt::getInstance()->appendPlainText(" DT CT AT               Recalibration using Trackfit\n");
+    CommandPrompt::getInstance()->appendPlainText(" DW CW                  Define, Estract cuts from compressed matrix\n");
+    CommandPrompt::getInstance()->appendPlainText(" DQ                     Define matrix and background subtraction mode\n");
+    CommandPrompt::getInstance()->appendPlainText(" E                      Expand/Zoom between last two Markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" X                      Expand around current cursor position\n");
+    CommandPrompt::getInstance()->appendPlainText(" FF FX FY               Full display Full_x Full_y\n");
+    CommandPrompt::getInstance()->appendPlainText(" SX SY                  same X or Y scale for all windows\n");
+    CommandPrompt::getInstance()->appendPlainText(" FO FU                  Set Y-maximum or Y-minimum by marker\n");
+    CommandPrompt::getInstance()->appendPlainText(" H ?                    Help (this list)\n");
+    CommandPrompt::getInstance()->appendPlainText(" K                      Energy calibration from previous 2 energies\n");
+    CommandPrompt::getInstance()->appendPlainText(" L                      Change the histogram Linear/Logaritmic\n");
+    CommandPrompt::getInstance()->appendPlainText(" N                      Input new spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" DN MN ZN               Define display behaviour at input of new spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" OS                     Write out current spectrum\n");
+    CommandPrompt::getInstance()->appendPlainText(" O=                     Postscript plot of current display\n");
+    CommandPrompt::getInstance()->appendPlainText(" P                      Insert a peak by energy\n");
+    CommandPrompt::getInstance()->appendPlainText(" Q                      Display projection of compressed matrix\n");
+    CommandPrompt::getInstance()->appendPlainText(" V                      Marker writing also counts in channel\n");
+    CommandPrompt::getInstance()->appendPlainText(" MZ                     Draw a line at zero counts\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZA                     Delete all B/G/I markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZB ZI ZJ ZG ZV         Delete corresponding type of markers\n");
+    CommandPrompt::getInstance()->appendPlainText(" ZF ZL                  Close output file for Area calculations\n");
+    CommandPrompt::getInstance()->appendPlainText(" DP MP ZP               Define, Show, Delete peaks in buffer\n");
+    CommandPrompt::getInstance()->appendPlainText(" + -                    Insert/delete a peak by marker\n");
+    CommandPrompt::getInstance()->appendPlainText(" =                      Repeat the display\n");
+    CommandPrompt::getInstance()->appendPlainText(" < >                    Shift display 3/4 to Left, Rigth\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_RIGHTARROW         Increase # of windows adding one column more\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_LEFTARROW          Decrease # of windows deleting last column\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_UPARROW            Increase # of windows adding one row more\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_DOWNARROW          Decrease # of windows deleting last row\n");
+    CommandPrompt::getInstance()->appendPlainText(" CTL_C CTL_Y CTL_Z      Close the program\n");
+    CommandPrompt::getInstance()->appendPlainText(" _________________________________________________________\n\n");
 }
