@@ -14,13 +14,51 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    setUpdatesEnabled(kFALSE);
    setMouseTracking(kTRUE);
    //Minimum size of the spectra
-   setMinimumSize(300, 200);
+   setMinimumSize(300, 300);
 
    // register the QWidget in TVirtualX, giving its native window id
    int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
    // create the ROOT TCanvas, giving as argument the QWidget registered id
    fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
+
    TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
+  // TObject *obj; // Acesta ar fi obiectul desenat pe canvasul tău ROOT
+   //obj->SetContextMenu(nullptr); // Dezactivează meniul contextual ROOT pentru acest obiect
+   Double_t proportie = 0.1/fCanvas->GetWh();
+gPad->SetMargin(proportie, proportie, proportie, proportie); // l, r, b, t
+  // fCanvas->SetTopMargin(0.1);     // 10% din înălțimea canvasului
+//fCanvas->SetBottomMargin(0.1);  // 10% din înălțimea canvasului
+//fCanvas->SetLeftMargin(0.1);    // 10% din lățimea canvasului
+//fCanvas->SetRightMargin(0.1);   // 10% din lățimea canvasului
+    //TLine *line = new TLine(0, 0, 100, 100);
+
+    // Setarea stilului liniei, opțional
+    //line->SetLineColor(kRed);  // Setarea culorii liniei la roșu
+    //line->SetLineWidth(2);     // Setarea grosimii liniei
+
+    //QPainter painter(this);
+//QPen pen;
+
+//pen.setColor(Qt::red); // Setează culoarea liniei ca roșu
+//pen.setWidth(3);
+//painter.setPen(pen); // Aplică stilul de pen (linie) pentru desenare
+
+//painter.drawLine(0, 0, width(), height());
+//this->update();
+//this->repaint();
+
+    // Desenarea liniei pe canvas
+    //line->Draw();
+   int canvasWidth = fCanvas->GetWw();
+   int canvasHeight = fCanvas->GetWh();
+
+std::cout << "Latimea canvasului: " << canvasWidth << " pixeli" << endl;
+std::cout << "Inaltimea canvasului: " << canvasHeight << " pixeli" << endl;
+
+
+std::cout << "Latimea canvasului: " << width() << " pixeli" << endl;
+std::cout << "Inaltimea canvasului: " << height() << " pixeli" << endl;
+
 
    setFocusPolicy(Qt::StrongFocus);
    TLatex l;
@@ -28,17 +66,66 @@ QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
    l.SetTextAlign(22);
    l.SetTextColor(kBlack);
    l.DrawLatex(0.5, 0.5, "NuTrackN");
+
+    QLabel *label = new QLabel();
+    label->setWindowFlags(Qt::ToolTip); // Utilizează ToolTip pentru a evita focusul
+    label->setText("Helllllllllllllllllllloooooooooooo");
+    label->setStyleSheet("background-color: yellow; color: black; padding: 10px;");
+    label->adjustSize(); // Ajustează dimensiunea label-ului în funcție de text
+
+    // Poziționare în colțul din dreapta sus
+    QRect screenGeometry = QApplication::primaryScreen()->geometry();
+    label->move(screenGeometry.topRight() - QPoint(label->width(), 0));
+
+    label->show();
+
+    QPropertyAnimation *animation = new QPropertyAnimation(label, "windowOpacity");
+    animation->setDuration(3000);
+    animation->setStartValue(1.0);
+    animation->setEndValue(0.0);
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+
+    QObject::connect(animation, &QPropertyAnimation::finished, label, &QLabel::deleteLater);
+
+
 }
+void QMainCanvas::draw_pixel_line(TCanvas* canvas, Int_t x1_pixel, Int_t y1_pixel, Int_t x2_pixel, Int_t y2_pixel) {
+    // Convertirea coordonatelor pixelilor în coordonatele utilizatorului
+    Double_t x1_user = canvas->AbsPixeltoX(x1_pixel);
+    Double_t y1_user = canvas->AbsPixeltoY(y1_pixel);
+    Double_t x2_user = canvas->AbsPixeltoX(x2_pixel);
+    Double_t y2_user = canvas->AbsPixeltoY(y2_pixel);
+
+    // Crearea și desenarea liniei
+    TLine* line = new TLine(x1_user, y1_user, x2_user, y2_user);
+    line->SetLineColor(kBlue);  // Setarea culorii liniei la roșu
+    line->SetLineWidth(4);
+    line->Draw();
+
+    // Actualizarea canvasului
+    //canvas->Update();
+}
+
 
 //______________________________________________________________________________
 void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 {
    // Handle mouse move events.
-
+emit mousePilgrim(e->x(), e->y());
+    fCanvas->Modified();
+    fCanvas->Update();
    //This tells the canvas to handle events when the mouse moves and any or none of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
+ qDebug() << "Coordonate mouse: (" << e->x() << "," << e->y() << ")";
+ qDebug() << "Coordonate mouse: (" << width() << "," << height() << ")";
+ //emit mouseMoved(e->x(), e->y());
+    //xPosLabel->setText("X: " + QString::number(e->x()));
+    //yPosLabel->setText("Y: " + QString::number(e->y()));
+//std::cout << "Latimea canvasului: " << width() << " pixeli" << endl;
+//std::cout << "Inaltimea canvasului: " << height() << " pixeli" << endl;
+
    if (fCanvas) {
       if (e->buttons() & Qt::LeftButton) {
-         fCanvas->HandleInput(kButton1Motion, e->x(), e->y());
+         //fCanvas->HandleInput(kButton1Motion, e->x(), e->y());
       } else if (e->buttons() & Qt::MiddleButton) {
          fCanvas->HandleInput(kButton2Motion, e->x(), e->y());
       } else if (e->buttons() & Qt::RightButton) {
@@ -76,10 +163,17 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
    // Handle mouse button press events.
 
     //This tells the canvas to handle events when any of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
+
+
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
-            fCanvas->HandleInput(kButton1Down, e->x(), e->y());
+             emit mouseMoved(e->x(), e->y());
+             //emit mouseMoved(e->x(), e->y());
+             //emit mouseMoved(e->x(), e->y());
+             //emit deline();
+            //fCanvas->HandleInput(kButton1Down, e->x(), e->y());
+             //emit mouseMoved(e->x(), e->y());
             break;
          case Qt::MiddleButton :
             fCanvas->HandleInput(kButton2Down, e->x(), e->y());
@@ -88,7 +182,9 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
             // does not work properly on Linux...
             // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
             // seems to cure the problem
-            fCanvas->HandleInput(kButton3Down, e->x(), e->y());
+            //fCanvas->HandleInput(kButton3Down, e->x(), e->y());
+             showContextMenu(e);
+
             break;
          default:
             break;
@@ -100,17 +196,19 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
 void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
 {
    // Handle mouse button release events.
-
+//emit mouseMoved(e->x(), e->y());
     //This tells the canvas to handle events when any of the mouse buttons are released. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
+            // setAttribute(Qt::WA_NoMousePropagation, true);
+
             //If the left button is released AND the Ctrl key is pressed, call the autofit function (to be implemented)
             if(controlKeyIsPressed)
             {
                 emit autoFitRequested(e->x(),e->y());
             }
-            fCanvas->HandleInput(kButton1Up, e->x(), e->y());
+            //fCanvas->HandleInput(kButton1Up, e->x(), e->y());
             break;
          case Qt::MiddleButton :
             fCanvas->HandleInput(kButton2Up, e->x(), e->y());
@@ -119,12 +217,45 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
             // does not work properly on Linux...
             // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
             // seems to cure the problem
-            fCanvas->HandleInput(kButton3Up, e->x(), e->y());
+             //e->ignore();
+//showContextMenu(e); // your custom context menu
+            //e->ignore();
+           //fCanvas->HandleInput(kButton3Up, e->x(), e->y());
+
             break;
          default:
             break;
       }
    }
+   QWidget::mouseReleaseEvent(e);
+}
+void QRootCanvas::showContextMenu(QMouseEvent *e)
+{
+    QMenu contextMenu(tr("Context menu"), this);
+
+    QAction *action1 = new QAction("Add Line", this);
+    connect(action1, &QAction::triggered, this, &QRootCanvas::requestDuplicate1);
+    contextMenu.addAction(action1);
+
+    QAction *action2 = new QAction("Add Column", this);
+    connect(action1, &QAction::triggered, this, &QRootCanvas::requestDuplicate);
+    contextMenu.addAction(action2);
+
+        QAction *action3 = new QAction("Delete Line", this);
+    connect(action3, &QAction::triggered, this, &QRootCanvas::requestDuplicate);
+    contextMenu.addAction(action3);
+
+    QAction *action4 = new QAction("Delete Column", this);
+    connect(action4, &QAction::triggered, this, &QRootCanvas::requestDuplicate);
+    contextMenu.addAction(action4);
+
+        QAction *action5 = new QAction("Refresh Display", this);
+    connect(action5, &QAction::triggered, this, &QRootCanvas::requestDuplicate);
+    contextMenu.addAction(action5);
+
+    // adding more actions as needed...
+//draw_pixel_line(canvas, width()/2, width()/2, 0, height());
+    contextMenu.exec(e->globalPos());
 }
 
 //______________________________________________________________________________
@@ -407,9 +538,16 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    // QMainCanvas constructor.
 
    QVBoxLayout *l = new QVBoxLayout(this);
+  // QHBoxLayout *p = new QHBoxLayout(this);
+
+
+
+
+//ColorTheGrid(coordi);
 
    //Adds the canvas to the window
    l->addWidget(canvas = new QRootCanvas(this));
+   //p->addWidget(canvas = new QRootCanvas(this));
    //Adds the button to the window
    l->addWidget(b = new QPushButton("&Select your file", this));
    //When the button is pressed, execute function clicked1
@@ -425,10 +563,34 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    l->addWidget(b = new QPushButton("&Cal2P", this));
    //Same as the previous line of code, it executes the function Cal2pMain when the button is clicked
    connect(b, SIGNAL(clicked()), this, SLOT(Cal2pMain()));
+   l->addWidget(b = new QPushButton("&Duplicate Line", this));
+   //Same as the previous line of code, it executes the function Cal2pMain when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(Duplicate1()));
+   l->addWidget(b = new QPushButton("&Duplicate Culomn", this));
+   //Same as the previous line of code, it executes the function Cal2pMain when the button is clicked
+   connect(b, SIGNAL(clicked()), this, SLOT(Duplicate()));
+connect(canvas,SIGNAL(mouseMoved( Double_t,  Double_t)), this, SLOT(updateLabels(Double_t, Double_t)));
+connect(canvas,SIGNAL(mouseMoved( Double_t,  Double_t)), this, SLOT(histoMatrix(Double_t , Double_t )));
+connect(canvas,SIGNAL(mousePilgrim( Double_t,  Double_t)), this, SLOT(updateLabels2(Double_t, Double_t)));
+connect(canvas,SIGNAL(mousePilgrim( Double_t,  Double_t)), this, SLOT(histoPilgrim(Double_t , Double_t )));
 
 
 
 
+
+
+
+
+
+
+
+
+
+ //connect(b, SIGNAL(rightClicked(QPoint)), this, SLOT(showMyContextMenu(QPoint)));
+connect(canvas,SIGNAL(deline()), this, SLOT(deletegrips()));
+
+   connect(canvas,SIGNAL(requestDuplicate()), this, SLOT(Duplicate()));
+   //connect(canvas,SIGNAL(requestDuplicate1()), this, SLOT(Duplicate1()));
    //connects the keyboard command C+I to the areaFunction;
    connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
 
@@ -443,6 +605,8 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
 
    //connects the keyboard command B to adding the background markers;
    connect(canvas,SIGNAL(addBackgroundMarkerRequested(Int_t, Int_t)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
+
+   //connect(canvas,SIGNAL(mouseMoved(int x, int y)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
 
    //connects the keyboard command I to adding the background markers;
    connect(canvas,SIGNAL(addIntegralMarkerRequested(Int_t, Int_t)), this, SLOT(addIntegralMarker(Int_t, Int_t)));
@@ -518,8 +682,213 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    fRootTimer->start( 20 );
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
-   h1f = new TracknHistogram("h1f","Test random numbers", 10240, 0, 10240);
+   h1f = new TracknHistogram("h1f" ,"",  10240, 0, 10240);
+   if(contor*bontor==1){selectedHisto=static_cast<TracknHistogram*>(h1f->Clone("h11f"));}
+
+
+   h1f->GetXaxis()->SetNdivisions(0, kTRUE);
+h1f->GetXaxis()->SetLabelSize(0);
+
+h1f->GetYaxis()->SetNdivisions(0, kTRUE);
+h1f->GetYaxis()->SetLabelSize(0);
+h1f->SetStats(0);
+//selectedHisto=static_cast<TracknHistogram*>(h1f->Clone("h"));
+   h2f = new TracknHistogram("h2f","", 10240, 0, 10240);
+
+   //hijfMatrix[1][1] = new TracknHistogram("h11f","", 10240, 0, 10240);
+    //hijfMatrix[1][1]=static_cast<TracknHistogram*>(h1f->Clone("h11f"));
+    //hijfMatrix[1][1]->SetTitle("h11f");
+    //hijfMatrix[1][1]->Draw();
+
+//selectedHisto=static_cast<TracknHistogram*>(h1f->Clone("dsds"));
+
+
+ //h1f->Divide(2, 1);
+ //h1f->Divide(2, 1);
+
 }
+void QMainCanvas::Duplicate()
+{
+
+    if(selectedHisto==nullptr ){
+    QLabel *label1 = new QLabel();
+    label1->setWindowFlags(Qt::ToolTip); // Utilizează ToolTip pentru a evita focusul
+
+
+    label1->setWindowFlags(Qt::ToolTip); // Utilizează ToolTip pentru a evita focusul
+    label1->setText("err: Please select a histogram, sir!");
+    label1->setStyleSheet("background-color: yellow; color: black; padding: 10px;");
+    label1->adjustSize(); // Ajustează dimensiunea label-ului în funcție de text
+
+    // Poziționare în colțul din dreapta sus
+    QRect screenGeometry = QApplication::primaryScreen()->geometry();
+    label1->move(screenGeometry.topRight() - QPoint(label1->width(), 0));
+
+    label1->show();
+
+    QPropertyAnimation *animation = new QPropertyAnimation(label1, "windowOpacity");
+    animation->setDuration(3000);
+    animation->setStartValue(1.0);
+    animation->setEndValue(0.0);
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+
+    QObject::connect(animation, &QPropertyAnimation::finished, label1, &QLabel::deleteLater);}
+    else{
+
+    if(bontor==1 && contor ==1){
+    for(int w=0;w++;w<=12){
+        for(int p=0; p<=12; p++){
+        hijkMatrix[w][p]=h1f;
+    }}}
+   hijfMatrix[1][1]= new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[1][1]=static_cast<TracknHistogram*>(h1f->Clone("11"));
+   hijfMatrix[1][1]->SetTitle(QString::number(contor).toStdString().c_str());
+   hijfMatrix[1][1]->SetTitle(("h1"+QString::number(1)+"f").toStdString().c_str());
+    contor++;
+    std::cout<<"contor="<<contor<<"  bontor"<<bontor<<"\n";
+    TObject* currentCanvas;
+    canvas->getCanvas()->Clear();
+    //canvas->getCanvas()->cd();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(contor, bontor,0,0,0);
+    //canvas->getCanvas()->cd(1);
+   for(int n=1;n<=bontor*contor;n++){
+       for(int z=1;z<=bontor;z++){
+           for(int g=1;g<=contor;g++){
+
+       if(contor>=2 && bontor >1){
+           if(g==contor){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+           else{
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(hijkMatrix[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+        }
+        if(contor==2 && bontor==1){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(h1f->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+    }
+        if(contor>2 && bontor==1){
+                       if(g==contor){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+           else{
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(hijkMatrix[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+        }
+
+
+
+hijkMatrix[z][g]=hijfMatrix[z][g];
+    canvas->getCanvas()->cd(n);
+    hijfMatrix[z][g]->Draw();
+    n++;
+   }
+    }
+   }
+   TCanvas* rootCanvas = canvas->getCanvas();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    selectedHisto=nullptr;}
+}
+
+void QMainCanvas::Duplicate1()
+{
+if(selectedHisto==nullptr ){
+    QLabel *label1 = new QLabel();
+    label1->setWindowFlags(Qt::ToolTip); // Utilizează ToolTip pentru a evita focusul
+    label1->setText("err: Please select a histogram, sir!");
+    label1->setStyleSheet("background-color: yellow; color: black; padding: 10px;");
+    label1->adjustSize(); // Ajustează dimensiunea label-ului în funcție de text
+
+    // Poziționare în colțul din dreapta sus
+    QRect screenGeometry = QApplication::primaryScreen()->geometry();
+    label1->move(screenGeometry.topRight() - QPoint(label1->width(), 0));
+
+    label1->show();
+
+    QPropertyAnimation *animation = new QPropertyAnimation(label1, "windowOpacity");
+    animation->setDuration(3000);
+    animation->setStartValue(1.0);
+    animation->setEndValue(0.0);
+    animation->start(QAbstractAnimation::DeleteWhenStopped);
+
+    QObject::connect(animation, &QPropertyAnimation::finished, label1, &QLabel::deleteLater);}
+    else{
+    if(bontor==1 && contor ==1){
+    for(int w=0;w++;w<=12){
+        for(int p=0; p<=12; p++){
+        hijkMatrix[w][p]=h1f;
+    }}}
+   hijfMatrix[1][1]= new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[1][1]=static_cast<TracknHistogram*>(h1f->Clone("11"));
+   hijfMatrix[1][1]->SetTitle(QString::number(contor).toStdString().c_str());
+   hijfMatrix[1][1]->SetTitle(("h1"+QString::number(1)+"f").toStdString().c_str());
+    bontor++;
+    std::cout<<"contor="<<contor<<"  bontor"<<bontor<<"\n";
+    TObject* currentCanvas;
+    canvas->getCanvas()->Clear();
+    //canvas->getCanvas()->cd();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(contor, bontor,0,0,0);
+    //canvas->getCanvas()->cd(1);
+   for(int n=1;n<=bontor*contor;n++){
+       for(int z=1;z<=bontor;z++){
+           for(int g=1;g<=contor;g++){
+
+       if(bontor>=2 && contor >1){
+           if(z== bontor){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+           else{
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(hijkMatrix[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+        }
+        if(bontor==2 && contor==1){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(h1f->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+    }
+        if(bontor>2 &&  contor==1){
+                       if(z==bontor){
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+           else{
+   hijfMatrix[z][g] = new TracknHistogram("h21f","dadada", 10240, 0, 10240);
+   hijfMatrix[z][g]=static_cast<TracknHistogram*>(hijkMatrix[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+   hijfMatrix[z][g]->SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+        }
+
+
+
+hijkMatrix[z][g]=hijfMatrix[z][g];
+    canvas->getCanvas()->cd(n);
+    hijfMatrix[z][g]->Draw();
+    n++;
+   }
+    }
+   }
+   TCanvas* rootCanvas = canvas->getCanvas();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    //selectedHisto=nullptr;
+    selectedHisto=nullptr;
+
+}
+
+    }
+
+
+
+
 
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
@@ -535,8 +904,15 @@ void QMainCanvas::clicked1()
    changeBackgroundColor(canvas->getCanvas());
    h1f->Reset();
    //This sets the color of the spectrum
+   //canvas->getCanvas()->Divide(2, 1);
+//for(int i = 1; i <= 2; ++i) {
+            //canvas->getCanvas()->cd(i); // Selecționează fiecare sub-canvas}
+//}
+
    h1f->SetFillColor(kViolet + 2);
    h1f->SetFillStyle(3001);
+
+
 
    // This opens a dialog to select a file for reading
    QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
@@ -561,7 +937,10 @@ void QMainCanvas::clicked1()
    maxValueInHistogram=h1f->GetBinContent(h1f->GetMaximumBin());
 
    //Draws the spectrum and tells the canvas to update itself
+   //h1f->SetLineWidth(4); // De exemplu, setăm grosimea la 2
+  //h1f->SetBorderMode(1);
    h1f->Draw();
+   //canvas->canvas->AddExec("dynamic", "TPadHandler", &TPadHandler);
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
 }
@@ -623,7 +1002,11 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
     std::string objectInfo, temp;
     int from, to, binX;
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+
+    objectInfo=selectedHisto->GetObjectInfo(x,y);
+    //objectInfo=h1f->GetObjectInfo(x,y);
+
+
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -646,6 +1029,9 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
     //std::cout<<(Double_t)binX<<std::endl;
 
     //Create a yellow integral line and add it to the screen
+    //addSpaceBarMatrixRequested[wbontor][wcontor][x][y]=binX;
+    canvas->getCanvas()->cd((wbontor)*contor+wcontor+1);;
+    //else{canvas->getCanvas()->cd(2);}
     TLine *spacebarLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
     spacebarLine->SetLineColor(kCyan);
     spacebarLine->SetLineWidth(2);
@@ -660,8 +1046,14 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
 
 
    //h1f->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
-   zoom_markers.push_back(binX);
 
+    Double_t y1MinAxis = selectedHisto->GetYaxis()->GetXmin();
+    Double_t y2MinAxis = selectedHisto->GetYaxis()->GetXmin();
+    double info1 = width();
+        std::cout << "Object info: " << width() << "\n";
+        std::cout << "Object info: " << y << "\n";
+   zoom_markers.push_back(binX);
+//std::cout<<width()<<"\n"<<y<<"\n";
    //canvas->getCanvas()->Modified();
    //canvas->getCanvas()->Update();
 
@@ -887,12 +1279,12 @@ void QMainCanvas::autoFit(int x, int y)
 //______________________________________________________________________________
 Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFinish)
 {
-    int minValueFound=h1f->GetBinContent(intervalStart);
+    int minValueFound=selectedHisto->GetBinContent(intervalStart);
 
     for(int i=intervalStart+1; i<=intervalFinish; i++)
     {
-        if(h1f->GetBinContent(i)<minValueFound)
-            minValueFound=h1f->GetBinContent(i);
+        if(selectedHisto->GetBinContent(i)<minValueFound)
+            minValueFound=selectedHisto->GetBinContent(i);
     }
     return minValueFound;
 }
@@ -900,12 +1292,12 @@ Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFini
 //______________________________________________________________________________
 Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFinish)
 {
-    int maxValueFound=h1f->GetBinContent(intervalStart);
+    int maxValueFound=selectedHisto->GetBinContent(intervalStart);
 
     for(int i=intervalStart+1; i<=intervalFinish; i++)
     {
-        if(h1f->GetBinContent(i)>maxValueFound)
-            maxValueFound=h1f->GetBinContent(i);
+        if(selectedHisto->GetBinContent(i)>maxValueFound)
+            maxValueFound=selectedHisto->GetBinContent(i);
     }
     return maxValueFound;
 }
@@ -1042,9 +1434,9 @@ void QMainCanvas::zoomTheScreen()
     int x1,x2;
     if(i>=2){
     if(zoom_markers[i-2]<zoom_markers[i-1]){
-    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
+    selectedHisto->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
     if(zoom_markers[i-1]<zoom_markers[i-2]){
-    h1f->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
+    selectedHisto->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
     if(i<=1){
         std::cout<<"AI nev de doi space\n";}
   clearTheScreen();
@@ -1739,3 +2131,170 @@ void QMainCanvas::changeEvent(QEvent * e)
       }
    }
 }
+void QMainCanvas::DisplayCoordinates(Int_t event, Int_t x, Int_t y, TObject *selectedObj)
+{
+    if (event == 11) // Event 11 corespunde mișcării mouse-ului
+    {
+        // Convertiți coordonatele x și y în coordonatele corespunzătoare ale histogramei
+        Double_t xCoord = gPad->AbsPixeltoX(x);
+        Double_t yCoord = gPad->AbsPixeltoY(y);
+
+        // Creați un text pentru afișarea coordonatelor
+        TText *text = new TText(xCoord, yCoord, Form("X: %.2f, Y: %.2f", xCoord, yCoord));
+        text->SetTextColor(kBlack);
+        text->SetTextSize(0.03);
+        text->Draw();
+    }
+}
+void QMainCanvas::updateMousePosition(QMouseEvent *event)
+{
+    xPosLabel->setText("X:     " + QString::number(event->x()));
+    yPosLabel->setText("Y: " + QString::number(event->y()));
+}
+/*void QMainCanvas::ColorTheGrid(Double_t mouseX, Double_t ){
+    std::cout << "Mouse x = " << mouseX << "\n";
+
+
+    if (0 < mouseX && mouseX <= width()/4) {
+        std::cout << "1\n";
+        coordi=1;
+
+    } else if (width()/4 < mouseX && mouseX <= 2*width()/4) {
+        std::cout << "2\n";
+        coordi=2;
+    } else if (2*width()/4 < mouseX && mouseX <= 3*width()/4) {
+        std::cout << "3\n";
+        coordi=3;
+    } else if (3*width()/4 < mouseX && mouseX <= width()) {
+        std::cout << "4\n";
+        coordi=4;
+    }
+}*/
+
+void QMainCanvas::deletegrips(){
+    //delete lineD;
+}
+
+
+void QMainCanvas::histoMatrix(Double_t , Double_t ){
+
+
+    if(bontor>1 || contor>1){
+//wcontor=1;wbontor=1;
+        if(contor*bontor!=1){
+selectedHisto=nullptr;}
+    delete lineR;
+    lineR=nullptr;
+    delete lineL;
+    lineL=nullptr;
+        delete lineD;
+    lineD=nullptr;
+        delete lineU;
+    lineU=nullptr;
+
+    for(int j=0;j<contor;j++){
+        if(j*canvas->getCanvas()->GetWw()/contor<mouseX && mouseX<(j+1)*canvas->getCanvas()->GetWw()/contor){
+            wcontor=j;}}
+    for(int h=0;h<bontor;h++){
+        if(h*canvas->getCanvas()->GetWh()/bontor<mouseY && mouseY<(h+1)*canvas->getCanvas()->GetWh()/bontor ){
+            wbontor=h;}}
+        std::cout<<"HSTR PE CARE AI MOUSE-UL ESTE: "<<("h"+QString::number(wbontor+1)+QString::number(wcontor+1) + "f").toStdString().c_str()<<"\n";
+         histName = ("hijfMatrix["+QString::number(wbontor+1)+"][" + QString::number(wcontor+1)+"]").toStdString().c_str();
+        histogram = (TH1F*) gDirectory->FindObject(histName);
+        selectedHisto =hijfMatrix[wbontor+1][wcontor+1];
+        std::cout<<"h="<<wbontor+1<<" j="<<wcontor+1<<"\n";
+        //std::cout<<histName<<"d\n";
+//for(int o=1;o<=wcontor+1;o++){
+   // for(int b=1;b<=wbontor+1;b++){
+       // canvas->getCanvas()->cd(o*b);
+   // }
+//}
+        canvas->getCanvas()->cd((wbontor)*contor+wcontor+1);
+    lineR = new TLine(hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), 0, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), maxValueInHistogram*1.05);
+    lineL= new TLine(0, 0, 0, maxValueInHistogram*1.05);
+    lineU= new TLine(0,  maxValueInHistogram*1.05, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), maxValueInHistogram*1.05);
+    lineD= new TLine(0, 0, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), 0);
+    lineR->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineR->SetLineWidth(8);     // Setarea grosimii liniei
+    lineR->Draw();
+    lineL->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineL->SetLineWidth(8);     // Setarea grosimii liniei
+    lineL->Draw();
+    lineU->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineU->SetLineWidth(8);     // Setarea grosimii liniei
+    lineU->Draw();
+    lineD->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineD->SetLineWidth(8);     // Setarea grosimii liniei
+    lineD->Draw();
+
+}
+
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+
+
+
+
+
+
+
+}
+
+void QMainCanvas::histoPilgrim(Double_t , Double_t ){
+    if(bontor>1 || contor>1){
+//wcontor=1;wbontor=1;
+    pilgrimHisto=nullptr;
+    delete lineR1;
+    lineR1=nullptr;
+    delete lineL1;
+    lineL1=nullptr;
+    delete lineD1;
+    lineD1=nullptr;
+    delete lineU1;
+    lineU1=nullptr;
+
+    for(int j=0;j<contor;j++){
+        if(j*canvas->getCanvas()->GetWw()/contor<mouseX2 && mouseX2<(j+1)*canvas->getCanvas()->GetWw()/contor){
+            wcontor=j;}}
+    for(int h=0;h<bontor;h++){
+        if(h*canvas->getCanvas()->GetWh()/bontor<mouseY2 && mouseY2<(h+1)*canvas->getCanvas()->GetWh()/bontor ){
+            wbontor=h;}}
+        std::cout<<"HSTR PE CARE AI MOUSE-UL ESTE: "<<("h"+QString::number(wbontor+1)+QString::number(wcontor+1) + "f").toStdString().c_str()<<"\n";
+         histName = ("hijfMatrix["+QString::number(wbontor+1)+"][" + QString::number(wcontor+1)+"]").toStdString().c_str();
+        histogram = (TH1F*) gDirectory->FindObject(histName);
+        pilgrimHisto =hijfMatrix[wbontor+1][wcontor+1];
+        std::cout<<"h="<<wbontor+1<<" j="<<wcontor+1<<"\n";
+        canvas->getCanvas()->cd((wbontor)*contor+wcontor+1);
+
+       lineR1 = new TLine(hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), 0, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), maxValueInHistogram*1.05);
+    lineL1= new TLine(0, 0, 0, maxValueInHistogram*1.05);
+    lineU1= new TLine(0,  maxValueInHistogram*1.05, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), maxValueInHistogram*1.05);
+    lineD1= new TLine(0, 0, hijfMatrix[wbontor+1][wcontor+1]->GetXaxis()->GetXmax(), 0);
+    lineR1->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineR1->SetLineWidth(4);     // Setarea grosimii liniei
+    lineR1->Draw();
+    lineL1->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineL1->SetLineWidth(4);     // Setarea grosimii liniei
+    lineL1->Draw();
+    lineU1->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineU1->SetLineWidth(4);     // Setarea grosimii liniei
+    lineU1->Draw();
+    lineD1->SetLineColor(kGray);  // Setarea culorii liniei la roșu
+    lineD1->SetLineWidth(4);     // Setarea grosimii liniei
+    lineD1->Draw();
+
+}
+
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+
+}
+
+
+
+
+

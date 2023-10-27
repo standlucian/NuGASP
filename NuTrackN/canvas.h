@@ -33,6 +33,11 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QWheelEvent>
+#include <QMenu>
+#include <QString>
+#include <QHBoxLayout>
+#include <QTimer>
+#include <QPropertyAnimation>
 
 
 
@@ -49,6 +54,10 @@
 #include <TLine.h>
 #include <TMatrixD.h>
 #include <Math/Minimizer.h>
+#include <TContextMenu.h>
+#include <TDirectory.h>
+#include <TROOT.h>
+
 
 
 #include <QLabel>
@@ -57,6 +66,7 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QScreen>
 
 class QPaintEvent;
 class QResizeEvent;
@@ -73,6 +83,7 @@ public:
    QRootCanvas( QWidget *parent = 0);
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
+   
 
 protected:
    TCanvas        *fCanvas;
@@ -86,6 +97,11 @@ protected:
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
    virtual void    wheelEvent(QWheelEvent *e);
+   void ColorTheGrid (int coord);
+  
+
+   virtual void    showContextMenu(QMouseEvent *e);
+    //virtual void contextMenuEvent(QContextMenuEvent *event);
    
 
    bool controlKeyIsPressed=0;
@@ -121,6 +137,15 @@ signals:
    void requesttranslatedownTheScreen();
    void requesttranslateupTheScreen();
    void fullscreen();
+   void requestDuplicate();
+   void requestDuplicate1();
+   void mouseMoved(Double_t , Double_t );
+   void mousePilgrim(Double_t , Double_t );
+   void deline();
+   
+
+   
+   
 };
 
 class QMainCanvas : public QWidget
@@ -134,11 +159,27 @@ public:
    virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
+   //void ColorTheGrid(Double_t x, Double_t y);
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
+   TracknHistogram *h2f;
+   TH1F* hijkMatrix[12][12];
+   TH1F* hijfMatrix[12][12];
+   Double_t addSpaceBarMatrixRequested[12][12][2][2];
+   TH1F *histogram;
+   TH1F* selectedHisto;
+   TH1F* pilgrimHisto;
+   TString histName;
+   int contor=1;
+   int bontor=1;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
+   Double_t mouseX,mouseY;
+   Double_t mouseX2,mouseY2;
+   int coordi ;
+    int wcontor;
+ int wbontor;
 
 
 public slots:
@@ -164,6 +205,8 @@ public slots:
    void showGaussMarkers();
    void fitGauss();
    void Cal2pMain();
+   void Duplicate();
+   void Duplicate1();
    void zoomTheScreen();
    void translateplusTheScreen();
    void translateminusTheScreen();
@@ -171,6 +214,23 @@ public slots:
    void translateupTheScreen();
    void zoomOut();
    void addSpaceBarMarker(Int_t, Int_t);
+   //void ColorTheGrid (int coord);
+      //void showContextMenu(QMouseEvent *e);
+      void DisplayCoordinates(Int_t event, Int_t x, Int_t y, TObject *selectedObj);
+      void draw_pixel_line(TCanvas* canvas, Int_t x1_pixel, Int_t y1_pixel, Int_t x2_pixel, Int_t y2_pixel);
+      void deletegrips();
+
+private:
+    QLabel *xPosLabel; // Declare xPosLabel
+    QLabel *yPosLabel; // Declare yPosLabel
+    QLineEdit *xLineEdit;
+QLineEdit *yLineEdit;
+QLabel *yLabel;
+QLabel *xLabel;
+
+
+private slots:
+void updateMousePosition(QMouseEvent *event);
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -178,7 +238,7 @@ protected:
    bool checkRanges();
    bool checkGauss();
    void fitBackground();
-
+QLabel *label;
    QRootCanvas    *canvas;
    QPushButton    *b;
    QTimer         *fRootTimer;
@@ -194,7 +254,29 @@ protected:
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
+   TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
+   TLine *lineR1;TLine *lineL1;TLine *lineD1;TLine *lineU1;
+public slots:
+    void updateLabels(Double_t x, Double_t y) {
+ std::cout<<x<<" "<<y<<"\n";
+ mouseX=x;mouseY=y;
+ int wi,wj;
+
+
+    }
+    void updateLabels2(Double_t x, Double_t y) {
+ std::cout<<x<<" "<<y<<"\n";
+ mouseX2=x;mouseY2=y;
+ int wi2,wj2;
+
+
+    }
+    void histoMatrix(Double_t x, Double_t y);
+    void histoPilgrim(Double_t x, Double_t y);
 };
+
+
+
 
 
 #endif
