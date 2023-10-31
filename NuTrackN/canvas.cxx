@@ -528,7 +528,23 @@ QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
    h1f = new TracknHistogram("h1f","Test random numbers", 10240, 0, 10240);
 }
+bool isAsciiFile(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Error opening the file." << std::endl;
+        return false;
+    }
 
+    char c;
+    while (file.get(c)) {
+        if (static_cast<unsigned char>(c) > 127) {
+            // If any character is outside the ASCII range, it's not an ASCII file.
+            return false;
+        }
+    }
+
+    return true;
+}
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
 {
@@ -558,9 +574,33 @@ void QMainCanvas::clicked1()
    // read the data into a vector
    std::vector<uint32_t> data;
    uint32_t value;
-   while (file.read(reinterpret_cast<char*>(&value), sizeof(value))) {
-       data.push_back(value);
-   }
+    //std::ofstream testAfisare("testAfisare.txt");
+   std::string line;
+
+    if (isAsciiFile(SpectrumName)) { // Checks if the file is Ascii format and reads it
+        std::cout << SpectrumName << " is an ASCII file." << std::endl;
+        while (std::getline(file, line)) { // Read each line from the file
+            std::istringstream iss(line);
+            while (iss>>value) {
+                data.push_back(value);
+            }
+        }
+    } else {
+        std::cout << SpectrumName << " is not an ASCII file." << std::endl;
+        while (file.read(reinterpret_cast<char*>(&value), sizeof(value)))
+                data.push_back(value);
+    }
+    /*int c=1;
+    for(int i=0;i<data.size();i++)
+        {
+            testAfisare << data[i] << " ";
+            if(c>=10)
+                {
+                    testAfisare << std::endl;
+                    c=0;
+                }
+            c++;
+        }*/
 
    //write the data into the histogram
    for(unsigned long int i=1;i<=data.size();i++)
