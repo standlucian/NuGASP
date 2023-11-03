@@ -34,10 +34,13 @@
 #include <QDialogButtonBox>
 #include <QWheelEvent>
 #include <QMenu>
+<<<<<<< Updated upstream
 #include <QString>
 #include <QHBoxLayout>
 #include <QTimer>
 #include <QPropertyAnimation>
+=======
+>>>>>>> Stashed changes
 
 
 
@@ -54,9 +57,16 @@
 #include <TLine.h>
 #include <TMatrixD.h>
 #include <Math/Minimizer.h>
+<<<<<<< Updated upstream
 #include <TContextMenu.h>
 #include <TDirectory.h>
 #include <TROOT.h>
+=======
+#include <TRandom.h>
+#include <THStack.h>
+#include <TContextMenu.h>
+#include <TObjArray.h>
+>>>>>>> Stashed changes
 
 
 
@@ -97,11 +107,15 @@ protected:
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
    virtual void    wheelEvent(QWheelEvent *e);
+<<<<<<< Updated upstream
    void ColorTheGrid (int coord);
   
 
    virtual void    showContextMenu(QMouseEvent *e);
     //virtual void contextMenuEvent(QContextMenuEvent *event);
+=======
+   virtual void    showContextMenu(QMouseEvent *e);
+>>>>>>> Stashed changes
    
 
    bool controlKeyIsPressed=0;
@@ -137,6 +151,7 @@ signals:
    void requesttranslatedownTheScreen();
    void requesttranslateupTheScreen();
    void fullscreen();
+<<<<<<< Updated upstream
    void requestDuplicate();
    void requestDuplicate1();
    void mouseMoved(Double_t , Double_t );
@@ -146,6 +161,15 @@ signals:
 
    
    
+=======
+   void requestHelp();
+   void mousePilgrimCoordRequest(Double_t , Double_t );
+   void mouseLeftClickCoordRequest(Double_t , Double_t );
+   void AddLineRequest();
+   void AddCulomnRequest();
+   void DeleteLineRequest();
+   void DeleteCulomnRequest();
+>>>>>>> Stashed changes
 };
 
 class QMainCanvas : public QWidget
@@ -159,7 +183,27 @@ public:
    virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
+<<<<<<< Updated upstream
    //void ColorTheGrid(Double_t x, Double_t y);
+=======
+   TH1F* HijF[12][12];
+   std::vector<TH1F*> HijC[12][12];
+   //TH1F* h1f;
+   TH1F* selectedHisto;
+   TH1F* pilgrimHisto;
+   Double_t mousePilgrimX, mousePilgrimY, mouseLeftClickXcoord, mouseLeftClickYcoord;
+   int maxElement_i=1, maxElement_j=1;
+   int SelectedElement_i, SelectedElement_j; //wcontor, bcontor (pt Andrei)
+   int PilgrimElement_i, PilgrimElement_j;
+   int numberoftimes=1;
+   //std::vector<Double_t> addSpaceBarMatrixRequested[12][12];
+   //std::vector<Double_t> background_markers_matrix[12][12];
+   //std::vector<Double_t> integral_markers_matrix[12][12];
+   //std::vector<Double_t> gauss_markers_matrix[12][12];
+   
+   
+   
+>>>>>>> Stashed changes
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
@@ -214,6 +258,7 @@ public slots:
    void translateupTheScreen();
    void zoomOut();
    void addSpaceBarMarker(Int_t, Int_t);
+<<<<<<< Updated upstream
    //void ColorTheGrid (int coord);
       //void showContextMenu(QMouseEvent *e);
       void DisplayCoordinates(Int_t event, Int_t x, Int_t y, TObject *selectedObj);
@@ -231,6 +276,14 @@ QLabel *xLabel;
 
 private slots:
 void updateMousePosition(QMouseEvent *event);
+=======
+   void offerHelp();
+   void AddCulomn();
+   void AddLine();
+   void DeleteCulomn();
+   void DeleteLine();
+   
+>>>>>>> Stashed changes
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -249,6 +302,10 @@ QLabel *label;
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
    std::vector<Double_t> zoom_markers;
+   std::vector<Double_t> addSpaceBarMatrixRequested[12][12];
+   std::vector<Double_t> background_markers_matrix[12][12];
+   //std::vector<Double_t> integral_markers_matrix[12][12];
+   //std::vector<Double_t> gauss_markers_matrix[12][12];
    Float_t maxValueInHistogram;
    std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
@@ -256,6 +313,7 @@ QLabel *label;
    TMatrixD *backgroundCovarianceMatrix;
    TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
    TLine *lineR1;TLine *lineL1;TLine *lineD1;TLine *lineU1;
+<<<<<<< Updated upstream
 public slots:
     void updateLabels(Double_t x, Double_t y) {
  std::cout<<x<<" "<<y<<"\n";
@@ -273,6 +331,27 @@ public slots:
     }
     void histoMatrix(Double_t x, Double_t y);
     void histoPilgrim(Double_t x, Double_t y);
+=======
+private:
+
+   
+   
+signals:
+void refreshLines();
+
+public slots:
+    void mouseLeftClickCoord(Double_t x, Double_t y) {
+    mouseLeftClickXcoord=x;mouseLeftClickYcoord=y;
+    //std::cout<<"x="<<mouseLeftClickXcoord<<"  y="<<mouseLeftClickYcoord<<"\n";
+
+    }
+    void mousePilgrimCoord(Double_t x, Double_t y) {
+    mousePilgrimX=x;mousePilgrimY=y;
+   // std::cout<<"x="<<mousePilgrimX<<"  y="<<mousePilgrimY<<"\n";
+    }
+    void IdentifyLastClickedHistogram(Double_t , Double_t );
+    void IdentifyLastPilgrimHistogram(Double_t , Double_t );
+>>>>>>> Stashed changes
 };
 
 

@@ -60,6 +60,9 @@ std::cout << "Latimea canvasului: " << width() << " pixeli" << endl;
 std::cout << "Inaltimea canvasului: " << height() << " pixeli" << endl;
 
 
+    Double_t proportion = 0.1/fCanvas->GetWh();
+    gPad->SetMargin(proportion, proportion, proportion, proportion);
+
    setFocusPolicy(Qt::StrongFocus);
    TLatex l;
    l.SetTextSize(0.15);
@@ -111,7 +114,11 @@ void QMainCanvas::draw_pixel_line(TCanvas* canvas, Int_t x1_pixel, Int_t y1_pixe
 void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 {
    // Handle mouse move events.
+<<<<<<< Updated upstream
 emit mousePilgrim(e->x(), e->y());
+=======
+emit mousePilgrimCoordRequest(e->x(), e->y());
+>>>>>>> Stashed changes
     fCanvas->Modified();
     fCanvas->Update();
    //This tells the canvas to handle events when the mouse moves and any or none of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
@@ -137,6 +144,7 @@ emit mousePilgrim(e->x(), e->y());
       }
    }
 }
+
 void QRootCanvas::wheelEvent(QWheelEvent *e)
 {
     // Handle mouse wheel events.
@@ -168,12 +176,17 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
    if (fCanvas) {
       switch (e->button()) {
          case Qt::LeftButton :
+<<<<<<< Updated upstream
              emit mouseMoved(e->x(), e->y());
              //emit mouseMoved(e->x(), e->y());
              //emit mouseMoved(e->x(), e->y());
              //emit deline();
             //fCanvas->HandleInput(kButton1Down, e->x(), e->y());
              //emit mouseMoved(e->x(), e->y());
+=======
+            //fCanvas->HandleInput(kButton1Down, e->x(), e->y());
+             emit mouseLeftClickCoordRequest(e->x(), e->y());
+>>>>>>> Stashed changes
             break;
          case Qt::MiddleButton :
             fCanvas->HandleInput(kButton2Down, e->x(), e->y());
@@ -183,8 +196,12 @@ void QRootCanvas::mousePressEvent( QMouseEvent *e )
             // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
             // seems to cure the problem
             //fCanvas->HandleInput(kButton3Down, e->x(), e->y());
+<<<<<<< Updated upstream
              showContextMenu(e);
 
+=======
+showContextMenu(e);
+>>>>>>> Stashed changes
             break;
          default:
             break;
@@ -217,10 +234,14 @@ void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
             // does not work properly on Linux...
             // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
             // seems to cure the problem
+<<<<<<< Updated upstream
              //e->ignore();
 //showContextMenu(e); // your custom context menu
             //e->ignore();
            //fCanvas->HandleInput(kButton3Up, e->x(), e->y());
+=======
+            //fCanvas->HandleInput(kButton3Up, e->x(), e->y());
+>>>>>>> Stashed changes
 
             break;
          default:
@@ -259,7 +280,34 @@ void QRootCanvas::showContextMenu(QMouseEvent *e)
 }
 
 //______________________________________________________________________________
+void QRootCanvas::showContextMenu(QMouseEvent *e)
+{
+    QMenu contextMenu(tr("Context menu"), this);
 
+    QAction *action1 = new QAction("Add Line", this);
+    connect(action1, &QAction::triggered, this, &QRootCanvas::AddLineRequest);
+    contextMenu.addAction(action1);
+
+    QAction *action2 = new QAction("Add Column", this);
+    connect(action2, &QAction::triggered, this, &QRootCanvas::AddCulomnRequest);
+    contextMenu.addAction(action2);
+
+        QAction *action3 = new QAction("Delete Line", this);
+    connect(action3, &QAction::triggered, this, &QRootCanvas::DeleteLineRequest);
+    contextMenu.addAction(action3);
+
+    QAction *action4 = new QAction("Delete Column", this);
+    connect(action4, &QAction::triggered, this, &QRootCanvas::DeleteCulomnRequest);
+    contextMenu.addAction(action4);
+
+        QAction *action5 = new QAction("Refresh Display", this);
+    connect(action5, &QAction::triggered, this, &QRootCanvas::AddCulomnRequest);
+    contextMenu.addAction(action5);
+
+    // adding more actions as needed...
+//draw_pixel_line(canvas, width()/2, width()/2, 0, height());
+    contextMenu.exec(e->globalPos());
+}
 
 
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
@@ -584,6 +632,7 @@ connect(canvas,SIGNAL(mousePilgrim( Double_t,  Double_t)), this, SLOT(histoPilgr
 
 
 
+<<<<<<< Updated upstream
 
 
  //connect(b, SIGNAL(rightClicked(QPoint)), this, SLOT(showMyContextMenu(QPoint)));
@@ -591,6 +640,27 @@ connect(canvas,SIGNAL(deline()), this, SLOT(deletegrips()));
 
    connect(canvas,SIGNAL(requestDuplicate()), this, SLOT(Duplicate()));
    //connect(canvas,SIGNAL(requestDuplicate1()), this, SLOT(Duplicate1()));
+=======
+connect(canvas,SIGNAL(mouseLeftClickCoordRequest( Double_t,  Double_t)), this, SLOT(mouseLeftClickCoord(Double_t, Double_t)));
+connect(canvas,SIGNAL(mouseLeftClickCoordRequest( Double_t,  Double_t)), this, SLOT(IdentifyLastClickedHistogram(Double_t , Double_t )));
+connect(canvas,SIGNAL(mousePilgrimCoordRequest( Double_t,  Double_t)), this, SLOT(mousePilgrimCoord(Double_t, Double_t)));
+connect(canvas,SIGNAL(mousePilgrimCoordRequest( Double_t,  Double_t)), this, SLOT(IdentifyLastPilgrimHistogram(Double_t , Double_t )));
+
+//connect(canvas,SIGNAL(refreshLines()), this, SLOT(mouseMoveEvent));
+
+connect(canvas,SIGNAL(AddLineRequest()), this, SLOT(AddLine()));
+
+connect(canvas,SIGNAL(AddCulomnRequest()), this, SLOT(AddCulomn()));
+
+connect(canvas,SIGNAL(DeleteLineRequest()), this, SLOT(DeleteLine()));
+
+connect(canvas,SIGNAL(DeleteCulomnRequest()), this, SLOT(DeleteCulomn()));
+
+
+connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
+
+
+>>>>>>> Stashed changes
    //connects the keyboard command C+I to the areaFunction;
    connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
 
@@ -682,6 +752,7 @@ connect(canvas,SIGNAL(deline()), this, SLOT(deletegrips()));
    fRootTimer->start( 20 );
 
    //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
+<<<<<<< Updated upstream
    h1f = new TracknHistogram("h1f" ,"",  10240, 0, 10240);
    if(contor*bontor==1){selectedHisto=static_cast<TracknHistogram*>(h1f->Clone("h11f"));}
 
@@ -881,9 +952,37 @@ hijkMatrix[z][g]=hijfMatrix[z][g];
     canvas->getCanvas()->Update();
     //selectedHisto=nullptr;
     selectedHisto=nullptr;
+=======
+    HijF[1][1] = new TracknHistogram("HijF[1][1]","Test random numbers", 10240, 0, 10240);
+    HijF[1][1]->GetXaxis()->SetNdivisions(0, kTRUE);
+    HijF[1][1]->GetXaxis()->SetLabelSize(0);
+    HijF[1][1]->GetYaxis()->SetNdivisions(0, kTRUE);
+    HijF[1][1]->GetYaxis()->SetLabelSize(0);
+    HijF[1][1]->SetStats(0);
+    //HijF[1][1]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() * 1.05);
+    //HijF[1][1]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() / 1.05);
+    IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mouseLeftClickXcoord,mouseLeftClickYcoord);
+
+    //TH1F* h1f = new TracknHistogram("h2f","h2f", 10240, 0, 10240);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+
+
+
+
+>>>>>>> Stashed changes
 
 }
+bool isAsciiFile(const std::string& filename) {
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        std::cerr << "Error opening the file." << std::endl;
+        return false;
+    }
 
+<<<<<<< Updated upstream
     }
 
 
@@ -914,6 +1013,29 @@ void QMainCanvas::clicked1()
 
 
 
+=======
+    char c;
+    while (file.get(c)) {
+        if (static_cast<unsigned char>(c) > 127) {
+            // If any character is outside the ASCII range, it's not an ASCII file.
+            return false;
+        }
+    }
+
+    return true;
+}
+//______________________________________________________________________________
+void QMainCanvas::clicked1()
+{
+if(numberoftimes==0){
+
+}
+    //canvas->getCanvas()->Clear();
+HijF[SelectedElement_i][SelectedElement_j]->Reset();
+//canvas->getCanvas()->Clear();
+canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+>>>>>>> Stashed changes
    // This opens a dialog to select a file for reading
    QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
    // Casts a QT string to C++ string
@@ -926,23 +1048,120 @@ void QMainCanvas::clicked1()
    // read the data into a vector
    std::vector<uint32_t> data;
    uint32_t value;
-   while (file.read(reinterpret_cast<char*>(&value), sizeof(value))) {
-       data.push_back(value);
-   }
+    //std::ofstream testAfisare("testAfisare.txt");
+   std::string line;
+
+    if (isAsciiFile(SpectrumName)) { // Checks if the file is Ascii format and reads it
+        std::cout << SpectrumName << " is an ASCII file." << std::endl;
+        while (std::getline(file, line)) { // Read each line from the file
+            std::istringstream iss(line);
+            while (iss>>value) {
+                data.push_back(value);
+            }
+        }
+    } else {
+        std::cout << SpectrumName << " is not an ASCII file." << std::endl;
+        while (file.read(reinterpret_cast<char*>(&value), sizeof(value)))
+                data.push_back(value);
+    }
+
 
    //write the data into the histogram
    for(unsigned long int i=1;i<=data.size();i++)
-       h1f->AddBinContent(i,data[i-1]);
+       HijF[SelectedElement_i][SelectedElement_j]->AddBinContent(i,data[i-1]);
 
-   maxValueInHistogram=h1f->GetBinContent(h1f->GetMaximumBin());
+   maxValueInHistogram=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
 
    //Draws the spectrum and tells the canvas to update itself
+<<<<<<< Updated upstream
    //h1f->SetLineWidth(4); // De exemplu, setăm grosimea la 2
   //h1f->SetBorderMode(1);
    h1f->Draw();
    //canvas->canvas->AddExec("dynamic", "TPadHandler", &TPadHandler);
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
+=======
+   //if(HijC[SelectedElement_i][SelectedElement_j].size()==0){
+canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+
+// Setăm culoarea liniei primei histograme la albastru
+HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(HijC[PilgrimElement_i][PilgrimElement_j].size()+4);
+
+// Desenăm prima histogramă
+HijF[SelectedElement_i][SelectedElement_j]->Draw();
+
+HijC[PilgrimElement_i][PilgrimElement_j].push_back((TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+if(HijC[PilgrimElement_i][PilgrimElement_j].size()>1){
+    for(int k=0;k<HijC[PilgrimElement_i][PilgrimElement_j].size();k++){
+        HijC[PilgrimElement_i][PilgrimElement_j][k]->SetLineColor(4+k);
+        HijC[PilgrimElement_i][PilgrimElement_j][k]->Draw("SAME");
+    }
+}
+
+// Clonăm histograma pentru a avea o copie pe care să o translatăm
+/*TH1F *hClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+
+// Setăm culoarea liniei clonei la o altă culoare pentru a o distinge
+hClone->SetLineColor(kRed);
+
+// Translatăm clona pe axa X (de exemplu, cu 1 unitate la dreapta)
+hClone->GetXaxis()->SetLimits(hClone->GetXaxis()->GetXmin() + 3, hClone->GetXaxis()->GetXmax() + 3);
+
+// Desenăm histograma clonată suprapusă peste originală, folosind opțiunea "SAME"
+hClone->Draw("SAME");
+
+TH1F *hClone1 = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+
+// Setăm culoarea liniei clonei la o altă culoare pentru a o distinge
+hClone1->SetLineColor(kGreen);
+
+// Translatăm clona pe axa X (de exemplu, cu 1 unitate la dreapta)
+hClone1->GetXaxis()->SetLimits(hClone1->GetXaxis()->GetXmin() + 6, hClone1->GetXaxis()->GetXmax() + 6);
+
+// Desenăm histograma clonată suprapusă peste originală, folosind opțiunea "SAME"
+hClone1->Draw("SAME"); */
+
+
+      // HijC[SelectedElement_i][SelectedElement_j].push_back(HijF[SelectedElement_i][SelectedElement_j]);
+//}
+//if(HijC[SelectedElement_i][SelectedElement_j].size()>=1){
+   // for(int k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
+           // HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(k+1);
+            //canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+            //canvas->getCanvas()->cd();
+            //HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+            //canvas->getCanvas()->Update();
+            //std::cout<<HijC[SelectedElement_i][SelectedElement_j].size()<<"dadada123\n";
+           // HijC[SelectedElement_i][SelectedElement_j].push_back(HijF[SelectedElement_i][SelectedElement_j]);
+
+
+
+//std::cout << HijC[SelectedElement_i][SelectedElement_j].size() << " histograme desenate\n";
+
+
+/*if(HijC[SelectedElement_i][SelectedElement_j].size()==0){
+HijF[SelectedElement_i][SelectedElement_j]->Draw();}
+if(HijC[SelectedElement_i][SelectedElement_j].size()>=1){
+    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+    HijC[SelectedElement_i][SelectedElement_j][HijC[SelectedElement_i][SelectedElement_j].size()-1]->SetLineColor(kRed);
+    HijC[SelectedElement_i][SelectedElement_j][HijC[SelectedElement_i][SelectedElement_j].size()-1]->Draw("same");
+}
+HijC[SelectedElement_i][SelectedElement_j].push_back(HijF[SelectedElement_i][SelectedElement_j]); */
+
+
+
+
+
+
+
+canvas->getCanvas()->Modified();
+canvas->getCanvas()->Update();
+
+
+
+
+ numberoftimes++;
+>>>>>>> Stashed changes
 }
 
 void QMainCanvas::Cal2pMain() {
@@ -1002,11 +1221,15 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
     std::string objectInfo, temp;
     int from, to, binX;
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
+<<<<<<< Updated upstream
 
     objectInfo=selectedHisto->GetObjectInfo(x,y);
     //objectInfo=h1f->GetObjectInfo(x,y);
 
 
+=======
+    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
+>>>>>>> Stashed changes
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1029,10 +1252,14 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
     //std::cout<<(Double_t)binX<<std::endl;
 
     //Create a yellow integral line and add it to the screen
+<<<<<<< Updated upstream
     //addSpaceBarMatrixRequested[wbontor][wcontor][x][y]=binX;
     canvas->getCanvas()->cd((wbontor)*contor+wcontor+1);;
     //else{canvas->getCanvas()->cd(2);}
     TLine *spacebarLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+=======
+    TLine *spacebarLine = new TLine(binX, 0., binX, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
+>>>>>>> Stashed changes
     spacebarLine->SetLineColor(kCyan);
     spacebarLine->SetLineWidth(2);
 
@@ -1045,7 +1272,13 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
     listOfObjectsDrawnOnScreen.Add(spacebarLine);
 
 
+<<<<<<< Updated upstream
    //h1f->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
+=======
+   //HijF[1][1]->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
+    addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j].push_back(binX);
+   zoom_markers.push_back(binX);
+>>>>>>> Stashed changes
 
     Double_t y1MinAxis = selectedHisto->GetYaxis()->GetXmin();
     Double_t y2MinAxis = selectedHisto->GetYaxis()->GetXmin();
@@ -1063,14 +1296,15 @@ void QMainCanvas::areaFunction()
 {
    //A stand in vector for the markers is used to call the integral function so it perform an integral with no background
    //Regardles of there are backgrounds or not
-   std::vector<Double_t> placeholder_background_markers;
-   integral_function(h1f,integral_markers,placeholder_background_markers,slope,addition);
+   std::vector<Double_t> placeholder_background_markers_matrix[PilgrimElement_i][PilgrimElement_j];
+   integral_function(HijF[PilgrimElement_i][PilgrimElement_j],integral_markers,placeholder_background_markers_matrix[PilgrimElement_i][PilgrimElement_j],slope,addition);
 }
 
 void QMainCanvas::areaFunctionWithBackground()
 {
    //The integral function is used with the background markers and the integral markers to perform an integral with backgorund
    //The function also returns the slope of the background
+<<<<<<< Updated upstream
    integral_function(h1f,integral_markers,background_markers,slope,addition);
    //Draw a line to show the background
    TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
@@ -1080,6 +1314,21 @@ void QMainCanvas::areaFunctionWithBackground()
    backgroundLine->Draw("same");
    //Add the line to the list of things put on the screen, so it can be deleted
    listOfObjectsDrawnOnScreen.Add(backgroundLine);
+=======
+    if(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()==0)
+    {
+        CommandPrompt::getInstance()->appendPlainText("There are no background markers, so an integral with background can not be performed\n");
+        std::cout<<"There are no background markers, so an integral with background can not be performed\n";
+    }
+    else
+    {
+
+       integral_function(HijF[PilgrimElement_i][PilgrimElement_j],integral_markers,background_markers_matrix[PilgrimElement_i][PilgrimElement_j],slope,addition);
+       //Draw a line to show the background
+       TLine *backgroundLine = new TLine(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][0]-0.5, slope*(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][0]-0.5)+addition, background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]-0.5, slope*(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]-0.5)+addition);
+       backgroundLine->SetLineColor(kBlue);
+       backgroundLine->SetLineWidth(2);
+>>>>>>> Stashed changes
 
    canvas->getCanvas()->Modified();
    canvas->getCanvas()->Update();
@@ -1096,7 +1345,7 @@ void QMainCanvas::autoFit(int x, int y)
     std::ostringstream tempStringStream;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1151,7 +1400,7 @@ void QMainCanvas::autoFit(int x, int y)
 
     //Fitting the histogram with the Gaussian function with background and putting the results in a special format
     //Fit options are Q - quiet; M - improved fitting; R-respect range from function
-    TFitResultPtr fitResult = h1f->Fit(gaussianWithBackgroundFunction,"QMRS", "same");
+    TFitResultPtr fitResult = HijF[PilgrimElement_i][PilgrimElement_j]->Fit(gaussianWithBackgroundFunction,"QMRS", "same");
 
     //Read the background parameters and feed them into the background function for use in finding the integral!
     bkgSlope=gaussianWithBackgroundFunction->GetParameter(3);
@@ -1172,7 +1421,7 @@ void QMainCanvas::autoFit(int x, int y)
         gaussianWithBackgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
         backgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
 
-        fitResult = h1f->Fit(gaussianWithBackgroundFunction,"QMRS", "");
+        fitResult = HijF[PilgrimElement_i][PilgrimElement_j]->Fit(gaussianWithBackgroundFunction,"QMRS", "");
 
         gaussianSigma=gaussianWithBackgroundFunction->GetParameter(2);
         gaussianFWHM=gaussianSigma*2.3548;
@@ -1279,12 +1528,21 @@ void QMainCanvas::autoFit(int x, int y)
 //______________________________________________________________________________
 Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFinish)
 {
+<<<<<<< Updated upstream
     int minValueFound=selectedHisto->GetBinContent(intervalStart);
 
     for(int i=intervalStart+1; i<=intervalFinish; i++)
     {
         if(selectedHisto->GetBinContent(i)<minValueFound)
             minValueFound=selectedHisto->GetBinContent(i);
+=======
+    int minValueFound=HijF[1][1]->GetBinContent(intervalStart);
+
+    for(int i=intervalStart+1; i<=intervalFinish; i++)
+    {
+        if(HijF[1][1]->GetBinContent(i)<minValueFound)
+            minValueFound=HijF[1][1]->GetBinContent(i);
+>>>>>>> Stashed changes
     }
     return minValueFound;
 }
@@ -1292,12 +1550,21 @@ Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFini
 //______________________________________________________________________________
 Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFinish)
 {
+<<<<<<< Updated upstream
     int maxValueFound=selectedHisto->GetBinContent(intervalStart);
 
     for(int i=intervalStart+1; i<=intervalFinish; i++)
     {
         if(selectedHisto->GetBinContent(i)>maxValueFound)
             maxValueFound=selectedHisto->GetBinContent(i);
+=======
+    int maxValueFound=HijF[1][1]->GetBinContent(intervalStart);
+
+    for(int i=intervalStart+1; i<=intervalFinish; i++)
+    {
+        if(HijF[1][1]->GetBinContent(i)>maxValueFound)
+            maxValueFound=HijF[1][1]->GetBinContent(i);
+>>>>>>> Stashed changes
     }
     return maxValueFound;
 }
@@ -1309,7 +1576,7 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     int from, to, binX;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1328,10 +1595,10 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     binX=std::stoi(temp);
 
     //Add the position to the background marker vector
-    background_markers.push_back(binX);
+    background_markers_matrix[PilgrimElement_i][PilgrimElement_j].push_back(binX);
 
     //Create a blue background line and add it to the screen
-    TLine *backgroundLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    TLine *backgroundLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
     backgroundLine->SetLineColor(kBlue);
     backgroundLine->SetLineWidth(2);
 
@@ -1340,9 +1607,9 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     //Add the line to the list of things put on the screen, so it can be deleted
     listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
-    if(background_markers.size()%2==0)
+    if(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()%2==0)
     {
-        TLine *bottomBackgroundLine = new TLine(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, 0);
+        TLine *bottomBackgroundLine = new TLine(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-2]-0.5, 0., binX-0.5, 0);
         bottomBackgroundLine->SetLineColor(kBlue);
         bottomBackgroundLine->SetLineWidth(2);
 
@@ -1351,7 +1618,7 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
         //Add the line to the list of things put on the screen, so it can be deleted
         listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-        TBox *backgroundArea = new TBox(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        TBox *backgroundArea = new TBox(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-2]-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         backgroundArea->SetFillColor(kBlue);
         backgroundArea->SetFillStyle(3545);
         backgroundArea->Draw("same");
@@ -1370,7 +1637,7 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
     int from, to, binX;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1393,7 +1660,7 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
     //std::cout<<(Double_t)binX<<std::endl;
 
     //Create a yellow integral line and add it to the screen
-    TLine *integralLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    TLine *integralLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
     integralLine->SetLineColor(kYellow);
     integralLine->SetLineWidth(2);
 
@@ -1412,9 +1679,9 @@ void QMainCanvas::clearTheScreen()
 {
     //Get a list of all the functions on the histogram and delete all except the first (which is the histogram itself)
 
-    while(h1f->GetListOfFunctions()->GetSize()>1)
+    while(HijF[PilgrimElement_i][PilgrimElement_j]->GetListOfFunctions()->GetSize()>1)
     {
-        h1f->GetListOfFunctions()->RemoveLast();
+        HijF[PilgrimElement_i][PilgrimElement_j]->GetListOfFunctions()->RemoveLast();
     }
 
     //Get a list of all the functions drawn on screen and delete all of them!
@@ -1423,34 +1690,50 @@ void QMainCanvas::clearTheScreen()
          listOfObjectsDrawnOnScreen.Last()->Delete();
          listOfObjectsDrawnOnScreen.RemoveLast();
     }
-
+ HijC[PilgrimElement_i][PilgrimElement_j].clear();
+    //HijF[PilgrimElement_i][PilgrimElement_j]->Reset();
+    HijF[PilgrimElement_i][PilgrimElement_j]->SetLineColor(kBlue);
+    HijF[PilgrimElement_i][PilgrimElement_j]->Draw();
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
 void QMainCanvas::zoomTheScreen()
 {
     //Zoom the histogram in the region delimited by spacebar markers
-    int i= zoom_markers.size();
+    int i= addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j].size();
     int x1,x2;
     if(i>=2){
+<<<<<<< Updated upstream
     if(zoom_markers[i-2]<zoom_markers[i-1]){
     selectedHisto->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
     if(zoom_markers[i-1]<zoom_markers[i-2]){
     selectedHisto->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
+=======
+    if(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-2]<addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-1]){
+    HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->SetRangeUser(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-2], addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-1]);}
+    if(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-1]<addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-2]){
+    HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->SetRangeUser(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-1], addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][i-2]);}}
+>>>>>>> Stashed changes
     if(i<=1){
         std::cout<<"AI nev de doi space\n";}
-  clearTheScreen();
+  //clearTheScreen();
+    IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
+  IdentifyLastClickedHistogram(mouseLeftClickXcoord,mouseLeftClickYcoord);
+  //canvas->getCanvas()->Clear();
   canvas->getCanvas()->Modified();
   canvas->getCanvas()->Update();
+
 }
 
 void QMainCanvas::zoomOut()
 {
   //Zoom out the histogram in its initial scale
-  h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() );
-  h1f->GetXaxis()->SetRangeUser(0, h1f->GetMaximum() );
-  h1f->GetXaxis()->UnZoom();
-  h1f->GetYaxis()->UnZoom();
+  HijF[PilgrimElement_i][PilgrimElement_j]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() );
+  HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() );
+  HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->UnZoom();
+  HijF[PilgrimElement_i][PilgrimElement_j]->GetYaxis()->UnZoom();
+  IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
+  IdentifyLastClickedHistogram(mouseLeftClickXcoord,mouseLeftClickYcoord);
   canvas->getCanvas()->Modified();
   canvas->getCanvas()->Update();
 }
@@ -1458,10 +1741,10 @@ void QMainCanvas::zoomOut()
 void QMainCanvas::translateplusTheScreen()
 {
     //Translates the zoom in the positive(right) direction of the abscissa
-    int k= zoom_markers.size();
+    int k= addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j].size();
     if(k>1){
-    zoom_markers[k-1]=zoom_markers[k-1]+fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
-    zoom_markers[k-2]=zoom_markers[k-2]+fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]=addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]+fabs(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]-addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2])/50;
+    addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2]=addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2]+fabs(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]-addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2])/50;
     zoomTheScreen();
     showAllMarkers();
     }
@@ -1470,10 +1753,10 @@ void QMainCanvas::translateplusTheScreen()
 void QMainCanvas::translateminusTheScreen()
 {
     //Translates the zoom in the negative(left) direction of the abscissa
-    int k= zoom_markers.size();
+    int k= addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j].size();
     if(k>1){
-    zoom_markers[k-1]=zoom_markers[k-1]-fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
-    zoom_markers[k-2]=zoom_markers[k-2]-fabs(zoom_markers[k-1]-zoom_markers[k-2])/50;
+    addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]=addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]-fabs(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]-addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2])/50;
+    addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2]=addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2]-fabs(addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-1]-addSpaceBarMatrixRequested[PilgrimElement_i][PilgrimElement_j][k-2])/50;
     zoomTheScreen();
     showAllMarkers();
     }
@@ -1482,7 +1765,10 @@ void QMainCanvas::translateminusTheScreen()
 void QMainCanvas::translatedownTheScreen()
 {
     //Increases the scale of the ordinate
-    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() * 1.05);
+    HijF[PilgrimElement_i][PilgrimElement_j]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() * 1.05);
+    IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mouseLeftClickXcoord,mouseLeftClickYcoord);
+    //canvas->getCanvas()->Clear();
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
@@ -1491,7 +1777,10 @@ void QMainCanvas::translatedownTheScreen()
 void QMainCanvas::translateupTheScreen()
 {
     //Decreases the scale of the ordinate
-    h1f->GetYaxis()->SetRangeUser(0, h1f->GetMaximum() / 1.05);
+    HijF[PilgrimElement_i][PilgrimElement_j]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() / 1.05);
+    IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mouseLeftClickXcoord,mouseLeftClickYcoord);
+    //canvas->getCanvas()->Clear();
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
@@ -1500,7 +1789,7 @@ void QMainCanvas::translateupTheScreen()
 //______________________________________________________________________________
 void QMainCanvas::deleteBackgroundMarkers()
 {
-    background_markers.clear();
+    background_markers_matrix[PilgrimElement_i][PilgrimElement_j].clear();
 }
 
 void QMainCanvas::deleteIntegralMarkers()
@@ -1520,9 +1809,9 @@ void QMainCanvas::deleteAllMarkers()
 //______________________________________________________________________________
 void QMainCanvas::showBackgroundMarkers()
 {
-    for(uint i=0;i<background_markers.size();i++)
+    for(uint i=0;i<background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size();i++)
     {
-        TLine *backgroundLine = new TLine(background_markers[i]-0.5, 0., background_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *backgroundLine = new TLine(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i]-0.5, 0., background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         backgroundLine->SetLineColor(kBlue);
         backgroundLine->SetLineWidth(2);
 
@@ -1532,7 +1821,7 @@ void QMainCanvas::showBackgroundMarkers()
 
         if(i%2)
         {
-            TLine *bottomBackgroundLine = new TLine(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, 0);
+            TLine *bottomBackgroundLine = new TLine(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i-1]-0.5, 0., background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i]-0.5, 0);
             bottomBackgroundLine->SetLineColor(kBlue);
             bottomBackgroundLine->SetLineWidth(2);
 
@@ -1541,7 +1830,7 @@ void QMainCanvas::showBackgroundMarkers()
             //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-            TBox *backgroundArea = new TBox(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, maxValueInHistogram*1.05);
+            TBox *backgroundArea = new TBox(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i-1]-0.5, 0., background_markers_matrix[PilgrimElement_i][PilgrimElement_j][i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
             backgroundArea->SetFillColor(kBlue);
             backgroundArea->SetFillStyle(3545);
             backgroundArea->Draw("same");
@@ -1559,7 +1848,7 @@ void QMainCanvas::showIntegralMarkers()
 {
     for(uint i=0;i<integral_markers.size();i++)
     {
-        TLine *integralLine = new TLine(integral_markers[i]-0.5, 0., integral_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *integralLine = new TLine(integral_markers[i]-0.5, 0., integral_markers[i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         integralLine->SetLineColor(kRed);
         integralLine->SetLineWidth(2);
 
@@ -1588,7 +1877,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
     int from, to, binX;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1610,7 +1899,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
     range_markers.push_back(binX);
 
     //Create a blue background line and add it to the screen
-    TLine *rangeLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    TLine *rangeLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
     rangeLine->SetLineColor(kYellow);
     rangeLine->SetLineWidth(2);
 
@@ -1630,7 +1919,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
         //Add the line to the list of things put on the screen, so it can be deleted
         listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         backgroundArea->SetFillColor(kYellow);
         backgroundArea->SetFillStyle(3545);
         backgroundArea->Draw("same");
@@ -1654,7 +1943,7 @@ void QMainCanvas::showRangeMarkers()
 {
     for(uint i=0;i<range_markers.size();i++)
     {
-        TLine *rangeLine = new TLine(range_markers[i]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *rangeLine = new TLine(range_markers[i]-0.5, 0., range_markers[i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         rangeLine->SetLineColor(kYellow);
         rangeLine->SetLineWidth(2);
 
@@ -1672,7 +1961,7 @@ void QMainCanvas::showRangeMarkers()
             //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-            TBox *backgroundArea = new TBox(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
+            TBox *backgroundArea = new TBox(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
             backgroundArea->SetFillColor(kYellow);
             backgroundArea->SetFillStyle(3545);
             backgroundArea->Draw("same");
@@ -1693,7 +1982,7 @@ void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
     int from, to, binX;
 
     //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    objectInfo=h1f->GetObjectInfo(x,y);
+    objectInfo=HijF[1][1]->GetObjectInfo(x,y);
 
     //Cut the first section, which represents the position on the x Axis of the click, in double precision float
     from=objectInfo.find("=");
@@ -1715,7 +2004,7 @@ void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
     gauss_markers.push_back(binX);
 
     //Create a blue background line and add it to the screen
-    TLine *gaussLine = new TLine(binX-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+    TLine *gaussLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
     gaussLine->SetLineColor(kPink);
     gaussLine->SetLineWidth(2);
 
@@ -1739,7 +2028,7 @@ void QMainCanvas::showGaussMarkers()
 {
     for(uint i=0;i<gauss_markers.size();i++)
     {
-        TLine *gaussLine = new TLine(gauss_markers[i]-0.5, 0., gauss_markers[i]-0.5, maxValueInHistogram*1.05);
+        TLine *gaussLine = new TLine(gauss_markers[i]-0.5, 0., gauss_markers[i]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*2);
         gaussLine->SetLineColor(kPink);
         gaussLine->SetLineWidth(2);
 
@@ -1809,7 +2098,7 @@ void QMainCanvas::fitGauss()
         //For every gauss marker, setting the values of the 3 parameters (height, position, width) and their limits
         for(uint i=0;i<gauss_markers.size();i++)
         {
-            fullFunction->SetParameter(2+i*3,h1f->GetBinContent(gauss_markers[i]-1));
+            fullFunction->SetParameter(2+i*3,HijF[1][1]->GetBinContent(gauss_markers[i]-1));
             fullFunction->SetParLimits(2+i*3,0,maxValue*1.1);
             fullFunction->SetParameter(3+i*3,gauss_markers[i]-1);
             fullFunction->SetParLimits(3+i*3,range_markers[0],range_markers[1]);
@@ -1821,7 +2110,7 @@ void QMainCanvas::fitGauss()
 
         //Fitting the histogram with the Gaussian function with background and putting the results in a special format
         //Fit options are Q - quiet; M - Minuit; R-respect range from function
-        TFitResultPtr fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+        TFitResultPtr fitResult = HijF[1][1]->Fit(fullFunction,"Q M R S", "same");
 
 
         //If the fit fails (fitResult=4), then change some minimizer options and try again
@@ -1831,7 +2120,7 @@ void QMainCanvas::fitGauss()
             ROOT::Math::MinimizerOptions::SetDefaultTolerance(0.1);
             ROOT::Math::MinimizerOptions::SetDefaultMaxFunctionCalls(10000000);
 
-            fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+            fitResult = HijF[1][1]->Fit(fullFunction,"Q M R S", "same");
             //ROOT::Math::MinimizerOptions::SetDefaultStrategy(1);
 
 
@@ -1840,14 +2129,14 @@ void QMainCanvas::fitGauss()
             {
                 ROOT::Math::MinimizerOptions::SetDefaultTolerance(1);
 
-                fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+                fitResult = HijF[1][1]->Fit(fullFunction,"Q M R S", "same");
 
                 //If it still fails, set different tolerance and try again
                 if((int) fitResult==4)
                 {
                     ROOT::Math::MinimizerOptions::SetDefaultTolerance(10);
 
-                    fitResult = h1f->Fit(fullFunction,"Q M R S", "same");
+                    fitResult = HijF[1][1]->Fit(fullFunction,"Q M R S", "same");
 
                     //If it still fails, tell the user it has failed
                     if((int) fitResult==4)
@@ -1964,35 +2253,35 @@ void QMainCanvas::fitGauss()
 void QMainCanvas::checkBackgrounds()
 {
     //Check that background markers exists
-    if(background_markers.size())
+    if(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size())
     {
         //If there is an odd number of background markers, delete the last one added
-        if(background_markers.size()%2)
+        if(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()%2)
         {
-            std::cout<<"There is an odd number of background markers, "<<background_markers.size()<<", so the last one, at "<<background_markers[background_markers.size()-1]<<", was removed"<<std::endl;
-            CommandPrompt::getInstance()->appendPlainText("There is an odd number of background markers, "+ QString::number(background_markers.size())+", so the last one, at " + QString::number(background_markers[background_markers.size()-1]) + ", was removed \n");
-            background_markers.pop_back();
+            std::cout<<"There is an odd number of background markers, "<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()<<", so the last one, at "<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]<<", was removed"<<std::endl;
+            CommandPrompt::getInstance()->appendPlainText("There is an odd number of background markers, "+ QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size())+", so the last one, at " + QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]) + ", was removed \n");
+            background_markers_matrix[PilgrimElement_i][PilgrimElement_j].pop_back();
         }
 
         //If the background markers overlap (meaning they define areas that overlap), then sort them so they don't overlap anymore
-        if(overlapping_markers(background_markers))
+        if(overlapping_markers(background_markers_matrix[PilgrimElement_i][PilgrimElement_j]))
         {
             std::cout<<"The background markers shown below produced regions which overlapped"<<std::endl;
             CommandPrompt::getInstance()->appendPlainText("The background markers shown below produced regions wwhich overlapped\n");
-            for(uint i=0;i<background_markers.size()/2;i++)
+            for(uint i=0;i<background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()/2;i++)
             {
-                std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
-                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
+                std::cout<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i]<<"-"<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1]<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i])+"-"+ QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1])+"\n");
             }
 
             std::cout<<"Thus, we have reordered them in order to produce non-overlapping regions, as seen below:"<<std::endl;
             CommandPrompt::getInstance()->appendPlainText("Thus, we have reordered them in order to produce non-overlapping regions, as seen below:\n");
-            sort(background_markers.begin(),background_markers.end());
+            sort(background_markers_matrix[PilgrimElement_i][PilgrimElement_j].begin(),background_markers_matrix[PilgrimElement_i][PilgrimElement_j].end());
 
-            for(uint i=0;i<background_markers.size()/2;i++)
+            for(uint i=0;i<background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()/2;i++)
             {
-                std::cout<<background_markers[2*i]<<"-"<<background_markers[2*i+1]<<std::endl;
-                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers[2*i])+"-"+ QString::number(background_markers[2*i+1])+"\n");
+                std::cout<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i]<<"-"<<background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1]<<std::endl;
+                CommandPrompt::getInstance()->appendPlainText(QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i])+"-"+ QString::number(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1])+"\n");
             }
         }
     }
@@ -2060,12 +2349,12 @@ void QMainCanvas::fitBackground()
     TracknHistogram *tempHist = new TracknHistogram("tempHist","", 10240, 0, 10240);
 
     //Add only the background ranges to the temp histogram
-    for(uint i=0;i<background_markers.size()/2;i++)
+    for(uint i=0;i<background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()/2;i++)
     {
-        for(uint j=background_markers[2*i];j<=background_markers[2*i+1];j++)
-            tempHist->AddBinContent(j,h1f->GetBinContent(j));
+        for(uint j=background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i];j<=background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1];j++)
+            tempHist->AddBinContent(j,HijF[1][1]->GetBinContent(j));
 
-        localMinimum=findMinValueInInterval(background_markers[2*i],background_markers[2*i+1]);
+        localMinimum=findMinValueInInterval(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i],background_markers_matrix[PilgrimElement_i][PilgrimElement_j][2*i+1]);
 
         if(localMinimum<minimum)
             minimum=localMinimum;
@@ -2095,7 +2384,7 @@ void QMainCanvas::fitBackground()
     tempHist->Delete();
 
     //Draw a line to show the background
-    TLine *backgroundLine = new TLine(background_markers[0]-0.5, backgroundA1*(background_markers[0]-0.5)+backgroundA0, background_markers[background_markers.size()-1]-0.5, backgroundA1*(background_markers[background_markers.size()-1]-0.5)+backgroundA0);
+    TLine *backgroundLine = new TLine(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][0]-0.5, backgroundA1*(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][0]-0.5)+backgroundA0, background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]-0.5, backgroundA1*(background_markers_matrix[PilgrimElement_i][PilgrimElement_j][background_markers_matrix[PilgrimElement_i][PilgrimElement_j].size()-1]-0.5)+backgroundA0);
     backgroundLine->SetLineColor(kBlue);
     backgroundLine->SetLineWidth(2);
 
@@ -2131,7 +2420,214 @@ void QMainCanvas::changeEvent(QEvent * e)
       }
    }
 }
+<<<<<<< Updated upstream
 void QMainCanvas::DisplayCoordinates(Int_t event, Int_t x, Int_t y, TObject *selectedObj)
+=======
+
+void QMainCanvas::AddCulomn(){
+    if(maxElement_i==1 && maxElement_j==1){
+        selectedHisto=static_cast<TracknHistogram*>(HijF[1][1]->Clone(("h"+QString::number(1)+QString::number(1)+"f").toStdString().c_str()));
+    }
+    maxElement_j++;
+    canvas->getCanvas()->Clear();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
+    int n=0;
+
+
+       for(int z=1;z<=maxElement_i;z++){
+           for(int g=1;g<=maxElement_j;g++){
+               if(g==maxElement_j){
+                    HijF[z][g] = static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+                    HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());
+                    addSpaceBarMatrixRequested[z][g]=addSpaceBarMatrixRequested[SelectedElement_i][PilgrimElement_j];
+                    HijC[z][g].push_back((TH1F*)selectedHisto->Clone());}
+
+               else{
+               HijF[z][g] = static_cast<TracknHistogram*>(HijF[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+               HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+               n++;
+               canvas->getCanvas()->cd(n);
+               HijF[z][g]->Draw();
+        }}
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::AddLine(){
+        if(maxElement_i==1 && maxElement_j==1){
+        selectedHisto=static_cast<TracknHistogram*>(HijF[1][1]->Clone(("h"+QString::number(1)+QString::number(1)+"f").toStdString().c_str()));
+    }
+    maxElement_i++;
+    canvas->getCanvas()->Clear();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
+    int n=0;
+
+
+       for(int z=1;z<=maxElement_i;z++){
+           for(int g=1;g<=maxElement_j;g++){
+               if(z==maxElement_i){
+                    HijF[z][g] = static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+                    HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());
+                    addSpaceBarMatrixRequested[z][g]=addSpaceBarMatrixRequested[SelectedElement_i][PilgrimElement_j];
+                    HijC[z][g].push_back((TH1F*)selectedHisto->Clone());
+            }
+               else{
+               HijF[z][g] = static_cast<TracknHistogram*>(HijF[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+               HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+               n++;
+               canvas->getCanvas()->cd(n);
+               HijF[z][g]->Draw();}}
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+void QMainCanvas::DeleteCulomn(){
+    if(maxElement_i==1 && maxElement_j==1){
+        selectedHisto=static_cast<TracknHistogram*>(HijF[1][1]->Clone(("h"+QString::number(1)+QString::number(1)+"f").toStdString().c_str()));
+    }
+    maxElement_j--;
+    canvas->getCanvas()->Clear();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
+    int n=0;
+
+
+       for(int z=1;z<=maxElement_i;z++){
+           for(int g=1;g<=maxElement_j;g++){
+               if(g==maxElement_j){
+                    HijF[z][g] = static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+                    HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());
+                    addSpaceBarMatrixRequested[z][g]=addSpaceBarMatrixRequested[SelectedElement_i][PilgrimElement_j];
+            }
+               else{
+               HijF[z][g] = static_cast<TracknHistogram*>(HijF[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+               HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+               n++;
+               canvas->getCanvas()->cd(n);
+               HijF[z][g]->Draw();
+        }}
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+void QMainCanvas::DeleteLine(){
+        if(maxElement_i==1 && maxElement_j==1){
+        selectedHisto=static_cast<TracknHistogram*>(HijF[1][1]->Clone(("h"+QString::number(1)+QString::number(1)+"f").toStdString().c_str()));
+    }
+    maxElement_i--;
+    canvas->getCanvas()->Clear();
+    canvas->getCanvas()->SetBorderMode(0);
+    canvas->getCanvas()->SetFillColor(0);
+    canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
+    int n=0;
+
+
+       for(int z=1;z<=maxElement_i;z++){
+           for(int g=1;g<=maxElement_j;g++){
+               if(z==maxElement_i){
+                    HijF[z][g] = static_cast<TracknHistogram*>(selectedHisto->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+                    HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());
+                    addSpaceBarMatrixRequested[z][g]=addSpaceBarMatrixRequested[SelectedElement_i][PilgrimElement_j];
+            }
+               else{
+               HijF[z][g] = static_cast<TracknHistogram*>(HijF[z][g]->Clone(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str()));
+               HijF[z][g]-> SetTitle(("h"+QString::number(z)+QString::number(g)+"f").toStdString().c_str());}
+               n++;
+               canvas->getCanvas()->cd(n);
+               HijF[z][g]->Draw();}}
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+void QMainCanvas::IdentifyLastClickedHistogram(Double_t , Double_t ){
+    //if(maxElement_i>1 || maxElement_j>1){
+selectedHisto=nullptr;
+    delete lineR;lineR=nullptr;
+    delete lineL;lineL=nullptr;
+    delete lineD;lineD=nullptr;
+    delete lineU;lineU=nullptr;
+
+    for(int j=0;j<maxElement_j;j++){
+        if(j*canvas->getCanvas()->GetWw()/maxElement_j<mouseLeftClickXcoord && mouseLeftClickXcoord<(j+1)*canvas->getCanvas()->GetWw()/maxElement_j){
+            SelectedElement_j=j+1;}}
+    for(int h=0;h<maxElement_i;h++){
+        if(h*canvas->getCanvas()->GetWh()/maxElement_i<mouseLeftClickYcoord && mouseLeftClickYcoord<(h+1)*canvas->getCanvas()->GetWh()/maxElement_i){
+            SelectedElement_i=h+1;}}
+    selectedHisto=HijF[SelectedElement_i][SelectedElement_j];
+   // std::cout<<"i="<<SelectedElement_i<<"  j="<<SelectedElement_j<<"\n";
+
+    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+    lineR = new TLine(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst(), 0, HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst(), HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+    lineL= new TLine(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast(), 0, HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast(), HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+    lineU= new TLine(HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetFirst(),  HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05, HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetLast(), HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+    lineD= new TLine(0, 0, HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetXmax(), 0);
+    if(maxElement_i>1 || maxElement_j>1){
+    lineR->SetLineColor(kOrange+1);  // Setarea culorii liniei la roșu
+    lineR->SetLineWidth(2);     // Setarea grosimii liniei
+    lineR->Draw();
+    lineL->SetLineColor(kOrange+1);  // Setarea culorii liniei la roșu
+    lineL->SetLineWidth(2);     // Setarea grosimii liniei
+    lineL->Draw();
+    lineU->SetLineColor(kOrange+1);  // Setarea culorii liniei la roșu
+    lineU->SetLineWidth(2);     // Setarea grosimii liniei
+    lineU->Draw();
+    lineD->SetLineColor(kOrange+1);  // Setarea culorii liniei la roșu
+    lineD->SetLineWidth(2);     // Setarea grosimii liniei
+    lineD->Draw();}
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+   // }
+}
+
+void QMainCanvas::IdentifyLastPilgrimHistogram(Double_t , Double_t ){
+   // if(maxElement_i>1 || maxElement_j>1){
+    pilgrimHisto=nullptr;
+    delete lineR1;lineR1=nullptr;
+    delete lineL1;lineL1=nullptr;
+    delete lineD1;lineD1=nullptr;
+    delete lineU1;lineU1=nullptr;
+
+    for(int j=0;j<maxElement_j;j++){
+        if(j*canvas->getCanvas()->GetWw()/maxElement_j<mousePilgrimX && mousePilgrimX<(j+1)*canvas->getCanvas()->GetWw()/maxElement_j){
+            PilgrimElement_j=j+1;}}
+    for(int h=0;h<maxElement_i;h++){
+        if(h*canvas->getCanvas()->GetWh()/maxElement_i<mousePilgrimY && mousePilgrimY<(h+1)*canvas->getCanvas()->GetWh()/maxElement_i){
+            PilgrimElement_i=h+1;}}
+    pilgrimHisto=HijF[PilgrimElement_i][PilgrimElement_j];
+    //std::cout<<"i="<<PilgrimElement_i<<"  j="<<PilgrimElement_j<<"\n";
+
+    canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
+    lineR1 = new TLine(HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetFirst(), 0, HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetFirst(), HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*1.05);
+    lineL1= new TLine(HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetLast(), 0, HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetLast(), HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*1.05);
+    lineU1= new TLine(HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetFirst(),  HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*1.05, HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetLast(), HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()*1.05);
+    lineD1= new TLine(0, 0, HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->GetXmax(), 0);
+    if(maxElement_i>1 || maxElement_j>1){
+    lineR1->SetLineColor(kGray+1);  // Setarea culorii liniei la roșu
+    lineR1->SetLineWidth(0);     // Setarea grosimii liniei
+    lineR1->Draw();
+    lineL1->SetLineColor(kGray+1);  // Setarea culorii liniei la roșu
+    lineL1->SetLineWidth(0);     // Setarea grosimii liniei
+    lineL1->Draw();
+    lineU1->SetLineColor(kGray+1);  // Setarea culorii liniei la roșu
+    lineU1->SetLineWidth(0);     // Setarea grosimii liniei
+    lineU1->Draw();
+    lineD1->SetLineColor(kGray+1);  // Setarea culorii liniei la roșu
+    lineD1->SetLineWidth(0);     // Setarea grosimii liniei
+    lineD1->Draw();}
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+  //  }
+}
+
+void QMainCanvas::offerHelp()
+>>>>>>> Stashed changes
 {
     if (event == 11) // Event 11 corespunde mișcării mouse-ului
     {
