@@ -37,11 +37,7 @@ MOVE          = mv -f
 TAR           = tar -cf
 COMPRESS      = gzip -9f
 DISTNAME      = canvas1.0.0
-<<<<<<< Updated upstream
-DISTDIR = /home/andrei/Desktop/andrei_Ctin/NuTrackN/.tmp/canvas1.0.0
-=======
 DISTDIR = /home/andrei/Desktop/nutrackn\ nov/NuGASP-main/NuTrackN/.tmp/canvas1.0.0
->>>>>>> Stashed changes
 LINK          = g++
 LFLAGS        = -Wl,-O1
 LIBS          = $(SUBLIBS) -L$(ROOTSYS)/lib -lCore -lRIO -lNet -lHist -lGraf -lGraf3d -lGpad -lTree -lRint -lPostscript -lMatrix -lPhysics -lGui -lMathCore -lpthread /usr/lib/x86_64-linux-gnu/libQt5Widgets.so /usr/lib/x86_64-linux-gnu/libQt5Gui.so /usr/lib/x86_64-linux-gnu/libQt5Core.so -lGL   
@@ -378,123 +374,6 @@ compiler_moc_header_clean:
 moc_canvas.cpp: canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		calib.h \
-		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
 		../../../../software/root-6.26.10/buildroot/include/TObject.h \
@@ -610,7 +489,6 @@ moc_canvas.cpp: canvas.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -619,11 +497,7 @@ moc_canvas.cpp: canvas.h \
 		$(ROOTSYS)/include/TError.h \
 		moc_predefs.h \
 		/usr/lib/qt5/bin/moc
-<<<<<<< Updated upstream
-	/usr/lib/qt5/bin/moc $(DEFINES) --include /home/andrei/Desktop/andrei_Ctin/NuTrackN/moc_predefs.h -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I/home/andrei/Desktop/andrei_Ctin/NuTrackN -I'/home/andrei/Desktop/andrei_Ctin/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
-=======
 	/usr/lib/qt5/bin/moc $(DEFINES) --include '/home/andrei/Desktop/nutrackn nov/NuGASP-main/NuTrackN/moc_predefs.h' -I/usr/lib/x86_64-linux-gnu/qt5/mkspecs/linux-g++ -I'/home/andrei/Desktop/nutrackn nov/NuGASP-main/NuTrackN' -I'/home/andrei/Desktop/nutrackn nov/NuGASP-main/NuTrackN/$(ROOTSYS)/include' -I/usr/include/x86_64-linux-gnu/qt5 -I/usr/include/x86_64-linux-gnu/qt5/QtWidgets -I/usr/include/x86_64-linux-gnu/qt5/QtGui -I/usr/include/x86_64-linux-gnu/qt5/QtCore -I/usr/include/c++/11 -I/usr/include/x86_64-linux-gnu/c++/11 -I/usr/include/c++/11/backward -I/usr/lib/gcc/x86_64-linux-gnu/11/include -I/usr/local/include -I/usr/include/x86_64-linux-gnu -I/usr/include canvas.h -o moc_canvas.cpp
->>>>>>> Stashed changes
 
 compiler_moc_objc_header_make_all:
 compiler_moc_objc_header_clean:
@@ -644,123 +518,6 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 canvas.o: canvas.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		calib.h \
-		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
 		../../../../software/root-6.26.10/buildroot/include/TObject.h \
@@ -876,7 +633,6 @@ canvas.o: canvas.cxx canvas.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -891,123 +647,6 @@ canvas.o: canvas.cxx canvas.h \
 main.o: main.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		calib.h \
-		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
 		../../../../software/root-6.26.10/buildroot/include/TObject.h \
@@ -1123,7 +762,6 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -1134,22 +772,6 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TStyle.h \
 		$(ROOTSYS)/include/TColor.h \
 		$(ROOTSYS)/include/THttpServer.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/THttpCallArg.h \
-		$(ROOTSYS)/include/TH2I.h \
-		../../../software/root-6.26.10/buildroot/include/TH2.h \
-		$(ROOTSYS)/include/TApplication.h \
-		../../../software/root-6.26.10/buildroot/include/TApplicationImp.h \
-		$(ROOTSYS)/include/TROOT.h \
-		../../../software/root-6.26.10/buildroot/include/TDirectory.h \
-		../../../software/root-6.26.10/buildroot/include/TUUID.h \
-		../../../software/root-6.26.10/buildroot/include/TBuffer.h \
-		../../../software/root-6.26.10/buildroot/include/Bytes.h \
-		../../../software/root-6.26.10/buildroot/include/Byteswap.h \
-		$(ROOTSYS)/include/TPluginManager.h \
-		$(ROOTSYS)/include/TVirtualGL.h \
-		../../../software/root-6.26.10/buildroot/include/GLConstants.h
-=======
 		../../../../software/root-6.26.10/buildroot/include/THttpCallArg.h \
 		$(ROOTSYS)/include/TH2I.h \
 		../../../../software/root-6.26.10/buildroot/include/TH2.h \
@@ -1164,53 +786,10 @@ main.o: main.cxx canvas.h \
 		$(ROOTSYS)/include/TPluginManager.h \
 		$(ROOTSYS)/include/TVirtualGL.h \
 		../../../../software/root-6.26.10/buildroot/include/GLConstants.h
->>>>>>> Stashed changes
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cxx
 
 Integral.o: Integral.cxx Integral.h \
 		$(ROOTSYS)/include/TH1F.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TH1.h \
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
@@ -1251,86 +830,12 @@ Integral.o: Integral.cxx Integral.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/TH1.h \
 		Design.h \
 		canvas.h \
 		tracknhistogram.h \
 		calib.h \
 		$(ROOTSYS)/include/TCanvas.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TPad.h \
 		../../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
 		../../../../software/root-6.26.10/buildroot/include/TAttPad.h \
@@ -1402,7 +907,6 @@ Integral.o: Integral.cxx Integral.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -1415,48 +919,6 @@ Integral.o: Integral.cxx Integral.h \
 
 calib.o: calib.cxx calib.h \
 		$(ROOTSYS)/include/TH1F.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TH1.h \
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
@@ -1497,86 +959,12 @@ calib.o: calib.cxx calib.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/TH1.h \
 		Design.h \
 		canvas.h \
 		tracknhistogram.h \
 		Integral.h \
 		$(ROOTSYS)/include/TCanvas.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TPad.h \
 		../../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
 		../../../../software/root-6.26.10/buildroot/include/TAttPad.h \
@@ -1648,7 +1036,6 @@ calib.o: calib.cxx calib.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
@@ -1661,47 +1048,6 @@ calib.o: calib.cxx calib.h \
 
 tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h
-=======
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
 		../../../../software/root-6.26.10/buildroot/include/TObject.h \
@@ -1741,129 +1087,11 @@ tracknhistogram.o: tracknhistogram.cpp tracknhistogram.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
 		../../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h
->>>>>>> Stashed changes
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o tracknhistogram.o tracknhistogram.cpp
 
 Design.o: Design.cxx canvas.h \
 		tracknhistogram.h \
 		$(ROOTSYS)/include/TH1.h \
-<<<<<<< Updated upstream
-		../../../software/root-6.26.10/buildroot/include/TAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TNamed.h \
-		../../../software/root-6.26.10/buildroot/include/TObject.h \
-		../../../software/root-6.26.10/buildroot/include/Rtypes.h \
-		../../../software/root-6.26.10/buildroot/include/RtypesCore.h \
-		$(ROOTSYS)/include/ROOT/RConfig.hxx \
-		../../../software/root-6.26.10/buildroot/include/RVersion.h \
-		$(ROOTSYS)/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/strtok.h \
-		../../../software/root-6.26.10/buildroot/include/strlcpy.h \
-		../../../software/root-6.26.10/buildroot/include/snprintf.h \
-		../../../software/root-6.26.10/buildroot/include/TGenericClassInfo.h \
-		../../../software/root-6.26.10/buildroot/include/TSchemaHelper.h \
-		../../../software/root-6.26.10/buildroot/include/TIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualIsAProxy.h \
-		../../../software/root-6.26.10/buildroot/include/TStorage.h \
-		../../../software/root-6.26.10/buildroot/include/TVersionCheck.h \
-		../../../software/root-6.26.10/buildroot/include/TString.h \
-		../../../software/root-6.26.10/buildroot/include/TMathBase.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RStringView.hxx \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RWrap_libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/libcpp_string_view.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/TypeTraits.hxx \
-		../../../software/root-6.26.10/buildroot/include/TAttAxis.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayD.h \
-		../../../software/root-6.26.10/buildroot/include/TArray.h \
-		../../../software/root-6.26.10/buildroot/include/TAttLine.h \
-		../../../software/root-6.26.10/buildroot/include/TAttFill.h \
-		../../../software/root-6.26.10/buildroot/include/TAttMarker.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayC.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayS.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayI.h \
-		../../../software/root-6.26.10/buildroot/include/TArrayF.h \
-		../../../software/root-6.26.10/buildroot/include/Foption.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/EExecutionPolicy.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVectorFfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TVectorDfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TFitResultPtr.h \
-		Integral.h \
-		$(ROOTSYS)/include/TH1F.h \
-		../../../software/root-6.26.10/buildroot/include/TH1.h \
-		calib.h \
-		$(ROOTSYS)/include/TCanvas.h \
-		../../../software/root-6.26.10/buildroot/include/TPad.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualPad.h \
-		../../../software/root-6.26.10/buildroot/include/TAttPad.h \
-		../../../software/root-6.26.10/buildroot/include/TQObject.h \
-		../../../software/root-6.26.10/buildroot/include/TList.h \
-		../../../software/root-6.26.10/buildroot/include/TSeqCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TCollection.h \
-		../../../software/root-6.26.10/buildroot/include/TIterator.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualRWMutex.h \
-		../../../software/root-6.26.10/buildroot/include/TVirtualMutex.h \
-		../../../software/root-6.26.10/buildroot/include/ROOT/RRangeCast.hxx \
-		$(ROOTSYS)/include/ROOT/RSpan.hxx \
-		$(ROOTSYS)/include/ROOT/span.hxx \
-		../../../software/root-6.26.10/buildroot/include/TVirtualQConnection.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreter.h \
-		../../../software/root-6.26.10/buildroot/include/TDataType.h \
-		../../../software/root-6.26.10/buildroot/include/TDictionary.h \
-		../../../software/root-6.26.10/buildroot/include/ESTLType.h \
-		../../../software/root-6.26.10/buildroot/include/TInterpreterValue.h \
-		../../../software/root-6.26.10/buildroot/include/TQClass.h \
-		../../../software/root-6.26.10/buildroot/include/TClass.h \
-		../../../software/root-6.26.10/buildroot/include/TObjArray.h \
-		../../../software/root-6.26.10/buildroot/include/GuiTypes.h \
-		../../../software/root-6.26.10/buildroot/include/Buttons.h \
-		../../../software/root-6.26.10/buildroot/include/TAttBBox2D.h \
-		../../../software/root-6.26.10/buildroot/include/TAttCanvas.h \
-		$(ROOTSYS)/include/TVirtualX.h \
-		../../../software/root-6.26.10/buildroot/include/TAttText.h \
-		$(ROOTSYS)/include/TSystem.h \
-		../../../software/root-6.26.10/buildroot/include/TInetAddress.h \
-		../../../software/root-6.26.10/buildroot/include/TTimer.h \
-		../../../software/root-6.26.10/buildroot/include/TSysEvtHandler.h \
-		../../../software/root-6.26.10/buildroot/include/TTime.h \
-		$(ROOTSYS)/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TBits.h \
-		$(ROOTSYS)/include/Math/Types.h \
-		$(ROOTSYS)/include/RtypesCore.h \
-		$(ROOTSYS)/include/TF1.h \
-		../../../software/root-6.26.10/buildroot/include/RConfigure.h \
-		../../../software/root-6.26.10/buildroot/include/TFormula.h \
-		../../../software/root-6.26.10/buildroot/include/TMethodCall.h \
-		../../../software/root-6.26.10/buildroot/include/TF1AbsComposition.h \
-		../../../software/root-6.26.10/buildroot/include/TMath.h \
-		../../../software/root-6.26.10/buildroot/include/TError.h \
-		$(ROOTSYS)/include/DllImport.h \
-		../../../software/root-6.26.10/buildroot/include/Math/Types.h \
-		../../../software/root-6.26.10/buildroot/include/Math/ParamFunctor.h \
-		$(ROOTSYS)/include/TFrame.h \
-		../../../software/root-6.26.10/buildroot/include/TWbox.h \
-		../../../software/root-6.26.10/buildroot/include/TBox.h \
-		../../../software/root-6.26.10/buildroot/include/TColor.h \
-		$(ROOTSYS)/include/TTimer.h \
-		$(ROOTSYS)/include/TFitResult.h \
-		../../../software/root-6.26.10/buildroot/include/Fit/FitResult.h \
-		$(ROOTSYS)/include/Math/IFunctionfwd.h \
-		$(ROOTSYS)/include/Math/IParamFunctionfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTSym.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTBase.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixFBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDBasefwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixTUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDSymfwd.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtils.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDUtilsfwd.h \
-		$(ROOTSYS)/include/TLatex.h \
-		../../../software/root-6.26.10/buildroot/include/TText.h \
-		$(ROOTSYS)/include/TLine.h \
-		$(ROOTSYS)/include/TMatrixD.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
-		../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
-=======
 		../../../../software/root-6.26.10/buildroot/include/TAxis.h \
 		../../../../software/root-6.26.10/buildroot/include/TNamed.h \
 		../../../../software/root-6.26.10/buildroot/include/TObject.h \
@@ -1979,7 +1207,6 @@ Design.o: Design.cxx canvas.h \
 		$(ROOTSYS)/include/TMatrixD.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixT.h \
 		../../../../software/root-6.26.10/buildroot/include/TMatrixDfwd.h \
->>>>>>> Stashed changes
 		$(ROOTSYS)/include/Math/Minimizer.h \
 		$(ROOTSYS)/include/Math/IFunction.h \
 		$(ROOTSYS)/include/Math/MinimizerOptions.h \
