@@ -14,6 +14,9 @@
 #include <tracknhistogram.h>
 #include "Integral.h"
 #include "calib.h"
+#include <cstdlib>
+#include <cstdio>
+#include <QComboBox>
 
 
 #include <QWidget>
@@ -34,6 +37,7 @@
 #include <QDialogButtonBox>
 #include <QWheelEvent>
 #include <QMenu>
+#include <QIcon>
 
 
 
@@ -80,9 +84,11 @@ public:
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
 
+
 protected:
    TCanvas        *fCanvas;
-   Int_t xMousePosition, yMousePosition;
+   Int_t xMousePosition, yMousePosition;   std::vector<Double_t> addSpaceBarMatrixRequested[4][4];
+
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
@@ -133,8 +139,8 @@ signals:
    void mouseLeftClickCoordRequest(Double_t , Double_t );
    void AddLineRequest();
    void AddCulomnRequest();
-   void DeleteLineRequest();
-   void DeleteCulomnRequest();
+   void showXY(Double_t , Double_t);
+   
 };
 
 class QMainCanvas : public QWidget
@@ -148,29 +154,22 @@ public:
    virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
-   TH1F* HijF[12][12];
-   std::vector<TH1F*> HijC[12][12];
-   //TH1F* h1f;
-   TH1F* selectedHisto;
-   TH1F* pilgrimHisto;
-   Double_t mousePilgrimX, mousePilgrimY, mouseLeftClickXcoord, mouseLeftClickYcoord;
-   int maxElement_i=1, maxElement_j=1;
-   int SelectedElement_i, SelectedElement_j; //wcontor, bcontor (pt Andrei)
-   int PilgrimElement_i, PilgrimElement_j;
-   int numberoftimes=1;
-   //std::vector<Double_t> addSpaceBarMatrixRequested[12][12];
-   //std::vector<Double_t> background_markers_matrix[12][12];
-   //std::vector<Double_t> integral_markers_matrix[12][12];
-   //std::vector<Double_t> gauss_markers_matrix[12][12];
-   
-   
-   
+         int numberoftimes=1;
+   std::vector<int> colors_hist={4,2,3,7,6,1,5,28,38,30,8};
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
-
+   int SelectedElement_i=1, SelectedElement_j=1; 
+   int PilgrimElement_i=1, PilgrimElement_j=1;
+   int maxElement_i=1, maxElement_j=1;
+   Double_t mousePilgrimX, mousePilgrimY, mouseLeftClickXcoord, mouseLeftClickYcoord;
+   TH1F* HijF[12][12];
+   std::vector<TH1F*> HijC[12][12];
+   TH1F* selectedHisto;
+   int maxk=0;
+   int maxkk=0;
 
 public slots:
    void clicked1();
@@ -205,9 +204,12 @@ public slots:
    void offerHelp();
    void AddCulomn();
    void AddLine();
-   void DeleteCulomn();
-   void DeleteLine();
-   
+   void IdentifyLastClickedHistogram(Double_t z, Double_t y);
+   void IdentifyLastPilgrimHistogram(Double_t x, Double_t y);
+   void ColorTheFrameOfTheHistogram();
+   void OpenColorSelectionDialog();
+   void showXYcoord(Double_t, Double_t);
+   void findHistoWithMaxY(std::vector<TH1F> histos);
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -226,36 +228,36 @@ protected:
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
    std::vector<Double_t> zoom_markers;
-   std::vector<Double_t> addSpaceBarMatrixRequested[12][12];
-   std::vector<Double_t> background_markers_matrix[12][12];
-   //std::vector<Double_t> integral_markers_matrix[12][12];
-   //std::vector<Double_t> gauss_markers_matrix[12][12];
+   std::vector<TF1> backgroundFunctionVector;
+   std::vector<TF1> gaussianWithBackgroundFunctionVector;
+   std::vector<TObject*> autoFitMarkers[12][12];
+   TList autoFitLatex[12][12];
+   std::vector<std::string> latexTexts;
+   
    Float_t maxValueInHistogram;
    std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
-   TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
-   TLine *lineR1;TLine *lineL1;TLine *lineD1;TLine *lineU1;
-private:
+      TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
+      //Tline *backgroundLine;
+      QLabel *labelX;
+      QLabel *labelY;
+    TFormula *gaussianWithBackground;
+    TF1 *gaussianWithBackgroundFunction;
+    //TLine *backgroundLine1;
+    //TLine *backgroundLine2;
+
+
+    TFormula *background; 
+    TF1 *backgroundFunction;
+   
+   signals:
+   void RequestSelectHistogram();
+   public slots:
+
 
    
-   
-signals:
-void refreshLines();
-
-public slots:
-    void mouseLeftClickCoord(Double_t x, Double_t y) {
-    mouseLeftClickXcoord=x;mouseLeftClickYcoord=y;
-    //std::cout<<"x="<<mouseLeftClickXcoord<<"  y="<<mouseLeftClickYcoord<<"\n";
-
-    }
-    void mousePilgrimCoord(Double_t x, Double_t y) {
-    mousePilgrimX=x;mousePilgrimY=y;
-   // std::cout<<"x="<<mousePilgrimX<<"  y="<<mousePilgrimY<<"\n";
-    }
-    void IdentifyLastClickedHistogram(Double_t , Double_t );
-    void IdentifyLastPilgrimHistogram(Double_t , Double_t );
 };
 
 
