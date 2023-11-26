@@ -14,6 +14,9 @@
 #include <tracknhistogram.h>
 #include "Integral.h"
 #include "calib.h"
+#include <cstdlib>
+#include <cstdio>
+#include <QComboBox>
 
 
 #include <QWidget>
@@ -33,6 +36,9 @@
 #include <QFormLayout>
 #include <QDialogButtonBox>
 #include <QWheelEvent>
+#include <QMenu>
+#include <QIcon>
+#include <QMainWindow>
 
 
 
@@ -49,6 +55,11 @@
 #include <TLine.h>
 #include <TMatrixD.h>
 #include <Math/Minimizer.h>
+#include <TRandom.h>
+#include <THStack.h>
+#include <TContextMenu.h>
+#include <TObjArray.h>
+
 
 
 #include <QLabel>
@@ -74,9 +85,11 @@ public:
    virtual ~QRootCanvas() {}
    TCanvas* getCanvas() { return fCanvas;}
 
+
 protected:
    TCanvas        *fCanvas;
-   Int_t xMousePosition, yMousePosition;
+   Int_t xMousePosition, yMousePosition;   std::vector<Double_t> addSpaceBarMatrixRequested[4][4];
+
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
@@ -86,6 +99,7 @@ protected:
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
    virtual void    wheelEvent(QWheelEvent *e);
+   virtual void    showContextMenu(QMouseEvent *e);
    
 
    bool controlKeyIsPressed=0;
@@ -122,6 +136,15 @@ signals:
    void requesttranslateupTheScreen();
    void fullscreen();
    void requestHelp();
+   void mousePilgrimCoordRequest(Double_t , Double_t );
+   void mouseLeftClickCoordRequest(Double_t , Double_t );
+   void AddLineRequest();
+   void DeleteLineRequest();
+   void AddCulomnRequest();
+   void DeleteCulomnRequest();
+   void RefreshScreenRequest();
+   void showXY(Double_t , Double_t);
+   
 };
 
 class QMainCanvas : public QWidget
@@ -135,12 +158,22 @@ public:
    virtual void closeEvent(QCloseEvent *e);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
+         int numberoftimes=1;
+   std::vector<int> colors_hist={4,2,3,7,6,1,5,28,38,30,8};
 
    //The histogram which is declared globally so every function can access it
    TracknHistogram *h1f;
    //These are some global variables for the integral function which are the parameters for the best fitted line of the background
    Double_t slope=0,addition=0;
-
+   int SelectedElement_i=1, SelectedElement_j=1; 
+   int PilgrimElement_i=1, PilgrimElement_j=1;
+   int maxElement_i=1, maxElement_j=1;
+   Double_t mousePilgrimX, mousePilgrimY, mouseLeftClickXcoord, mouseLeftClickYcoord;
+   TH1F* HijF[12][12];
+   std::vector<TH1F*> HijC[12][12];
+   TH1F* selectedHisto;
+   int maxk=0;
+   int maxkk=0;
 
 public slots:
    void clicked1();
@@ -173,6 +206,18 @@ public slots:
    void zoomOut();
    void addSpaceBarMarker(Int_t, Int_t);
    void offerHelp();
+   void AddCulomn();
+   void AddLine();
+   void IdentifyLastClickedHistogram(Double_t z, Double_t y);
+   void IdentifyLastPilgrimHistogram(Double_t x, Double_t y);
+   void ColorTheFrameOfTheHistogram();
+   void OpenColorSelectionDialog();
+   void showXYcoord(Double_t, Double_t);
+   void findHistoWithMaxY(std::vector<TH1F> histos);
+   void DeleteCulomn();
+   void DeleteLine();
+   void RefreshScreen();
+   //void DrawHisto();
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
@@ -191,11 +236,39 @@ protected:
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
    std::vector<Double_t> zoom_markers;
+   std::vector<TF1> backgroundFunctionVector;
+   std::vector<TF1> gaussianWithBackgroundFunctionVector;
+   std::vector<TObject*> autoFitMarkers[12][12];
+   std::vector<Double_t> gaussCenters[12][12];
+   std::vector<Double_t> gaussCentersHeight[12][12];
+   TList autoFitLatex[12][12];
+   std::vector<std::string> latexTexts;
+   
    Float_t maxValueInHistogram;
    std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
+      TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
+      //Tline *backgroundLine;
+      QLabel *labelX;
+      QLabel *labelY;
+    TFormula *gaussianWithBackground;
+    TF1 *gaussianWithBackgroundFunction;
+    //TLine *backgroundLine1;
+    //TLine *backgroundLine2;
+
+
+    TFormula *background; 
+    TF1 *backgroundFunction;
+    TLatex *gaussianCenterMarkerText;
+   
+   signals:
+   void RequestSelectHistogram();
+   public slots:
+
+
+   
 };
 
 
