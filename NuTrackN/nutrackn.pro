@@ -37,9 +37,10 @@ LIBS += \
 HEADERS += \
     Include/canvas.h \
     Include/Integral.h \
-    Include/calib.h\
+    Include/calib.h \
     Include/tracknhistogram.h \
-    Include/Design.h
+    Include/Design.h \
+    Include/PeakFit.h
 
 # Project source files
 SOURCES += \
@@ -48,6 +49,7 @@ SOURCES += \
     Sources/Integral.cxx \
     Sources/calib.cxx \
     Sources/tracknhistogram.cxx \
-    Sources/Design.cxx
+    Sources/Design.cxx \
+    Sources/PeakFit.cxx
 
 

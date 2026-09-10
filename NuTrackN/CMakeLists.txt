@@ -25,6 +25,7 @@ set(SOURCES
     Sources/calib.cxx
     Sources/tracknhistogram.cxx
     Sources/Design.cxx
+    Sources/PeakFit.cxx
 )
 
 set(HEADERS
@@ -33,6 +34,7 @@ set(HEADERS
     Include/calib.h
     Include/tracknhistogram.h
     Include/Design.h
+    Include/PeakFit.h
 )
 
 add_executable(nutrackn ${SOURCES} ${HEADERS})

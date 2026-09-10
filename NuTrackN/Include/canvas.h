@@ -14,6 +14,7 @@
 #include <tracknhistogram.h>
 #include "Integral.h"
 #include "calib.h"
+#include "PeakFit.h"
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
@@ -68,13 +69,17 @@
 #include <QMessageBox>
 #include <QApplication>
 #include <QCloseEvent>
-
-class QPaintEvent;
-class QResizeEvent;
-class QMouseEvent;
-class QPushButton;
-class QTimer;
-class TCanvas;
+#include <TApplication.h>
+#include <TTimer.h>
+#include <TGFrame.h>
+#include <TSystem.h>
+#include <TVirtualX.h>
+#include <TEnv.h>
+#include <TGClient.h>
+#include <TStyle.h>
+#include <TColor.h>
+#include <TAxis.h>
+#include <TList.h>
 
 class QRootCanvas : public QWidget
 {
@@ -83,30 +88,23 @@ class QRootCanvas : public QWidget
 public:
    QRootCanvas( QWidget *parent = 0);
    virtual ~QRootCanvas() {}
-   TCanvas* getCanvas() { return fCanvas;}
-
+   TCanvas* getCanvas() { return fCanvas; }
 
 protected:
    TCanvas        *fCanvas;
-   Int_t xMousePosition, yMousePosition;   std::vector<Double_t> addSpaceBarMatrixRequested[4][4];
-
+   Double_t       xMousePosition, yMousePosition;
+   bool           controlKeyIsPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed;
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
    virtual void    mouseReleaseEvent( QMouseEvent *e );
-   virtual void    keyPressEvent(QKeyEvent *event);
-   virtual void    keyReleaseEvent(QKeyEvent *event);
    virtual void    paintEvent( QPaintEvent *e );
    virtual void    resizeEvent( QResizeEvent *e );
    virtual void    wheelEvent(QWheelEvent *e);
    virtual void    showContextMenu(QMouseEvent *e);
-   
+   virtual void    keyPressEvent(QKeyEvent *event);
+   virtual void    keyReleaseEvent(QKeyEvent *event);
 
-   bool controlKeyIsPressed=0;
-   bool cKeyWasPressed=0;
-   bool zKeyWasPressed=0;
-   bool mKeyWasPressed=0;
-   bool fKeyWasPressed=0;
 signals:
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
@@ -114,12 +112,24 @@ signals:
    void requestClearTheScreen();
    void addBackgroundMarkerRequested(Int_t, Int_t);
    void addIntegralMarkerRequested(Int_t, Int_t);
+   void deleteBackgroundMarkersRequested();
+   void deleteIntegralMarkersRequested();
+   void showBackgroundMarkersRequested();
+   void showIntegralMarkersRequested();
+   void showAllMarkersRequested();
+   void requestZoomTheScreen();
+   void requesttranslateplusTheScreen();
+   void requesttranslateminusTheScreen();
+   void requesttranslatedownTheScreen();
+   void requesttranslateupTheScreen();
+   void fullscreen();
    void requestDeleteBackgroundMarkers();
    void requestDeleteIntegralMarkers();
    void requestDeleteAllMarkers();
    void requestShowBackgroundMarkers();
    void requestShowIntegralMarkers();
    void requestShowAllMarkers();
+   void addSpaceBarMarkerRequested(Int_t, Int_t);
    void requestAddRangeMarker(Int_t, Int_t);
    void requestDeleteRangeMarkers();
    void requestShowRangeMarkers();
@@ -127,15 +137,8 @@ signals:
    void requestDeleteGaussMarkers();
    void requestShowGaussMarkers();
    void requestFitGauss();
-   void killSwitch();
-   void addSpaceBarMarkerRequested(Int_t, Int_t);
-   void requestZoomTheScreen();
-   void requesttranslateplusTheScreen();
-   void requesttranslateminusTheScreen();
-   void requesttranslatedownTheScreen();
-   void requesttranslateupTheScreen();
-   void fullscreen();
    void requestHelp();
+   void killSwitch();
    void mousePilgrimCoordRequest(Double_t , Double_t );
    void mouseLeftClickCoordRequest(Double_t , Double_t );
    void AddLineRequest();
@@ -150,6 +153,10 @@ signals:
 class QMainCanvas : public QWidget
 {
    Q_OBJECT
+
+   friend void runAutoFit(QMainCanvas *mainCanvas, int x, int y);
+   friend void runMultiPeakFit(QMainCanvas *mainCanvas);
+   friend void fitBackgroundHelper(QMainCanvas *mainCanvas);
 
 public:
    QMainCanvas( QWidget *parent = 0);
@@ -221,10 +228,6 @@ public slots:
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
-   void checkBackgrounds();
-   bool checkRanges();
-   bool checkGauss();
-   void fitBackground();
 
    QRootCanvas    *canvas;
    QPushButton    *b;
