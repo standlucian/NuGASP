@@ -46,8 +46,8 @@ SOURCES += \
     Sources/canvas.cxx \
     Sources/main.cxx \
     Sources/Integral.cxx \
-    Sources/calib.cxx\
-    Sources/tracknhistogram.cpp \
+    Sources/calib.cxx \
+    Sources/tracknhistogram.cxx \
     Sources/Design.cxx
 
 

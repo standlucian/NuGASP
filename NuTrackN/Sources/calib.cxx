@@ -1,5 +1,6 @@
 #include "calib.h"
 #include "Design.h"
+#include <iostream>
 
 // Performs a two-point energy calibration using the last two fitted
 // points and their corresponding reference energies.

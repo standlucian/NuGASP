@@ -1,57 +1,51 @@
 #ifndef DESIGN_H
 #define DESIGN_H
 
-#include "canvas.h"
-#include <QColor>
-#include <QPalette>
-#include <TCanvas.h>
-#include <TStyle.h>
-#include <TColor.h>
 #include <QPlainTextEdit>
-#include <QVBoxLayout>
-#include <QProcess>
-#include <QDebug>
-#include <QKeyEvent>
+#include <QString>
 
+// Forward declarations to avoid circular dependencies
+class QMainCanvas;
+class TCanvas;
 
-
-
-class CommandPrompt: public QPlainTextEdit //this class manages the command prompt and its functions, and is derived from QPlainTextEdit to access its functions;
+/**
+ * @brief CommandPrompt manages the embedded terminal logger and output console in NuTrackN.
+ *
+ * Implemented as a singleton derived from QPlainTextEdit for easy logging from any analysis module.
+ */
+class CommandPrompt : public QPlainTextEdit
 {
+    Q_OBJECT
 
 public:
-    static CommandPrompt* getInstance();//getter for the class instance, allowing usage in any other file of the program
-    static void setMainCanvas(QMainCanvas* m);//setter for the main canvas variable for the getInstance function to not require the QMainCanvas m as a parameter
-    std::string allowUserInput();//currently not in use
-    std::string getUserInput();//currently not in use
-    bool userInputRequested = false; // bool to check if any file requests user input, currently not in use
+    static CommandPrompt* getInstance();
+    static void setMainCanvas(QMainCanvas* m);
+
+    virtual ~CommandPrompt() override;
 
 private:
-    CommandPrompt(QMainCanvas* m);
+    explicit CommandPrompt(QWidget *parent = nullptr);
+
     static CommandPrompt* instance;
-    static QMainCanvas* mainCanvas; // Declare mainCanvas here
-    void setAvailableText(QString string);
+    static QMainCanvas* mainCanvas;
 
-    bool commandPromptHasFocus; // bool to check if command  prompt has focus, currently not in use
-    bool copyAvailabile;
-    std::string command; //  should have been used to be returned by getUserInput()
-    QString availableText;
-protected:
-    void focusInEvent(QFocusEvent* event) override;
-    void focusOutEvent(QFocusEvent* event) override;
-
-public slots:
-        void handleTextChanges();
-        void allowUserToCopyText(bool yes);
-        void handleCursorMoved();
-
-
-
+    // Prevent copying
+    CommandPrompt(const CommandPrompt&) = delete;
+    CommandPrompt& operator=(const CommandPrompt&) = delete;
 };
 
-
-void changeBackgroundColor(TCanvas* canvas);
+/**
+ * @brief Embeds the command prompt console into the main canvas window layout.
+ *
+ * @param mainCanvas Pointer to the main application window.
+ */
 void addCommandPrompt(QMainCanvas* mainCanvas);
 
-#endif // DESIGN_H
+/**
+ * @brief Changes the background color of the given ROOT canvas.
+ *
+ * @param canvas Pointer to the ROOT TCanvas.
+ */
+void changeBackgroundColor(TCanvas* canvas);
 
+#endif // DESIGN_H
