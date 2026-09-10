@@ -45,6 +45,13 @@ public:
     void SetSourceFilePath(const std::string &path) { fSourceFilePath = path; }
     const std::string &GetSourceFilePath() const { return fSourceFilePath; }
 
+    /**
+     * @brief Loads spectrum data from a file (supports binary uint32 and ASCII formats).
+     * @param filename Path to the spectrum file.
+     * @return True if loading was successful, false otherwise.
+     */
+    bool LoadFromFile(const std::string &filename);
+
 private:
     bool fIsCalibrated{false};
     Double_t fCalibA0{0.0};

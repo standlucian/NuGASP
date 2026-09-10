@@ -48,4 +48,12 @@ void addCommandPrompt(QMainCanvas* mainCanvas);
  */
 void changeBackgroundColor(TCanvas* canvas);
 
+/**
+ * @brief Displays the interactive color/theme settings dialog.
+ *
+ * @param parent Parent widget for the dialog.
+ * @param canvasWidget Pointer to the main canvas widget.
+ */
+void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget);
+
 #endif // DESIGN_H

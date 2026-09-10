@@ -153,9 +153,10 @@ class QMainCanvas : public QWidget
 
 public:
    QMainCanvas( QWidget *parent = 0);
-   virtual ~QMainCanvas() {}
+   virtual ~QMainCanvas();
    virtual void changeEvent(QEvent * e);
    virtual void closeEvent(QCloseEvent *e);
+   int getBinFromClick(int x, int y);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
          int numberoftimes=1;
@@ -213,7 +214,6 @@ public slots:
    void ColorTheFrameOfTheHistogram();
    void OpenColorSelectionDialog();
    void showXYcoord(Double_t, Double_t);
-   void findHistoWithMaxY(std::vector<TH1F> histos);
    void DeleteCulomn();
    void DeleteLine();
    void RefreshScreen();
@@ -248,7 +248,7 @@ protected:
    std::vector<Float_t> puncte_calib2p;
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
-   TMatrixD *backgroundCovarianceMatrix;
+   TMatrixD *backgroundCovarianceMatrix = nullptr;
    TLine* lineR = nullptr;
    TLine* lineL = nullptr;
    TLine* lineD = nullptr;
@@ -265,13 +265,6 @@ protected:
     TFormula *background; 
     TF1 *backgroundFunction;
     TLatex *gaussianCenterMarkerText;
-   
-   signals:
-   void RequestSelectHistogram();
-   public slots:
-
-
-   
 };
 
 

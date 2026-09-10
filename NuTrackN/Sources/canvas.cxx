@@ -449,7 +449,7 @@ void QMainCanvas::closeEvent(QCloseEvent *e)
 //------------------------------------------------------------------------------
 
 //______________________________________________________________________________
-QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent)
+QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent), backgroundCovarianceMatrix(nullptr)
 {
    // QMainCanvas constructor.
 
@@ -491,22 +491,21 @@ hLayout->addStretch();
    readiconButton->setIcon(QIcon("readicon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
    readiconButton->setFixedSize(20, 20);
    hLayout->addWidget(readiconButton);
-   l->addLayout(hLayout);
    connect(readiconButton, SIGNAL(clicked()), this, SLOT(clicked1()));
 
    QPushButton *iconButton = new QPushButton(this);
    iconButton->setIcon(QIcon("icon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
    iconButton->setFixedSize(20, 20);
    hLayout->addWidget(iconButton);
-   l->addLayout(hLayout);
    connect(iconButton, SIGNAL(clicked()), this, SLOT(OpenColorSelectionDialog()));
 
-      QPushButton *c2piconButton = new QPushButton(this);
+   QPushButton *c2piconButton = new QPushButton(this);
    c2piconButton->setIcon(QIcon("c2picon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
    c2piconButton->setFixedSize(20, 20);
    hLayout->addWidget(c2piconButton);
-   l->addLayout(hLayout);
    connect(c2piconButton, SIGNAL(clicked()), this, SLOT(Cal2pMain()));
+
+   l->addLayout(hLayout);
 
 
 
@@ -629,11 +628,6 @@ hLayout->addStretch();
     connect(canvas,SIGNAL(DeleteCulomnRequest()), this, SLOT(DeleteCulomn()));
     connect(canvas,SIGNAL(RefreshScreenRequest()), this, SLOT(RefreshScreen()));
 
-    connect(canvas,SIGNAL(RequestSelectHistogram()), this, SLOT(mousePressEvent( QMouseEvent )));
-
-    //connect RequestSelectHistogram()
-
-
 
    fRootTimer = new QTimer( this );
    //Every 20 ms, call function handle_root_events()
@@ -648,223 +642,116 @@ hLayout->addStretch();
     HijF[1][1]->GetYaxis()->SetLabelSize(0);
     HijF[1][1]->SetStats(0);
 }
-bool isAsciiFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::binary);
-    if (!file) {
-        std::cerr << "Error opening the file." << std::endl;
-        return false;
-    }
 
-    char c;
-    while (file.get(c)) {
-        if (static_cast<unsigned char>(c) > 127) {
-            // If any character is outside the ASCII range, it's not an ASCII file.
-            return false;
-        }
-    }
-
-    return true;
+//______________________________________________________________________________
+QMainCanvas::~QMainCanvas()
+{
+    delete backgroundCovarianceMatrix;
+    backgroundCovarianceMatrix = nullptr;
 }
+
+//______________________________________________________________________________
+int QMainCanvas::getBinFromClick(int x, int y)
+{
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return 1;
+
+    std::string objectInfo = hist->GetObjectInfo(x, y);
+
+    size_t to = objectInfo.find(" ");
+    if (to == std::string::npos) return 1;
+    objectInfo = objectInfo.substr(to + 1);
+
+    to = objectInfo.find(" ");
+    if (to == std::string::npos) return 1;
+    objectInfo = objectInfo.substr(to + 1);
+
+    size_t from = objectInfo.find("=");
+    to = objectInfo.find(" ");
+    if (from == std::string::npos || to == std::string::npos || to <= from + 1) return 1;
+
+    try {
+        std::string temp = objectInfo.substr(from + 1, to - from - 2);
+        return std::stoi(temp);
+    } catch (...) {
+        return 1;
+    }
+}
+
 //______________________________________________________________________________
 void QMainCanvas::clicked1()
 {
-if(numberoftimes==0){
-
-}
-    //canvas->getCanvas()->Clear();
-HijF[SelectedElement_i][SelectedElement_j]->Reset();
-//canvas->getCanvas()->Clear();
-canvas->getCanvas()->SetBorderMode(0);
+    HijF[SelectedElement_i][SelectedElement_j]->Reset();
+    canvas->getCanvas()->SetBorderMode(0);
     canvas->getCanvas()->SetFillColor(0);
-   // This opens a dialog to select a file for reading
 
-   QString fileName = QFileDialog::getOpenFileName(this, "Open a file","C://");
-   // Casts a QT string to C++ string
-   std::string SpectrumName = fileName.toStdString();
-   std::ifstream file(SpectrumName, std::ios::in);
-   if (!file) {
-      std::cerr << "Error: could not open file" << std::endl;
-   }
-
-   // read the data into a vector
-   std::vector<uint32_t> data;
-   uint32_t value;
-    //std::ofstream testAfisare("testAfisare.txt");
-   std::string line;
-
-    if (isAsciiFile(SpectrumName)) { // Checks if the file is Ascii format and reads it
-        std::cout << SpectrumName << " is an ASCII file." << std::endl;
-        while (std::getline(file, line)) { // Read each line from the file
-            std::istringstream iss(line);
-            while (iss>>value) {
-                data.push_back(value);
-            }
-        }
-    } else {
-        std::cout << SpectrumName << " is not an ASCII file." << std::endl;
-        while (file.read(reinterpret_cast<char*>(&value), sizeof(value)))
-                data.push_back(value);
+    // This opens a dialog to select a spectrum file for reading
+    QString fileName = QFileDialog::getOpenFileName(this, "Open a spectrum", QString(), "Spectra (*.spe *.dat *.txt *.asc *.*);;All Files (*)");
+    if (fileName.isEmpty()) {
+        return;
     }
 
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+    if (trackHist) {
+        if (!trackHist->LoadFromFile(fileName.toStdString())) {
+            std::cerr << "Failed to load spectrum from: " << fileName.toStdString() << std::endl;
+            return;
+        }
+    } else {
+        std::cerr << "Active histogram is null or invalid." << std::endl;
+        return;
+    }
 
-   //write the data into the histogram
-   for(unsigned long int i=1;i<=data.size();i++)
-       HijF[SelectedElement_i][SelectedElement_j]->AddBinContent(i,data[i-1]);
-    maxValueInHistogram=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
-HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->UnZoom();
-      HijC[SelectedElement_i][SelectedElement_j].push_back((TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+    maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
+    HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
+    HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->UnZoom();
+    HijC[SelectedElement_i][SelectedElement_j].push_back((TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
 
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[HijC[SelectedElement_i][SelectedElement_j].size()-1]);
+    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+    HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 
-
-
-
-
-HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[HijC[SelectedElement_i][SelectedElement_j].size()-1]);
-canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-HijF[SelectedElement_i][SelectedElement_j]->Draw();
-
-        canvas->getCanvas()->Modified();
-        canvas->getCanvas()->Update();
-
-for(std::size_t k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
+    for(std::size_t k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
         HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(colors_hist[k]);
         canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-        HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");}
+        HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+    }
 
-     IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
     //Zoom the histogram in the region delimited by spacebar markers
-    int i= zoom_markers.size();
-//ColorTheFrameOfTheHistogram();
+    int i = zoom_markers.size();
     if(i>=2){
-    if(zoom_markers[i-2]<zoom_markers[i-1]){
-    HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
-    if(zoom_markers[i-1]<zoom_markers[i-2]){
-    HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
+        if(zoom_markers[i-2]<zoom_markers[i-1]){
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);
+        }
+        if(zoom_markers[i-1]<zoom_markers[i-2]){
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);
+        }
+    }
 
-ColorTheFrameOfTheHistogram();
+    ColorTheFrameOfTheHistogram();
 
-        canvas->getCanvas()->Modified();
-        canvas->getCanvas()->Update();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
 void QMainCanvas::OpenColorSelectionDialog() {
-    QDialog dialog(this);
-    dialog.setWindowTitle("Settings");
-    dialog.setStyleSheet("background-color: #708090;");
-    QFormLayout form(&dialog);
-
-    // Dropdown list for colir selection
-    QComboBox *colorComboBox = new QComboBox(&dialog);
-    colorComboBox->addItem("Vampire");
-    colorComboBox->addItem("2");
-    colorComboBox->addItem("3");
-    form.addRow("Set mode", colorComboBox);
-
-    // Add Ok and Cance buttons
-    QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &dialog);
-    form.addRow(&buttonBox);
-
-    QObject::connect(&buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
-    QObject::connect(&buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
-
-    // Move dialog to desired screen position
-    dialog.move(100, 500); // Adjst x and y coordinates as needed
-
-    if (dialog.exec() == QDialog::Accepted) {
-        QString selectedColor = colorComboBox->currentText();
-        std::cout << "Selected Color: " << selectedColor.toStdString() << "\n";
-        if(selectedColor.toStdString()=="Vampire"){
-             //HijF[1][1]->SetFillColor(kRed);
-            HijF[1][1]->SetFillColor(TColor::GetColor("#870202"));//set the color of the baackground, in hexa color code
-QMainWindow* mainWin = new QMainWindow;
-mainWin->setStyleSheet("background-color: red;");
-mainWin->show();
-          canvas->getCanvas()->Modified();
-canvas->getCanvas()->Update();
-        }
-        CommandPrompt::getInstance()->appendPlainText("!!! " + selectedColor + "\n");
-    }
+    openColorSelectionDialog(this, this);
 }
 
 void QMainCanvas::Cal2pMain() {
-    if(puncte_calib2p.size() > 1) {
-        QDialog dialog(this);
-        dialog.setWindowTitle("Two point calibration");
-        dialog.setStyleSheet("background-color: #708090;");
-        QFormLayout form(&dialog);
-
-        // Add the first energy input
-        QLineEdit *energy1LineEdit = new QLineEdit(&dialog);
-        energy1LineEdit->setStyleSheet("background-color: white;");
-        form.addRow(QString::number(puncte_calib2p[puncte_calib2p.size() - 2]) + " no. channel (First Energy):", energy1LineEdit);
-
-
-        // Add the second energy input
-        QLineEdit *energy2LineEdit = new QLineEdit(&dialog);
-        energy2LineEdit->setStyleSheet("background-color: white;");
-        form.addRow(QString::number(puncte_calib2p[puncte_calib2p.size() - 1]) + " no. channel (Second Energy):", energy2LineEdit);
-
-        // Add Ok and Cancel buttons
-        QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &dialog);
-        form.addRow(&buttonBox);
-
-        QObject::connect(&buttonBox, SIGNAL(accepted()), &dialog, SLOT(accept()));
-        QObject::connect(&buttonBox, SIGNAL(rejected()), &dialog, SLOT(reject()));
-
-        // Muta dialogul in pozitia dorita pe ecran
-        dialog.move(100, 500); // Coordonatele x și y pot fi ajustate conform necesităților
-
-        if (dialog.exec() == QDialog::Accepted) {
-            bool ok1, ok2;
-            double energie1 = energy1LineEdit->text().toDouble(&ok1);
-            double energie2 = energy2LineEdit->text().toDouble(&ok2);
-
-            if(ok1 && ok2 && energie1 > 0 && energie2 > 0) {
-                TwoPointCalibration(puncte_calib2p, energie1, energie2);
-            } else {
-                if(ok1 && ok2 && (energie1 < 0 || energie2 < 0)) {
-                    std::cout << "The energy values ​​must be positive\n";
-                    CommandPrompt::getInstance()->appendPlainText("The energy values ​​must be positive\n");
-                } else {
-                    std::cout << "The fields must be filled\n";
-                    CommandPrompt::getInstance()->appendPlainText("The fields must be filled\n");
-                }
-            }
-        }
-    } else {
-        std::cout << "Two markers are needed to calibrate in two points\n";
-        CommandPrompt::getInstance()->appendPlainText("Two markers are needed to calibrate in two points\n");
-    }
+    runTwoPointCalibrationDialog(this, puncte_calib2p, dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]));
 }
 
 
 void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
 {
-    std::string objectInfo, temp;
-    int from, to, binX;
-    //emit RequestSelectHistogram();
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-    objectInfo=HijF[SelectedElement_i][SelectedElement_j]->GetObjectInfo(x,y);
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
+    int binX = getBinFromClick(x, y);
 
     //Add the position to the integral marker vector
     spacebar_markers.push_back((Double_t)binX);
@@ -931,51 +818,11 @@ void QMainCanvas::areaFunctionWithBackground()
 
 void QMainCanvas::autoFit(int x, int y)
 {
-    std::string objectInfo, temp;
-    int from, to, binX, binC;//, sum;
-    //Double_t xPos, yPos;
+    int binX = getBinFromClick(x, y);
+    int binC = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(binX);
     Double_t gaussianHeight, gaussianCenter, gaussianSigma, bkgSlope, bkg0, gaussianFWHM, gaussianCenterError, gaussianIntegral, gaussianIntegralError, gaussianFWHMError;
     std::ostringstream tempStringStream;
-
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-    objectInfo=HijF[SelectedElement_i][SelectedElement_j]->GetObjectInfo(x,y);
-
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    //xPos=std::stof(temp);
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    //yPos=std::stof(temp);
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
-
-    //Cut the next section, which is the value in the bin that was clicked
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binC=std::stoi(temp);
-
-    //Cut the next section, which represents the sum of all bins shown on the screen until the bin on which it was clicked
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(")");
-    temp=objectInfo.substr(from+1,to-from-1);
-    //sum=std::stoi(temp);
+    std::string temp;
 
     //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
     gaussianWithBackground = new TFormula("gaussianWithBackground","[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
@@ -1179,29 +1026,7 @@ Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFini
 //______________________________________________________________________________
 void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 {
-    std::string objectInfo, temp;
-    int from, to, binX;
-
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-    objectInfo=HijF[SelectedElement_i][SelectedElement_j]->GetObjectInfo(x,y);
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
+    int binX = getBinFromClick(x, y);
 
     //Add the position to the background marker vector
     background_markers.push_back(binX);
@@ -1252,29 +1077,7 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 
 void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
 {
-    std::string objectInfo, temp;
-    int from, to, binX;
-
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
-    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
+    int binX = getBinFromClick(x, y);
 
     //Add the position to the integral marker vector
     integral_markers.push_back((Double_t)binX);
@@ -1562,29 +1365,7 @@ void QMainCanvas::showAllMarkers()
 void QMainCanvas::addRangeMarker(Int_t x, Int_t y){
 if(range_markers.size()<2){
 
-    std::string objectInfo, temp;
-    int from, to, binX;
-
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-        IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
-    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
+    int binX = getBinFromClick(x, y);
 
     //Add the position to the background marker vector
     range_markers.push_back(binX);
@@ -1683,29 +1464,7 @@ void QMainCanvas::showRangeMarkers()
 //______________________________________________________________________________
 void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
 {
-    std::string objectInfo, temp;
-    int from, to, binX;
-
-    //Finding to what Histogram info the click location corresponds to, returned to us as a string with 5 numerical values
-        IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
-    objectInfo=HijF[PilgrimElement_i][PilgrimElement_j]->GetObjectInfo(x,y);
-
-    //Cut the first section, which represents the position on the x Axis of the click, in double precision float
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the position on the y Axis of the click
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-
-    //Cut the next section, which represents the bin which is actually shown at that position (due to zoom in procedures)
-    objectInfo=objectInfo.substr(to+1);
-    from=objectInfo.find("=");
-    to=objectInfo.find(" ");
-    temp=objectInfo.substr(from+1,to-from-2);
-    binX=std::stoi(temp);
+    int binX = getBinFromClick(x, y);
 
     //Add the position to the background marker vector
     gauss_markers.push_back(binX);
@@ -2085,9 +1844,8 @@ void QMainCanvas::fitBackground()
     backgroundIntegral=backgroundFunction->Integral(range_markers[0],range_markers[1]);
     backgroundIntegralError=backgroundFunction->IntegralError(range_markers[0],range_markers[1],fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
 
-    TMatrixD tempMatrix=fitResult->GetCovarianceMatrix();
-
-    backgroundCovarianceMatrix=&tempMatrix;
+    delete backgroundCovarianceMatrix;
+    backgroundCovarianceMatrix = new TMatrixD(fitResult->GetCovarianceMatrix());
 
     tempHist->Delete();
 
@@ -2352,9 +2110,6 @@ std::cout<<objectInfo<<"\n";
 
 }
 
-void QMainCanvas::findHistoWithMaxY(std::vector<TH1F> histos){
-    std::vector<TH1F> temp=histos;
-}
 
 void QMainCanvas::DeleteCulomn(){
 if(maxElement_j>1){

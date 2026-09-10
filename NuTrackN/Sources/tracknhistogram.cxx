@@ -1,5 +1,9 @@
 #include "tracknhistogram.h"
 #include <cmath>
+#include <fstream>
+#include <sstream>
+#include <vector>
+#include <iostream>
 
 TracknHistogram::TracknHistogram()
     : TH1F()
@@ -78,4 +82,69 @@ Double_t TracknHistogram::EnergyToChannel(Double_t energy) const
         return (energy - fCalibA0) / fCalibA1;
     }
     return energy;
+}
+
+static bool isAsciiFile(const std::string& filename)
+{
+    std::ifstream file(filename, std::ios::binary);
+    if (!file) {
+        return false;
+    }
+    char c;
+    while (file.get(c)) {
+        if (static_cast<unsigned char>(c) > 127) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool TracknHistogram::LoadFromFile(const std::string &filename)
+{
+    std::ifstream file(filename, std::ios::in | std::ios::binary);
+    if (!file) {
+        std::cerr << "Error: could not open spectrum file: " << filename << std::endl;
+        return false;
+    }
+
+    std::vector<uint32_t> data;
+    uint32_t value = 0;
+    std::string line;
+
+    if (isAsciiFile(filename)) {
+        file.close();
+        std::ifstream asciiFile(filename);
+        while (std::getline(asciiFile, line)) {
+            std::istringstream iss(line);
+            while (iss >> value) {
+                data.push_back(value);
+            }
+        }
+    } else {
+        while (file.read(reinterpret_cast<char*>(&value), sizeof(value))) {
+            data.push_back(value);
+        }
+    }
+
+    if (data.empty()) {
+        std::cerr << "Warning: spectrum file contains no data: " << filename << std::endl;
+        return false;
+    }
+
+    Reset();
+
+    // Adjust binning if incoming spectrum is larger than default
+    if (static_cast<Int_t>(data.size()) > GetNbinsX()) {
+        SetBins(static_cast<Int_t>(data.size()), 0.0, static_cast<Double_t>(data.size()));
+    }
+
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        SetBinContent(static_cast<Int_t>(i + 1), data[i]);
+    }
+
+    GetXaxis()->UnZoom();
+    GetYaxis()->UnZoom();
+    SetSourceFilePath(filename);
+
+    return true;
 }
