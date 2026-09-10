@@ -766,547 +766,649 @@ void QMainCanvas::Cal2pMain() {
 }
 
 
+//==============================================================================
+// QMainCanvas::addSpaceBarMarker
+//==============================================================================
+// Places a cyan vertical marker line on the spectrum at the channel bin clicked
+// by the user. Pairs of spacebar markers define the boundaries of the region of
+// interest to be zoomed when the user subsequently presses 'E'.
+//==============================================================================
 void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
 {
     int binX = getBinFromClick(x, y);
 
-    //Add the position to the integral marker vector
-    spacebar_markers.push_back((Double_t)binX);
-    //std::cout<<(Double_t)binX<<std::endl;
+    // Record the channel in both spacebar and zoom marker collections
+    spacebar_markers.push_back(static_cast<Double_t>(binX));
+    zoom_markers.push_back(binX);
 
-    //Create a yellow integral line and add it to the screen
-    TLine *spacebarLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    const Double_t yMax = hist ? (hist->GetMaximum() * 1.05) : 100.0;
+
+    // Create a cyan vertical marker line and draw it over the spectrum
+    TLine *spacebarLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
     spacebarLine->SetLineColor(kCyan);
     spacebarLine->SetLineWidth(2);
-
     spacebarLine->Draw("same");
+
+    // Register graphical object so it can be cleared on reset or zoom
+    listOfObjectsDrawnOnScreen.Add(spacebarLine);
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
-
-    //Add the line to the list of things put on the screen, so it can be deleted
-    listOfObjectsDrawnOnScreen.Add(spacebarLine);
-
-
-   //HijF[1][1]->GetXaxis()->SetRangeUser(20, 80); // Zoom între 20 și 80
-   zoom_markers.push_back(binX);
-
-   //canvas->getCanvas()->Modified();
-   //canvas->getCanvas()->Update();
-
 }
 
+//==============================================================================
+// QMainCanvas::areaFunction
+//==============================================================================
+// Computes gross peak area without background subtraction (triggered by 'C + I'
+// shortcut or UI button). Delegates calculation to integral_function() in
+// Integral.h with an empty background marker set.
+//==============================================================================
 void QMainCanvas::areaFunction()
 {
-   //A stand in vector for the markers is used to call the integral function so it perform an integral with no background
-   //Regardles of there are backgrounds or not
-   std::vector<Int_t> placeholder_background_markers;
-   integral_function(HijF[SelectedElement_i][SelectedElement_j],integral_markers,placeholder_background_markers,slope,addition);
+    // A stand-in empty vector is used so integral_function performs a gross integral
+    // with no background subtraction regardless of existing background markers
+    std::vector<Int_t> placeholder_background_markers;
+    integral_function(HijF[SelectedElement_i][SelectedElement_j],
+                      integral_markers,
+                      placeholder_background_markers,
+                      slope,
+                      addition);
 }
 
+//==============================================================================
+// QMainCanvas::areaFunctionWithBackground
+//==============================================================================
+// Computes net peak area with linear background subtraction (triggered by
+// 'C + J' shortcut or UI button). Computes background slope and intercept
+// from background markers and overlays the subtracted background line.
+//==============================================================================
 void QMainCanvas::areaFunctionWithBackground()
 {
-   //The integral function is used with the background markers and the integral markers to perform an integral with backgorund
-   //The function also returns the slope of the background
-    if(background_markers.size()==0)
-    {
-        CommandPrompt::getInstance()->appendPlainText("There are no background markers, so an integral with background can not be performed\n");
-        std::cout<<"There are no background markers, so an integral with background can not be performed\n";
+    if (background_markers.empty()) {
+        const QString msg = "There are no background markers, so an integral with background cannot be performed\n";
+        CommandPrompt::getInstance()->appendPlainText(msg);
+        std::cout << msg.toStdString();
+        return;
     }
-    else
-    {
 
-       integral_function(HijF[SelectedElement_i][SelectedElement_j],integral_markers,background_markers,slope,addition);
-       //Draw a line to show the background
-       TLine *backgroundLine = new TLine(background_markers[0]-0.5, slope*(background_markers[0]-0.5)+addition, background_markers[background_markers.size()-1]-0.5, slope*(background_markers[background_markers.size()-1]-0.5)+addition);
-       backgroundLine->SetLineColor(kBlue);
-       backgroundLine->SetLineWidth(2);
+    integral_function(HijF[SelectedElement_i][SelectedElement_j],
+                      integral_markers,
+                      background_markers,
+                      slope,
+                      addition);
 
-       backgroundLine->Draw("same");
-       //Add the line to the list of things put on the screen, so it can be deleted
-       listOfObjectsDrawnOnScreen.Add(backgroundLine);
+    // Draw a blue line showing the fitted background across the marked interval
+    const Double_t xStart = background_markers[0] - 0.5;
+    const Double_t xEnd   = background_markers.back() - 0.5;
+    TLine *backgroundLine = new TLine(xStart, slope * xStart + addition,
+                                      xEnd,   slope * xEnd   + addition);
+    backgroundLine->SetLineColor(kBlue);
+    backgroundLine->SetLineWidth(2);
+    backgroundLine->Draw("same");
 
-       canvas->getCanvas()->Modified();
-       canvas->getCanvas()->Update();
-    }
+    listOfObjectsDrawnOnScreen.Add(backgroundLine);
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
-//______________________________________________________________________________
-
+//==============================================================================
+// QMainCanvas::autoFit
+//==============================================================================
+// Performs an automated single-peak Gaussian fit around the clicked channel.
+//
+// Model function:
+//   y(x) = [0] * exp( -(x - [1])^2 / (2 * [2]) ) + [3] * x + [4]
+// where:
+//   [0] = Gaussian amplitude (peak height)
+//   [1] = Centroid (channel)
+//   [2] = Variance sigma^2
+//   [3] = Background slope
+//   [4] = Background intercept
+//
+// Adaptive range adjustment:
+//   Initially fits [binX - 20, binX + 20]. If the fitted FWHM exceeds (41 / 6)
+//   channels, the fit range is expanded to [centroid - 3*FWHM, centroid + 3*FWHM]
+//   and re-evaluated for improved convergence on broad peaks.
+//
+// Outputs:
+//   Monospace summary table printed to the terminal console and stdout with:
+//   Peak#, Channel, Energy, Area, and Width (FWHM).
+//   Automatically registers the peak centroid in puncte_calib2p for 2-point calibration.
+//==============================================================================
 void QMainCanvas::autoFit(int x, int y)
 {
     int binX = getBinFromClick(x, y);
-    int binC = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(binX);
-    Double_t gaussianHeight, gaussianCenter, gaussianSigma, bkgSlope, bkg0, gaussianFWHM, gaussianCenterError, gaussianIntegral, gaussianIntegralError, gaussianFWHMError;
-    std::ostringstream tempStringStream;
-    std::string temp;
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
 
-    //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
-    gaussianWithBackground = new TFormula("gaussianWithBackground","[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
-    gaussianWithBackgroundFunction = new TF1("gaussianWithBackgroundFunction","gaussianWithBackground",binX-20,binX+20);
+    int binC = hist->GetBinContent(binX);
+    Double_t gaussianHeight = 0.0, gaussianCenter = 0.0, gaussianSigma = 0.0;
+    Double_t bkgSlope = 0.0, bkg0 = 0.0, gaussianFWHM = 0.0;
+    Double_t gaussianCenterError = 0.0, gaussianIntegral = 0.0;
+    Double_t gaussianIntegralError = 0.0, gaussianFWHMError = 0.0;
 
-    //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
-    background = new TFormula("background","[0]*x+[1]");
-    backgroundFunction = new TF1("backgroundFunction","background",binX-20,binX+20);
+    // Define model: Gaussian peak superimposed on a linear background
+    delete gaussianWithBackground;
+    delete gaussianWithBackgroundFunction;
+    gaussianWithBackground = new TFormula("gaussianWithBackground", "[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
+    gaussianWithBackgroundFunction = new TF1("gaussianWithBackgroundFunction", "gaussianWithBackground", binX - 20, binX + 20);
+
+    delete background;
+    delete backgroundFunction;
+    background = new TFormula("background", "[0]*x+[1]");
+    backgroundFunction = new TF1("backgroundFunction", "background", binX - 20, binX + 20);
 
     gaussianCenterMarkerText = new TLatex();
 
-    //Declaring the initial values for the 5 parameters to be fit
-    gaussianWithBackgroundFunction->SetParameter(0,binC);
-    gaussianWithBackgroundFunction->SetParameter(1,binX);
-    gaussianWithBackgroundFunction->SetParameter(2,4.);
-    gaussianWithBackgroundFunction->SetParameter(3,0.);
-    gaussianWithBackgroundFunction->SetParameter(4,findMinValueInInterval(binX-20,binX+20));
+    // Initial parameter estimates
+    gaussianWithBackgroundFunction->SetParameter(0, binC);                                      // Height
+    gaussianWithBackgroundFunction->SetParameter(1, binX);                                      // Centroid
+    gaussianWithBackgroundFunction->SetParameter(2, 4.0);                                       // Initial sigma^2 estimate
+    gaussianWithBackgroundFunction->SetParameter(3, 0.0);                                       // Initial slope
+    gaussianWithBackgroundFunction->SetParameter(4, findMinValueInInterval(binX - 20, binX + 20)); // Baseline offset
 
-    //Fitting the histogram with the Gaussian function with background and putting the results in a special format
-    //Fit options are Q - quiet; M - improved fitting; R-respect range from function
-    TFitResultPtr fitResult = HijF[SelectedElement_i][SelectedElement_j]->Fit(gaussianWithBackgroundFunction,"QMRS", "same");
+    // Fit with ROOT Minuit: Q (Quiet), M (Improve fit), R (Use function range), S (Return fit result)
+    TFitResultPtr fitResult = hist->Fit(gaussianWithBackgroundFunction, "QMRS", "same");
 
-    //Read the background parameters and feed them into the background function for use in finding the integral!
-    bkgSlope=gaussianWithBackgroundFunction->GetParameter(3);
-    bkg0=gaussianWithBackgroundFunction->GetParameter(4);
-    backgroundFunction->FixParameter(0,bkgSlope);
-    backgroundFunction->FixParameter(1,bkg0);
+    // Extract fitted linear background parameters
+    bkgSlope = gaussianWithBackgroundFunction->GetParameter(3);
+    bkg0     = gaussianWithBackgroundFunction->GetParameter(4);
+    backgroundFunction->FixParameter(0, bkgSlope);
+    backgroundFunction->FixParameter(1, bkg0);
 
-    //Extract the Full Width Half Maximum (FWHM, related to the width of the Gaussian) and calculate the integral and integral error
-    gaussianSigma=gaussianWithBackgroundFunction->GetParameter(2);
-    gaussianFWHM=gaussianSigma*2.3548;
-    gaussianIntegral=gaussianWithBackgroundFunction->Integral(binX-20,binX+20)-backgroundFunction->Integral(binX-20,binX+20);
-    gaussianIntegralError=gaussianWithBackgroundFunction->IntegralError(binX-20,binX+20,fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
-
-    //If the FWHM is more than a sixth of the region we use for the autofit (41 bins), then redo the fitting in a region that is six times bigger than the FWHM
-    //Reobtain the FWHM, integral and integral error, because the region changed
-    if(gaussianFWHM>41./6)
-    {
-        gaussianWithBackgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
-        backgroundFunction->SetRange(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
-
-       fitResult = HijF[SelectedElement_i][SelectedElement_j]->Fit(gaussianWithBackgroundFunction,"QMRS", "");
-
-        gaussianSigma=gaussianWithBackgroundFunction->GetParameter(2);
-        gaussianFWHM=gaussianSigma*2.3548;
-        gaussianIntegral=gaussianWithBackgroundFunction->Integral(binX-gaussianFWHM*3,binX+gaussianFWHM*3)-backgroundFunction->Integral(binX-gaussianFWHM*3,binX+gaussianFWHM*3);
-        gaussianIntegralError=gaussianWithBackgroundFunction->IntegralError(binX-gaussianFWHM*3,binX+gaussianFWHM*3,fitResult->GetParams(),fitResult->GetCovarianceMatrix().GetMatrixArray());
+    // Extract FWHM (2.35482 * sigma) and calculate net integral above background
+    gaussianSigma = gaussianWithBackgroundFunction->GetParameter(2);
+    gaussianFWHM  = gaussianSigma * 2.35482;
+    gaussianIntegral = gaussianWithBackgroundFunction->Integral(binX - 20, binX + 20)
+                     - backgroundFunction->Integral(binX - 20, binX + 20);
+    if (fitResult.Get()) {
+        gaussianIntegralError = gaussianWithBackgroundFunction->IntegralError(
+            binX - 20, binX + 20, fitResult->GetParams(), fitResult->GetCovarianceMatrix().GetMatrixArray());
     }
 
-    //Obtain the Gaussian's maximum, center (with error), FWHM error
-    gaussianHeight=gaussianWithBackgroundFunction->GetParameter(0);
-    gaussianCenter=gaussianWithBackgroundFunction->GetParameter(1);
-    gaussianCenterError=gaussianWithBackgroundFunction->GetParError(1);
-    gaussianFWHMError=gaussianWithBackgroundFunction->GetParError(2)*2.3548;
+    // Adaptive refit: if peak is wide relative to 41-bin window, widen range to +/- 3*FWHM
+    if (gaussianFWHM > (41.0 / 6.0)) {
+        const Double_t fitMin = binX - gaussianFWHM * 3.0;
+        const Double_t fitMax = binX + gaussianFWHM * 3.0;
+        gaussianWithBackgroundFunction->SetRange(fitMin, fitMax);
+        backgroundFunction->SetRange(fitMin, fitMax);
 
-    //Create the text to be shown in screen showing the Gaussian center and add it to the list of objects to be later deleted
+        fitResult = hist->Fit(gaussianWithBackgroundFunction, "QMRS", "");
+
+        gaussianSigma = gaussianWithBackgroundFunction->GetParameter(2);
+        gaussianFWHM  = gaussianSigma * 2.35482;
+        gaussianIntegral = gaussianWithBackgroundFunction->Integral(fitMin, fitMax)
+                         - backgroundFunction->Integral(fitMin, fitMax);
+        if (fitResult.Get()) {
+            gaussianIntegralError = gaussianWithBackgroundFunction->IntegralError(
+                fitMin, fitMax, fitResult->GetParams(), fitResult->GetCovarianceMatrix().GetMatrixArray());
+        }
+    }
+
+    // Extract final optimized peak parameters and uncertainties
+    gaussianHeight      = gaussianWithBackgroundFunction->GetParameter(0);
+    gaussianCenter      = gaussianWithBackgroundFunction->GetParameter(1);
+    gaussianCenterError = gaussianWithBackgroundFunction->GetParError(1);
+    gaussianFWHMError   = gaussianWithBackgroundFunction->GetParError(2) * 2.35482;
+
+    // Display peak centroid label on canvas
     char buffer[64];
-    snprintf(buffer, sizeof buffer, "%f", gaussianCenter);
-//gaussianCenterMarkerText->DrawLatex(33,gaussianHeight,buffer);
-   //listOfObjectsDrawnOnScreen.Add(gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer));
-    gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer);
-   gaussCenters[SelectedElement_i][SelectedElement_j].push_back(gaussianCenter);
-   gaussCentersHeight[SelectedElement_i][SelectedElement_j].push_back(gaussianHeight);
+    snprintf(buffer, sizeof(buffer), "%.2f", gaussianCenter);
+    gaussianCenterMarkerText->DrawLatex(gaussianCenter, gaussianHeight, buffer);
+    gaussCenters[SelectedElement_i][SelectedElement_j].push_back(gaussianCenter);
+    gaussCentersHeight[SelectedElement_i][SelectedElement_j].push_back(gaussianHeight);
 
-   //std::cout<<gaussCenters[1][1][0]<<"\n";
-
-
-    //Draw the fitted function, so it remains on screen regardless of how many other fits are made
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+    // Draw the fitted total function and the background function
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     gaussianWithBackgroundFunction->Draw("same");
 
-    //A background function is made to show the subtracted background
     backgroundFunction->SetLineColor(kBlue);
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
     backgroundFunction->Draw("same");
 
     autoFitMarkers[SelectedElement_i][SelectedElement_j].push_back(backgroundFunction);
-     autoFitMarkers[SelectedElement_i][SelectedElement_j].push_back(gaussianWithBackgroundFunction);
- //autoFitMarkers[PilgrimElement_i][PilgrimElement_j].push_back(gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer));
-//autoFitLatex[PilgrimElement_i][PilgrimElement_j].Add(gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer));
+    autoFitMarkers[SelectedElement_i][SelectedElement_j].push_back(gaussianWithBackgroundFunction);
 
-
-    //Updating the canvas, so all the changes appear
-
-    //Writing the obtained data on screen, in a fixed format, so everything aligns nicely
-    //First (fixed) row
-
-    QString peakLabel = QString("%1").arg("Peak#",-10,QChar(' '));
-    QString channelLabel = QString("%1").arg("Channel",-10, QChar(' '));
-    QString energyLabel = QString("%1").arg("Energy",-15, QChar(' '));
-    QString areaLabel = QString("%1").arg("Area",-25, QChar(' '));
-    QString widthLabel = QString("%1").arg("Width",-10, QChar(' '));
-
-    QString headerRow = QString("%1%2%3%4%5")
-        .arg(peakLabel)
-        .arg(channelLabel)
-        .arg(energyLabel)
-        .arg(areaLabel)
-        .arg(widthLabel);
-    CommandPrompt::getInstance()->appendPlainText(headerRow);
-
-    std::cout<<std::left;
-    std::cout<<std::setw(10);
-    std::cout<<"Peak#";
-    std::cout<<std::setw(10);
-    std::cout<<"Channel";
-    std::cout<<std::setw(15);
-    std::cout<<"Energy";
-    std::cout<<std::setw(25);
-    std::cout<<"Area";
-    std::cout<<std::setw(10);
-    std::cout<<"Width"<<std::endl;
+    // Save peak centroid into calibration list
     puncte_calib2p.push_back(gaussianCenter);
 
+    // Format and print report table to CommandPrompt terminal and stdout
+    QString headerRow = QString("%1%2%3%4%5")
+        .arg("Peak#",    -10, QChar(' '))
+        .arg("Channel",  -10, QChar(' '))
+        .arg("Energy",   -15, QChar(' '))
+        .arg("Area",     -25, QChar(' '))
+        .arg("Width",    -10, QChar(' '));
+    CommandPrompt::getInstance()->appendPlainText(headerRow);
 
-    //Second row that contains variable numbers
-    std::cout<<std::setw(10);
-    std::cout<<"1";
-    std::cout<<std::setw(10);
-    std::cout << std::fixed;
-    std::cout<<std::setprecision(2)<<gaussianCenter;
-    std::cout<<std::setw(15);
-    tempStringStream<< std::fixed<<std::setprecision(2)<<gaussianCenter<<"("<<std::setprecision(0)<<ceil(gaussianCenterError*100)<<")";
-    temp=tempStringStream.str();
-    std::cout<<temp;
-    tempStringStream.str(std::string());
-    tempStringStream<< std::fixed<<std::setprecision(0)<<gaussianIntegral<<"("<<round(gaussianIntegralError)<<")";
-    temp=tempStringStream.str();
-    std::cout<<std::setw(25);
-    std::cout<<temp;
-    tempStringStream.str(std::string());
-    tempStringStream<< std::fixed<<std::setprecision(2)<<gaussianFWHM<<"("<<std::setprecision(0)<<ceil(gaussianFWHMError*100)<<")";
-    temp=tempStringStream.str();
-    std::cout<<std::setw(10);
-    std::cout<<temp<<std::endl;
+    std::cout << std::left
+              << std::setw(10) << "Peak#"
+              << std::setw(10) << "Channel"
+              << std::setw(15) << "Energy"
+              << std::setw(25) << "Area"
+              << std::setw(10) << "Width" << std::endl;
 
-    QString numberStr = QString("%1").arg("1", 0, ' ');
-    QString gaussianCenterStr = QString("%1").arg(gaussianCenter,0, ' ', 2);
-    QString energyStr = QString("%1(%2)").arg(gaussianCenter, 0, ' ', 2).arg(qCeil(gaussianCenterError * 100));
-    QString gaussianIntegralStr = QString("%1(%2)").arg(gaussianIntegral, 0, ' ', 0).arg(qRound(gaussianIntegralError));
-    QString gaussianFWHMStr = QString("%1(%2)").arg(gaussianFWHM, 0, ' ', 2).arg(qCeil(gaussianFWHMError * 100));
-
+    QString numberStr           = QString("%1").arg("1", -10, QChar(' '));
+    QString gaussianCenterStr   = QString("%1").arg(gaussianCenter, -10, 'f', 2, QChar(' '));
+    QString energyStr           = QString("%1(%2)").arg(gaussianCenter, 0, 'f', 2).arg(qCeil(gaussianCenterError * 100));
+    QString gaussianIntegralStr = QString("%1(%2)").arg(gaussianIntegral, 0, 'f', 0).arg(qRound(gaussianIntegralError));
+    QString gaussianFWHMStr     = QString("%1(%2)").arg(gaussianFWHM, 0, 'f', 2).arg(qCeil(gaussianFWHMError * 100));
 
     QString dataRow = QString("%1%2%3%4%5")
-        .arg(numberStr,-10,QChar(' '))
-        .arg(gaussianCenterStr, -10, QChar(' '))
-        .arg(energyStr, -15, QChar(' '))
+        .arg(numberStr)
+        .arg(gaussianCenterStr)
+        .arg(energyStr,           -15, QChar(' '))
         .arg(gaussianIntegralStr, -25, QChar(' '))
-        .arg(gaussianFWHMStr, -10, QChar(' '));
+        .arg(gaussianFWHMStr,     -10, QChar(' '));
 
-    // Insert data row into QPlainTextEdit
-    CommandPrompt::getInstance()->appendPlainText(dataRow + '\n');
-    if (HijF[SelectedElement_i][SelectedElement_j]) {
-    // Obțineți lista de funcții asociată cu histograma
-    TList* funcList = HijF[SelectedElement_i][SelectedElement_j]->GetListOfFunctions();
+    CommandPrompt::getInstance()->appendPlainText(dataRow + "\n");
 
-    // Verificați dacă lista nu este goală
-    if (funcList != nullptr) {
-        // Căutați funcția de fit în listă și îndepărtați-o
-        TObject* fitFunc = funcList->FindObject(gaussianWithBackgroundFunction->GetName());
+    std::cout << std::setw(10) << "1"
+              << std::setw(10) << std::fixed << std::setprecision(2) << gaussianCenter
+              << std::setw(15) << energyStr.toStdString()
+              << std::setw(25) << gaussianIntegralStr.toStdString()
+              << std::setw(10) << gaussianFWHMStr.toStdString() << std::endl;
+
+    // Prevent ROOT from duplicating function in histogram list
+    TList *funcList = hist->GetListOfFunctions();
+    if (funcList) {
+        TObject *fitFunc = funcList->FindObject(gaussianWithBackgroundFunction->GetName());
         if (fitFunc) {
             funcList->Remove(fitFunc);
-            // Opțional, dacă fitFunc a fost alocat dinamic, eliberați memoria
-            // delete fitFunc;
         }
-    }}
-  canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
+    }
 
-    //Make list of objects that have been drawn to delete them later
-    //listOfObjectsDrawnOnScreen.Add(gaussianWithBackgroundFunction);
-    //listOfObjectsDrawnOnScreen.Add(backgroundFunction);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::findMinValueInInterval
+//==============================================================================
+// Finds and returns the minimum bin content within the specified channel range.
+// Includes bounds validation against the histogram bin limits.
+//==============================================================================
 Double_t QMainCanvas::findMinValueInInterval(int intervalStart, int intervalFinish)
 {
-    int minValueFound=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(intervalStart);
-
-    for(int i=intervalStart+1; i<=intervalFinish; i++)
-    {
-        if(HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(i)<minValueFound)
-            minValueFound=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(i);
+    if (intervalStart > intervalFinish) {
+        std::swap(intervalStart, intervalFinish);
     }
-    return minValueFound;
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return 0.0;
+
+    const int nBins = hist->GetNbinsX();
+    intervalStart  = std::max(1, std::min(nBins, intervalStart));
+    intervalFinish = std::max(1, std::min(nBins, intervalFinish));
+
+    Double_t minValue = hist->GetBinContent(intervalStart);
+    for (int i = intervalStart + 1; i <= intervalFinish; ++i) {
+        const Double_t val = hist->GetBinContent(i);
+        if (val < minValue) {
+            minValue = val;
+        }
+    }
+    return minValue;
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::findMaxValueInInterval
+//==============================================================================
+// Finds and returns the maximum bin content within the specified channel range.
+// Includes bounds validation against the histogram bin limits.
+//==============================================================================
 Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFinish)
 {
-    int maxValueFound=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(intervalStart);
-
-    for(int i=intervalStart+1; i<=intervalFinish; i++)
-    {
-        if(HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(i)>maxValueFound)
-            maxValueFound=HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(i);
+    if (intervalStart > intervalFinish) {
+        std::swap(intervalStart, intervalFinish);
     }
-    return maxValueFound;
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return 0.0;
+
+    const int nBins = hist->GetNbinsX();
+    intervalStart  = std::max(1, std::min(nBins, intervalStart));
+    intervalFinish = std::max(1, std::min(nBins, intervalFinish));
+
+    Double_t maxValue = hist->GetBinContent(intervalStart);
+    for (int i = intervalStart + 1; i <= intervalFinish; ++i) {
+        const Double_t val = hist->GetBinContent(i);
+        if (val > maxValue) {
+            maxValue = val;
+        }
+    }
+    return maxValue;
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::addBackgroundMarker
+//==============================================================================
+// Drops a blue vertical background marker at the clicked channel coordinate.
+// Background markers are placed in pairs [left, right]. When an even marker
+// completes a pair, a blue baseline and a hatched shaded box (fill style 3545)
+// are drawn across the background estimation interval.
+//==============================================================================
 void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 {
     int binX = getBinFromClick(x, y);
-
-    //Add the position to the background marker vector
     background_markers.push_back(binX);
 
-    //Create a blue background line and add it to the screen
-            if(background_markers.size()%2==0 && background_markers.size()!=0){
-        int i = background_markers.size();
-        TLine *backgroundLineSecond = new TLine(background_markers[i-2]-0.5, 0., background_markers[i-2]-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()* 1.05);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    // When placing the second marker of a pair, ensure previous boundary is redrawn
+    if (background_markers.size() % 2 == 0 && !background_markers.empty()) {
+        const std::size_t i = background_markers.size();
+        TLine *backgroundLineSecond = new TLine(background_markers[i - 2] - 0.5, 0.0,
+                                                background_markers[i - 2] - 0.5, yMax);
         backgroundLineSecond->SetLineColor(kBlue);
         backgroundLineSecond->SetLineWidth(2);
-        canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
         backgroundLineSecond->Draw();
+        listOfObjectsDrawnOnScreen.Add(backgroundLineSecond);
+    }
 
-        listOfObjectsDrawnOnScreen.Add(backgroundLineSecond);}
-
-    TLine *backgroundLine = new TLine(binX-0.5, 0., binX-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()* 1.05);
+    // Draw vertical boundary line at current clicked position
+    TLine *backgroundLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
     backgroundLine->SetLineColor(kBlue);
     backgroundLine->SetLineWidth(2);
-
     backgroundLine->Draw("same");
-
-    //Add the line to the list of things put on the screen, so it can be deleted
     listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
-    if(background_markers.size()%2==0)
-    {
-        TLine *bottomBackgroundLine = new TLine(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, 0);
+    // When completing a pair, draw baseline and hatched region
+    if (background_markers.size() % 2 == 0) {
+        const Int_t leftBin = background_markers[background_markers.size() - 2];
+        TLine *bottomBackgroundLine = new TLine(leftBin - 0.5, 0.0, binX - 0.5, 0.0);
         bottomBackgroundLine->SetLineColor(kBlue);
         bottomBackgroundLine->SetLineWidth(2);
-
         bottomBackgroundLine->Draw("same");
-
-        //Add the line to the list of things put on the screen, so it can be deleted
         listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-        TBox *backgroundArea = new TBox(background_markers[background_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
+        TBox *backgroundArea = new TBox(leftBin - 0.5, 0.0, binX - 0.5, maxValueInHistogram * 1.05);
         backgroundArea->SetFillColor(kBlue);
         backgroundArea->SetFillStyle(3545);
         backgroundArea->Draw("same");
-
-        //Add the line to the list of things put on the screen, so it can be deleted
         listOfObjectsDrawnOnScreen.Add(backgroundArea);
     }
-//canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j)->Draw();
+
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::addIntegralMarker
+//==============================================================================
+// Drops a yellow vertical marker line at the clicked channel coordinate marking
+// peak integration boundaries.
+//==============================================================================
 void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
 {
     int binX = getBinFromClick(x, y);
+    integral_markers.push_back(binX);
 
-    //Add the position to the integral marker vector
-    integral_markers.push_back((Double_t)binX);
-    //std::cout<<(Double_t)binX<<std::endl;
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
 
-    //Create a yellow integral line and add it to the screen
-        if(integral_markers.size()%2==0 && integral_markers.size()!=0){
-        int i = integral_markers.size();
-        TLine *integralLineSecond = new TLine(integral_markers[i-2]-0.5, 0., integral_markers[i-2]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    // If second marker of pair, ensure the first is properly drawn
+    if (integral_markers.size() % 2 == 0 && !integral_markers.empty()) {
+        const std::size_t i = integral_markers.size();
+        TLine *integralLineSecond = new TLine(integral_markers[i - 2] - 0.5, 0.0,
+                                              integral_markers[i - 2] - 0.5, yMax);
         integralLineSecond->SetLineColor(kYellow);
         integralLineSecond->SetLineWidth(2);
-        canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
         integralLineSecond->Draw();
+        listOfObjectsDrawnOnScreen.Add(integralLineSecond);
+    }
 
-        listOfObjectsDrawnOnScreen.Add(integralLineSecond);}
-    TLine *integralLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
+    TLine *integralLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
     integralLine->SetLineColor(kYellow);
     integralLine->SetLineWidth(2);
-
     integralLine->Draw("same");
+    listOfObjectsDrawnOnScreen.Add(integralLine);
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
-
-    //Add the line to the list of things put on the screen, so it can be deleted
-    listOfObjectsDrawnOnScreen.Add(integralLine);
 }
 
-
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::clearTheScreen
+//==============================================================================
+// Clears all visual marker lines, shaded boxes, and fit curves from the screen,
+// freeing the graphical objects from memory without modifying the histogram data.
+// Triggered by the '=' key shortcut.
+//==============================================================================
 void QMainCanvas::clearTheScreen()
 {
-    //Get a list of all the functions on the histogram and delete all except the first (which is the histogram itself)
-//canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
-IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
-//autoFitMarkers[SelectedElement_i][SelectedElement_j];
+    // Free all dynamically allocated graphical primitives drawn on the canvas
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
 
+    // Clear fit markers and redraw clean base histogram
+    autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    if (HijF[SelectedElement_i][SelectedElement_j]) {
+        HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
+        HijC[SelectedElement_i][SelectedElement_j].clear();
+        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(kBlue);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(
+            (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+    }
 
-  TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
-}
-listOfObjectsDrawnOnScreen.Clear();
-
-
-//
- // HijF[PilgrimElement_i][PilgrimElement_j]->Reset();
-autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
-canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
-HijF[SelectedElement_i][SelectedElement_j]->Draw();
-
-    //Get a list of all the functions drawn on screen and delete all of them!
-
-
-  HijC[SelectedElement_i][SelectedElement_j].clear();
-    //HijF[PilgrimElement_i][PilgrimElement_j]->Reset();
-     HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(kBlue);
-
-     //HijC[SelectedElement_i][SelectedElement_j].clear();
-      HijC[SelectedElement_i][SelectedElement_j].push_back((TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
-      canvas->getCanvas()->Draw();
-
-//IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-ColorTheFrameOfTheHistogram();
+    ColorTheFrameOfTheHistogram();
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
+
+//==============================================================================
+// QMainCanvas::zoomTheScreen
+//==============================================================================
+// Executes zoom between the two most recently placed spacebar markers.
+// Triggered by the 'E' key shortcut.
+//==============================================================================
 void QMainCanvas::zoomTheScreen()
 {
+    // Clear temporary overlay markers before applying zoom
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
 
-      TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
-}
-listOfObjectsDrawnOnScreen.Clear();
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    int i= zoom_markers.size();
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    const std::size_t n = zoom_markers.size();
 
-    if(i>=2){
-    if(zoom_markers[i-2]<zoom_markers[i-1]){
-    HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);}
-    if(zoom_markers[i-1]<zoom_markers[i-2]){
-    HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);}}
-    if(i<=1){
-        std::cout<<"AI nev de doi space\n";}
+    if (n >= 2) {
+        const double low  = std::min(zoom_markers[n - 2], zoom_markers[n - 1]);
+        const double high = std::max(zoom_markers[n - 2], zoom_markers[n - 1]);
+        if (HijF[SelectedElement_i][SelectedElement_j]) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(low, high);
+        }
+    } else {
+        const QString msg = "At least two spacebar markers are required to define a zoom window.\n";
+        std::cout << msg.toStdString();
+        CommandPrompt::getInstance()->appendPlainText(msg);
+    }
 
-//listOfObjectsDrawnOnScreen.Clear();
     ColorTheFrameOfTheHistogram();
-
-   canvas->getCanvas()->Modified();
-   canvas->getCanvas()->Update();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::zoomOut
+//==============================================================================
+// Resets spectrum axes to their full unzoomed range.
+// Triggered by 'F + F' or 'F + S' keyboard shortcuts.
+//==============================================================================
 void QMainCanvas::zoomOut()
 {
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-  //Zoom out the histogram in its initial scale
-  HijF[PilgrimElement_i][PilgrimElement_j]->GetYaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() );
-  HijF[PilgrimElement_i][PilgrimElement_j]->GetXaxis()->SetRangeUser(0, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum() );
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        // Reset both X and Y axis ranges to unzoomed full spectrum scale
+        hist->GetXaxis()->UnZoom();
+        hist->GetYaxis()->UnZoom();
+    }
 
-ColorTheFrameOfTheHistogram();
-//IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-
-  canvas->getCanvas()->Modified();
-  canvas->getCanvas()->Update();
+    ColorTheFrameOfTheHistogram();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::translateplusTheScreen
+//==============================================================================
+// Pans the spectrum display horizontally to the right (toward higher channels)
+// by ~3% of the visible window width. Triggered by the Right Arrow key.
+//==============================================================================
 void QMainCanvas::translateplusTheScreen()
 {
-     IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    ColorTheFrameOfTheHistogram();
-          TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
-}
-listOfObjectsDrawnOnScreen.Clear();
-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()-(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast())/33, HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast()-(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast())/33);
- IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    ColorTheFrameOfTheHistogram();
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
-    //zoomTheScreen();
-  canvas->getCanvas()->Modified();
-  canvas->getCanvas()->Update();
-   // }
+    // Remove drawn lines/markers when panning
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        TAxis *xAxis = hist->GetXaxis();
+        const Int_t first  = xAxis->GetFirst();
+        const Int_t last   = xAxis->GetLast();
+        const Int_t step   = std::max(1, (last - first) / 33);
+        const Int_t maxBin = hist->GetNbinsX();
+        const Int_t newFirst = std::min(maxBin, first + step);
+        const Int_t newLast  = std::min(maxBin, last + step);
+        xAxis->SetRange(newFirst, newLast);
+    }
+
+    ColorTheFrameOfTheHistogram();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::translateminusTheScreen
+//==============================================================================
+// Pans the spectrum display horizontally to the left (toward lower channels)
+// by ~3% of the visible window width. Triggered by the Left Arrow key.
+//==============================================================================
 void QMainCanvas::translateminusTheScreen()
 {
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+
+    // Remove drawn lines/markers when panning
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        TAxis *xAxis = hist->GetXaxis();
+        const Int_t first    = xAxis->GetFirst();
+        const Int_t last     = xAxis->GetLast();
+        const Int_t step     = std::max(1, (last - first) / 33);
+        const Int_t newFirst = std::max(1, first - step);
+        const Int_t newLast  = std::max(1, last - step);
+        xAxis->SetRange(newFirst, newLast);
+    }
+
     ColorTheFrameOfTheHistogram();
-              TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
-}
-listOfObjectsDrawnOnScreen.Clear();
-    //Translates the zoom in the negative(left) direction of the abscissa
-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()+(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast())/33, HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast()+(HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetFirst()-HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->GetLast())/33);
- IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    ColorTheFrameOfTheHistogram();
-
-    //zoomTheScreen();
-  canvas->getCanvas()->Modified();
-  canvas->getCanvas()->Update();
-
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::translatedownTheScreen
+//==============================================================================
+// Expands the vertical count scale (zooms out vertically by 1.05x).
+// Triggered by the Down Arrow key.
+//==============================================================================
 void QMainCanvas::translatedownTheScreen()
 {
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        hist->GetYaxis()->SetRangeUser(0, hist->GetMaximum() * 1.05);
+    }
+
     ColorTheFrameOfTheHistogram();
-          TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
-}
-listOfObjectsDrawnOnScreen.Clear();
-    //Increases the scale of the ordinate
-     //Increases the scale of the ordinate
-    HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(0, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum() * 1.05);
-
-    //IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
-    //IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    //showAllMarkers();
-    //deleteAllMarkers();
-
-
-ColorTheFrameOfTheHistogram();
-
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::translateupTheScreen
+//==============================================================================
+// Compresses the vertical count scale (zooms in vertically by 1.05x).
+// Triggered by the Up Arrow key.
+//==============================================================================
 void QMainCanvas::translateupTheScreen()
 {
-          TIter iterator(listOfObjectsDrawnOnScreen.MakeIterator());
-TObject* obj;
-while ((obj = iterator())) {
-    listOfObjectsDrawnOnScreen.Remove(obj);
-    delete obj; // Eliberează memoria dacă obiectul a fost alocat dinamic
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+
+    TIter next(&listOfObjectsDrawnOnScreen);
+    while (TObject *obj = next()) {
+        delete obj;
+    }
+    listOfObjectsDrawnOnScreen.Clear();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        hist->GetYaxis()->SetRangeUser(0, hist->GetMaximum() / 1.05);
+    }
+
+    ColorTheFrameOfTheHistogram();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
 }
-listOfObjectsDrawnOnScreen.Clear();
-     //Increases the scale of the ordinate
-    HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(0, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum() / 1.05);
-    //IdentifyLastPilgrimHistogram(mousePilgrimX,mousePilgrimY);
-    //IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    //showAllMarkers();
-    //deleteAllMarkers();
 
-
-ColorTheFrameOfTheHistogram();
-}
-
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::deleteBackgroundMarkers
+//==============================================================================
+// Clears all stored background marker positions (shortcut: 'Z + B').
+//==============================================================================
 void QMainCanvas::deleteBackgroundMarkers()
 {
     background_markers.clear();
 }
 
+//==============================================================================
+// QMainCanvas::deleteIntegralMarkers
+//==============================================================================
+// Clears all stored peak integration marker positions (shortcut: 'Z + I').
+//==============================================================================
 void QMainCanvas::deleteIntegralMarkers()
 {
     integral_markers.clear();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::deleteAllMarkers
+//==============================================================================
+// Clears all active markers of all types from memory (shortcut: 'Z + A').
+//==============================================================================
 void QMainCanvas::deleteAllMarkers()
 {
     deleteBackgroundMarkers();
@@ -1315,36 +1417,41 @@ void QMainCanvas::deleteAllMarkers()
     deleteGaussMarkers();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::showBackgroundMarkers
+//==============================================================================
+// Re-renders all stored background markers, baselines, and shaded regions on
+// the canvas (shortcut: 'M + B').
+//==============================================================================
 void QMainCanvas::showBackgroundMarkers()
 {
-    for(uint i=0;i<background_markers.size();i++)
-    {
-        TLine *backgroundLine = new TLine(background_markers[i]-0.5, 0., background_markers[i]-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    for (std::size_t i = 0; i < background_markers.size(); ++i) {
+        TLine *backgroundLine = new TLine(background_markers[i] - 0.5, 0.0,
+                                          background_markers[i] - 0.5, yMax);
         backgroundLine->SetLineColor(kBlue);
         backgroundLine->SetLineWidth(2);
-
         backgroundLine->Draw("same");
-
         listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
-        if(i%2)
-        {
-            TLine *bottomBackgroundLine = new TLine(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, 0);
+        // When completing a pair, redraw baseline and hatched box
+        if (i % 2 == 1) {
+            TLine *bottomBackgroundLine = new TLine(background_markers[i - 1] - 0.5, 0.0,
+                                                    background_markers[i] - 0.5, 0.0);
             bottomBackgroundLine->SetLineColor(kBlue);
             bottomBackgroundLine->SetLineWidth(2);
-
             bottomBackgroundLine->Draw("same");
-
-            //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-            TBox *backgroundArea = new TBox(background_markers[i-1]-0.5, 0., background_markers[i]-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+            TBox *backgroundArea = new TBox(background_markers[i - 1] - 0.5, 0.0,
+                                            background_markers[i] - 0.5, yMax);
             backgroundArea->SetFillColor(kBlue);
             backgroundArea->SetFillStyle(3545);
             backgroundArea->Draw("same");
-
-            //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(backgroundArea);
         }
     }
@@ -1353,15 +1460,24 @@ void QMainCanvas::showBackgroundMarkers()
     canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::showIntegralMarkers
+//==============================================================================
+// Re-renders all stored yellow peak integral markers on the canvas (shortcut: 'M + I').
+//==============================================================================
 void QMainCanvas::showIntegralMarkers()
 {
-    for(uint i=0;i<integral_markers.size();i++)
-    {
-        TLine *integralLine = new TLine(integral_markers[i]-0.5, 0., integral_markers[i]-0.5,HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
-        integralLine->SetLineColor(kRed);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    for (std::size_t i = 0; i < integral_markers.size(); ++i) {
+        TLine *integralLine = new TLine(integral_markers[i] - 0.5, 0.0,
+                                        integral_markers[i] - 0.5, yMax);
+        integralLine->SetLineColor(kYellow);
         integralLine->SetLineWidth(2);
         integralLine->Draw("same");
-
         listOfObjectsDrawnOnScreen.Add(integralLine);
     }
 
@@ -1369,7 +1485,12 @@ void QMainCanvas::showIntegralMarkers()
     canvas->getCanvas()->Update();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::showAllMarkers
+//==============================================================================
+// Redraws all stored markers (background, integral, range, and Gauss) on the
+// canvas (shortcut: 'M + A').
+//==============================================================================
 void QMainCanvas::showAllMarkers()
 {
     showBackgroundMarkers();
@@ -1378,99 +1499,111 @@ void QMainCanvas::showAllMarkers()
     showGaussMarkers();
 }
 
-//______________________________________________________________________________
-void QMainCanvas::addRangeMarker(Int_t x, Int_t y){
-if(range_markers.size()<2){
+//==============================================================================
+// QMainCanvas::addRangeMarker
+//==============================================================================
+// Drops a red vertical range boundary marker at the clicked channel. Exactly two
+// range markers define the region for multi-peak Gaussian fitting.
+//==============================================================================
+void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
+{
+    if (range_markers.size() < 2) {
+        int binX = getBinFromClick(x, y);
+        range_markers.push_back(binX);
 
-    int binX = getBinFromClick(x, y);
+        TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+        if (!hist) return;
 
-    //Add the position to the background marker vector
-    range_markers.push_back(binX);
+        const Double_t yMax = hist->GetMaximum() * 1.05;
 
-    //Create a blue background line and add it to the screen
+        // When placing the second marker of a pair, ensure the first is drawn
+        if (range_markers.size() % 2 == 0 && !range_markers.empty()) {
+            const std::size_t i = range_markers.size();
+            TLine *rangeLineSecond = new TLine(range_markers[i - 2] - 0.5, 0.0,
+                                               range_markers[i - 2] - 0.5, yMax);
+            rangeLineSecond->SetLineColor(kRed);
+            rangeLineSecond->SetLineWidth(2);
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            rangeLineSecond->Draw();
+            listOfObjectsDrawnOnScreen.Add(rangeLineSecond);
+        }
 
-            if(range_markers.size()%2==0 && range_markers.size()!=0){
-        int i = range_markers.size();
-        TLine *rangeLineSecond = new TLine(range_markers[i-2]-0.5, 0., range_markers[i-2]-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
-        rangeLineSecond->SetLineColor(kRed);
-        rangeLineSecond->SetLineWidth(2);
-        canvas->getCanvas()->cd((PilgrimElement_i-1)*maxElement_j+PilgrimElement_j);
-        rangeLineSecond->Draw();
+        TLine *rangeLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+        rangeLine->SetLineColor(kRed);
+        rangeLine->SetLineWidth(2);
+        rangeLine->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(rangeLine);
 
-        listOfObjectsDrawnOnScreen.Add(rangeLineSecond);}
-    TLine *rangeLine = new TLine(binX-0.5, 0., binX-0.5,HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
-    rangeLine->SetLineColor(kRed);
-    rangeLine->SetLineWidth(2);
+        // If pair is complete, draw baseline and shaded red region
+        if (range_markers.size() % 2 == 0) {
+            const Int_t leftBin = range_markers[range_markers.size() - 2];
+            TLine *bottomRangeLine = new TLine(leftBin - 0.5, 0.0, binX - 0.5, 0.0);
+            bottomRangeLine->SetLineColor(kRed);
+            bottomRangeLine->SetLineWidth(2);
+            bottomRangeLine->Draw("same");
+            listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-    rangeLine->Draw("same");
+            TBox *rangeArea = new TBox(leftBin - 0.5, 0.0, binX - 0.5, maxValueInHistogram * 1.05);
+            rangeArea->SetFillColor(kRed);
+            rangeArea->SetFillStyle(3545);
+            rangeArea->Draw("same");
+            listOfObjectsDrawnOnScreen.Add(rangeArea);
+        }
 
-    //Add the line to the list of things put on the screen, so it can be deleted
-    listOfObjectsDrawnOnScreen.Add(rangeLine);
-
-    if(range_markers.size()%2==0)
-    {
-        TLine *bottomRangeLine = new TLine(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, 0);
-        bottomRangeLine->SetLineColor(kRed);
-        bottomRangeLine->SetLineWidth(2);
-
-        bottomRangeLine->Draw("same");
-
-        //Add the line to the list of things put on the screen, so it can be deleted
-        listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
-
-        TBox *backgroundArea = new TBox(range_markers[range_markers.size()-2]-0.5, 0., binX-0.5, maxValueInHistogram*1.05);
-        backgroundArea->SetFillColor(kRed);
-        backgroundArea->SetFillStyle(3545);
-        backgroundArea->Draw("same");
-
-        //Add the line to the list of things put on the screen, so it can be deleted
-        listOfObjectsDrawnOnScreen.Add(backgroundArea);
-    }
-
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
-}
-    else{
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    } else {
+        // Warn user if attempting to place more than 2 range markers
         printf("\a");
+        CommandPrompt::getInstance()->appendPlainText("Fitting range is already defined by two markers (use Z+R to clear).\n");
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::deleteRangeMarkers
+//==============================================================================
+// Clears stored fit range boundary markers (shortcut: 'Z + R').
+//==============================================================================
 void QMainCanvas::deleteRangeMarkers()
 {
     range_markers.clear();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::showRangeMarkers
+//==============================================================================
+// Re-renders all stored fit range markers and shaded intervals on the canvas
+// (shortcut: 'M + R').
+//==============================================================================
 void QMainCanvas::showRangeMarkers()
 {
-    for(uint i=0;i<range_markers.size();i++)
-    {
-        TLine *rangeLine = new TLine(range_markers[i]-0.5, 0., range_markers[i]-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
-        rangeLine->SetLineColor(kYellow);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    for (std::size_t i = 0; i < range_markers.size(); ++i) {
+        TLine *rangeLine = new TLine(range_markers[i] - 0.5, 0.0,
+                                     range_markers[i] - 0.5, yMax);
+        rangeLine->SetLineColor(kRed);
         rangeLine->SetLineWidth(2);
-
         rangeLine->Draw("same");
-
         listOfObjectsDrawnOnScreen.Add(rangeLine);
 
-        if(i%2)
-        {
-            TLine *bottomRangeLine = new TLine(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, 0);
-            bottomRangeLine->SetLineColor(kYellow);
+        if (i % 2 == 1) {
+            TLine *bottomRangeLine = new TLine(range_markers[i - 1] - 0.5, 0.0,
+                                               range_markers[i] - 0.5, 0.0);
+            bottomRangeLine->SetLineColor(kRed);
             bottomRangeLine->SetLineWidth(2);
-
             bottomRangeLine->Draw("same");
-            //Add the line to the list of things put on the screen, so it can be deleted
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-            TBox *backgroundArea = new TBox(range_markers[i-1]-0.5, 0., range_markers[i]-0.5, maxValueInHistogram*1.05);
-            backgroundArea->SetFillColor(kYellow);
-            backgroundArea->SetFillStyle(3545);
-            backgroundArea->Draw("same");
-
-            //Add the line to the list of things put on the screen, so it can be deleted
-            listOfObjectsDrawnOnScreen.Add(backgroundArea);
+            TBox *rangeArea = new TBox(range_markers[i - 1] - 0.5, 0.0,
+                                       range_markers[i] - 0.5, yMax);
+            rangeArea->SetFillColor(kRed);
+            rangeArea->SetFillStyle(3545);
+            rangeArea->Draw("same");
+            listOfObjectsDrawnOnScreen.Add(rangeArea);
         }
     }
 
@@ -1478,51 +1611,68 @@ void QMainCanvas::showRangeMarkers()
     canvas->getCanvas()->Update();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::addGaussMarker
+//==============================================================================
+// Drops a pink vertical marker line at the clicked channel coordinate marking
+// an initial peak centroid estimate for multi-peak Gaussian fitting.
+//==============================================================================
 void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
 {
     int binX = getBinFromClick(x, y);
-
-    //Add the position to the background marker vector
     gauss_markers.push_back(binX);
 
-    //Create a blue background line and add it to the screen
-    TLine *gaussLine = new TLine(binX-0.5, 0., binX-0.5, HijF[PilgrimElement_i][PilgrimElement_j]->GetMaximum()* 1.05);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    TLine *gaussLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
     gaussLine->SetLineColor(kPink);
     gaussLine->SetLineWidth(2);
-
     gaussLine->Draw("same");
+    listOfObjectsDrawnOnScreen.Add(gaussLine);
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
-
-    //Add the line to the list of things put on the screen, so it can be deleted
-    listOfObjectsDrawnOnScreen.Add(gaussLine);
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::deleteGaussMarkers
+//==============================================================================
+// Clears all stored Gaussian peak centroid estimate markers (shortcut: 'Z + G').
+//==============================================================================
 void QMainCanvas::deleteGaussMarkers()
 {
     gauss_markers.clear();
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::showGaussMarkers
+//==============================================================================
+// Re-renders all stored pink Gaussian centroid estimate markers on the canvas
+// (shortcut: 'M + G').
+//==============================================================================
 void QMainCanvas::showGaussMarkers()
 {
-    for(uint i=0;i<gauss_markers.size();i++)
-    {
-        TLine *gaussLine = new TLine(gauss_markers[i]-0.5, 0., gauss_markers[i]-0.5, HijF[SelectedElement_i][SelectedElement_j]->GetMaximum()*1.05);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    for (std::size_t i = 0; i < gauss_markers.size(); ++i) {
+        TLine *gaussLine = new TLine(gauss_markers[i] - 0.5, 0.0,
+                                     gauss_markers[i] - 0.5, yMax);
         gaussLine->SetLineColor(kPink);
         gaussLine->SetLineWidth(2);
-
         gaussLine->Draw("same");
-
         listOfObjectsDrawnOnScreen.Add(gaussLine);
     }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
+
 
 //______________________________________________________________________________
 void QMainCanvas::fitGauss()
