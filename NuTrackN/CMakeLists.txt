@@ -1,23 +1,45 @@
-cmake_minimum_required(VERSION 3.9 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project(NuTrackN)
+project(NuTrackN LANGUAGES CXX)
 
-find_package(ROOT REQUIRED)
-include(${ROOT_USE_FILE})
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
-set(CMAKE_INCLUDE_CURRENT_DIR ON)
+find_package(Qt5 COMPONENTS Core Gui Widgets REQUIRED)
+find_package(ROOT REQUIRED COMPONENTS Core RIO Net Hist Graf Graf3d Gpad Tree Rint Postscript Matrix Physics Gui MathCore)
+include(${ROOT_USE_FILE})
 
-find_package(Qt5 COMPONENTS Widgets REQUIRED WebEngine WebEngineWidgets)
-
-add_executable(NuTrackN
-    ExampleMain.cpp
+include_directories(
+    Include
+    ${ROOT_INCLUDE_DIRS}
 )
 
-target_link_libraries(NuTrackN
-   Qt5::Core Qt5::Widgets Qt5::WebEngine Qt5::WebEngineWidgets
-   ${ROOT_LIBRARIES} ROOT::ROOTWebDisplay ROOT::Gpad ROOT::WebGui6 ROOT::ROOTGpadv7 ROOT::ROOTCanvasPainter ROOT::Geom ROOT::ROOTBrowserv7 ROOT::ROOTEve
+set(SOURCES
+    Sources/canvas.cxx
+    Sources/main.cxx
+    Sources/Integral.cxx
+    Sources/calib.cxx
+    Sources/tracknhistogram.cxx
+    Sources/Design.cxx
+)
+
+set(HEADERS
+    Include/canvas.h
+    Include/Integral.h
+    Include/calib.h
+    Include/tracknhistogram.h
+    Include/Design.h
+)
+
+add_executable(nutrackn ${SOURCES} ${HEADERS})
+
+target_link_libraries(nutrackn
+    Qt5::Core
+    Qt5::Gui
+    Qt5::Widgets
+    ${ROOT_LIBRARIES}
 )
