@@ -228,6 +228,7 @@ public slots:
 
 protected:
    //virtual void paintEvent(QPaintEvent *event);
+   void clearDrawnObjects();
 
    QRootCanvas    *canvas;
    QPushButton    *b;

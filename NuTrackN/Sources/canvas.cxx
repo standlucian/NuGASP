@@ -612,13 +612,29 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 }
 
 //==============================================================================
+// QMainCanvas::clearDrawnObjects
+//==============================================================================
+// Safely removes and deletes all dynamically allocated temporary visual markers
+// (lines, boxes, shaded regions) from the canvas and list, preventing dangling
+// pointers and use-after-free crashes.
+//==============================================================================
+void QMainCanvas::clearDrawnObjects()
+{
+    while (TObject *obj = listOfObjectsDrawnOnScreen.First()) {
+        listOfObjectsDrawnOnScreen.Remove(obj);
+        delete obj;
+    }
+}
+
+//==============================================================================
 // QMainCanvas Destructor
 //==============================================================================
 // Cleans up dynamically allocated resources including the background covariance
-// matrix produced by fitBackground().
+// matrix produced by fitBackground() and any remaining drawn marker objects.
 //==============================================================================
 QMainCanvas::~QMainCanvas()
 {
+    clearDrawnObjects();
     delete backgroundCovarianceMatrix;
     backgroundCovarianceMatrix = nullptr;
 }
@@ -993,11 +1009,7 @@ void QMainCanvas::clearTheScreen()
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
     // Free all dynamically allocated graphical primitives drawn on the canvas
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     // Clear fit markers and redraw clean base histogram
     autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
@@ -1025,11 +1037,7 @@ void QMainCanvas::clearTheScreen()
 void QMainCanvas::zoomTheScreen()
 {
     // Clear temporary overlay markers before applying zoom
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
     const std::size_t n = zoom_markers.size();
@@ -1083,11 +1091,7 @@ void QMainCanvas::translateplusTheScreen()
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
     // Remove drawn lines/markers when panning
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
@@ -1117,11 +1121,7 @@ void QMainCanvas::translateminusTheScreen()
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
     // Remove drawn lines/markers when panning
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
@@ -1149,11 +1149,7 @@ void QMainCanvas::translatedownTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
@@ -1175,11 +1171,7 @@ void QMainCanvas::translateupTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
 
-    TIter next(&listOfObjectsDrawnOnScreen);
-    while (TObject *obj = next()) {
-        delete obj;
-    }
-    listOfObjectsDrawnOnScreen.Clear();
+    clearDrawnObjects();
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
