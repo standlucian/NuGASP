@@ -2,7 +2,13 @@
 #include "Design.h"
 
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas Constructor
+//==============================================================================
+// Initializes an embedded CERN ROOT TCanvas inside a Qt QWidget.
+// Uses TVirtualX to register the native window ID, configuring mouse tracking,
+// minimal padding, and an initial "NuTrackN" splash label.
+//==============================================================================
 QRootCanvas::QRootCanvas(QWidget *parent)
     : QWidget(parent),
       fCanvas(nullptr),
@@ -27,10 +33,12 @@ QRootCanvas::QRootCanvas(QWidget *parent)
     fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
     TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
 
+    // Set canvas borders and margins as small as possible for maximal spectrum viewing area
     Double_t canvasHeight = fCanvas->GetWh();
     Double_t proportion = (canvasHeight > 0.0) ? (0.1 / canvasHeight) : 0.01;
     gPad->SetMargin(proportion, proportion, proportion, proportion);
 
+    // Initial splash text drawn in the center of the canvas
     setFocusPolicy(Qt::StrongFocus);
     TLatex l;
     l.SetTextSize(0.15);
@@ -39,9 +47,15 @@ QRootCanvas::QRootCanvas(QWidget *parent)
     l.DrawLatex(0.5, 0.5, "NuTrackN");
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::mouseMoveEvent
+//==============================================================================
+// Emits real-time mouse coordinates for live channel/count readouts and forwards
+// mouse motion events to the underlying ROOT TCanvas.
+//==============================================================================
 void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 {
+    // Notify main canvas of cursor position to update coordinates and hover tracking
     emit mousePilgrimCoordRequest(e->x(), e->y());
     if (fCanvas) {
         fCanvas->Modified();
@@ -58,22 +72,33 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::wheelEvent
+//==============================================================================
+// Translates vertical wheel rotations into vertical spectrum pan / scroll events.
+//==============================================================================
 void QRootCanvas::wheelEvent(QWheelEvent *e)
 {
     if (fCanvas) {
         const QPoint mousePos = e->position().toPoint();
-        if (e->angleDelta().y() > 0) { // Wheel scrolled up
+        if (e->angleDelta().y() > 0) { // Wheel scrolled up: pan downward
             fCanvas->HandleInput(kWheelUp, mousePos.x(), mousePos.y());
             emit requesttranslatedownTheScreen();
-        } else if (e->angleDelta().y() < 0) { // Wheel scrolled down
+        } else if (e->angleDelta().y() < 0) { // Wheel scrolled down: pan upward
             fCanvas->HandleInput(kWheelDown, mousePos.x(), mousePos.y());
             emit requesttranslateupTheScreen();
         }
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::mousePressEvent
+//==============================================================================
+// Handles mouse clicks:
+// - Left click: records click position and emits coordinate display request.
+// - Middle click: forwards to ROOT.
+// - Right click: opens spectrum management context menu.
+//==============================================================================
 void QRootCanvas::mousePressEvent(QMouseEvent *e)
 {
     if (fCanvas) {
@@ -94,7 +119,12 @@ void QRootCanvas::mousePressEvent(QMouseEvent *e)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::mouseReleaseEvent
+//==============================================================================
+// Handles mouse button release. If the Left button is released while Ctrl is
+// held down, triggers an automated Gaussian peak fit at the clicked position.
+//==============================================================================
 void QRootCanvas::mouseReleaseEvent(QMouseEvent *e)
 {
     if (fCanvas) {
@@ -115,11 +145,17 @@ void QRootCanvas::mouseReleaseEvent(QMouseEvent *e)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::showContextMenu
+//==============================================================================
+// Constructs and displays the right-click popup context menu for spectrum grid
+// operations (adding/removing matrix rows and columns, refreshing canvas).
+//==============================================================================
 void QRootCanvas::showContextMenu(QMouseEvent *e)
 {
     QMenu contextMenu(tr("Spectrum Actions"), this);
 
+    // Row / Column matrix manipulation actions
     QAction *actionAddLine = new QAction(tr("Add Line"), this);
     connect(actionAddLine, &QAction::triggered, this, &QRootCanvas::AddLineRequest);
     contextMenu.addAction(actionAddLine);
@@ -138,6 +174,7 @@ void QRootCanvas::showContextMenu(QMouseEvent *e)
 
     contextMenu.addSeparator();
 
+    // Canvas redrawing
     QAction *actionRefresh = new QAction(tr("Refresh Display"), this);
     connect(actionRefresh, &QAction::triggered, this, &QRootCanvas::RefreshScreenRequest);
     contextMenu.addAction(actionRefresh);
@@ -145,9 +182,38 @@ void QRootCanvas::showContextMenu(QMouseEvent *e)
     contextMenu.exec(e->globalPos());
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::keyPressEvent
+//==============================================================================
+// Multi-key modal state machine replicating legacy Xtrackn / GASP keyboard shortcuts:
+// - CTRL + C/Z/Y : Application exit confirmation.
+// - C Prefix (Compute):
+//     C + I : Net peak integration without background subtraction.
+//     C + J : Peak integration with linear background subtraction.
+//     C + V : Gaussian multi-peak fit.
+// - Z Prefix (Zero / Delete):
+//     Z + I : Delete integral range markers.
+//     Z + B : Delete background markers.
+//     Z + R : Delete fit range markers.
+//     Z + G : Delete Gauss peak centroid markers.
+//     Z + A : Delete all markers on the spectrum.
+// - M Prefix (Markers visibility):
+//     M + I, M + B, M + R, M + G, M + A : Redraw / toggle marker overlays.
+// - F Prefix: Fullscreen / Unzoom.
+// - Single Key Navigation:
+//     Space : Place zoom window boundary marker.
+//     E     : Execute zoom between spacebar markers.
+//     I     : Place integral marker at current mouse position.
+//     B     : Place background marker at current mouse position.
+//     R     : Place fit range boundary marker.
+//     G     : Place Gaussian peak center marker.
+//     =     : Clear all drawn lines/markers from screen.
+//     Arrows: Pan / translate spectrum view (left, right, up, down).
+//     ? / H : Display interactive help command list.
+//==============================================================================
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
+    // Handle key sequences following a CTRL press
     if (controlKeyIsPressed) {
         switch (event->key()) {
             case Qt::Key_C:
@@ -168,21 +234,23 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         controlKeyIsPressed = false;
     }
+    // Handle commands prefixed by 'C' (Computation routines)
     else if (cKeyWasPressed) {
         switch (event->key()) {
             case Qt::Key_I:
-                // C + I: Integration without background
+                // C + I: Integration without background subtraction
                 emit requestIntegrationNoBackground();
                 break;
             case Qt::Key_J:
-                // C + J: Integration with background
+                // C + J: Integration with linear background subtraction
                 emit requestIntegrationWithBackground();
                 break;
             case Qt::Key_V:
-                // C + V: Gaussian peak fitting
+                // C + V: Gaussian multi-peak fit over marked region
                 emit requestFitGauss();
                 break;
             case Qt::Key_C:
+                // Redundant C press: cancel prefix
                 break;
             default:
                 std::cout << "Waited for execute command after C was pressed but no valid command arrived after it" << std::endl;
@@ -191,6 +259,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         cKeyWasPressed = false;
     }
+    // Handle commands prefixed by 'Z' (Zero / Delete markers)
     else if (zKeyWasPressed) {
         switch (event->key()) {
             case Qt::Key_I:
@@ -206,14 +275,15 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 emit requestDeleteRangeMarkers();
                 break;
             case Qt::Key_G:
-                // Z + G: Delete Gauss markers
+                // Z + G: Delete Gauss centroid markers
                 emit requestDeleteGaussMarkers();
                 break;
             case Qt::Key_A:
-                // Z + A: Delete all markers
+                // Z + A: Delete all active markers
                 emit requestDeleteAllMarkers();
                 break;
             case Qt::Key_Z:
+                // Redundant Z press: cancel prefix
                 break;
             default:
                 std::cout << "Waited for delete command after Z was pressed but no valid command arrived after it" << std::endl;
@@ -222,29 +292,31 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         zKeyWasPressed = false;
     }
+    // Handle commands prefixed by 'M' (Show / Redraw markers)
     else if (mKeyWasPressed) {
         switch (event->key()) {
             case Qt::Key_I:
-                // M + I: Show integral markers
+                // M + I: Redraw integral markers
                 emit requestShowIntegralMarkers();
                 break;
             case Qt::Key_B:
-                // M + B: Show background markers
+                // M + B: Redraw background markers
                 emit requestShowBackgroundMarkers();
                 break;
             case Qt::Key_R:
-                // M + R: Show range markers
+                // M + R: Redraw range markers
                 emit requestShowRangeMarkers();
                 break;
             case Qt::Key_G:
-                // M + G: Show Gauss markers
+                // M + G: Redraw Gauss peak centroid markers
                 emit requestShowGaussMarkers();
                 break;
             case Qt::Key_A:
-                // M + A: Show all markers
+                // M + A: Redraw all markers
                 emit requestShowAllMarkers();
                 break;
             case Qt::Key_M:
+                // Redundant M press: cancel prefix
                 break;
             default:
                 std::cout << "Waited for show command after M was pressed but no valid command arrived after it" << std::endl;
@@ -253,6 +325,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         mKeyWasPressed = false;
     }
+    // Handle commands prefixed by 'F' (Fullscreen / zoom reset)
     else if (fKeyWasPressed) {
         switch (event->key()) {
             case Qt::Key_F:
@@ -264,10 +337,12 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         }
         fKeyWasPressed = false;
     }
+    // Single-key analysis and navigation triggers
     else {
         switch (event->key()) {
             case Qt::Key_H:
             case Qt::Key_Question:
+                // '?' or 'H': Display interactive help menu
                 emit requestHelp();
                 break;
             case Qt::Key_Control:
@@ -283,39 +358,50 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 mKeyWasPressed = true;
                 break;
             case Qt::Key_I:
+                // 'I': Place integral boundary marker at cursor
                 emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Space:
+                // Spacebar: Place zoom boundary marker at cursor
                 emit addSpaceBarMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_F:
                 fKeyWasPressed = true;
                 break;
             case Qt::Key_Right:
+                // Right Arrow: Pan spectrum to higher channels
                 emit requesttranslateplusTheScreen();
                 break;
             case Qt::Key_Left:
+                // Left Arrow: Pan spectrum to lower channels
                 emit requesttranslateminusTheScreen();
                 break;
             case Qt::Key_Down:
+                // Down Arrow: Pan spectrum vertical scale downward
                 emit requesttranslatedownTheScreen();
                 break;
             case Qt::Key_Up:
+                // Up Arrow: Pan spectrum vertical scale upward
                 emit requesttranslateupTheScreen();
                 break;
             case Qt::Key_B:
+                // 'B': Place background sample marker at cursor
                 emit addBackgroundMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_R:
+                // 'R': Place fit range boundary marker at cursor
                 emit requestAddRangeMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_G:
+                // 'G': Place Gaussian peak estimate marker at cursor
                 emit requestAddGaussMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Equal:
+                // '=': Clear drawn overlay lines and reset display
                 emit requestClearTheScreen();
                 break;
             case Qt::Key_E:
+                // 'E': Execute zoom between spacebar markers
                 emit requestZoomTheScreen();
                 break;
             default:
@@ -325,7 +411,11 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::keyReleaseEvent
+//==============================================================================
+// Tracks release of modifier keys (such as Control) to reset modal flags.
+//==============================================================================
 void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
 {
     switch (event->key()) {
@@ -338,7 +428,11 @@ void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::resizeEvent
+//==============================================================================
+// Resizes the embedded CERN ROOT TCanvas whenever the parent Qt widget is resized.
+//==============================================================================
 void QRootCanvas::resizeEvent(QResizeEvent *event)
 {
     if (fCanvas) {
@@ -348,17 +442,24 @@ void QRootCanvas::resizeEvent(QResizeEvent *event)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QRootCanvas::paintEvent
+//==============================================================================
+// Synchronizes the embedded ROOT X11 pad painting system with Qt's paint engine.
+//==============================================================================
 void QRootCanvas::paintEvent(QPaintEvent *)
 {
-    // Synchronize embedded ROOT canvas sizing and painting
     if (fCanvas) {
         fCanvas->Resize();
         fCanvas->Update();
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::closeEvent
+//==============================================================================
+// Confirms whether the user truly intends to terminate the application.
+//==============================================================================
 void QMainCanvas::closeEvent(QCloseEvent *e)
 {
     QMessageBox::StandardButton quiting = QMessageBox::question(
@@ -372,7 +473,18 @@ void QMainCanvas::closeEvent(QCloseEvent *e)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas Constructor
+//==============================================================================
+// Builds the main user interface:
+// 1. Instantiates and embeds QRootCanvas inside a vertical layout.
+// 2. Builds a coordinate readout bar (X channel, Y counts).
+// 3. Adds toolbar icon buttons (Open file, Color settings, 2-Point calibration).
+// 4. Adds primary analysis push buttons (Select File, Integral without/with background).
+// 5. Connects all QRootCanvas user-interaction signals to QMainCanvas slots.
+// 6. Sets up the ROOT graphics event processing timer (fRootTimer).
+// 7. Allocates the default 10240-channel TracknHistogram instance.
+//==============================================================================
 QMainCanvas::QMainCanvas(QWidget *parent)
     : QWidget(parent),
       backgroundCovarianceMatrix(nullptr)
@@ -380,11 +492,11 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     QHBoxLayout *coordBarLayout = new QHBoxLayout();
 
-    // Embed the ROOT canvas
+    // 1. Embed the interactive ROOT canvas
     canvas = new QRootCanvas(this);
     mainLayout->addWidget(canvas);
 
-    // Coordinate status bar
+    // 2. Coordinate status bar for channel and count displays
     coordBarLayout->addStretch();
 
     QLabel *labelXTitle = new QLabel("X:", this);
@@ -407,7 +519,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     coordBarLayout->addStretch();
 
-    // Toolbar icon buttons
+    // 3. Toolbar icon buttons
     QPushButton *readiconButton = new QPushButton(this);
     readiconButton->setIcon(QIcon("readicon.png"));
     readiconButton->setToolTip(tr("Open Spectrum File"));
@@ -431,7 +543,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     mainLayout->addLayout(coordBarLayout);
 
-    // Primary action buttons
+    // 4. Primary analysis push buttons
     QPushButton *btnSelectFile = new QPushButton(tr("&Select your file"), this);
     mainLayout->addWidget(btnSelectFile);
     connect(btnSelectFile, &QPushButton::clicked, this, &QMainCanvas::clicked1);
@@ -444,7 +556,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     mainLayout->addWidget(btnIntegralWithBkg);
     connect(btnIntegralWithBkg, &QPushButton::clicked, this, &QMainCanvas::areaFunctionWithBackground);
 
-    // Connect user interactions from canvas to analysis routines
+    // 5. Connect user interaction signals from canvas to analysis slots
     connect(canvas, &QRootCanvas::requestIntegrationNoBackground, this, &QMainCanvas::areaFunction);
     connect(canvas, &QRootCanvas::requestIntegrationWithBackground, this, &QMainCanvas::areaFunctionWithBackground);
     connect(canvas, &QRootCanvas::autoFitRequested, this, &QMainCanvas::autoFit);
@@ -484,12 +596,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::DeleteCulomnRequest, this, &QMainCanvas::DeleteCulomn);
     connect(canvas, &QRootCanvas::RefreshScreenRequest, this, &QMainCanvas::RefreshScreen);
 
-    // Event timer for processing ROOT graphics events
+    // 6. Root event loop timer: calls handle_root_events() every 20ms
     fRootTimer = new QTimer(this);
     connect(fRootTimer, &QTimer::timeout, this, &QMainCanvas::handle_root_events);
     fRootTimer->start(20);
 
-    // Initial default histogram with 10240 bins
+    // 7. Initialize default 10240-channel TracknHistogram for the primary spectrum cell
     HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0, 10240);
     HijF[1][1]->GetXaxis()->SetNdivisions(0, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);
@@ -498,16 +610,33 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     HijF[1][1]->SetStats(0);
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas Destructor
+//==============================================================================
+// Cleans up dynamically allocated resources including the background covariance
+// matrix produced by fitBackground().
+//==============================================================================
 QMainCanvas::~QMainCanvas()
 {
     delete backgroundCovarianceMatrix;
     backgroundCovarianceMatrix = nullptr;
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::getBinFromClick
+//==============================================================================
+// Parses the ROOT TObject information string returned by GetObjectInfo(x, y)
+// on the active histogram pad to extract the integer channel bin number.
+//
+// Format produced by ROOT GetObjectInfo:
+//   "x=..., y=..., binx=..., biny=..., binc=..."
+//
+// Skips the first two coordinate tokens (x and y) and extracts the binx integer,
+// returning 1 as a fallback if the click falls outside valid bounds.
+//==============================================================================
 int QMainCanvas::getBinFromClick(int x, int y)
 {
+    // Ensure the clicked histogram pad is selected and activated
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
     canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
@@ -515,14 +644,17 @@ int QMainCanvas::getBinFromClick(int x, int y)
 
     std::string objectInfo = hist->GetObjectInfo(x, y);
 
+    // Skip section 1: x coordinate position
     size_t to = objectInfo.find(" ");
     if (to == std::string::npos) return 1;
     objectInfo = objectInfo.substr(to + 1);
 
+    // Skip section 2: y coordinate position
     to = objectInfo.find(" ");
     if (to == std::string::npos) return 1;
     objectInfo = objectInfo.substr(to + 1);
 
+    // Extract section 3: binx (channel index)
     size_t from = objectInfo.find("=");
     to = objectInfo.find(" ");
     if (from == std::string::npos || to == std::string::npos || to <= from + 1) return 1;
@@ -535,19 +667,29 @@ int QMainCanvas::getBinFromClick(int x, int y)
     }
 }
 
-//______________________________________________________________________________
+//==============================================================================
+// QMainCanvas::clicked1
+//==============================================================================
+// Opens a file dialog allowing the user to select a gamma spectrum file,
+// loads the data via TracknHistogram::LoadFromFile (supporting both binary
+// uint32 and ASCII formats), updates the display, and preserves existing zoom.
+//==============================================================================
 void QMainCanvas::clicked1()
 {
+    // Reset active histogram content and configure canvas background
     HijF[SelectedElement_i][SelectedElement_j]->Reset();
     canvas->getCanvas()->SetBorderMode(0);
     canvas->getCanvas()->SetFillColor(0);
 
-    // This opens a dialog to select a spectrum file for reading
-    QString fileName = QFileDialog::getOpenFileName(this, "Open a spectrum", QString(), "Spectra (*.spe *.dat *.txt *.asc *.*);;All Files (*)");
+    // Display file chooser dialog supporting multiple spectrum file extensions
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Open Spectrum File"), QString(),
+        tr("Spectra (*.spe *.dat *.txt *.asc *.*);;All Files (*)"));
     if (fileName.isEmpty()) {
         return;
     }
 
+    // Delegate binary and ASCII data parsing to TracknHistogram
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
     if (trackHist) {
         if (!trackHist->LoadFromFile(fileName.toStdString())) {
@@ -559,33 +701,41 @@ void QMainCanvas::clicked1()
         return;
     }
 
-    maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
+    // Update maximum counts and unzoom axes
+    maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
+        HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
     HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
     HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->UnZoom();
-    HijC[SelectedElement_i][SelectedElement_j].push_back((TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+    HijC[SelectedElement_i][SelectedElement_j].push_back(
+        (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
 
-    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[HijC[SelectedElement_i][SelectedElement_j].size()-1]);
-    canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+    // Set color based on overlay index and draw to canvas pad
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(
+        colors_hist[HijC[SelectedElement_i][SelectedElement_j].size() - 1]);
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
-    for(std::size_t k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
+    // Redraw all previously loaded spectra on the same pad with "SAME" option
+    for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size() - 1; ++k) {
         HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(colors_hist[k]);
-        canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
         HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
     }
 
-    IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
-    //Zoom the histogram in the region delimited by spacebar markers
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+
+    // If zoom markers are present, preserve the zoomed region
     int i = zoom_markers.size();
-    if(i>=2){
-        if(zoom_markers[i-2]<zoom_markers[i-1]){
-            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-2], zoom_markers[i-1]);
-        }
-        if(zoom_markers[i-1]<zoom_markers[i-2]){
-            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zoom_markers[i-1], zoom_markers[i-2]);
+    if (i >= 2) {
+        if (zoom_markers[i - 2] < zoom_markers[i - 1]) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
+                zoom_markers[i - 2], zoom_markers[i - 1]);
+        } else if (zoom_markers[i - 1] < zoom_markers[i - 2]) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
+                zoom_markers[i - 1], zoom_markers[i - 2]);
         }
     }
 
@@ -595,12 +745,24 @@ void QMainCanvas::clicked1()
     canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::OpenColorSelectionDialog
+//==============================================================================
+// Delegates color theme configuration to Design module.
+//==============================================================================
 void QMainCanvas::OpenColorSelectionDialog() {
     openColorSelectionDialog(this, this);
 }
 
+//==============================================================================
+// QMainCanvas::Cal2pMain
+//==============================================================================
+// Delegates two-point energy calibration dialog to calib module.
+//==============================================================================
 void QMainCanvas::Cal2pMain() {
-    runTwoPointCalibrationDialog(this, puncte_calib2p, dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]));
+    runTwoPointCalibrationDialog(
+        this, puncte_calib2p,
+        dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]));
 }
 
 
