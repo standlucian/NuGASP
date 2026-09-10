@@ -3,399 +3,334 @@
 
 
 //______________________________________________________________________________
-QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent), fCanvas(nullptr)
+QRootCanvas::QRootCanvas(QWidget *parent)
+    : QWidget(parent),
+      fCanvas(nullptr),
+      xMousePosition(0),
+      yMousePosition(0),
+      controlKeyIsPressed(false),
+      cKeyWasPressed(false),
+      zKeyWasPressed(false),
+      mKeyWasPressed(false),
+      fKeyWasPressed(false)
 {
-   // QRootCanvas constructor.
+    // Configure widget attributes for embedded ROOT TCanvas
+    setAttribute(Qt::WA_PaintOnScreen, false);
+    setAttribute(Qt::WA_OpaquePaintEvent, true);
+    setAttribute(Qt::WA_NativeWindow, true);
+    setUpdatesEnabled(kFALSE);
+    setMouseTracking(kTRUE);
+    setMinimumSize(300, 200);
 
-   // set options needed to properly update the canvas when resizing the widget
-   // and to properly handle context menus and mouse move events
-   setAttribute(Qt::WA_PaintOnScreen, false);
-   setAttribute(Qt::WA_OpaquePaintEvent, true);
-   setAttribute(Qt::WA_NativeWindow, true);
-   setUpdatesEnabled(kFALSE);
-   setMouseTracking(kTRUE);
-   //Minimum size of the spectra
-   setMinimumSize(300, 200);
+    // Register widget with TVirtualX using native window id
+    int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
+    fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
+    TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
 
-   // register the QWidget in TVirtualX, giving its native window id
-   int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
-   // create the ROOT TCanvas, giving as argument the QWidget registered id
-   fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
-   TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
+    Double_t canvasHeight = fCanvas->GetWh();
+    Double_t proportion = (canvasHeight > 0.0) ? (0.1 / canvasHeight) : 0.01;
+    gPad->SetMargin(proportion, proportion, proportion, proportion);
 
-
-    Double_t proportion = 0.1/fCanvas->GetWh();
-    gPad->SetMargin(proportion, proportion, proportion, proportion); //set the edges of the canvas as small as possible
-
-   setFocusPolicy(Qt::StrongFocus);
-   TLatex l;
-   l.SetTextSize(0.15);
-   l.SetTextAlign(22);
-   l.SetTextColor(kBlack);
-   l.DrawLatex(0.5, 0.5, "NuTrackN");
+    setFocusPolicy(Qt::StrongFocus);
+    TLatex l;
+    l.SetTextSize(0.15);
+    l.SetTextAlign(22);
+    l.SetTextColor(kBlack);
+    l.DrawLatex(0.5, 0.5, "NuTrackN");
 }
 
 //______________________________________________________________________________
 void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
 {
-   // Handle mouse move events.
     emit mousePilgrimCoordRequest(e->x(), e->y());
-    fCanvas->Modified();
-    fCanvas->Update();
-   //This tells the canvas to handle events when the mouse moves and any or none of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
-   if (fCanvas) {
-      if (e->buttons() & Qt::LeftButton) {
-         //fCanvas->HandleInput(kButton1Motion, e->x(), e->y());
-      } else if (e->buttons() & Qt::MiddleButton) {
-         fCanvas->HandleInput(kButton2Motion, e->x(), e->y());
-      } else if (e->buttons() & Qt::RightButton) {
-         fCanvas->HandleInput(kButton3Motion, e->x(), e->y());
-      } else {
-         fCanvas->HandleInput(kMouseMotion, e->x(), e->y());
-         xMousePosition=e->x();
-         yMousePosition=e->y();
-      }
-   }
-}
-void QRootCanvas::wheelEvent(QWheelEvent *e)
-{
-    // Handle mouse wheel events.
-
-    // This tells the canvas to handle events when the mouse wheel is scrolled.
-    // These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
     if (fCanvas) {
-        if (e->angleDelta().y() > 0) { // Wheel scrolled up
-            fCanvas->HandleInput(kWheelUp, e->position().x(), e->position().y());
-            emit requesttranslatedownTheScreen();
-        } else if (e->angleDelta().y() < 0) { // Wheel scrolled down
-            fCanvas->HandleInput(kWheelDown, e->position().x(), e->position().y());
-            emit requesttranslateupTheScreen();
+        fCanvas->Modified();
+        fCanvas->Update();
+        if (e->buttons() & Qt::MiddleButton) {
+            fCanvas->HandleInput(kButton2Motion, e->x(), e->y());
+        } else if (e->buttons() & Qt::RightButton) {
+            fCanvas->HandleInput(kButton3Motion, e->x(), e->y());
+        } else {
+            fCanvas->HandleInput(kMouseMotion, e->x(), e->y());
+            xMousePosition = e->x();
+            yMousePosition = e->y();
         }
-
-        // Save the x and y positions of the mouse when the wheel is scrolled.
-
     }
 }
+
 //______________________________________________________________________________
-void QRootCanvas::mousePressEvent( QMouseEvent *e )
+void QRootCanvas::wheelEvent(QWheelEvent *e)
 {
-   // Handle mouse button press events.
-
-    //This tells the canvas to handle events when any of the mouse buttons are pressed. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
-   if (fCanvas) {
-      switch (e->button()) {
-         case Qt::LeftButton :
-            //fCanvas->HandleInput(kButton1Down, e->x(), e->y());
-             emit mouseLeftClickCoordRequest(e->x(), e->y());
-
-             emit showXY(xMousePosition, yMousePosition);
-             break;
-            break;
-         case Qt::MiddleButton :
-            fCanvas->HandleInput(kButton2Down, e->x(), e->y());
-            break;
-         case Qt::RightButton :
-            // does not work properly on Linux...
-            // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
-            // seems to cure the problem
-            //fCanvas->HandleInput(kButton3Down, e->x(), e->y());
-             showContextMenu(e);
-            break;
-         default:
-            break;
-      }
-   }
+    if (fCanvas) {
+        const QPoint mousePos = e->position().toPoint();
+        if (e->angleDelta().y() > 0) { // Wheel scrolled up
+            fCanvas->HandleInput(kWheelUp, mousePos.x(), mousePos.y());
+            emit requesttranslatedownTheScreen();
+        } else if (e->angleDelta().y() < 0) { // Wheel scrolled down
+            fCanvas->HandleInput(kWheelDown, mousePos.x(), mousePos.y());
+            emit requesttranslateupTheScreen();
+        }
+    }
 }
 
 //______________________________________________________________________________
-void QRootCanvas::mouseReleaseEvent( QMouseEvent *e )
+void QRootCanvas::mousePressEvent(QMouseEvent *e)
 {
-   // Handle mouse button release events.
-
-    //This tells the canvas to handle events when any of the mouse buttons are released. These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
-   if (fCanvas) {
-      switch (e->button()) {
-         case Qt::LeftButton :
-            //If the left button is released AND the Ctrl key is pressed, call the autofit function (to be implemented)
-            if(controlKeyIsPressed)
-            {
-                emit autoFitRequested(e->x(),e->y());
-            }
-            //fCanvas->HandleInput(kButton1Up, e->x(), e->y());
-            break;
-         case Qt::MiddleButton :
-            fCanvas->HandleInput(kButton2Up, e->x(), e->y());
-            break;
-         case Qt::RightButton :
-            // does not work properly on Linux...
-            // ...adding setAttribute(Qt::WA_PaintOnScreen, true) 
-            // seems to cure the problem
-            //fCanvas->HandleInput(kButton3Up, e->x(), e->y());
-
-            break;
-         default:
-            break;
-      }
-   }
+    if (fCanvas) {
+        switch (e->button()) {
+            case Qt::LeftButton:
+                emit mouseLeftClickCoordRequest(e->x(), e->y());
+                emit showXY(xMousePosition, yMousePosition);
+                break;
+            case Qt::MiddleButton:
+                fCanvas->HandleInput(kButton2Down, e->x(), e->y());
+                break;
+            case Qt::RightButton:
+                showContextMenu(e);
+                break;
+            default:
+                break;
+        }
+    }
 }
+
+//______________________________________________________________________________
+void QRootCanvas::mouseReleaseEvent(QMouseEvent *e)
+{
+    if (fCanvas) {
+        switch (e->button()) {
+            case Qt::LeftButton:
+                if (controlKeyIsPressed) {
+                    emit autoFitRequested(e->x(), e->y());
+                }
+                break;
+            case Qt::MiddleButton:
+                fCanvas->HandleInput(kButton2Up, e->x(), e->y());
+                break;
+            case Qt::RightButton:
+                break;
+            default:
+                break;
+        }
+    }
+}
+
+//______________________________________________________________________________
 void QRootCanvas::showContextMenu(QMouseEvent *e)
 {
-    QMenu contextMenu(tr("Context menu"), this);
+    QMenu contextMenu(tr("Spectrum Actions"), this);
 
-    QAction *action1 = new QAction("Add Line", this);
-    connect(action1, &QAction::triggered, this, &QRootCanvas::AddLineRequest);
-    contextMenu.addAction(action1);
+    QAction *actionAddLine = new QAction(tr("Add Line"), this);
+    connect(actionAddLine, &QAction::triggered, this, &QRootCanvas::AddLineRequest);
+    contextMenu.addAction(actionAddLine);
 
-    QAction *action2 = new QAction("Add Column", this);
-    connect(action2, &QAction::triggered, this, &QRootCanvas::AddCulomnRequest);
-    contextMenu.addAction(action2);
+    QAction *actionAddCol = new QAction(tr("Add Column"), this);
+    connect(actionAddCol, &QAction::triggered, this, &QRootCanvas::AddCulomnRequest);
+    contextMenu.addAction(actionAddCol);
 
-        QAction *action3 = new QAction("Delete Line", this);
-    connect(action3, &QAction::triggered, this, &QRootCanvas::DeleteLineRequest);
-    contextMenu.addAction(action3);
+    QAction *actionDelLine = new QAction(tr("Delete Line"), this);
+    connect(actionDelLine, &QAction::triggered, this, &QRootCanvas::DeleteLineRequest);
+    contextMenu.addAction(actionDelLine);
 
-    QAction *action4 = new QAction("Delete Column", this);
-    connect(action4, &QAction::triggered, this,&QRootCanvas::DeleteCulomnRequest);
-    contextMenu.addAction(action4);
+    QAction *actionDelCol = new QAction(tr("Delete Column"), this);
+    connect(actionDelCol, &QAction::triggered, this, &QRootCanvas::DeleteCulomnRequest);
+    contextMenu.addAction(actionDelCol);
 
-        QAction *action5 = new QAction("Refresh Display", this);
-    connect(action5, &QAction::triggered, this, &QRootCanvas::RefreshScreenRequest);
-    contextMenu.addAction(action5);
+    contextMenu.addSeparator();
 
-    // adding more actions as needed...
-//draw_pixel_line(canvas, width()/2, width()/2, 0, height());
+    QAction *actionRefresh = new QAction(tr("Refresh Display"), this);
+    connect(actionRefresh, &QAction::triggered, this, &QRootCanvas::RefreshScreenRequest);
+    contextMenu.addAction(actionRefresh);
+
     contextMenu.exec(e->globalPos());
 }
 
 //______________________________________________________________________________
-
-
-
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
-    //Checks if any of the top keys (CTRL,C, M, Z) was pressed just before
-
-
-    if(controlKeyIsPressed)
-    {
-        switch(event->key())
-        {
-        case Qt::Key_C:
-        case Qt::Key_Z:
-        case Qt::Key_Y:
-            //if either the C,Z or Y key was pressed after the CTRL key then the program will attempt to quit asking the user if they intended it or not
-            QMessageBox::StandardButton quiting;
-            quiting=QMessageBox::question(this,"Quit","Are you sure you want to quit?",QMessageBox::Yes|QMessageBox::No);
-            if(quiting==QMessageBox::Yes)
-            {
-                emit killSwitch();
+    if (controlKeyIsPressed) {
+        switch (event->key()) {
+            case Qt::Key_C:
+            case Qt::Key_Z:
+            case Qt::Key_Y: {
+                QMessageBox::StandardButton quiting = QMessageBox::question(
+                    this, tr("Quit"), tr("Are you sure you want to quit?"),
+                    QMessageBox::Yes | QMessageBox::No);
+                if (quiting == QMessageBox::Yes) {
+                    emit killSwitch();
+                }
+                break;
             }
-            break;
-        default:
-            std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
-            CommandPrompt::getInstance()->appendPlainText("Waited for execute command after C was pressed but no valid command arrived after it\n");
-            break;
+            default:
+                std::cout << "Waited for execute command after CTRL was pressed but no valid command arrived after it" << std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for execute command after CTRL was pressed but no valid command arrived after it\n");
+                break;
         }
-        controlKeyIsPressed=0;
+        controlKeyIsPressed = false;
     }
-    else if(cKeyWasPressed)
-    {
-        switch(event->key())
-        {
+    else if (cKeyWasPressed) {
+        switch (event->key()) {
             case Qt::Key_I:
-                //If I key is pressed after C, call integration without background
+                // C + I: Integration without background
                 emit requestIntegrationNoBackground();
                 break;
             case Qt::Key_J:
-                //If J key is pressed after C, call integration with background
+                // C + J: Integration with background
                 emit requestIntegrationWithBackground();
                 break;
             case Qt::Key_V:
-                //If V key is pressed after C, call fitting with Gaussian functions
+                // C + V: Gaussian peak fitting
                 emit requestFitGauss();
                 break;
             case Qt::Key_C:
-                //if the C key is pressed after C, do nothing
                 break;
             default:
-                std::cout<<"Waited for execute command after C was pressed but no valid command arrived after it"<<std::endl;
+                std::cout << "Waited for execute command after C was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for execute command after C was pressed but no valid command arrived after it\n");
                 break;
         }
-        cKeyWasPressed=0;
+        cKeyWasPressed = false;
     }
-    else if(zKeyWasPressed)
-    {
-        switch(event->key())
-        {
+    else if (zKeyWasPressed) {
+        switch (event->key()) {
             case Qt::Key_I:
-                //If I key is pressed after Z, call delete integral markers
+                // Z + I: Delete integral markers
                 emit requestDeleteIntegralMarkers();
                 break;
             case Qt::Key_B:
-                //If B key is pressed after Z, call delete background markers
+                // Z + B: Delete background markers
                 emit requestDeleteBackgroundMarkers();
                 break;
             case Qt::Key_R:
-                //If B key is pressed after Z, call delete background markers
+                // Z + R: Delete range markers
                 emit requestDeleteRangeMarkers();
                 break;
             case Qt::Key_G:
-                //If B key is pressed after Z, call delete background markers
+                // Z + G: Delete Gauss markers
                 emit requestDeleteGaussMarkers();
                 break;
             case Qt::Key_A:
-                //If A key is pressed after Z, call delete all markers
+                // Z + A: Delete all markers
                 emit requestDeleteAllMarkers();
                 break;
             case Qt::Key_Z:
-                //if the Z key is pressed after Z, do nothing
                 break;
             default:
-                std::cout<<"Waited for delete command after Z was pressed but no valid command arrived after it"<<std::endl;
+                std::cout << "Waited for delete command after Z was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for delete command after Z was pressed but no valid command arrived after it\n");
                 break;
         }
-        zKeyWasPressed=0;
+        zKeyWasPressed = false;
     }
-    else if(mKeyWasPressed)
-    {
-        switch(event->key())
-        {
+    else if (mKeyWasPressed) {
+        switch (event->key()) {
             case Qt::Key_I:
-                //If I key is pressed after M, call show integral markers
+                // M + I: Show integral markers
                 emit requestShowIntegralMarkers();
                 break;
             case Qt::Key_B:
-                //If B key is pressed after M, call show background markers
+                // M + B: Show background markers
                 emit requestShowBackgroundMarkers();
                 break;
             case Qt::Key_R:
-                //If B key is pressed after Z, call delete background markers
+                // M + R: Show range markers
                 emit requestShowRangeMarkers();
                 break;
             case Qt::Key_G:
-                //If B key is pressed after Z, call delete background markers
+                // M + G: Show Gauss markers
                 emit requestShowGaussMarkers();
                 break;
             case Qt::Key_A:
-                //If A key is pressed after M, call show all markers
+                // M + A: Show all markers
                 emit requestShowAllMarkers();
                 break;
             case Qt::Key_M:
-                //if the M key is pressed after M, do nothing
                 break;
             default:
-                std::cout<<"Waited for show command after M was pressed but no valid command arrived after it"<<std::endl;
+                std::cout << "Waited for show command after M was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for show command after M was pressed but no valid command arrived after it\n");
                 break;
         }
-        mKeyWasPressed=0;
+        mKeyWasPressed = false;
     }
-        else if(fKeyWasPressed)
-    {
-        switch(event->key())
-        {
+    else if (fKeyWasPressed) {
+        switch (event->key()) {
             case Qt::Key_F:
-                //If I key is pressed after M, call show integral markers
+            case Qt::Key_S:
                 emit fullscreen();
                 break;
+            default:
+                break;
         }
-        fKeyWasPressed=0;
+        fKeyWasPressed = false;
     }
-    else
-    {
-        //Looks at what key was pressed and does different things depending on what was pressed
-        switch(event->key())
-        {
+    else {
+        switch (event->key()) {
             case Qt::Key_H:
             case Qt::Key_Question:
-                //If shift is pressed, mark that down to later check if the / is pressed at the same time
                 emit requestHelp();
                 break;
             case Qt::Key_Control:
-                //If control is pressed, mark that down to later check if the mouse is clicked at the same time
-                controlKeyIsPressed=1;
+                controlKeyIsPressed = true;
                 break;
             case Qt::Key_C:
-                //if the C key is pressed, mark that down and prepare to execute a command
-                cKeyWasPressed=1;
+                cKeyWasPressed = true;
                 break;
             case Qt::Key_Z:
-                //if the C key is pressed, mark that down and prepare to execute a command
-                zKeyWasPressed=1;
+                zKeyWasPressed = true;
                 break;
             case Qt::Key_M:
-                //if the C key is pressed, mark that down and prepare to execute a command
-                mKeyWasPressed=1;
+                mKeyWasPressed = true;
                 break;
             case Qt::Key_I:
-                //if the I key is pressed, add an integral marker on screen and remember the integral position
                 emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
                 break;
-                case Qt::Key_Space:
-                //if the [SpaceBar] key is pressed, add an zoom marker on screen and remember the zoom position
+            case Qt::Key_Space:
                 emit addSpaceBarMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_F:
-                //if the F key is pressed, mark that down and prepare to execute a command
-                fKeyWasPressed=1;
+                fKeyWasPressed = true;
                 break;
             case Qt::Key_Right:
-                //if the > key is pressed, add an integral marker on screen and remember the integral position
                 emit requesttranslateplusTheScreen();
                 break;
             case Qt::Key_Left:
-                //if the < key is pressed, add an integral marker on screen and remember the integral position
                 emit requesttranslateminusTheScreen();
                 break;
             case Qt::Key_Down:
-                //if the v key is pressed, add an integral marker on screen and remember the integral position
                 emit requesttranslatedownTheScreen();
                 break;
             case Qt::Key_Up:
-                //if the ^ key is pressed, add an integral marker on screen and remember the integral position
                 emit requesttranslateupTheScreen();
                 break;
             case Qt::Key_B:
-                //if the B key is pressed, add a background marker on screen and remember the background position
                 emit addBackgroundMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_R:
-                //if the R key is pressed, add a range marker on screen and remember the range position
                 emit requestAddRangeMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_G:
-                //if the G key is pressed, add a Gauss marker on screen and remember the Gauss position
                 emit requestAddGaussMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Equal:
-                //if the = key is pressed, clear the screen of everything except the histogram
                 emit requestClearTheScreen();
-            break;
-            case Qt::Key_Return:
-                //Pentru Petre
                 break;
             case Qt::Key_E:
-                //if the E key is pressed, zoom the region between the spacebar markers
                 emit requestZoomTheScreen();
-            break;
+                break;
             default:
                 QWidget::keyPressEvent(event);
                 break;
-
         }
     }
 }
 
+//______________________________________________________________________________
 void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
 {
-    //Looks at what key was released and does different things depending on what was released
-    switch(event->key())
-    {
+    switch (event->key()) {
         case Qt::Key_Control:
-            //If control is released, mark that down so no check is done with the mouse
-            controlKeyIsPressed=0;
+            controlKeyIsPressed = false;
             break;
         default:
             QWidget::keyReleaseEvent(event);
@@ -404,239 +339,159 @@ void QRootCanvas::keyReleaseEvent(QKeyEvent *event)
 }
 
 //______________________________________________________________________________
-void QRootCanvas::resizeEvent( QResizeEvent *event )
+void QRootCanvas::resizeEvent(QResizeEvent *event)
 {
-   // Handle resize events.
-
-    //Instructs the spectra what to do when the main window gets resized
-   if (fCanvas) {
-      fCanvas->SetCanvasSize(event->size().width(), event->size().height()); 
-      fCanvas->Resize();
-      fCanvas->Update();
-   }
+    if (fCanvas) {
+        fCanvas->SetCanvasSize(event->size().width(), event->size().height());
+        fCanvas->Resize();
+        fCanvas->Update();
+    }
 }
 
 //______________________________________________________________________________
-void QRootCanvas::paintEvent( QPaintEvent * )
+void QRootCanvas::paintEvent(QPaintEvent *)
 {
-   // Handle paint events.
-
-    //Not sure what this does, I have checked the documentation but it is unclear to me
-   if (fCanvas) {
-      fCanvas->Resize();
-      fCanvas->Update();
-   }
+    // Synchronize embedded ROOT canvas sizing and painting
+    if (fCanvas) {
+        fCanvas->Resize();
+        fCanvas->Update();
+    }
 }
 
 //______________________________________________________________________________
 void QMainCanvas::closeEvent(QCloseEvent *e)
 {
-    //This function is called when then app is attempting to close
-    //A window is created which asks the user if he is sure he wants to quit
-    QMessageBox::StandardButton quiting;
-    quiting=QMessageBox::question(this,"Quit","Are you sure you want to quit?",QMessageBox::Yes|QMessageBox::No);
-    //If the answers if yes the app proceeds to close, otherwise it does not
-    if(quiting==QMessageBox::Yes)
-    {
+    QMessageBox::StandardButton quiting = QMessageBox::question(
+        this, tr("Quit"), tr("Are you sure you want to quit?"),
+        QMessageBox::Yes | QMessageBox::No);
+
+    if (quiting == QMessageBox::Yes) {
         e->accept();
-    }
-    else
-    {
+    } else {
         e->ignore();
     }
 }
 
-//------------------------------------------------------------------------------
-
 //______________________________________________________________________________
-QMainCanvas::QMainCanvas(QWidget *parent) : QWidget(parent), backgroundCovarianceMatrix(nullptr)
+QMainCanvas::QMainCanvas(QWidget *parent)
+    : QWidget(parent),
+      backgroundCovarianceMatrix(nullptr)
 {
-   // QMainCanvas constructor.
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    QHBoxLayout *coordBarLayout = new QHBoxLayout();
 
-   QVBoxLayout *l = new QVBoxLayout(this);
-QHBoxLayout *hLayout = new QHBoxLayout();
+    // Embed the ROOT canvas
+    canvas = new QRootCanvas(this);
+    mainLayout->addWidget(canvas);
 
-   //Adds the canvas to the window
-l->addWidget(canvas = new QRootCanvas(this));
+    // Coordinate status bar
+    coordBarLayout->addStretch();
 
-hLayout->addStretch();
+    QLabel *labelXTitle = new QLabel("X:", this);
+    coordBarLayout->addWidget(labelXTitle);
 
-// Crearea QLabel-ului "Andrei" și adăugarea acestuia în layout-ul orizontal
-QLabel *labelAndrei = new QLabel("X:", this);
-hLayout->addWidget(labelAndrei);
+    labelX = new QLabel("", this);
+    labelX->setAlignment(Qt::AlignCenter);
+    labelX->setFixedSize(110, 20);
+    labelX->setStyleSheet("border: 1px solid #555555; background-color: #2b2b2b; color: #ffffff;");
+    coordBarLayout->addWidget(labelX);
 
-// Crearea QLabel-ului pentru coordonate și adăugarea acestuia în layout-ul orizontal
-labelX = new QLabel("", this);
-labelX->setAlignment(Qt::AlignCenter);
-labelX->setFixedSize(110, 20);
-labelX->setStyleSheet("border: 1px solid black;");
-hLayout->addWidget(labelX);
+    QLabel *labelYTitle = new QLabel("Y:", this);
+    coordBarLayout->addWidget(labelYTitle);
 
-labelAndrei = new QLabel("Y:", this);
-hLayout->addWidget(labelAndrei);
+    labelY = new QLabel("", this);
+    labelY->setAlignment(Qt::AlignCenter);
+    labelY->setFixedSize(110, 20);
+    labelY->setStyleSheet("border: 1px solid #555555; background-color: #2b2b2b; color: #ffffff;");
+    coordBarLayout->addWidget(labelY);
 
-labelY = new QLabel("", this);
-labelY->setAlignment(Qt::AlignCenter);
-labelY->setFixedSize(110, 20);
-labelY->setStyleSheet("border: 1px solid black;");
-hLayout->addWidget(labelY);
+    coordBarLayout->addStretch();
 
-// Adăugați stretch și după QLabel-uri pentru a le centra complet
-hLayout->addStretch();
-
-//QLabel *labelText = new QLabel("X:", this);
-//hLayout->addWidget(labelText);
-//l->addLayout(hLayout);
+    // Toolbar icon buttons
     QPushButton *readiconButton = new QPushButton(this);
-   readiconButton->setIcon(QIcon("readicon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
-   readiconButton->setFixedSize(20, 20);
-   hLayout->addWidget(readiconButton);
-   connect(readiconButton, SIGNAL(clicked()), this, SLOT(clicked1()));
+    readiconButton->setIcon(QIcon("readicon.png"));
+    readiconButton->setToolTip(tr("Open Spectrum File"));
+    readiconButton->setFixedSize(24, 24);
+    coordBarLayout->addWidget(readiconButton);
+    connect(readiconButton, &QPushButton::clicked, this, &QMainCanvas::clicked1);
 
-   QPushButton *iconButton = new QPushButton(this);
-   iconButton->setIcon(QIcon("icon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
-   iconButton->setFixedSize(20, 20);
-   hLayout->addWidget(iconButton);
-   connect(iconButton, SIGNAL(clicked()), this, SLOT(OpenColorSelectionDialog()));
+    QPushButton *iconButton = new QPushButton(this);
+    iconButton->setIcon(QIcon("icon.png"));
+    iconButton->setToolTip(tr("Color & Theme Settings"));
+    iconButton->setFixedSize(24, 24);
+    coordBarLayout->addWidget(iconButton);
+    connect(iconButton, &QPushButton::clicked, this, &QMainCanvas::OpenColorSelectionDialog);
 
-   QPushButton *c2piconButton = new QPushButton(this);
-   c2piconButton->setIcon(QIcon("c2picon.png")); // Înlocuiți cu calea către fișierul dvs. de iconiță
-   c2piconButton->setFixedSize(20, 20);
-   hLayout->addWidget(c2piconButton);
-   connect(c2piconButton, SIGNAL(clicked()), this, SLOT(Cal2pMain()));
+    QPushButton *c2piconButton = new QPushButton(this);
+    c2piconButton->setIcon(QIcon("c2picon.png"));
+    c2piconButton->setToolTip(tr("Two-Point Energy Calibration"));
+    c2piconButton->setFixedSize(24, 24);
+    coordBarLayout->addWidget(c2piconButton);
+    connect(c2piconButton, &QPushButton::clicked, this, &QMainCanvas::Cal2pMain);
 
-   l->addLayout(hLayout);
+    mainLayout->addLayout(coordBarLayout);
 
+    // Primary action buttons
+    QPushButton *btnSelectFile = new QPushButton(tr("&Select your file"), this);
+    mainLayout->addWidget(btnSelectFile);
+    connect(btnSelectFile, &QPushButton::clicked, this, &QMainCanvas::clicked1);
 
+    QPushButton *btnIntegralNoBkg = new QPushButton(tr("&Integral No Background"), this);
+    mainLayout->addWidget(btnIntegralNoBkg);
+    connect(btnIntegralNoBkg, &QPushButton::clicked, this, &QMainCanvas::areaFunction);
 
-   //Adds the button to the window
-   l->addWidget(b = new QPushButton("&Select your file", this));
-   //When the button is pressed, execute function clicked1
-   connect(b, SIGNAL(clicked()), this, SLOT(clicked1()));
-   //Same as the previous line of code, it adds a button to the window
-   l->addWidget(b = new QPushButton("&Integral No Background", this));
-   //Same as the previous line of code, it executes the function areaFunction when the button is clicked
-   connect(b, SIGNAL(clicked()), this, SLOT(areaFunction()));
-   //Same as the previous line of code, it adds a button to the window
-   l->addWidget(b = new QPushButton("&Integral With Background", this));
-   //Same as the previous line of code, it executes the function areaFunctionWithBackground when the button is clicked
-   connect(b, SIGNAL(clicked()), this, SLOT(areaFunctionWithBackground()));
+    QPushButton *btnIntegralWithBkg = new QPushButton(tr("Integral &With Background"), this);
+    mainLayout->addWidget(btnIntegralWithBkg);
+    connect(btnIntegralWithBkg, &QPushButton::clicked, this, &QMainCanvas::areaFunctionWithBackground);
 
+    // Connect user interactions from canvas to analysis routines
+    connect(canvas, &QRootCanvas::requestIntegrationNoBackground, this, &QMainCanvas::areaFunction);
+    connect(canvas, &QRootCanvas::requestIntegrationWithBackground, this, &QMainCanvas::areaFunctionWithBackground);
+    connect(canvas, &QRootCanvas::autoFitRequested, this, &QMainCanvas::autoFit);
+    connect(canvas, &QRootCanvas::requestClearTheScreen, this, &QMainCanvas::clearTheScreen);
+    connect(canvas, &QRootCanvas::addBackgroundMarkerRequested, this, &QMainCanvas::addBackgroundMarker);
+    connect(canvas, &QRootCanvas::addIntegralMarkerRequested, this, &QMainCanvas::addIntegralMarker);
+    connect(canvas, &QRootCanvas::showXY, this, &QMainCanvas::showXYcoord);
+    connect(canvas, &QRootCanvas::requestZoomTheScreen, this, &QMainCanvas::zoomTheScreen);
+    connect(canvas, &QRootCanvas::requesttranslateplusTheScreen, this, &QMainCanvas::translateplusTheScreen);
+    connect(canvas, &QRootCanvas::requesttranslateminusTheScreen, this, &QMainCanvas::translateminusTheScreen);
+    connect(canvas, &QRootCanvas::requesttranslatedownTheScreen, this, &QMainCanvas::translatedownTheScreen);
+    connect(canvas, &QRootCanvas::requesttranslateupTheScreen, this, &QMainCanvas::translateupTheScreen);
+    connect(canvas, &QRootCanvas::fullscreen, this, &QMainCanvas::zoomOut);
+    connect(canvas, &QRootCanvas::requestDeleteBackgroundMarkers, this, &QMainCanvas::deleteBackgroundMarkers);
+    connect(canvas, &QRootCanvas::requestDeleteIntegralMarkers, this, &QMainCanvas::deleteIntegralMarkers);
+    connect(canvas, &QRootCanvas::requestDeleteAllMarkers, this, &QMainCanvas::deleteAllMarkers);
+    connect(canvas, &QRootCanvas::requestShowBackgroundMarkers, this, &QMainCanvas::showBackgroundMarkers);
+    connect(canvas, &QRootCanvas::requestShowIntegralMarkers, this, &QMainCanvas::showIntegralMarkers);
+    connect(canvas, &QRootCanvas::requestShowAllMarkers, this, &QMainCanvas::showAllMarkers);
+    connect(canvas, &QRootCanvas::addSpaceBarMarkerRequested, this, &QMainCanvas::addSpaceBarMarker);
+    connect(canvas, &QRootCanvas::requestAddRangeMarker, this, &QMainCanvas::addRangeMarker);
+    connect(canvas, &QRootCanvas::requestDeleteRangeMarkers, this, &QMainCanvas::deleteRangeMarkers);
+    connect(canvas, &QRootCanvas::requestShowRangeMarkers, this, &QMainCanvas::showRangeMarkers);
+    connect(canvas, &QRootCanvas::requestAddGaussMarker, this, &QMainCanvas::addGaussMarker);
+    connect(canvas, &QRootCanvas::requestDeleteGaussMarkers, this, &QMainCanvas::deleteGaussMarkers);
+    connect(canvas, &QRootCanvas::requestShowGaussMarkers, this, &QMainCanvas::showGaussMarkers);
+    connect(canvas, &QRootCanvas::requestFitGauss, this, &QMainCanvas::fitGauss);
+    connect(canvas, &QRootCanvas::requestHelp, this, &QMainCanvas::offerHelp);
+    connect(canvas, &QRootCanvas::killSwitch, qApp, &QCoreApplication::quit);
 
+    connect(canvas, &QRootCanvas::mousePilgrimCoordRequest, this, &QMainCanvas::IdentifyLastPilgrimHistogram);
+    connect(canvas, &QRootCanvas::mouseLeftClickCoordRequest, this, &QMainCanvas::IdentifyLastClickedHistogram);
 
+    connect(canvas, &QRootCanvas::AddLineRequest, this, &QMainCanvas::AddLine);
+    connect(canvas, &QRootCanvas::AddCulomnRequest, this, &QMainCanvas::AddCulomn);
+    connect(canvas, &QRootCanvas::DeleteLineRequest, this, &QMainCanvas::DeleteLine);
+    connect(canvas, &QRootCanvas::DeleteCulomnRequest, this, &QMainCanvas::DeleteCulomn);
+    connect(canvas, &QRootCanvas::RefreshScreenRequest, this, &QMainCanvas::RefreshScreen);
 
+    // Event timer for processing ROOT graphics events
+    fRootTimer = new QTimer(this);
+    connect(fRootTimer, &QTimer::timeout, this, &QMainCanvas::handle_root_events);
+    fRootTimer->start(20);
 
-
-   //connects the keyboard command C+I to the areaFunction;
-   connect(canvas,SIGNAL(requestIntegrationNoBackground()), this, SLOT(areaFunction()));
-
-   //connects the keyboard command C+J to the areaFunction;
-   connect(canvas,SIGNAL(requestIntegrationWithBackground()), this, SLOT(areaFunctionWithBackground()));
-
-   //connects the keyboard/mouse combination command Ctrl+Left Click to the autoFit function;
-   connect(canvas,SIGNAL(autoFitRequested(int, int)), this, SLOT(autoFit(int, int)));
-
-   //connects the keyboard command = to clearing the screen;
-   connect(canvas,SIGNAL(requestClearTheScreen()), this, SLOT(clearTheScreen()));
-
-   //connects the keyboard command B to adding the background markers;
-   connect(canvas,SIGNAL(addBackgroundMarkerRequested(Int_t, Int_t)), this, SLOT(addBackgroundMarker(Int_t, Int_t)));
-
-   //connects the keyboard command I to adding the background markers;
-   connect(canvas,SIGNAL(addIntegralMarkerRequested(Int_t, Int_t)), this, SLOT(addIntegralMarker(Int_t, Int_t)));
-
-   connect(canvas,SIGNAL(showXY(Double_t, Double_t)), this, SLOT(showXYcoord(Double_t, Double_t)));
-
-   //connects the keyboard command E ;
-   connect(canvas,SIGNAL(requestZoomTheScreen()), this, SLOT(zoomTheScreen()));
-
-   //connects the keyboard command > to adding the background markers;
-   connect(canvas,SIGNAL(requesttranslateplusTheScreen()), this, SLOT(translateplusTheScreen()));
-
-   //connects the keyboard command < to adding the background markers;
-   connect(canvas,SIGNAL(requesttranslateminusTheScreen()), this, SLOT(translateminusTheScreen()));
-
-   //connects the keyboard command V to adding the background markers;
-   connect(canvas,SIGNAL(requesttranslatedownTheScreen()), this, SLOT(translatedownTheScreen()));
-
-   //connects the keyboard command ^ to adding the background markers;
-   connect(canvas,SIGNAL(requesttranslateupTheScreen()), this, SLOT(translateupTheScreen()));
-
-   //connects the keyboard command F+S to clearing all markers;
-   connect(canvas,SIGNAL(fullscreen()), this, SLOT(zoomOut()));
-
-   //connects the keyboard command Z+B to clearing the background markers;
-   connect(canvas,SIGNAL(requestDeleteBackgroundMarkers()), this, SLOT(deleteBackgroundMarkers()));
-
-   //connects the keyboard command Z+I to clearing the integral markers;
-   connect(canvas,SIGNAL(requestDeleteIntegralMarkers()), this, SLOT(deleteIntegralMarkers()));
-
-   //connects the keyboard command Z+A to clearing all markers;
-   connect(canvas,SIGNAL(requestDeleteAllMarkers()), this, SLOT(deleteAllMarkers()));
-
-   //connects the keyboard command M+B to clearing the background markers;
-   connect(canvas,SIGNAL(requestShowBackgroundMarkers()), this, SLOT(showBackgroundMarkers()));
-
-   //connects the keyboard command M+I to clearing the integral markers;
-   connect(canvas,SIGNAL(requestShowIntegralMarkers()), this, SLOT(showIntegralMarkers()));
-
-   //connects the keyboard command M+A to clearing all markers;
-   connect(canvas,SIGNAL(requestShowAllMarkers()), this, SLOT(showAllMarkers()));
-
-    //connects the keyboard command space bar to adding the background markers;
-   connect(canvas,SIGNAL(addSpaceBarMarkerRequested(Int_t, Int_t)), this, SLOT(addSpaceBarMarker(Int_t, Int_t)));
-
-   //connects the keyboard command R to adding a range marker;
-   connect(canvas,SIGNAL(requestAddRangeMarker(Int_t, Int_t)), this, SLOT(addRangeMarker(Int_t, Int_t)));
-
-   //connects the keyboard command Z+R to clearing the range markers;
-   connect(canvas,SIGNAL(requestDeleteRangeMarkers()), this, SLOT(deleteRangeMarkers()));
-
-   //connects the keyboard command M+R to clearing the range markers;
-   connect(canvas,SIGNAL(requestShowRangeMarkers()), this, SLOT(showRangeMarkers()));
-
-   //connects the keyboard command G to adding a Gauss marker;
-   connect(canvas,SIGNAL(requestAddGaussMarker(Int_t, Int_t)), this, SLOT(addGaussMarker(Int_t, Int_t)));
-
-   //connects the keyboard command Z+G to clearing the Gauss markers;
-   connect(canvas,SIGNAL(requestDeleteGaussMarkers()), this, SLOT(deleteGaussMarkers()));
-
-   //connects the keyboard command M+G to clearing the Gauss markers;
-   connect(canvas,SIGNAL(requestShowGaussMarkers()), this, SLOT(showGaussMarkers()));
-
-   //connects the keyboard command C+V to fitting the Gauss Functions;
-   connect(canvas,SIGNAL(requestFitGauss()), this, SLOT(fitGauss()));
-
-   //connects the keyboard key ? to listing the commands
-   connect(canvas,SIGNAL(requestHelp()),this,SLOT(offerHelp()));
-
-   //connects the keyboard commands CTRL+C/Z/Y to quitting the app
-   connect(canvas,SIGNAL(killSwitch()), qApp, SLOT(quit()));
-
-
-
-    //connect(canvas,SIGNAL(mousePilgrimCoordRequest( Double_t,  Double_t)), this, SLOT(mousePilgrimCoord(Double_t, Double_t)));
-   //connect(canvas,SIGNAL(mousePilgrimCoordRequest( Double_t,  Double_t)), this, SLOT(mousePilgrimCoord(Double_t, Double_t)));
-    connect(canvas,SIGNAL(mousePilgrimCoordRequest( Double_t,  Double_t)), this, SLOT(IdentifyLastPilgrimHistogram(Double_t , Double_t )));
-
-    connect(canvas,SIGNAL(mouseLeftClickCoordRequest( Double_t,  Double_t)), this, SLOT(IdentifyLastClickedHistogram(Double_t , Double_t )));
-;
-
-    connect(canvas,SIGNAL(AddLineRequest()), this, SLOT(AddLine()));
-    connect(canvas,SIGNAL(AddCulomnRequest()), this, SLOT(AddCulomn()));
-    connect(canvas,SIGNAL(DeleteLineRequest()), this, SLOT(DeleteLine()));
-    connect(canvas,SIGNAL(DeleteCulomnRequest()), this, SLOT(DeleteCulomn()));
-    connect(canvas,SIGNAL(RefreshScreenRequest()), this, SLOT(RefreshScreen()));
-
-
-   fRootTimer = new QTimer( this );
-   //Every 20 ms, call function handle_root_events()
-   QObject::connect( fRootTimer, SIGNAL(timeout()), this, SLOT(handle_root_events()) );
-   fRootTimer->start( 20 );
-
-   //Creates the new TH1F histogram with 10240 bins. Why 10240? Because that's how many our test file has.
-   HijF[1][1] = new TracknHistogram("HijF[1][1]","", 10240, 0, 10240);
-      HijF[1][1]->GetXaxis()->SetNdivisions(0, kTRUE);
+    // Initial default histogram with 10240 bins
+    HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0, 10240);
+    HijF[1][1]->GetXaxis()->SetNdivisions(0, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);
     HijF[1][1]->GetYaxis()->SetNdivisions(0, kTRUE);
     HijF[1][1]->GetYaxis()->SetLabelSize(0);
@@ -1816,10 +1671,10 @@ void QMainCanvas::fitBackground()
     TracknHistogram *tempHist = new TracknHistogram("tempHist","", 10240, 0, 10240);
 
     //Add only the background ranges to the temp histogram
-    for(uint i=0;i<background_markers.size()/2;i++)
+    for (std::size_t i = 0; i < background_markers.size() / 2; ++i)
     {
-        for(uint j=background_markers[2*i];j<=background_markers[2*i+1];j++)
-            tempHist->AddBinContent(j,HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(j));
+        for (Int_t j = background_markers[2 * i]; j <= background_markers[2 * i + 1]; ++j)
+            tempHist->AddBinContent(j, HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(j));
 
         localMinimum=findMinValueInInterval(background_markers[2*i],background_markers[2*i+1]);
 
