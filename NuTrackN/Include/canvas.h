@@ -258,20 +258,18 @@ protected:
    TLine* lineD = nullptr;
    TLine* lineU = nullptr;
       //Tline *backgroundLine;
-      QLabel *labelX;
-      QLabel *labelY;
-    TFormula *gaussianWithBackground;
-    TF1 *gaussianWithBackgroundFunction;
+      QLabel *labelX = nullptr;
+      QLabel *labelY = nullptr;
+    TFormula *gaussianWithBackground = nullptr;
+    TF1 *gaussianWithBackgroundFunction = nullptr;
     //TLine *backgroundLine1;
     //TLine *backgroundLine2;
 
 
-    TFormula *background; 
-    TF1 *backgroundFunction;
-    TLatex *gaussianCenterMarkerText;
+    TFormula *background = nullptr; 
+    TF1 *backgroundFunction = nullptr;
+    TLatex *gaussianCenterMarkerText = nullptr;
 };
 
 
 #endif
-
-

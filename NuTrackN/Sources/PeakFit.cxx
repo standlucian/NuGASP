@@ -225,8 +225,6 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
         }
     }
 
-    delete mainCanvas->background;
-    delete mainCanvas->backgroundFunction;
     mainCanvas->background = new TFormula("background", "[0]*x+[1]");
     mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", 0, 10240);
     mainCanvas->backgroundFunction->SetParameter(0, 0.0);
@@ -287,15 +285,11 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     Double_t gaussianCenterError = 0.0, gaussianIntegral = 0.0;
     Double_t gaussianIntegralError = 0.0, gaussianFWHMError = 0.0;
 
-    delete mainCanvas->gaussianWithBackground;
-    delete mainCanvas->gaussianWithBackgroundFunction;
     mainCanvas->gaussianWithBackground = new TFormula(
         "gaussianWithBackground", "[0]*exp(-(x-[1])^2/(2*[2]))+[3]*x+[4]");
     mainCanvas->gaussianWithBackgroundFunction = new TF1(
         "gaussianWithBackgroundFunction", "gaussianWithBackground", binX - 20, binX + 20);
 
-    delete mainCanvas->background;
-    delete mainCanvas->backgroundFunction;
     mainCanvas->background = new TFormula("background", "[0]*x+[1]");
     mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", binX - 20, binX + 20);
 
