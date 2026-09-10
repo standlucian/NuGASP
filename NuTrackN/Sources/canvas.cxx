@@ -3,7 +3,7 @@
 
 
 //______________________________________________________________________________
-QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent, 0), fCanvas(0)
+QRootCanvas::QRootCanvas(QWidget *parent) : QWidget(parent), fCanvas(nullptr)
 {
    // QRootCanvas constructor.
 
@@ -64,11 +64,11 @@ void QRootCanvas::wheelEvent(QWheelEvent *e)
     // This tells the canvas to handle events when the mouse wheel is scrolled.
     // These are functions of the parent TCanvas class, we should look in the documentation to see what they do.
     if (fCanvas) {
-        if (e->delta() > 0) { // Wheel scrolled up
-            fCanvas->HandleInput(kWheelUp, e->x(), e->y());
+        if (e->angleDelta().y() > 0) { // Wheel scrolled up
+            fCanvas->HandleInput(kWheelUp, e->position().x(), e->position().y());
             emit requesttranslatedownTheScreen();
-        } else if (e->delta() < 0) { // Wheel scrolled down
-            fCanvas->HandleInput(kWheelDown, e->x(), e->y());
+        } else if (e->angleDelta().y() < 0) { // Wheel scrolled down
+            fCanvas->HandleInput(kWheelDown, e->position().x(), e->position().y());
             emit requesttranslateupTheScreen();
         }
 
@@ -728,7 +728,7 @@ HijF[SelectedElement_i][SelectedElement_j]->Draw();
         canvas->getCanvas()->Modified();
         canvas->getCanvas()->Update();
 
-for(int k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
+for(std::size_t k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
         HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(colors_hist[k]);
         canvas->getCanvas()->cd((SelectedElement_i-1)*maxElement_j+SelectedElement_j);
         HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");}
@@ -736,7 +736,6 @@ for(int k=0;k<HijC[SelectedElement_i][SelectedElement_j].size()-1;k++){
      IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
     //Zoom the histogram in the region delimited by spacebar markers
     int i= zoom_markers.size();
-    int x1,x2;
 //ColorTheFrameOfTheHistogram();
     if(i>=2){
     if(zoom_markers[i-2]<zoom_markers[i-1]){
@@ -749,6 +748,7 @@ ColorTheFrameOfTheHistogram();
         canvas->getCanvas()->Modified();
         canvas->getCanvas()->Update();
 }
+
 void QMainCanvas::OpenColorSelectionDialog() {
     QDialog dialog(this);
     dialog.setWindowTitle("Settings");
@@ -822,9 +822,9 @@ void QMainCanvas::Cal2pMain() {
             double energie2 = energy2LineEdit->text().toDouble(&ok2);
 
             if(ok1 && ok2 && energie1 > 0 && energie2 > 0) {
-                CalibrareIn2P(puncte_calib2p, energie1, energie2);
+                TwoPointCalibration(puncte_calib2p, energie1, energie2);
             } else {
-                if(ok1 && ok2 && energie1 < 0 || energie2 < 0) {
+                if(ok1 && ok2 && (energie1 < 0 || energie2 < 0)) {
                     std::cout << "The energy values ​​must be positive\n";
                     CommandPrompt::getInstance()->appendPlainText("The energy values ​​must be positive\n");
                 } else {
@@ -896,7 +896,7 @@ void QMainCanvas::areaFunction()
 {
    //A stand in vector for the markers is used to call the integral function so it perform an integral with no background
    //Regardles of there are backgrounds or not
-   std::vector<Double_t> placeholder_background_markers;
+   std::vector<Int_t> placeholder_background_markers;
    integral_function(HijF[SelectedElement_i][SelectedElement_j],integral_markers,placeholder_background_markers,slope,addition);
 }
 
@@ -1032,7 +1032,7 @@ void QMainCanvas::autoFit(int x, int y)
     gaussianFWHMError=gaussianWithBackgroundFunction->GetParError(2)*2.3548;
 
     //Create the text to be shown in screen showing the Gaussian center and add it to the list of objects to be later deleted
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", gaussianCenter);
 //gaussianCenterMarkerText->DrawLatex(33,gaussianHeight,buffer);
    //listOfObjectsDrawnOnScreen.Add(gaussianCenterMarkerText->DrawLatex(gaussianCenter,gaussianHeight,buffer));
@@ -1114,9 +1114,9 @@ void QMainCanvas::autoFit(int x, int y)
 
     QString numberStr = QString("%1").arg("1", 0, ' ');
     QString gaussianCenterStr = QString("%1").arg(gaussianCenter,0, ' ', 2);
-    QString energyStr = QString("%1(%2)").arg(gaussianCenter, 0, ' ', 2).arg(qCeil(gaussianCenterError * 100), 0, ' ',0);
-    QString gaussianIntegralStr = QString("%1(%2)").arg(gaussianIntegral, 0, ' ', 0).arg(qRound(gaussianIntegralError), 0, ' ',0);
-    QString gaussianFWHMStr = QString("%1(%2)").arg(gaussianFWHM, 0, ' ', 2).arg(qCeil(gaussianFWHMError * 100), 0, ' ',0);
+    QString energyStr = QString("%1(%2)").arg(gaussianCenter, 0, ' ', 2).arg(qCeil(gaussianCenterError * 100));
+    QString gaussianIntegralStr = QString("%1(%2)").arg(gaussianIntegral, 0, ' ', 0).arg(qRound(gaussianIntegralError));
+    QString gaussianFWHMStr = QString("%1(%2)").arg(gaussianFWHM, 0, ' ', 2).arg(qCeil(gaussianFWHMError * 100));
 
 
     QString dataRow = QString("%1%2%3%4%5")
@@ -1358,9 +1358,6 @@ while ((obj = iterator())) {
 listOfObjectsDrawnOnScreen.Clear();
     IdentifyLastClickedHistogram(mousePilgrimX,mousePilgrimY);
     int i= zoom_markers.size();
-    int x1,x2;
-
-
 
     if(i>=2){
     if(zoom_markers[i-2]<zoom_markers[i-1]){
@@ -1787,11 +1784,11 @@ void QMainCanvas::fitGauss()
         fitBackground();
 
         //Declaring a new formula which is a Gaussian and a simple background, and making it a Root function. Define a range on which it is applied
-        TFormula *background = new TFormula("background","[0]*x+[1]");
-        TFormula *gaussian = new TFormula("gaussian","[0]*exp(-(x-[1])^2/(2*[2]))");
+        //TFormula *background = new TFormula("background","[0]*x+[1]");
+        //TFormula *gaussian = new TFormula("gaussian","[0]*exp(-(x-[1])^2/(2*[2]))");
 
         //Declaring the background function
-        TF1 *backgroundFunction = new TF1("backgroundFunction","background",range_markers[0],range_markers[1]);
+        //TF1 *backgroundFunction = new TF1("backgroundFunction","background",range_markers[0],range_markers[1]);
 
         //Declaring the full function that will be used for fitting, initially with just the background
         TF1* fullFunction = new TF1("fullFunction","backgroundFunction", range_markers[0],range_markers[1]);
@@ -1935,11 +1932,11 @@ void QMainCanvas::fitGauss()
             std::cout<<std::setw(10);
             std::cout<<temp<<std::endl;
 
-            QString numberStr = QString("%1").arg(i+1, 0, ' ');
+            QString numberStr = QString("%1").arg(i+1);
             QString gaussianCenterStr = QString("%1").arg(fullFunction->GetParameter(3+i*3),0, ' ', 2);
-            QString energyStr = QString("%1(%2)").arg(fullFunction->GetParameter(3+i*3), 0, ' ', 2).arg(ceil(fullFunction->GetParError(3+i*3)*100), 0, ' ',0);
-            QString gaussianIntegralStr = QString("%1(%2)").arg(tempGaussFunction->Integral(range_markers[0],range_markers[1]), 0, ' ', 0).arg(round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2))), 0, ' ',0);
-            QString gaussianFWHMStr = QString("%1(%2)").arg(fullFunction->GetParameter(4+i*3)*2.3548, 0, ' ', 2).arg(ceil(fullFunction->GetParError(4+i*3)*2.3548*100), 0, ' ',0);
+            QString energyStr = QString("%1(%2)").arg(fullFunction->GetParameter(3+i*3), 0, ' ', 2).arg(ceil(fullFunction->GetParError(3+i*3)*100));
+            QString gaussianIntegralStr = QString("%1(%2)").arg(tempGaussFunction->Integral(range_markers[0],range_markers[1]), 0, ' ', 0).arg(round(sqrt(pow(fitIntegralError,2)+pow(backgroundIntegralError,2))));
+            QString gaussianFWHMStr = QString("%1(%2)").arg(fullFunction->GetParameter(4+i*3)*2.3548, 0, ' ', 2).arg(ceil(fullFunction->GetParError(4+i*3)*2.3548*100));
 
 
             QString dataRow = QString("%1%2%3%4%5")
@@ -2072,7 +2069,7 @@ void QMainCanvas::fitBackground()
     }
 
     //Declaring a new formula which is a simple background, and making it a Root function. Define a range on which it is applied
-    TFormula *background = new TFormula("background","[0]*x+[1]");
+    //TFormula *background = new TFormula("background","[0]*x+[1]");
     TF1 *backgroundFunction = new TF1("backgroundFunction","background",0, 10240);
 
     //Setting the two parameters before the fit
@@ -2141,8 +2138,6 @@ void QMainCanvas::AddCulomn(){
     canvas->getCanvas()->SetBorderMode(0);
     canvas->getCanvas()->SetFillColor(0);
     canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
-    int n=0;
-
 
        for(int z=1;z<=maxElement_i;z++){
            for(int g=1;g<=maxElement_j;g++){
@@ -2169,11 +2164,11 @@ void QMainCanvas::AddCulomn(){
     Double_t center = gaussCenters[z][g][k];
     Double_t height = gaussCentersHeight[z][g][k];
 canvas->getCanvas()->cd((z-1)*maxElement_j+g);
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", center);
     gaussianCenterMarkerText->DrawLatex(center, height, buffer);
 }
-               for(int k=0;k<HijC[z][g].size();k++){
+               for(std::size_t k=0;k<HijC[z][g].size();k++){
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
                for (auto obj : autoFitMarkers[z][g]) {
@@ -2204,8 +2199,6 @@ void QMainCanvas::AddLine(){
     canvas->getCanvas()->SetBorderMode(0);
     canvas->getCanvas()->SetFillColor(0);
     canvas->getCanvas()->Divide(maxElement_j, maxElement_i,0,0,0);
-    int n=0;
-
 
        for(int z=1;z<=maxElement_i;z++){
            for(int g=1;g<=maxElement_j;g++){
@@ -2233,11 +2226,11 @@ for (size_t k = 0; k < gaussCenters[z][g].size(); ++k) {
     Double_t center = gaussCenters[z][g][k];
     Double_t height = gaussCentersHeight[z][g][k];
 canvas->getCanvas()->cd((z-1)*maxElement_j+g);
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", center);
     gaussianCenterMarkerText->DrawLatex(center, height, buffer);
 }
-               for(int k=0;k<HijC[z][g].size();k++){
+for(std::size_t k=0;k<HijC[z][g].size();k++){
 
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
@@ -2296,7 +2289,8 @@ void QMainCanvas::IdentifyLastPilgrimHistogram(Double_t x, Double_t y){
     canvas->getCanvas()->Update();
 }
 
-void QMainCanvas::ColorTheFrameOfTheHistogram(){
+void QMainCanvas::ColorTheFrameOfTheHistogram()
+{
     delete lineR;lineR=nullptr;
     delete lineL;lineL=nullptr;
     delete lineD;lineD=nullptr;
@@ -2325,6 +2319,7 @@ void QMainCanvas::ColorTheFrameOfTheHistogram(){
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
+
   void QMainCanvas::showXYcoord(Double_t x, Double_t y){
 std::string objectInfo, temp;
 double_t from, to, binX, binC;
@@ -2358,8 +2353,9 @@ std::cout<<objectInfo<<"\n";
 }
 
 void QMainCanvas::findHistoWithMaxY(std::vector<TH1F> histos){
-
+    std::vector<TH1F> temp=histos;
 }
+
 void QMainCanvas::DeleteCulomn(){
 if(maxElement_j>1){
 
@@ -2381,11 +2377,11 @@ if(maxElement_j>1){
     Double_t center = gaussCenters[z][g][k];
     Double_t height = gaussCentersHeight[z][g][k];
 canvas->getCanvas()->cd((z-1)*maxElement_j+g);
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", center);
     gaussianCenterMarkerText->DrawLatex(center, height, buffer);
 }
-               for(int k=0;k<HijC[z][g].size();k++){
+               for(std::size_t k=0;k<HijC[z][g].size();k++){
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
                for (auto obj : autoFitMarkers[z][g]) {
@@ -2433,11 +2429,11 @@ for (size_t k = 0; k < gaussCenters[z][g].size(); ++k) {
     Double_t center = gaussCenters[z][g][k];
     Double_t height = gaussCentersHeight[z][g][k];
 canvas->getCanvas()->cd((z-1)*maxElement_j+g);
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", center);
     gaussianCenterMarkerText->DrawLatex(center, height, buffer);
 }
-               for(int k=0;k<HijC[z][g].size();k++){
+               for(std::size_t k=0;k<HijC[z][g].size();k++){
 
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
@@ -2479,11 +2475,11 @@ for (size_t k = 0; k < gaussCenters[z][g].size(); ++k) {
     Double_t center = gaussCenters[z][g][k];
     Double_t height = gaussCentersHeight[z][g][k];
 canvas->getCanvas()->cd((z-1)*maxElement_j+g);
-    char buffer[8];
+    char buffer[64];
     snprintf(buffer, sizeof buffer, "%f", center);
     gaussianCenterMarkerText->DrawLatex(center, height, buffer);
 }
-               for(int k=0;k<HijC[z][g].size();k++){
+               for(std::size_t k=0;k<HijC[z][g].size();k++){
 
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
@@ -2531,7 +2527,7 @@ void QMainCanvas::RefreshScreen(){
                canvas->getCanvas()->cd(n);
                HijF[z][g]->GetYaxis()->SetRangeUser(0, HijF[z][g]->GetMaximum() * 1);
                HijF[z][g]->Draw();
-               for(int k=0;k<HijC[z][g].size();k++){
+               for(std::size_t k=0;k<HijC[z][g].size();k++){
             HijC[z][g][k]->SetLineColor(colors_hist[k]);
                HijC[z][g][k]->Draw("SAME");
                for (auto obj : autoFitMarkers[z][g]) {

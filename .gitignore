@@ -1,0 +1,35 @@
+# C++ object and build files
+*.o
+*.obj
+*.a
+*.la
+*.so
+*.dylib
+
+# Qt generated files
+moc_*
+qrc_*
+ui_*
+*.moc
+moc_predefs.h
+.qmake.stash
+
+# Qt Creator & IDE settings
+*.user
+*.user.*
+.qtc_clangd/
+.vscode/
+.idea/
+
+# Build artifacts & directories
+build/
+build-*/
+Makefile
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+
+# Executables
+NuTrackN/nutrackn
+NuTrackN/canvas
+NuTrackN/Legacy/xtrack/xtrackn

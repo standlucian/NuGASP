@@ -230,8 +230,8 @@ protected:
    QPushButton    *b;
    QTimer         *fRootTimer;
    TList listOfObjectsDrawnOnScreen;
-   std::vector<Double_t> integral_markers;
-   std::vector<Double_t> background_markers;
+   std::vector<Int_t> integral_markers;
+   std::vector<Int_t> background_markers;
    std::vector<Double_t> spacebar_markers;
    std::vector<Double_t> range_markers;
    std::vector<Double_t> gauss_markers;
@@ -249,7 +249,10 @@ protected:
    double_t backgroundA0, backgroundA1;
    double_t backgroundIntegral, backgroundIntegralError;
    TMatrixD *backgroundCovarianceMatrix;
-      TLine *lineR;TLine *lineL;TLine *lineD;TLine *lineU;
+   TLine* lineR = nullptr;
+   TLine* lineL = nullptr;
+   TLine* lineD = nullptr;
+   TLine* lineU = nullptr;
       //Tline *backgroundLine;
       QLabel *labelX;
       QLabel *labelY;
