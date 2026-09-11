@@ -1546,8 +1546,9 @@ void QMainCanvas::clicked1()
         (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
 
     // Set color based on overlay index and draw to canvas pad
-    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(
-        colors_hist[HijC[SelectedElement_i][SelectedElement_j].size() - 1]);
+    const int activeColorIdx = (HijC[SelectedElement_i][SelectedElement_j].size() - 1) % colors_hist.size();
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[activeColorIdx]);
+    HijC[SelectedElement_i][SelectedElement_j].back()->SetLineColor(colors_hist[activeColorIdx]);
     canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
@@ -1556,9 +1557,12 @@ void QMainCanvas::clicked1()
 
     // Redraw all previously loaded spectra on the same pad with "SAME" option
     for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size() - 1; ++k) {
-        HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(colors_hist[k]);
-        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
-        HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+        if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+            HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
+                colors_hist[k % colors_hist.size()]);
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+        }
     }
 
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
@@ -1714,12 +1718,12 @@ void QMainCanvas::stepSpectrumIndex(int delta)
     const int targetIndex = m_currentSpectrumIndex + delta;
     if (targetIndex < 0) {
         CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at first spectrum (#0 of %1).\n").arg(m_currentSpectrumCount));
+            QString("Already at first spectrum (1 of %1).\n").arg(m_currentSpectrumCount));
         return;
     }
     if (targetIndex >= m_currentSpectrumCount) {
         CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at last spectrum (#%1 of %2).\n").arg(m_currentSpectrumCount - 1).arg(m_currentSpectrumCount));
+            QString("Already at last spectrum (%1 of %1).\n").arg(m_currentSpectrumCount));
         return;
     }
 
@@ -1737,6 +1741,23 @@ void QMainCanvas::stepSpectrumIndex(int delta)
         return;
     }
 
+    // Preserve active zoom window before loading new data (LoadFromData unzooms by default)
+    TAxis *xAxis = HijF[SelectedElement_i][SelectedElement_j]->GetXaxis();
+    bool wasZoomed = false;
+    double prevXmin = 0.0, prevXmax = 0.0;
+    if (xAxis && (xAxis->GetFirst() > 1 || xAxis->GetLast() < xAxis->GetNbins())) {
+        wasZoomed = true;
+        prevXmin = xAxis->GetBinLowEdge(xAxis->GetFirst());
+        prevXmax = xAxis->GetBinUpEdge(xAxis->GetLast());
+    }
+
+    // Ensure baseline spectrum is present in HijC if it was previously empty
+    if (HijC[SelectedElement_i][SelectedElement_j].empty()) {
+        TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        baseClone->SetLineColor(colors_hist[0]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
+    }
+
     if (!trackHist->LoadFromData(spectrumData, m_currentSpectrumFile.toStdString())) {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Failed to load spectrum data for #%1.\n").arg(targetIndex));
@@ -1745,15 +1766,52 @@ void QMainCanvas::stepSpectrumIndex(int delta)
 
     m_currentSpectrumIndex = targetIndex;
 
-    // Update clone list HijC so overlay doesn't pile up uncontrollably on stepping
-    if (!HijC[SelectedElement_i][SelectedElement_j].empty()) {
-        delete HijC[SelectedElement_i][SelectedElement_j].back();
-        HijC[SelectedElement_i][SelectedElement_j].pop_back();
+    if (delta > 0) {
+        // Xtrackn behavior: preserve previous spectra and overlay the new one with a different color
+        TH1F *newClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        const int colorIdx = HijC[SelectedElement_i][SelectedElement_j].size() % colors_hist.size();
+        newClone->SetLineColor(colors_hist[colorIdx]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(newClone);
+    } else {
+        // Stepping backwards (delta < 0, # -):
+        // If overlays exist, remove the most recent overlay so navigation steps back cleanly
+        if (HijC[SelectedElement_i][SelectedElement_j].size() > 1) {
+            delete HijC[SelectedElement_i][SelectedElement_j].back();
+            HijC[SelectedElement_i][SelectedElement_j].pop_back();
+        } else {
+            // Single spectrum displayed: replace it with the new target spectrum
+            if (!HijC[SelectedElement_i][SelectedElement_j].empty()) {
+                delete HijC[SelectedElement_i][SelectedElement_j].back();
+                HijC[SelectedElement_i][SelectedElement_j].pop_back();
+            }
+            TH1F *newClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+            newClone->SetLineColor(colors_hist[0]);
+            HijC[SelectedElement_i][SelectedElement_j].push_back(newClone);
+        }
     }
-    HijC[SelectedElement_i][SelectedElement_j].push_back(
-        (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
 
-    // Update axes and canvas
+    // Ensure line colors match their respective positions in colors_hist
+    for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size(); ++k) {
+        if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+            HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
+                colors_hist[k % colors_hist.size()]);
+        }
+    }
+
+    const int activeColorIdx = (HijC[SelectedElement_i][SelectedElement_j].size() - 1) % colors_hist.size();
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[activeColorIdx]);
+
+    // Restore zoom range if active
+    if (wasZoomed) {
+        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(prevXmin, prevXmax);
+    } else if (zoom_markers.size() >= 2) {
+        std::size_t zm = zoom_markers.size();
+        double zLow = std::min(zoom_markers[zm - 2], zoom_markers[zm - 1]);
+        double zHigh = std::max(zoom_markers[zm - 2], zoom_markers[zm - 1]);
+        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zLow, zHigh);
+    }
+
+    // Update axes and canvas considering all visible overlaid spectra
     adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
     maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
         HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
@@ -1761,13 +1819,17 @@ void QMainCanvas::stepSpectrumIndex(int delta)
     canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
-    // Redraw any other overlays if present
+    // Redraw all previous spectra in HijC with "SAME" option
     for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size() - 1; ++k) {
-        HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(colors_hist[k]);
-        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
-        HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+        if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+            HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
+                colors_hist[k % colors_hist.size()]);
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+        }
     }
 
+    ColorTheFrameOfTheHistogram();
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
@@ -2143,10 +2205,14 @@ void QMainCanvas::clearTheScreen()
     if (HijF[SelectedElement_i][SelectedElement_j]) {
         HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
+        for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
+            delete h;
+        }
         HijC[SelectedElement_i][SelectedElement_j].clear();
-        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(kBlue);
-        HijC[SelectedElement_i][SelectedElement_j].push_back(
-            (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
+        TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        baseClone->SetLineColor(colors_hist[0]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
     }
 
     ColorTheFrameOfTheHistogram();
@@ -2246,7 +2312,7 @@ void QMainCanvas::toggleLogY()
 // empty space at the top of the spectrum so the largest peak does not touch
 // the top border.
 //==============================================================================
-void QMainCanvas::adjustYAxisToVisibleMax(TH1F *hist)
+void QMainCanvas::adjustYAxisToVisibleMax(TH1F *hist, int z, int g)
 {
     if (!hist) return;
     TAxis *xAxis = hist->GetXaxis();
@@ -2262,6 +2328,25 @@ void QMainCanvas::adjustYAxisToVisibleMax(TH1F *hist)
         double content = hist->GetBinContent(b);
         if (content > localMax) {
             localMax = content;
+        }
+    }
+
+    // Also consider overlaid spectra on the target pad to avoid clipping peaks
+    const int targetZ = (z >= 1 && z < 12) ? z : SelectedElement_i;
+    const int targetG = (g >= 1 && g < 12) ? g : SelectedElement_j;
+    if (targetZ >= 1 && targetZ < 12 && targetG >= 1 && targetG < 12) {
+        for (TH1F *overlay : HijC[targetZ][targetG]) {
+            if (!overlay || overlay == hist) continue;
+            Int_t ovFirst = firstBin;
+            Int_t ovLast  = lastBin;
+            if (ovFirst < 1) ovFirst = 1;
+            if (ovLast > overlay->GetNbinsX()) ovLast = overlay->GetNbinsX();
+            for (Int_t b = ovFirst; b <= ovLast; ++b) {
+                double content = overlay->GetBinContent(b);
+                if (content > localMax) {
+                    localMax = content;
+                }
+            }
         }
     }
 
@@ -2879,7 +2964,7 @@ void QMainCanvas::AddCulomn()
 
             const int padIndex = (z - 1) * maxElement_j + g;
             rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g]);
+            adjustYAxisToVisibleMax(HijF[z][g], z, g);
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations
@@ -2964,7 +3049,7 @@ void QMainCanvas::AddLine()
 
             const int padIndex = (z - 1) * maxElement_j + g;
             rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g]);
+            adjustYAxisToVisibleMax(HijF[z][g], z, g);
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations
@@ -3264,7 +3349,7 @@ void QMainCanvas::DeleteCulomn()
 
             const int padIndex = (z - 1) * maxElement_j + g;
             rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g]);
+            adjustYAxisToVisibleMax(HijF[z][g], z, g);
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations
@@ -3444,7 +3529,7 @@ void QMainCanvas::RefreshScreen()
                 rootCanvas->cd(padIndex);
             }
 
-            adjustYAxisToVisibleMax(HijF[z][g]);
+            adjustYAxisToVisibleMax(HijF[z][g], z, g);
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations

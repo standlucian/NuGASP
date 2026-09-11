@@ -278,7 +278,7 @@ public slots:
     //void DrawHisto();
     void toggleLogY();
     void updateAxisStatusLabels();
-    void adjustYAxisToVisibleMax(TH1F *hist);
+    void adjustYAxisToVisibleMax(TH1F *hist, int z = -1, int g = -1);
     void renderPeakLabels(int z, int g);
     QSplitter* getMainSplitter() const { return mainSplitter; }
 
