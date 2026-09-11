@@ -15,6 +15,7 @@
 #include "Integral.h"
 #include "calib.h"
 #include "PeakFit.h"
+#include "SpectrumImportDialog.h"
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
@@ -23,6 +24,7 @@
 #include <QWidget>
 #include <QPushButton>
 #include <QLayout>
+#include <QSplitter>
 #include <QTimer>
 #include <QPaintEvent>
 #include <QResizeEvent>
@@ -40,6 +42,8 @@
 #include <QMenu>
 #include <QIcon>
 #include <QMainWindow>
+#include <QDir>
+#include <QFileInfo>
 
 
 
@@ -81,19 +85,59 @@
 #include <TAxis.h>
 #include <TList.h>
 
+class TH1F;
+class QMainCanvas;
+
+class QZoomHUD : public QWidget
+{
+   Q_OBJECT
+public:
+   explicit QZoomHUD(QWidget *parent = nullptr);
+   void updateData(TH1F *hist, int targetBin, double energy = -1.0, bool isCalibrated = false,
+                   const std::vector<double> &fitCurve = {},
+                   const std::vector<double> &bkgCurve = {},
+                   bool hasFit = false,
+                   const QString &fitInfo = QString());
+
+protected:
+   void paintEvent(QPaintEvent *event) override;
+
+private:
+   int                 m_targetBin;
+   double              m_targetCounts;
+   double              m_targetEnergy;
+   bool                m_isCalibrated;
+   int                 m_startBin;
+   int                 m_endBin;
+   double              m_maxCount;
+   std::vector<double> m_counts;
+   std::vector<double> m_fitCurve;
+   std::vector<double> m_bkgCurve;
+   bool                m_hasFit;
+   QString             m_fitInfo;
+};
+
 class QRootCanvas : public QWidget
 {
    Q_OBJECT
+   friend class QMainCanvas;
 
 public:
    QRootCanvas( QWidget *parent = 0);
-   virtual ~QRootCanvas() {}
+   virtual ~QRootCanvas();
    TCanvas* getCanvas() { return fCanvas; }
+   QZoomHUD* getZoomHUD() { return m_zoomHUD; }
+   void setMainCanvas(QMainCanvas *main) { m_mainCanvas = main; }
+   void updateZoomHUD(int mouseX, int mouseY);
+   void hideZoomHUD();
+   bool eventFilter(QObject *watched, QEvent *event) override;
 
 protected:
    TCanvas        *fCanvas;
    Double_t       xMousePosition, yMousePosition;
    bool           controlKeyIsPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed;
+   QZoomHUD       *m_zoomHUD;
+   QMainCanvas    *m_mainCanvas;
 
    virtual void    mouseMoveEvent( QMouseEvent *e );
    virtual void    mousePressEvent( QMouseEvent *e );
@@ -104,6 +148,9 @@ protected:
    virtual void    showContextMenu(QMouseEvent *e);
    virtual void    keyPressEvent(QKeyEvent *event);
    virtual void    keyReleaseEvent(QKeyEvent *event);
+   virtual void    focusOutEvent(QFocusEvent *event);
+   virtual void    enterEvent(QEvent *event);
+   virtual void    leaveEvent(QEvent *event);
 
 signals:
    void requestIntegrationNoBackground();
@@ -157,12 +204,15 @@ class QMainCanvas : public QWidget
    friend void runAutoFit(QMainCanvas *mainCanvas, int x, int y);
    friend void runMultiPeakFit(QMainCanvas *mainCanvas);
    friend void fitBackgroundHelper(QMainCanvas *mainCanvas);
+   friend class QRootCanvas;
 
 public:
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas();
    virtual void changeEvent(QEvent * e);
    virtual void closeEvent(QCloseEvent *e);
+   virtual void keyPressEvent(QKeyEvent *event);
+   virtual void keyReleaseEvent(QKeyEvent *event);
    int getBinFromClick(int x, int y);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
@@ -223,14 +273,25 @@ public slots:
    void showXYcoord(Double_t, Double_t);
    void DeleteCulomn();
    void DeleteLine();
-   void RefreshScreen();
-   //void DrawHisto();
+    void RefreshScreen();
+    //void DrawHisto();
+    void toggleLogY();
+    void updateAxisStatusLabels();
+    void adjustYAxisToVisibleMax(TH1F *hist);
+    void renderPeakLabels(int z, int g);
+    QSplitter* getMainSplitter() const { return mainSplitter; }
+
+    // Multi-spectrum navigation slots (# - and # +)
+    void onSpectrumIncrement();
+    void onSpectrumDecrement();
+    void stepSpectrumIndex(int delta);
 
 protected:
-   //virtual void paintEvent(QPaintEvent *event);
-   void clearDrawnObjects();
+    //virtual void paintEvent(QPaintEvent *event);
+    void clearDrawnObjects();
 
-   QRootCanvas    *canvas;
+    QSplitter      *mainSplitter = nullptr;
+    QRootCanvas    *canvas = nullptr;
    QPushButton    *b;
    QTimer         *fRootTimer;
    TList listOfObjectsDrawnOnScreen;
@@ -260,6 +321,21 @@ protected:
       //Tline *backgroundLine;
       QLabel *labelX = nullptr;
       QLabel *labelY = nullptr;
+
+      // Xtrackn top status header labels
+      QLabel *labelXMin = nullptr;
+      QLabel *labelXMax = nullptr;
+      QLabel *labelYMin = nullptr;
+      QLabel *labelYMax = nullptr;
+      QLabel *labelChannel = nullptr;
+      QLabel *labelEnergy = nullptr;
+      QLabel *labelCounts = nullptr;
+      QLabel *labelCursorY = nullptr;
+
+      // Xtrackn bottom control bar status labels
+      QLabel *labelSpectrumFile = nullptr;
+      QLabel *labelWorkingPath = nullptr;
+      QLabel *labelOutputFile = nullptr;
     TFormula *gaussianWithBackground = nullptr;
     TF1 *gaussianWithBackgroundFunction = nullptr;
     //TLine *backgroundLine1;
@@ -269,6 +345,13 @@ protected:
     TFormula *background = nullptr; 
     TF1 *backgroundFunction = nullptr;
     TLatex *gaussianCenterMarkerText = nullptr;
+
+    // Multi-spectrum file state
+    QString        m_currentSpectrumFile;
+    int            m_currentSpectrumIndex{0};
+    int            m_currentSpectrumCount{1};
+    int            m_currentSpectrumLength{10240};
+    SpectrumFormat m_currentSpectrumFormat{SpectrumFormat::LongInt32};
 };
 
 

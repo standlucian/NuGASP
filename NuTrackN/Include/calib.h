@@ -14,9 +14,15 @@ class TracknHistogram;
 void TwoPointCalibration(const std::vector<Float_t>& puncte_calib2p, double energie1, double energie2);
 
 /**
- * @brief Launches the interactive 2-point calibration dialog, prompts the user for
- *        energies corresponding to the last two peaks, and applies the calibration
- *        to the active spectrum.
+ * @brief Computes first-order linear energy calibration coefficients A0 (intercept) and A1 (slope)
+ *        using linear regression over N reference points (channel, energy).
+ */
+void LinearCalibration(const std::vector<double>& channels, const std::vector<double>& energies);
+
+/**
+ * @brief Launches the interactive N-point first-order calibration dialog, prompting the user for
+ *        the number of points and physical energies corresponding to the reference channels,
+ *        and applies the calibration to the active spectrum.
  */
 void runTwoPointCalibrationDialog(QWidget *parent,
                                   const std::vector<Float_t> &puncte_calib2p,

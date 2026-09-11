@@ -52,6 +52,14 @@ public:
      */
     bool LoadFromFile(const std::string &filename);
 
+    /**
+     * @brief Loads spectrum data from an in-memory vector of channel counts.
+     * @param data Vector of channel count values.
+     * @param sourcePath Optional path to the source file for display/provenance.
+     * @return True if data was non-empty and loaded, false otherwise.
+     */
+    bool LoadFromData(const std::vector<double> &data, const std::string &sourcePath = "");
+
 private:
     bool fIsCalibrated{false};
     Double_t fCalibA0{0.0};

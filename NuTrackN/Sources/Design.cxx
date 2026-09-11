@@ -3,6 +3,7 @@
 
 #include <QFontDatabase>
 #include <QVBoxLayout>
+#include <QSplitter>
 #include <QDialog>
 #include <QFormLayout>
 #include <QComboBox>
@@ -20,7 +21,8 @@ QMainCanvas *CommandPrompt::mainCanvas = nullptr;
 // CommandPrompt Constructor
 //==============================================================================
 // Constructs the embedded terminal log widget. Configures read-only display,
-// cross-platform monospace typography, a circular buffer limit, and dark styling.
+// cross-platform monospace typography, a circular buffer limit, and a clean
+// white background theme.
 //==============================================================================
 CommandPrompt::CommandPrompt(QWidget *parent) : QPlainTextEdit(parent) {
   setPlaceholderText("NuTrackN Output Console...");
@@ -30,19 +32,19 @@ CommandPrompt::CommandPrompt(QWidget *parent) : QPlainTextEdit(parent) {
   // uncertainties (e.g. centroid, FWHM, Poisson errors) align column-by-column
   // across different operating systems (Linux, Windows, macOS).
   QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  monoFont.setPointSize(9);
+  monoFont.setPointSize(14);
   setFont(monoFont);
 
   // Buffer Management: Limit maximum line history to 10,000 blocks to prevent
   // memory exhaustion during heavy analysis or multi-peak scanning loops.
   setMaximumBlockCount(10000);
 
-  // Styling: Dark terminal theme with high-contrast text and subtle border
+  // Styling: White background theme with high-contrast text and clean border
   setStyleSheet("QPlainTextEdit {"
-                "  background-color: #1e1e1e;"
-                "  color: #d4d4d4;"
-                "  border: 1px solid #3c3c3c;"
-                "  selection-background-color: #264f78;"
+                "  background-color: #ffffff;"
+                "  color: #000000;"
+                "  border: 1px solid #cccccc;"
+                "  selection-background-color: #0078d7;"
                 "  selection-color: #ffffff;"
                 "}");
 }
@@ -77,8 +79,9 @@ CommandPrompt *CommandPrompt::getInstance() {
 //==============================================================================
 // addCommandPrompt
 //==============================================================================
-// Embeds the singleton CommandPrompt widget directly into the main application
-// window's layout below the ROOT canvas, with proportional sizing.
+// Embeds the singleton CommandPrompt widget into the main application window's
+// vertical QSplitter below the ROOT spectrum canvas, enabling dynamic mouse
+// resizing. Defaults the prompt console height to 20% of the total window height.
 //==============================================================================
 void addCommandPrompt(QMainCanvas *m) {
   if (!m) {
@@ -89,19 +92,28 @@ void addCommandPrompt(QMainCanvas *m) {
   CommandPrompt::setMainCanvas(m);
   CommandPrompt *prompt = CommandPrompt::getInstance();
 
-  // Calculate proportional height (35% of total canvas height, minimum 120px)
-  // to balance spectrum visibility with text log readability.
-  const int canvasHeight = m->height();
-  const int initialHeight =
-      (canvasHeight > 0) ? static_cast<int>(canvasHeight * 0.35) : 220;
-  prompt->setMinimumHeight(120);
-  prompt->resize(prompt->width(), initialHeight);
+  QSplitter *splitter = m->getMainSplitter();
+  if (splitter) {
+    prompt->setParent(splitter);
+    splitter->addWidget(prompt);
+    prompt->setMinimumHeight(60);
 
-  // Insert the console widget at the bottom of the main vertical layout
-  QVBoxLayout *layout = qobject_cast<QVBoxLayout *>(m->layout());
-  if (layout) {
-    layout->addWidget(prompt);
-    layout->update();
+    // Calculate default height: 20% of total window height for prompt,
+    // remaining 80% for top spectrum and controls area.
+    const int totalHeight = (m->height() > 0) ? m->height() : 720;
+    const int promptHeight = std::max(60, static_cast<int>(totalHeight * 0.20));
+    const int topHeight = totalHeight - promptHeight;
+
+    splitter->setStretchFactor(0, 4); // 80% stretch for spectrum / controls
+    splitter->setStretchFactor(1, 1); // 20% stretch for output prompt
+    splitter->setSizes(QList<int>() << topHeight << promptHeight);
+  } else {
+    // Fallback: insert directly into vertical layout if splitter is unavailable
+    QVBoxLayout *layout = qobject_cast<QVBoxLayout *>(m->layout());
+    if (layout) {
+      layout->addWidget(prompt);
+      layout->update();
+    }
   }
 }
 
@@ -129,7 +141,14 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
   // Construct dialog modal
   QDialog dialog(parent);
   dialog.setWindowTitle("Color & Theme Settings");
-  dialog.setStyleSheet("background-color: #2b2b2b; color: #ffffff;");
+  dialog.setStyleSheet(
+      "QDialog { background-color: #2b2b2b; color: #ffffff; font-size: 16px; }"
+      "QLabel { color: #ffffff; font-size: 16px; }"
+      "QComboBox { background-color: #ffffff; color: #000000; font-size: 16px; padding: 4px 8px; border-radius: 3px; }"
+      "QPushButton { background-color: #4a4a4a; color: #ffffff; border: 1px solid #707070; "
+      "border-radius: 4px; padding: 6px 20px; font-weight: bold; font-size: 16px; min-height: 28px; }"
+      "QPushButton:hover { background-color: #5a5a5a; }"
+  );
   QFormLayout form(&dialog);
 
   // Theme dropdown options

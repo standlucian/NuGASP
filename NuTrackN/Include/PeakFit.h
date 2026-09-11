@@ -69,6 +69,22 @@ bool checkGauss(std::vector<Double_t> &gauss_markers, const std::vector<Double_t
 void fitBackgroundHelper(QMainCanvas *mainCanvas);
 
 /**
+ * @brief Identifies the peak apex and determines optimal fit boundaries using 3-point smoothing.
+ *
+ * Scans a local window around clickedBin on a 3-point triangular smoothed representation
+ * to locate the true local apex, then walks left and right down the slopes to detect the
+ * valley floors (or baseline level). Returns the apex and the recommended [xMin, xMax]
+ * fitting range with background padding, without modifying the underlying raw histogram.
+ *
+ * @param hist Pointer to ROOT 1D histogram.
+ * @param clickedBin Channel bin corresponding to the user click.
+ * @param outApex Output refined peak apex channel.
+ * @param outXMin Output lower fitting boundary channel.
+ * @param outXMax Output upper fitting boundary channel.
+ */
+void findPeakBoundariesWithSmoothing(TH1F *hist, int clickedBin, int &outApex, Double_t &outXMin, Double_t &outXMax);
+
+/**
  * @brief Runs the automated single-peak Gaussian fit workflow on the active histogram pad.
  *
  * Fits a Gaussian peak + linear background around the clicked channel coordinate,

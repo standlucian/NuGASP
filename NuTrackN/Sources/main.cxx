@@ -14,15 +14,26 @@ int main(int argc, char **argv) {
   app.setApplicationName("NuTrackN");
   app.setApplicationDisplayName("NuTrackN - Gamma Spectroscopy Analysis");
   app.setOrganizationName("NuGASP");
-  app.setWindowIcon(QIcon("icon.png"));
+  // Scale global application default font by 50%
+  QFont appFont = app.font();
+  if (appFont.pointSizeF() > 0) {
+    appFont.setPointSizeF(appFont.pointSizeF() * 1.5);
+  } else if (appFont.pointSize() > 0) {
+    appFont.setPointSize(static_cast<int>(std::round(appFont.pointSize() * 1.5)));
+  } else if (appFont.pixelSize() > 0) {
+    appFont.setPixelSize(static_cast<int>(std::round(appFont.pixelSize() * 1.5)));
+  } else {
+    appFont.setPointSize(14);
+  }
+  app.setFont(appFont);
 
   // Instantiate main analysis canvas widget
   QMainCanvas mainWindow(nullptr);
   mainWindow.setWindowTitle("NuTrackN - Gamma Spectroscopy Analysis");
   mainWindow.setWindowIcon(QIcon("icon.png"));
 
-  // Set initial window geometry and attach the command prompt interface
-  mainWindow.setGeometry(100, 100, 1024, 720);
+  // Set initial window geometry to comfortably accommodate 50% larger UI elements
+  mainWindow.setGeometry(80, 80, 1200, 800);
   mainWindow.show();
 
   // Attach command prompt panel to the canvas layout

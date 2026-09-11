@@ -40,7 +40,8 @@ HEADERS += \
     Include/calib.h \
     Include/tracknhistogram.h \
     Include/Design.h \
-    Include/PeakFit.h
+    Include/PeakFit.h \
+    Include/SpectrumImportDialog.h
 
 # Project source files
 SOURCES += \
@@ -50,6 +51,7 @@ SOURCES += \
     Sources/calib.cxx \
     Sources/tracknhistogram.cxx \
     Sources/Design.cxx \
-    Sources/PeakFit.cxx
+    Sources/PeakFit.cxx \
+    Sources/SpectrumImportDialog.cxx
 
 

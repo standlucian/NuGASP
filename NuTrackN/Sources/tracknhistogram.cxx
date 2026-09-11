@@ -188,3 +188,33 @@ bool TracknHistogram::LoadFromFile(const std::string &filename) {
   return true;
 }
 
+//==============================================================================
+// TracknHistogram::LoadFromData
+//==============================================================================
+// Loads spectrum data directly from an in-memory vector of channel counts.
+// Adjusts the histogram bins to exactly match the data size, resets axes,
+// and optionally records the file path.
+//==============================================================================
+bool TracknHistogram::LoadFromData(const std::vector<double> &data, const std::string &sourcePath) {
+  if (data.empty()) {
+    return false;
+  }
+
+  Reset();
+
+  // Resize histogram bins to match incoming spectrum length
+  SetBins(static_cast<Int_t>(data.size()), 0.0, static_cast<Double_t>(data.size()));
+
+  for (std::size_t i = 0; i < data.size(); ++i) {
+    SetBinContent(static_cast<Int_t>(i + 1), data[i]);
+  }
+
+  GetXaxis()->UnZoom();
+  GetYaxis()->UnZoom();
+  if (!sourcePath.empty()) {
+    SetSourceFilePath(sourcePath);
+  }
+
+  return true;
+}
+
