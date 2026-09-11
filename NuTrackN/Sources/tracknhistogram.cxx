@@ -218,3 +218,17 @@ bool TracknHistogram::LoadFromData(const std::vector<double> &data, const std::s
   return true;
 }
 
+//==============================================================================
+// TracknHistogram::GetBinData
+//==============================================================================
+// Retrieves all channel counts from bin 1 through NbinsX into a std::vector.
+//==============================================================================
+std::vector<double> TracknHistogram::GetBinData() const {
+  Int_t nBins = GetNbinsX();
+  std::vector<double> data;
+  data.reserve(nBins);
+  for (Int_t i = 1; i <= nBins; ++i) {
+    data.push_back(GetBinContent(i));
+  }
+  return data;
+}

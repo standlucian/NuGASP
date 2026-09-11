@@ -235,6 +235,7 @@ public:
 
 public slots:
    void clicked1();
+   void clickedW();
    void areaFunction();
    void areaFunctionWithBackground();
    void handle_root_events();
@@ -348,6 +349,7 @@ protected:
 
     // Multi-spectrum file state
     QString        m_currentSpectrumFile;
+    QString        m_currentOutputFile;
     int            m_currentSpectrumIndex{0};
     int            m_currentSpectrumCount{1};
     int            m_currentSpectrumLength{10240};

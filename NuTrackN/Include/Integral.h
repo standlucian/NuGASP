@@ -49,6 +49,22 @@ void get_best_fitted_line(TH1F *histogram,
                           Double_t &slope, Double_t &yIntercept);
 
 /**
+ * @brief Stores summary results of an integrated peak.
+ */
+struct IntegratedPeak {
+    int index{0};
+    Double_t centroid{0.0};
+    Double_t centroidError{0.0};
+    Double_t area{0.0};
+    Double_t areaError{0.0};
+    Double_t fwhm{0.0};
+    Double_t fwhmError{0.0};
+    Double_t energy{0.0};
+    Double_t energyError{0.0};
+    bool isCalibrated{false};
+};
+
+/**
  * @brief Performs ROI peak integration with background subtraction, computing
  * net area, peak centroid, and FWHM along with propagated statistical
  * uncertainties.
@@ -64,10 +80,13 @@ void get_best_fitted_line(TH1F *histogram,
  * @param slope Reference receiving the background slope.
  * @param addition Reference receiving the background intercept (named
  * 'addition' for legacy compatibility).
+ * @param outPeaks Optional pointer to vector receiving peak result records.
  */
 void integral_function(TH1F *histogram,
                        const std::vector<Int_t> &integral_markers,
                        const std::vector<Int_t> &background_markers,
-                       Double_t &slope, Double_t &addition);
+                       Double_t &slope, Double_t &addition,
+                       std::vector<IntegratedPeak> *outPeaks = nullptr);
 
 #endif // INTEGRAL_H
+

@@ -206,6 +206,9 @@ void runTwoPointCalibrationDialog(QWidget *parent,
             chLabel->setStyleSheet("color: #dddddd;");
             QLineEdit *chEdit = new QLineEdit(rowWidget);
             chEdit->setFixedWidth(140);
+            chEdit->setReadOnly(true);
+            chEdit->setFocusPolicy(Qt::NoFocus);
+            chEdit->setStyleSheet("background-color: #383838; color: #9cdcfe; font-weight: bold; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px;");
 
             QLabel *enLabel = new QLabel("Energy (keV):", rowWidget);
             enLabel->setStyleSheet("color: #dddddd;");

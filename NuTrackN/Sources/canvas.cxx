@@ -3,6 +3,7 @@
 #include "PeakFit.h"
 #include "tracknhistogram.h"
 #include "SpectrumImportDialog.h"
+#include "SpectrumExportDialog.h"
 
 #include <QPainter>
 #include <QPen>
@@ -1186,6 +1187,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     QPushButton *btnInt = makeButton("Int", topContainer, true);
     btnInt->setFixedWidth(93);
     btnInt->setFixedHeight(36);
+    btnInt->setToolTip(tr("Integrate peak area (gross or net with background)."));
     rightBar->addWidget(btnInt);
     connect(btnInt, &QPushButton::clicked, this, &QMainCanvas::areaFunctionWithBackground);
 
@@ -1274,9 +1276,11 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnR, &QPushButton::clicked, this, &QMainCanvas::clicked1);
     bottomBtnGrid->addWidget(btnR, 0, 0);
 
-    QPushButton *btnW = makeButton("W", topContainer, false);
+    QPushButton *btnW = makeButton("W", topContainer, true);
     btnW->setFixedWidth(54);
     btnW->setFixedHeight(36);
+    btnW->setToolTip(tr("Write / export current spectrum to a file."));
+    connect(btnW, &QPushButton::clicked, this, &QMainCanvas::clickedW);
     bottomBtnGrid->addWidget(btnW, 0, 1);
 
     QPushButton *btnDec = makeButton("# -", topContainer, true);
@@ -1614,6 +1618,75 @@ void QMainCanvas::clicked1()
 }
 
 //==============================================================================
+// QMainCanvas::clickedW
+//==============================================================================
+// Opens the SpectrumExportDialog allowing the user to export the active spectrum
+// to disk in Long (32-bit int), Float (32-bit), Double (64-bit), or Fortran
+// ASCII (10I9) format, with custom or standard channel count, and supporting
+// overwrite, append, or indexed direct-access write for multi-spectrum files.
+// Upon successful export, updates labelOutputFile ("-> filename").
+//==============================================================================
+void QMainCanvas::clickedW()
+{
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+    if (!trackHist || trackHist->GetNbinsX() <= 0) {
+        QMessageBox::information(this, tr("No Spectrum Loaded"),
+                                 tr("There is no active spectrum to export.\nPlease load a spectrum first with 'R'."));
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    std::vector<double> data = trackHist->GetBinData();
+    if (data.empty()) {
+        QMessageBox::information(this, tr("Empty Spectrum"),
+                                 tr("The active spectrum contains no channel data to export."));
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    QString suggestedPath = m_currentOutputFile;
+    if (suggestedPath.isEmpty() && !m_currentSpectrumFile.isEmpty()) {
+        QFileInfo fi(m_currentSpectrumFile);
+        suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+    }
+
+    SpectrumExportDialog exportDlg(data, suggestedPath, m_currentSpectrumFormat, trackHist->GetNbinsX(), this);
+    if (exportDlg.exec() != QDialog::Accepted) {
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    m_currentOutputFile = exportDlg.getSelectedFilePath();
+
+    if (labelOutputFile) {
+        QString outName = QFileInfo(m_currentOutputFile).fileName();
+        if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
+            outName += QString("#%1").arg(exportDlg.getTargetIndex());
+        }
+        labelOutputFile->setText(QString("-> %1").arg(outName));
+    }
+
+    QString modeDesc;
+    if (exportDlg.getExportMode() == SpectrumExportMode::Append) {
+        modeDesc = "appended";
+    } else if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
+        modeDesc = QString("written at index #%1").arg(exportDlg.getTargetIndex());
+    } else {
+        modeDesc = "saved";
+    }
+
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Exported spectrum (%1 channels) %2 to %3\n")
+            .arg(exportDlg.getSelectedLength())
+            .arg(modeDesc)
+            .arg(QFileInfo(m_currentOutputFile).fileName()));
+
+    if (canvas) {
+        canvas->setFocus();
+    }
+}
+
+//==============================================================================
 // Multi-Spectrum Navigation Slots (# - and # +)
 //==============================================================================
 void QMainCanvas::onSpectrumIncrement()
@@ -1798,53 +1871,123 @@ void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
 // QMainCanvas::areaFunction
 //==============================================================================
 // Computes gross peak area without background subtraction (triggered by 'C + I'
-// shortcut or UI button). Delegates calculation to integral_function() in
-// Integral.h with an empty background marker set.
+// shortcut). Delegates calculation to integral_function() in Integral.h with
+// an empty background marker set, and overlays peak index labels on the canvas.
 //==============================================================================
 void QMainCanvas::areaFunction()
 {
-    // A stand-in empty vector is used so integral_function performs a gross integral
-    // with no background subtraction regardless of existing background markers
-    std::vector<Int_t> placeholder_background_markers;
-    integral_function(HijF[SelectedElement_i][SelectedElement_j],
-                      integral_markers,
-                      placeholder_background_markers,
-                      slope,
-                      addition);
-}
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
 
-//==============================================================================
-// QMainCanvas::areaFunctionWithBackground
-//==============================================================================
-// Computes net peak area with linear background subtraction (triggered by
-// 'C + J' shortcut or UI button). Computes background slope and intercept
-// from background markers and overlays the subtracted background line.
-//==============================================================================
-void QMainCanvas::areaFunctionWithBackground()
-{
-    if (background_markers.empty()) {
-        const QString msg = "There are no background markers, so an integral with background cannot be performed\n";
+    if (integral_markers.empty()) {
+        const QString msg = "Place markers with 'I' for the integral to be calculated.\n";
         CommandPrompt::getInstance()->appendPlainText(msg);
         std::cout << msg.toStdString();
         return;
     }
 
-    integral_function(HijF[SelectedElement_i][SelectedElement_j],
+    std::vector<Int_t> placeholder_background_markers;
+    std::vector<IntegratedPeak> peaks;
+    integral_function(hist,
+                      integral_markers,
+                      placeholder_background_markers,
+                      slope,
+                      addition,
+                      &peaks);
+
+    // Render peak index labels on the canvas above peak centroids
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    for (const auto &peak : peaks) {
+        Int_t bin = hist->FindBin(peak.centroid);
+        Double_t peakY = hist->GetBinContent(bin);
+        if (peakY <= 0.0) peakY = hist->GetMaximum() * 0.5;
+        Double_t labelY = peakY * 1.05;
+
+        char labelBuf[32];
+        if (peak.isCalibrated) {
+            snprintf(labelBuf, sizeof(labelBuf), "[%d] %.1f", peak.index, peak.energy);
+        } else {
+            snprintf(labelBuf, sizeof(labelBuf), "[%d]", peak.index);
+        }
+
+        TLatex *lbl = new TLatex(peak.centroid, labelY, labelBuf);
+        lbl->SetName(Form("IntPeakLabel_%d", peak.index));
+        lbl->SetTextFont(43);
+        lbl->SetTextSize(18);
+        lbl->SetTextColor(kCyan);
+        lbl->SetTextAlign(21);
+        lbl->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(lbl);
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//==============================================================================
+// QMainCanvas::areaFunctionWithBackground
+//==============================================================================
+// Computes net peak area (triggered by 'Int' UI button or 'C + J' shortcut).
+// If background markers exist, fits linear background and overlays baseline;
+// if no background markers exist, gracefully falls back to gross peak integration.
+// Labels peak index above peak centroid on the canvas.
+//==============================================================================
+void QMainCanvas::areaFunctionWithBackground()
+{
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    if (integral_markers.empty()) {
+        const QString msg = "Place markers with 'I' for the integral to be calculated.\n";
+        CommandPrompt::getInstance()->appendPlainText(msg);
+        std::cout << msg.toStdString();
+        return;
+    }
+
+    std::vector<IntegratedPeak> peaks;
+    integral_function(hist,
                       integral_markers,
                       background_markers,
                       slope,
-                      addition);
+                      addition,
+                      &peaks);
 
-    // Draw a blue line showing the fitted background across the marked interval
-    const Double_t xStart = background_markers[0] - 0.5;
-    const Double_t xEnd   = background_markers.back() - 0.5;
-    TLine *backgroundLine = new TLine(xStart, slope * xStart + addition,
-                                      xEnd,   slope * xEnd   + addition);
-    backgroundLine->SetLineColor(kBlue);
-    backgroundLine->SetLineWidth(2);
-    backgroundLine->Draw("same");
+    // If background markers exist, draw blue baseline
+    if (!background_markers.empty() && background_markers.size() >= 2) {
+        const Double_t xStart = background_markers.front() - 0.5;
+        const Double_t xEnd   = background_markers.back() - 0.5;
+        TLine *backgroundLine = new TLine(xStart, slope * xStart + addition,
+                                          xEnd,   slope * xEnd   + addition);
+        backgroundLine->SetLineColor(kBlue);
+        backgroundLine->SetLineWidth(2);
+        backgroundLine->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(backgroundLine);
+    }
 
-    listOfObjectsDrawnOnScreen.Add(backgroundLine);
+    // Render peak index labels on the canvas above peak centroids
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    for (const auto &peak : peaks) {
+        Int_t bin = hist->FindBin(peak.centroid);
+        Double_t peakY = hist->GetBinContent(bin);
+        if (peakY <= 0.0) peakY = hist->GetMaximum() * 0.5;
+        Double_t labelY = peakY * 1.05;
+
+        char labelBuf[32];
+        if (peak.isCalibrated) {
+            snprintf(labelBuf, sizeof(labelBuf), "[%d] %.1f", peak.index, peak.energy);
+        } else {
+            snprintf(labelBuf, sizeof(labelBuf), "[%d]", peak.index);
+        }
+
+        TLatex *lbl = new TLatex(peak.centroid, labelY, labelBuf);
+        lbl->SetName(Form("IntPeakLabel_%d", peak.index));
+        lbl->SetTextFont(43);
+        lbl->SetTextSize(18);
+        lbl->SetTextColor(kCyan);
+        lbl->SetTextAlign(21);
+        lbl->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(lbl);
+    }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();

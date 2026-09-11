@@ -60,6 +60,11 @@ public:
      */
     bool LoadFromData(const std::vector<double> &data, const std::string &sourcePath = "");
 
+    /**
+     * @brief Returns an in-memory vector of channel counts from bin 1 to NbinsX.
+     */
+    std::vector<double> GetBinData() const;
+
 private:
     bool fIsCalibrated{false};
     Double_t fCalibA0{0.0};

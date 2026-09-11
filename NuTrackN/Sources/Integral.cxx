@@ -1,5 +1,6 @@
 #include "Integral.h"
 #include "Design.h"
+#include "tracknhistogram.h"
 
 #include <iostream>
 #include <iomanip>
@@ -140,8 +141,13 @@ void integral_function(TH1F* histogram,
                        const std::vector<Int_t>& integral_markers,
                        const std::vector<Int_t>& background_markers,
                        Double_t& slope,
-                       Double_t& addition)
+                       Double_t& addition,
+                       std::vector<IntegratedPeak>* outPeaks)
 {
+    if (outPeaks) {
+        outPeaks->clear();
+    }
+
     if (!histogram) {
         const QString errMsg = "Error: Histogram pointer is null in integral_function.";
         CommandPrompt::getInstance()->appendPlainText(errMsg);
@@ -287,18 +293,60 @@ void integral_function(TH1F* histogram,
 
         const int peakIndex = static_cast<int>(i / 2 + 1);
 
+        TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(histogram);
+        const bool isCalib = (trackHist && trackHist->IsCalibrated());
+
+        Double_t energy = 0.0;
+        Double_t energyError = 0.0;
+        Double_t widthDisp = fwhm;
+        Double_t widthDispError = fwhmError;
+
+        if (isCalib) {
+            energy = trackHist->ChannelToEnergy(centroid);
+            const Double_t eLow = trackHist->ChannelToEnergy(std::max(0.0, centroid - centroidError * 0.5));
+            const Double_t eHigh = trackHist->ChannelToEnergy(centroid + centroidError * 0.5);
+            energyError = std::abs(eHigh - eLow);
+
+            const Double_t wLow = trackHist->ChannelToEnergy(std::max(0.0, centroid - fwhm * 0.5));
+            const Double_t wHigh = trackHist->ChannelToEnergy(centroid + fwhm * 0.5);
+            widthDisp = std::abs(wHigh - wLow);
+            if (fwhm > 0.0) {
+                widthDispError = (fwhmError / fwhm) * widthDisp;
+            }
+        }
+
         // Format row strings with standard bracketed uncertainty notation
-        const QString numberStr          = QString::number(peakIndex);
-        const QString centroidStr        = QString::number(centroid, 'f', 2);
-        const QString energyStr          = QString("%1(%2)")
-                                               .arg(centroid, 0, 'f', 2)
-                                               .arg(qCeil(centroidError * 100));
-        const QString areaStr            = QString("%1(%2)")
-                                               .arg(area, 0, 'f', 0)
-                                               .arg(qRound(areaError));
-        const QString fwhmStr            = QString("%1(%2)")
-                                               .arg(fwhm, 0, 'f', 2)
-                                               .arg(qCeil(fwhmError * 100));
+        const QString numberStr   = QString::number(peakIndex);
+        const QString centroidStr = QString::number(centroid, 'f', 2);
+        QString energyStr;
+        if (isCalib) {
+            energyStr = QString("%1(%2)")
+                            .arg(energy, 0, 'f', 2)
+                            .arg(qCeil(energyError * 100));
+        } else {
+            energyStr = QString("%1(uncal)").arg(centroid, 0, 'f', 1);
+        }
+        const QString areaStr     = QString("%1(%2)")
+                                        .arg(area, 0, 'f', 0)
+                                        .arg(qRound(areaError));
+        const QString fwhmStr     = QString("%1(%2)")
+                                        .arg(widthDisp, 0, 'f', 2)
+                                        .arg(qCeil(widthDispError * 100));
+
+        if (outPeaks) {
+            IntegratedPeak p;
+            p.index = peakIndex;
+            p.centroid = centroid;
+            p.centroidError = centroidError;
+            p.area = area;
+            p.areaError = areaError;
+            p.fwhm = fwhm;
+            p.fwhmError = fwhmError;
+            p.energy = isCalib ? energy : centroid;
+            p.energyError = isCalib ? energyError : centroidError;
+            p.isCalibrated = isCalib;
+            outPeaks->push_back(p);
+        }
 
         // Output to terminal
         std::cout << std::left
