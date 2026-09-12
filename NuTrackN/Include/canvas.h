@@ -19,6 +19,12 @@
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
+#include <QCheckBox>
+#include <QDoubleSpinBox>
+#include <QGroupBox>
+#include <QLabel>
+#include <QGridLayout>
+#include <QScrollArea>
 
 
 #include <QWidget>
@@ -38,6 +44,8 @@
 #include <QInputDialog>
 #include <QFormLayout>
 #include <QDialogButtonBox>
+#include <QDialog>
+#include <QTextBrowser>
 #include <QWheelEvent>
 #include <QMenu>
 #include <QIcon>
@@ -194,7 +202,26 @@ signals:
    void DeleteCulomnRequest();
    void RefreshScreenRequest();
    void showXY(Double_t , Double_t);
-   
+};
+
+struct PeakParamState {
+    bool fixCentroid{false};
+    double centroidVal{0.0};
+    bool fixAmp{false};
+    double ampVal{0.0};
+    bool fixWidth{false};
+    double widthVal{0.0};
+};
+
+struct PeakUIControls {
+    QGroupBox *groupBox{nullptr};
+    QLabel *lblNetArea{nullptr};
+    QCheckBox *chkFixCentroid{nullptr};
+    QDoubleSpinBox *spinCentroid{nullptr};
+    QCheckBox *chkFixAmp{nullptr};
+    QDoubleSpinBox *spinAmp{nullptr};
+    QCheckBox *chkFixWidth{nullptr};
+    QDoubleSpinBox *spinWidth{nullptr};
 };
 
 class QMainCanvas : public QWidget
@@ -204,6 +231,7 @@ class QMainCanvas : public QWidget
    friend void runAutoFit(QMainCanvas *mainCanvas, int x, int y);
    friend void runMultiPeakFit(QMainCanvas *mainCanvas);
    friend void fitBackgroundHelper(QMainCanvas *mainCanvas);
+   friend void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks);
    friend class QRootCanvas;
 
 public:
@@ -346,6 +374,32 @@ protected:
     TFormula *background = nullptr; 
     TF1 *backgroundFunction = nullptr;
     TLatex *gaussianCenterMarkerText = nullptr;
+
+    // Unfocused fit parameters dialog and interactive background controls
+    QDialog *fitParamsDialog = nullptr;
+    QTextBrowser *fitParamsBrowser = nullptr;
+    QCheckBox *chkUncoupleWidths = nullptr;
+    QCheckBox *chkFixBackground = nullptr;
+    QDoubleSpinBox *spinBkgSlope = nullptr;
+    QDoubleSpinBox *spinBkgIntercept = nullptr;
+    QTimer *bkgDebounceTimer = nullptr;
+    bool m_uncoupleWidths{false};
+    bool m_bkgFixed{false};
+    double m_bkgSlopeVal{0.0};
+    double m_bkgInterceptVal{0.0};
+    int m_lastFitType{2}; // 1 = AutoFit, 2 = MultiPeakFit
+    int m_lastAutoFitX{0};
+    int m_lastAutoFitY{0};
+    bool m_isRefitting{false};
+    std::size_t m_lastMultiPeakCount{0};
+    TLine *multiPeakBkgLine = nullptr;
+
+    // Interactive fitted peak controls
+    QScrollArea *peaksScrollArea = nullptr;
+    QWidget *peaksContainer = nullptr;
+    QVBoxLayout *peaksLayout = nullptr;
+    std::vector<PeakUIControls> m_peakUIControls;
+    std::vector<PeakParamState> m_peakFixedStates;
 
     // Multi-spectrum file state
     QString        m_currentSpectrumFile;

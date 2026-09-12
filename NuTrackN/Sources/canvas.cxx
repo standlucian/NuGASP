@@ -346,6 +346,38 @@ QRootCanvas::~QRootCanvas()
 
 bool QRootCanvas::eventFilter(QObject *watched, QEvent *event)
 {
+    if (!m_mainCanvas) {
+        QWidget *p = parentWidget();
+        while (p) {
+            m_mainCanvas = qobject_cast<QMainCanvas*>(p);
+            if (m_mainCanvas) break;
+            p = p->parentWidget();
+        }
+    }
+
+    // Auto-dismiss fit parameters dialog on key press or mouse click outside the dialog
+    if (m_mainCanvas && m_mainCanvas->fitParamsDialog && m_mainCanvas->fitParamsDialog->isVisible()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *me = static_cast<QMouseEvent*>(event);
+            QWidget *w = qobject_cast<QWidget*>(watched);
+            const bool isInside = (w && (w == m_mainCanvas->fitParamsDialog || m_mainCanvas->fitParamsDialog->isAncestorOf(w)))
+                               || (me && m_mainCanvas->fitParamsDialog->frameGeometry().contains(me->globalPos()));
+            if (isInside) {
+                return false;
+            }
+            m_mainCanvas->fitParamsDialog->hide();
+        } else if (event->type() == QEvent::KeyPress) {
+            QWidget *fw = QApplication::focusWidget();
+            QWidget *w = qobject_cast<QWidget*>(watched);
+            const bool isInside = (w && (w == m_mainCanvas->fitParamsDialog || m_mainCanvas->fitParamsDialog->isAncestorOf(w)))
+                               || (fw && (fw == m_mainCanvas->fitParamsDialog || m_mainCanvas->fitParamsDialog->isAncestorOf(fw)));
+            if (isInside) {
+                return false;
+            }
+            m_mainCanvas->fitParamsDialog->hide();
+        }
+    }
+
     if (event->type() == QEvent::KeyPress) {
         QKeyEvent *ke = static_cast<QKeyEvent*>(event);
         if (ke->key() == Qt::Key_Control) {
@@ -737,6 +769,10 @@ void QRootCanvas::showContextMenu(QMouseEvent *e)
 //==============================================================================
 void QRootCanvas::keyPressEvent(QKeyEvent *event)
 {
+    if (m_mainCanvas && m_mainCanvas->fitParamsDialog && m_mainCanvas->fitParamsDialog->isVisible()) {
+        m_mainCanvas->fitParamsDialog->hide();
+    }
+
     if (event->key() == Qt::Key_Control) {
         controlKeyIsPressed = true;
         QPoint localPos = mapFromGlobal(QCursor::pos());
@@ -1413,6 +1449,7 @@ void QMainCanvas::clearDrawnObjects()
         listOfObjectsDrawnOnScreen.Remove(obj);
         delete obj;
     }
+    multiPeakBkgLine = nullptr;
 }
 
 //==============================================================================
@@ -2196,6 +2233,15 @@ void QMainCanvas::clearTheScreen()
     // Free all dynamically allocated graphical primitives drawn on the canvas
     clearDrawnObjects();
 
+    if (fitParamsDialog && fitParamsDialog->isVisible()) {
+        fitParamsDialog->hide();
+    }
+    if (bkgDebounceTimer && bkgDebounceTimer->isActive()) {
+        bkgDebounceTimer->stop();
+    }
+    m_bkgFixed = false;
+    m_peakFixedStates.clear();
+
     // Clear fit markers and redraw clean base histogram
     autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
     gaussCenters[SelectedElement_i][SelectedElement_j].clear();
@@ -2690,7 +2736,7 @@ void QMainCanvas::showAllMarkers()
 //==============================================================================
 // QMainCanvas::addRangeMarker
 //==============================================================================
-// Drops a red vertical range boundary marker at the clicked channel. Exactly two
+// Drops a yellow vertical range boundary marker at the clicked channel. Exactly two
 // range markers define the region for multi-peak Gaussian fitting.
 //==============================================================================
 void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
@@ -2709,7 +2755,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
             const std::size_t i = range_markers.size();
             TLine *rangeLineSecond = new TLine(range_markers[i - 2] - 0.5, 0.0,
                                                range_markers[i - 2] - 0.5, yMax);
-            rangeLineSecond->SetLineColor(kRed);
+            rangeLineSecond->SetLineColor(kYellow);
             rangeLineSecond->SetLineWidth(2);
             canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
             rangeLineSecond->Draw();
@@ -2717,22 +2763,22 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
         }
 
         TLine *rangeLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
-        rangeLine->SetLineColor(kRed);
+        rangeLine->SetLineColor(kYellow);
         rangeLine->SetLineWidth(2);
         rangeLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(rangeLine);
 
-        // If pair is complete, draw baseline and shaded red region
+        // If pair is complete, draw baseline and shaded yellow region
         if (range_markers.size() % 2 == 0) {
             const Int_t leftBin = range_markers[range_markers.size() - 2];
             TLine *bottomRangeLine = new TLine(leftBin - 0.5, 0.0, binX - 0.5, 0.0);
-            bottomRangeLine->SetLineColor(kRed);
+            bottomRangeLine->SetLineColor(kYellow);
             bottomRangeLine->SetLineWidth(2);
             bottomRangeLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
             TBox *rangeArea = new TBox(leftBin - 0.5, 0.0, binX - 0.5, maxValueInHistogram * 1.05);
-            rangeArea->SetFillColor(kRed);
+            rangeArea->SetFillColor(kYellow);
             rangeArea->SetFillStyle(3545);
             rangeArea->Draw("same");
             listOfObjectsDrawnOnScreen.Add(rangeArea);
@@ -2760,7 +2806,7 @@ void QMainCanvas::deleteRangeMarkers()
 //==============================================================================
 // QMainCanvas::showRangeMarkers
 //==============================================================================
-// Re-renders all stored fit range markers and shaded intervals on the canvas
+// Re-renders all stored yellow fit range markers and shaded intervals on the canvas
 // (shortcut: 'M + R').
 //==============================================================================
 void QMainCanvas::showRangeMarkers()
@@ -2773,7 +2819,7 @@ void QMainCanvas::showRangeMarkers()
     for (std::size_t i = 0; i < range_markers.size(); ++i) {
         TLine *rangeLine = new TLine(range_markers[i] - 0.5, 0.0,
                                      range_markers[i] - 0.5, yMax);
-        rangeLine->SetLineColor(kRed);
+        rangeLine->SetLineColor(kYellow);
         rangeLine->SetLineWidth(2);
         rangeLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(rangeLine);
@@ -2781,14 +2827,14 @@ void QMainCanvas::showRangeMarkers()
         if (i % 2 == 1) {
             TLine *bottomRangeLine = new TLine(range_markers[i - 1] - 0.5, 0.0,
                                                range_markers[i] - 0.5, 0.0);
-            bottomRangeLine->SetLineColor(kRed);
+            bottomRangeLine->SetLineColor(kYellow);
             bottomRangeLine->SetLineWidth(2);
             bottomRangeLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
             TBox *rangeArea = new TBox(range_markers[i - 1] - 0.5, 0.0,
                                        range_markers[i] - 0.5, yMax);
-            rangeArea->SetFillColor(kRed);
+            rangeArea->SetFillColor(kYellow);
             rangeArea->SetFillStyle(3545);
             rangeArea->Draw("same");
             listOfObjectsDrawnOnScreen.Add(rangeArea);

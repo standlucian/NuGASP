@@ -107,4 +107,35 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y);
  */
 void runMultiPeakFit(QMainCanvas *mainCanvas);
 
+class QString;
+
+/**
+ * @brief Container for fitted peak results passed to the interactive parameters dialog.
+ */
+struct FittedPeakData {
+    int peakIndex{0};
+    double centroid{0.0};
+    double centroidErr{0.0};
+    double amplitude{0.0};
+    double amplitudeErr{0.0};
+    double width{0.0}; // FWHM in display units (keV if calib, ch if uncalib)
+    double widthErr{0.0};
+    double netArea{0.0};
+    double netAreaErr{0.0};
+    bool isCalibrated{false};
+};
+
+/**
+ * @brief Displays an unfocused floating parameters dialog in the top-right corner.
+ *
+ * Shows background values, fit quality, and interactive peak cards for centroids,
+ * amplitudes, and widths with fix constraints.
+ *
+ * @param mainCanvas Pointer to the main application window.
+ * @param title Window title.
+ * @param htmlContent Formatted HTML text for fit quality.
+ * @param peaks Vector of fitted peak data.
+ */
+void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks = {});
+
 #endif // PEAKFIT_H
