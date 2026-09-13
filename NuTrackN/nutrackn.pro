@@ -31,7 +31,8 @@ LIBS += \
     -lMatrix \
     -lPhysics \
     -lGui \
-    -lMathCore
+    -lMathCore \
+    -lSpectrum
 
 # Project headers
 HEADERS += \
@@ -47,6 +48,12 @@ HEADERS += \
 # Project source files
 SOURCES += \
     Sources/canvas.cxx \
+    Sources/ZoomHUD.cxx \
+    Sources/RootCanvas.cxx \
+    Sources/CanvasGrid.cxx \
+    Sources/CanvasNavigation.cxx \
+    Sources/CanvasMarkers.cxx \
+    Sources/CanvasPeaks.cxx \
     Sources/main.cxx \
     Sources/Integral.cxx \
     Sources/calib.cxx \

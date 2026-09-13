@@ -2,10 +2,38 @@
 #define CALIB_H
 
 #include <vector>
+#include <QString>
 #include "RtypesCore.h"
+#include "tracknhistogram.h"
 
 class QWidget;
+class QMainCanvas;
 class TracknHistogram;
+
+struct CalibDetector {
+    int group{1};
+    int detectorId{0};
+    int numSegments{0};
+    std::vector<CalibSegment> segments;
+};
+
+/**
+ * @brief Parses calibration files in GASP multi-detector .mcal format or simple .cal / .dat formats.
+ * @param filePath Path to the calibration file.
+ * @param outDetectors List of parsed detectors and their calibration segments.
+ * @param outFormatInfo Summary description of parsed file.
+ * @return True if parsing succeeded and at least one detector/calibration was loaded.
+ */
+bool ParseCalibrationFile(const QString &filePath,
+                          std::vector<CalibDetector> &outDetectors,
+                          QString &outFormatInfo);
+
+/**
+ * @brief Saves calibration to a file (.mcal or simple .cal format).
+ */
+bool SaveCalibrationFile(const QString &filePath,
+                         const std::vector<CalibDetector> &detectors,
+                         bool isMcalFormat);
 
 /**
  * @brief Computes linear energy calibration coefficients A0 (intercept) and A1 (slope)
@@ -27,5 +55,12 @@ void LinearCalibration(const std::vector<double>& channels, const std::vector<do
 void runTwoPointCalibrationDialog(QWidget *parent,
                                   const std::vector<Float_t> &puncte_calib2p,
                                   TracknHistogram *activeHistogram = nullptr);
+
+/**
+ * @brief Launches the full Energy Calibration Manager dialog (EnCal).
+ *        Supports GASP multi-detector .mcal files, simple .cal files, manual polynomial entry,
+ *        and multi-point linear regression.
+ */
+void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId = 0);
 
 #endif // CALIB_H

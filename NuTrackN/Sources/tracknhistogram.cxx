@@ -14,7 +14,8 @@ TracknHistogram::TracknHistogram(const char *name, const char *title,
 TracknHistogram::TracknHistogram(const TracknHistogram &other)
     : TH1F(other), fIsCalibrated(other.fIsCalibrated), fCalibA0(other.fCalibA0),
       fCalibA1(other.fCalibA1), fCalibA2(other.fCalibA2),
-      fSourceFilePath(other.fSourceFilePath) {}
+      fSourceFilePath(other.fSourceFilePath),
+      fCalibSegments(other.fCalibSegments) {}
 
 TracknHistogram &TracknHistogram::operator=(const TracknHistogram &other) {
   if (this != &other) {
@@ -24,8 +25,17 @@ TracknHistogram &TracknHistogram::operator=(const TracknHistogram &other) {
     fCalibA1 = other.fCalibA1;
     fCalibA2 = other.fCalibA2;
     fSourceFilePath = other.fSourceFilePath;
+    fCalibSegments = other.fCalibSegments;
   }
   return *this;
+}
+
+TObject *TracknHistogram::Clone(const char *newname) const {
+  TracknHistogram *copy = new TracknHistogram(*this);
+  if (newname && newname[0]) {
+    copy->SetName(newname);
+  }
+  return copy;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -50,15 +60,50 @@ void TracknHistogram::SetCalibration(Double_t a0, Double_t a1, Double_t a2) {
   fCalibA0 = a0;
   fCalibA1 = a1;
   fCalibA2 = a2;
+  fCalibSegments.clear();
+  CalibSegment seg;
+  seg.maxChannel = 1e9;
+  seg.coeffs = {a0, a1, a2};
+  fCalibSegments.push_back(seg);
   fIsCalibrated = (std::abs(a1) > 1e-12 || std::abs(a2) > 1e-12);
+}
+
+//==============================================================================
+// TracknHistogram::SetSegmentedCalibration
+//==============================================================================
+// Stores piecewise polynomial energy calibration segments (e.g. from GASP .mcal).
+//==============================================================================
+void TracknHistogram::SetSegmentedCalibration(const std::vector<CalibSegment> &segments) {
+  fCalibSegments = segments;
+  if (!fCalibSegments.empty()) {
+    const auto &c = fCalibSegments[0].coeffs;
+    fCalibA0 = (c.size() > 0) ? c[0] : 0.0;
+    fCalibA1 = (c.size() > 1) ? c[1] : 1.0;
+    fCalibA2 = (c.size() > 2) ? c[2] : 0.0;
+    fIsCalibrated = true;
+  } else {
+    ClearCalibration();
+  }
+}
+
+//==============================================================================
+// TracknHistogram::ClearCalibration
+//==============================================================================
+// Clears / disables energy calibration, reverting readouts to raw channels.
+//==============================================================================
+void TracknHistogram::ClearCalibration() {
+  fCalibA0 = 0.0;
+  fCalibA1 = 1.0;
+  fCalibA2 = 0.0;
+  fCalibSegments.clear();
+  fIsCalibrated = false;
 }
 
 //==============================================================================
 // TracknHistogram::ChannelToEnergy
 //==============================================================================
 // Converts a spectrum channel number into calibrated physical energy (keV)
-// using the quadratic calibration polynomial:
-//   E(ch) = A(0) + A(1) * ch + A(2) * ch^2
+// using either piecewise segments or quadratic calibration polynomial.
 //
 // If uncalibrated, returns the channel number unchanged.
 //==============================================================================
@@ -66,29 +111,81 @@ Double_t TracknHistogram::ChannelToEnergy(Double_t channel) const {
   if (!fIsCalibrated) {
     return channel;
   }
+  if (!fCalibSegments.empty()) {
+    const CalibSegment *activeSeg = &fCalibSegments.back();
+    for (const auto &seg : fCalibSegments) {
+      if (channel <= seg.maxChannel) {
+        activeSeg = &seg;
+        break;
+      }
+    }
+    const auto &c = activeSeg->coeffs;
+    if (c.empty()) return channel;
+    // Horner's method: E = c0 + ch * (c1 + ch * (c2 + ...))
+    Double_t energy = c.back();
+    for (int i = static_cast<int>(c.size()) - 2; i >= 0; --i) {
+      energy = c[i] + channel * energy;
+    }
+    return energy;
+  }
   return fCalibA0 + fCalibA1 * channel + fCalibA2 * channel * channel;
 }
 
 //==============================================================================
 // TracknHistogram::EnergyToChannel
 //==============================================================================
-// Inverts the energy calibration to find the channel corresponding to a given energy:
-//
-// For quadratic calibration:
-//   a2 * ch^2 + a1 * ch + (a0 - E) = 0
-// Using the positive quadratic root:
-//   ch = (-a1 + sqrt(a1^2 - 4 * a2 * (a0 - E))) / (2 * a2)
-//
-// For linear calibration:
-//   ch = (E - a0) / a1
-//
-// If uncalibrated, returns the energy unchanged.
+// Inverts the energy calibration to find the channel corresponding to a given energy.
+// For piecewise segments, locates the appropriate segment and solves via Newton-Raphson.
 //==============================================================================
 Double_t TracknHistogram::EnergyToChannel(Double_t energy) const {
   if (!fIsCalibrated) {
     return energy;
   }
-  // For quadratic calibration: a2 * ch^2 + a1 * ch + (a0 - E) = 0
+  if (!fCalibSegments.empty()) {
+    // Locate the matching segment by comparing energy to segment maxChannel energy
+    const CalibSegment *activeSeg = &fCalibSegments.back();
+    for (const auto &seg : fCalibSegments) {
+      // Evaluate energy at seg.maxChannel
+      const auto &c = seg.coeffs;
+      if (c.empty()) continue;
+      Double_t eMax = c.back();
+      for (int i = static_cast<int>(c.size()) - 2; i >= 0; --i) {
+        eMax = c[i] + seg.maxChannel * eMax;
+      }
+      if (energy <= eMax) {
+        activeSeg = &seg;
+        break;
+      }
+    }
+
+    const auto &c = activeSeg->coeffs;
+    if (c.empty()) return energy;
+    if (c.size() == 1) return 0.0;
+
+    // Initial guess from linear part: ch0 = (energy - c[0]) / c[1]
+    Double_t ch = (std::abs(c[1]) > 1e-12) ? (energy - c[0]) / c[1] : energy;
+
+    // Newton-Raphson iteration
+    for (int iter = 0; iter < 20; ++iter) {
+      Double_t p = c.back();
+      Double_t p_prime = 0.0;
+      for (int i = static_cast<int>(c.size()) - 2; i >= 0; --i) {
+        p_prime = p + ch * p_prime;
+        p = c[i] + ch * p;
+      }
+      Double_t diff = p - energy;
+      if (std::abs(diff) < 1e-7) {
+        return ch;
+      }
+      if (std::abs(p_prime) < 1e-12) {
+        break;
+      }
+      ch -= diff / p_prime;
+    }
+    return ch;
+  }
+
+  // Fallback for simple quadratic
   if (std::abs(fCalibA2) > 1e-12) {
     const Double_t c = fCalibA0 - energy;
     const Double_t disc = fCalibA1 * fCalibA1 - 4.0 * fCalibA2 * c;
@@ -96,7 +193,6 @@ Double_t TracknHistogram::EnergyToChannel(Double_t energy) const {
       return (-fCalibA1 + std::sqrt(disc)) / (2.0 * fCalibA2);
     }
   }
-  // Linear fallback: ch = (E - a0) / a1
   if (std::abs(fCalibA1) > 1e-12) {
     return (energy - fCalibA0) / fCalibA1;
   }

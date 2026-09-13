@@ -143,7 +143,7 @@ public:
 protected:
    TCanvas        *fCanvas;
    Double_t       xMousePosition, yMousePosition;
-   bool           controlKeyIsPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed;
+   bool           controlKeyIsPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed, sKeyWasPressed, dKeyWasPressed;
    QZoomHUD       *m_zoomHUD;
    QMainCanvas    *m_mainCanvas;
 
@@ -161,6 +161,7 @@ protected:
    virtual void    leaveEvent(QEvent *event);
 
 signals:
+   void requestEnCalDialog();
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void autoFitRequested(int, int);
@@ -178,6 +179,10 @@ signals:
    void requesttranslatedownTheScreen();
    void requesttranslateupTheScreen();
    void fullscreen();
+   void requestFullX();
+   void requestFullY();
+   void requestSameX();
+   void requestSameY();
    void requestDeleteBackgroundMarkers();
    void requestDeleteIntegralMarkers();
    void requestDeleteAllMarkers();
@@ -191,8 +196,12 @@ signals:
    void requestAddGaussMarker(Int_t, Int_t);
    void requestDeleteGaussMarkers();
    void requestShowGaussMarkers();
-   void requestFitGauss();
-   void requestHelp();
+    void requestFitGauss();
+    void requestPeakSearch();
+    void requestDeletePeakMarkers();
+    void requestShowPeakMarkers();
+    void requestHelp();
+    void requestToggleLogY();
    void killSwitch();
    void mousePilgrimCoordRequest(Double_t , Double_t );
    void mouseLeftClickCoordRequest(Double_t , Double_t );
@@ -224,6 +233,8 @@ struct PeakUIControls {
     QDoubleSpinBox *spinWidth{nullptr};
 };
 
+struct DetectedPeak;
+
 class QMainCanvas : public QWidget
 {
    Q_OBJECT
@@ -232,6 +243,7 @@ class QMainCanvas : public QWidget
    friend void runMultiPeakFit(QMainCanvas *mainCanvas);
    friend void fitBackgroundHelper(QMainCanvas *mainCanvas);
    friend void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks);
+   friend void showPeakSearchParamsDialog(QMainCanvas *mainCanvas, double sigma, double threshold, const std::vector<DetectedPeak> &peaks, double xMin, double xMax);
    friend class QRootCanvas;
 
 public:
@@ -283,14 +295,24 @@ public slots:
    void addGaussMarker(Int_t, Int_t);
    void deleteGaussMarkers();
    void showGaussMarkers();
-   void fitGauss();
-   void Cal2pMain();
+    void fitGauss();
+    void searchPeaks();
+    void searchPeaksWithParams(double sigma, double threshold);
+    void deletePeakMarkers();
+    void showPeakMarkers();
+    void renderPeakSearchLabels(int z, int g);
+    void transferPeaksToGaussMarkers();
+    void Cal2pMain();
    void zoomTheScreen();
    void translateplusTheScreen();
    void translateminusTheScreen();
    void translatedownTheScreen();
    void translateupTheScreen();
    void zoomOut();
+    void fullX(bool logPrompt = true);
+    void fullY(bool logPrompt = true);
+    void sameX();
+    void sameY();
    void addSpaceBarMarker(Int_t, Int_t);
    void offerHelp();
    void AddCulomn();
@@ -315,6 +337,22 @@ public slots:
     void onSpectrumDecrement();
     void stepSpectrumIndex(int delta);
 
+    // Energy calibration dialog
+    void openEnCalDialog();
+
+    TracknHistogram* getActiveTracknHistogram() const {
+        if (SelectedElement_i >= 1 && SelectedElement_i <= maxElement_i &&
+            SelectedElement_j >= 1 && SelectedElement_j <= maxElement_j) {
+            return dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+        }
+        return nullptr;
+    }
+    const std::vector<Float_t>& getPuncteCalib2p() const { return puncte_calib2p; }
+    const std::vector<Double_t>& getSpacebarMarkers() const { return spacebar_markers; }
+    const std::vector<Double_t>& getGaussCenters(int i, int j) const { return gaussCenters[i][j]; }
+    int getCurrentSpectrumIndex() const { return m_currentSpectrumIndex; }
+    QRootCanvas* getRootCanvas() const { return canvas; }
+
 protected:
     //virtual void paintEvent(QPaintEvent *event);
     void clearDrawnObjects();
@@ -335,7 +373,10 @@ protected:
    std::vector<TObject*> autoFitMarkers[12][12];
    std::vector<Double_t> gaussCenters[12][12];
    std::vector<Double_t> gaussCentersHeight[12][12];
-   TList autoFitLatex[12][12];
+    std::vector<Double_t> peakSearchCenters[12][12];
+    std::vector<Double_t> peakSearchHeights[12][12];
+    std::vector<TObject*> peakSearchPrimitives[12][12];
+    TList autoFitLatex[12][12];
    std::vector<std::string> latexTexts;
    
    Float_t maxValueInHistogram;
@@ -393,6 +434,15 @@ protected:
     bool m_isRefitting{false};
     std::size_t m_lastMultiPeakCount{0};
     TLine *multiPeakBkgLine = nullptr;
+
+    // Unfocused peak search parameters dialog
+    QDialog *peakSearchParamsDialog = nullptr;
+    QDoubleSpinBox *spinPeakSigma = nullptr;
+    QDoubleSpinBox *spinPeakThreshold = nullptr;
+    QTextBrowser *peakSearchBrowser = nullptr;
+    QTimer *peakSearchDebounceTimer = nullptr;
+    double m_peakSearchSigma{2.5};
+    double m_peakSearchThreshold{0.05};
 
     // Interactive fitted peak controls
     QScrollArea *peaksScrollArea = nullptr;

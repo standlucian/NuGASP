@@ -138,4 +138,57 @@ struct FittedPeakData {
  */
 void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks = {});
 
+/**
+ * @brief Container for peak search results detected via TSpectrum.
+ */
+struct DetectedPeak {
+    int index{0};
+    double channel{0.0};
+    double energy{0.0};
+    double height{0.0};
+    bool isCalibrated{false};
+};
+
+/**
+ * @brief Performs peak finding on a histogram using ROOT's TSpectrum::Search.
+ *
+ * Operates on the visible X-axis range of the histogram if useVisibleRange is true.
+ * Sorts detected peaks in ascending channel order and applies energy calibration
+ * if the histogram is a calibrated TracknHistogram.
+ *
+ * @param hist Pointer to ROOT histogram.
+ * @param sigma Expected peak standard deviation in channels (default: 2.5).
+ * @param threshold Relative threshold (fraction of max peak) (default: 0.05).
+ * @param useVisibleRange If true, restricts search to visible X-axis range.
+ * @return Vector of detected peaks sorted by channel.
+ */
+std::vector<DetectedPeak> findPeaksWithTSpectrum(
+    TH1F *hist,
+    double sigma = 2.5,
+    double threshold = 0.05,
+    bool useVisibleRange = true
+);
+
+/**
+ * @brief Displays an unfocused floating peak search dialog docked in the top-right corner.
+ *
+ * Shows interactive spinboxes for sigma and threshold, search range, number of peaks,
+ * and a table of detected peaks. Automatically closes on any external key or mouse click.
+ *
+ * @param mainCanvas Pointer to the main application window.
+ * @param sigma Current sigma parameter.
+ * @param threshold Current threshold parameter.
+ * @param peaks Vector of detected peaks.
+ * @param xMin Lower channel/energy bound searched.
+ * @param xMax Upper channel/energy bound searched.
+ */
+void showPeakSearchParamsDialog(
+    QMainCanvas *mainCanvas,
+    double sigma,
+    double threshold,
+    const std::vector<DetectedPeak> &peaks,
+    double xMin,
+    double xMax
+);
+
 #endif // PEAKFIT_H

@@ -24,6 +24,11 @@
 #include <QGroupBox>
 #include <QLabel>
 #include <QGridLayout>
+#include <QTimer>
+#include <QPainter>
+#include <QDir>
+#include <QFile>
+#include <QPolygon>
 
 #include <TF1.h>
 #include <TFormula.h>
@@ -33,6 +38,7 @@
 #include <TMatrixDSym.h>
 #include <TLine.h>
 #include <TLatex.h>
+#include <TSpectrum.h>
 #include <TList.h>
 #include <Math/MinimizerOptions.h>
 
@@ -1286,6 +1292,37 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     showFitParametersDialog(mainCanvas, "Multi-Peak Fit Parameters", html, peaks);
 }
 
+// Helper to ensure crisp spinbox arrow icons are available on disk
+static void ensureSpinArrowIcons(QString &upPath, QString &downPath) {
+    QString dir = QDir::tempPath();
+    upPath = dir + "/nutrackn_spin_up.png";
+    downPath = dir + "/nutrackn_spin_down.png";
+    if (!QFile::exists(upPath)) {
+        QPixmap upPix(9, 6);
+        upPix.fill(Qt::transparent);
+        QPainter p(&upPix);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor("#dcdfe4"));
+        QPolygon poly;
+        poly << QPoint(4, 0) << QPoint(8, 5) << QPoint(0, 5);
+        p.drawPolygon(poly);
+        upPix.save(upPath);
+    }
+    if (!QFile::exists(downPath)) {
+        QPixmap downPix(9, 6);
+        downPix.fill(Qt::transparent);
+        QPainter p(&downPix);
+        p.setRenderHint(QPainter::Antialiasing, false);
+        p.setPen(Qt::NoPen);
+        p.setBrush(QColor("#dcdfe4"));
+        QPolygon poly;
+        poly << QPoint(0, 0) << QPoint(8, 0) << QPoint(4, 5);
+        p.drawPolygon(poly);
+        downPix.save(downPath);
+    }
+}
+
 //==============================================================================
 // showFitParametersDialog
 //==============================================================================
@@ -1297,11 +1334,14 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
 {
     if (!mainCanvas) return;
 
+    QString upArrowPath, downArrowPath;
+    ensureSpinArrowIcons(upArrowPath, downArrowPath);
+
     if (!mainCanvas->fitParamsDialog) {
         mainCanvas->fitParamsDialog = new QDialog(mainCanvas, Qt::Tool | Qt::WindowStaysOnTopHint);
         mainCanvas->fitParamsDialog->setAttribute(Qt::WA_ShowWithoutActivating, true);
         mainCanvas->fitParamsDialog->setFocusPolicy(Qt::NoFocus);
-        mainCanvas->fitParamsDialog->setStyleSheet(
+        mainCanvas->fitParamsDialog->setStyleSheet(QString(
             "QDialog, QWidget {"
             "    background-color: #1e1e24;"
             "    color: #e0e0e0;"
@@ -1340,7 +1380,7 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
             "    color: #e5c07b;"
             "    border: 1px solid #3e4451;"
             "    border-radius: 3px;"
-            "    padding: 2px 4px;"
+            "    padding: 2px 22px 2px 4px;"
             "    font-family: 'Consolas', 'DejaVu Sans Mono', 'Monaco', monospace;"
             "    font-size: 11px;"
             "}"
@@ -1352,13 +1392,38 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
             "    color: #5c6370;"
             "    border: 1px solid #2c313a;"
             "}"
-            "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {"
+            "QDoubleSpinBox::up-button {"
+            "    subcontrol-origin: border;"
+            "    subcontrol-position: top right;"
+            "    width: 18px;"
+            "    height: 11px;"
             "    background-color: #2c313a;"
-            "    border: 1px solid #3e4451;"
-            "    width: 16px;"
+            "    border-left: 1px solid #3e4451;"
+            "    border-bottom: 1px solid #3e4451;"
             "}"
-            "QDoubleSpinBox::up-button:hover, QDoubleSpinBox::down-button:hover {"
+            "QDoubleSpinBox::up-button:hover {"
             "    background-color: #3e4451;"
+            "}"
+            "QDoubleSpinBox::up-arrow {"
+            "    image: url(%1);"
+            "    width: 8px;"
+            "    height: 5px;"
+            "}"
+            "QDoubleSpinBox::down-button {"
+            "    subcontrol-origin: border;"
+            "    subcontrol-position: bottom right;"
+            "    width: 18px;"
+            "    height: 11px;"
+            "    background-color: #2c313a;"
+            "    border-left: 1px solid #3e4451;"
+            "}"
+            "QDoubleSpinBox::down-button:hover {"
+            "    background-color: #3e4451;"
+            "}"
+            "QDoubleSpinBox::down-arrow {"
+            "    image: url(%2);"
+            "    width: 8px;"
+            "    height: 5px;"
             "}"
             "QLabel {"
             "    background-color: transparent;"
@@ -1386,7 +1451,7 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
             "    background-color: #3e4451;"
             "    color: #ffffff;"
             "}"
-        );
+        ).arg(upArrowPath, downArrowPath));
 
         QVBoxLayout *layout = new QVBoxLayout(mainCanvas->fitParamsDialog);
         layout->setContentsMargins(8, 8, 8, 8);
@@ -1874,6 +1939,383 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
     QWidget *focused = QApplication::focusWidget();
     bool userEditing = (focused && mainCanvas->fitParamsDialog &&
                         (focused == mainCanvas->fitParamsDialog || mainCanvas->fitParamsDialog->isAncestorOf(focused)));
+    if (!userEditing && mainCanvas->canvas) {
+        mainCanvas->canvas->setFocus();
+    }
+}
+
+//==============================================================================
+// findPeaksWithTSpectrum
+//==============================================================================
+// Runs ROOT's TSpectrum deconvolution-based peak finding on the histogram.
+// Operates on the current visible X-axis range, sorts peaks by channel in
+// ascending order, and applies energy calibration if available.
+//==============================================================================
+std::vector<DetectedPeak> findPeaksWithTSpectrum(
+    TH1F *hist,
+    double sigma,
+    double threshold,
+    bool useVisibleRange
+) {
+    std::vector<DetectedPeak> result;
+    if (!hist) return result;
+
+    TAxis *xAxis = hist->GetXaxis();
+    if (!xAxis) return result;
+
+    const Int_t originalFirst = xAxis->GetFirst();
+    const Int_t originalLast = xAxis->GetLast();
+    const bool needsRangeReset = (!useVisibleRange && (originalFirst != 1 || originalLast != hist->GetNbinsX()));
+    if (needsRangeReset) {
+        xAxis->SetRange(1, hist->GetNbinsX());
+    }
+
+    // Clamp parameters to reasonable physics defaults
+    if (sigma <= 0.0) sigma = 2.5;
+    if (threshold <= 0.0) threshold = 0.05;
+    if (threshold >= 1.0) threshold = 0.99;
+
+    TSpectrum spectrum(200);
+    // "goff" suppresses default ROOT TPolyMarker drawing
+    Int_t nFound = spectrum.Search(hist, sigma, "goff", threshold);
+
+    Double_t *xPeaks = spectrum.GetPositionX();
+    Double_t *yPeaks = spectrum.GetPositionY();
+
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
+    bool isCalib = (trackHist && trackHist->IsCalibrated());
+
+    // Pair positions and heights to sort by ascending channel
+    std::vector<std::pair<double, double>> peakPairs;
+    peakPairs.reserve(nFound);
+    for (Int_t i = 0; i < nFound; ++i) {
+        double ch = xPeaks[i];
+        double h = (yPeaks != nullptr) ? yPeaks[i] : 0.0;
+        if (h <= 0.0) {
+            h = hist->GetBinContent(hist->FindBin(ch));
+        }
+        peakPairs.emplace_back(ch, h);
+    }
+
+    std::sort(peakPairs.begin(), peakPairs.end(),
+              [](const std::pair<double, double> &a, const std::pair<double, double> &b) {
+                  return a.first < b.first;
+              });
+
+    result.reserve(peakPairs.size());
+    for (size_t i = 0; i < peakPairs.size(); ++i) {
+        DetectedPeak dp;
+        dp.index = static_cast<int>(i + 1);
+        dp.channel = peakPairs[i].first;
+        dp.height = peakPairs[i].second;
+        dp.isCalibrated = isCalib;
+        if (isCalib) {
+            dp.energy = trackHist->ChannelToEnergy(dp.channel);
+        } else {
+            dp.energy = dp.channel;
+        }
+        result.push_back(dp);
+    }
+
+    if (needsRangeReset) {
+        xAxis->SetRange(originalFirst, originalLast);
+    }
+
+    return result;
+}
+
+//==============================================================================
+// showPeakSearchParamsDialog
+//==============================================================================
+// Displays an unfocused floating peak search dialog docked in the top-right corner.
+// Provides interactive controls for sigma and threshold with real-time updates,
+// a tabular view of detected peaks, and auto-dismiss on external interaction.
+//==============================================================================
+void showPeakSearchParamsDialog(
+    QMainCanvas *mainCanvas,
+    double sigma,
+    double threshold,
+    const std::vector<DetectedPeak> &peaks,
+    double xMin,
+    double xMax
+) {
+    if (!mainCanvas) return;
+
+    QString upArrowPath, downArrowPath;
+    ensureSpinArrowIcons(upArrowPath, downArrowPath);
+
+    if (!mainCanvas->peakSearchParamsDialog) {
+        mainCanvas->peakSearchParamsDialog = new QDialog(mainCanvas, Qt::Tool | Qt::WindowStaysOnTopHint);
+        mainCanvas->peakSearchParamsDialog->setAttribute(Qt::WA_ShowWithoutActivating, true);
+        mainCanvas->peakSearchParamsDialog->setFocusPolicy(Qt::NoFocus);
+        mainCanvas->peakSearchParamsDialog->setStyleSheet(QString(
+            "QDialog, QWidget {"
+            "    background-color: #1e1e24;"
+            "    color: #e0e0e0;"
+            "}"
+            "QDialog {"
+            "    border: 1px solid #4f5b66;"
+            "    border-radius: 6px;"
+            "}"
+            "QTextBrowser {"
+            "    background-color: #181a1f;"
+            "    color: #dcdfe4;"
+            "    border: 1px solid #2c313a;"
+            "    border-radius: 4px;"
+            "    font-family: 'Consolas', 'DejaVu Sans Mono', 'Monaco', monospace;"
+            "    font-size: 11px;"
+            "    padding: 6px;"
+            "}"
+            "QGroupBox {"
+            "    background-color: transparent;"
+            "    border: 1px solid #3e4451;"
+            "    border-radius: 5px;"
+            "    margin-top: 6px;"
+            "    padding: 8px 8px 8px 8px;"
+            "    font-size: 11px;"
+            "    font-weight: bold;"
+            "    color: #61afef;"
+            "}"
+            "QGroupBox::title {"
+            "    subcontrol-origin: margin;"
+            "    subcontrol-position: top left;"
+            "    left: 8px;"
+            "    padding: 0 4px;"
+            "}"
+            "QDoubleSpinBox {"
+            "    background-color: #14161a;"
+            "    color: #e5c07b;"
+            "    border: 1px solid #4f5b66;"
+            "    border-radius: 4px;"
+            "    padding: 3px 26px 3px 8px;"
+            "    font-family: 'Consolas', 'DejaVu Sans Mono', 'Monaco', monospace;"
+            "    font-size: 12px;"
+            "    font-weight: bold;"
+            "}"
+            "QDoubleSpinBox:hover {"
+            "    border: 1px solid #61afef;"
+            "}"
+            "QDoubleSpinBox:focus {"
+            "    border: 1px solid #61afef;"
+            "    background-color: #181a1f;"
+            "}"
+            "QDoubleSpinBox::up-button {"
+            "    subcontrol-origin: border;"
+            "    subcontrol-position: top right;"
+            "    width: 22px;"
+            "    height: 13px;"
+            "    background-color: #2c313a;"
+            "    border-left: 1px solid #4f5b66;"
+            "    border-bottom: 1px solid #3e4451;"
+            "    border-top-right-radius: 3px;"
+            "}"
+            "QDoubleSpinBox::up-button:hover {"
+            "    background-color: #3e4451;"
+            "}"
+            "QDoubleSpinBox::up-arrow {"
+            "    image: url(%1);"
+            "    width: 9px;"
+            "    height: 6px;"
+            "}"
+            "QDoubleSpinBox::down-button {"
+            "    subcontrol-origin: border;"
+            "    subcontrol-position: bottom right;"
+            "    width: 22px;"
+            "    height: 13px;"
+            "    background-color: #2c313a;"
+            "    border-left: 1px solid #4f5b66;"
+            "    border-bottom-right-radius: 3px;"
+            "}"
+            "QDoubleSpinBox::down-button:hover {"
+            "    background-color: #3e4451;"
+            "}"
+            "QDoubleSpinBox::down-arrow {"
+            "    image: url(%2);"
+            "    width: 9px;"
+            "    height: 6px;"
+            "}"
+            "QLabel {"
+            "    background-color: transparent;"
+            "    color: #abb2bf;"
+            "    font-size: 11px;"
+            "}"
+            "QPushButton {"
+            "    background-color: #2c313a;"
+            "    color: #dcdfe4;"
+            "    border: 1px solid #4f5b66;"
+            "    border-radius: 3px;"
+            "    padding: 4px 10px;"
+            "    font-size: 11px;"
+            "}"
+            "QPushButton:hover {"
+            "    background-color: #3e4451;"
+            "}"
+        ).arg(upArrowPath, downArrowPath));
+        mainCanvas->peakSearchParamsDialog->setWindowTitle("Peak Search (TSpectrum)");
+        mainCanvas->peakSearchParamsDialog->setFixedWidth(380);
+
+        QVBoxLayout *layout = new QVBoxLayout(mainCanvas->peakSearchParamsDialog);
+        layout->setContentsMargins(8, 8, 8, 8);
+        layout->setSpacing(6);
+
+        // Parameters group box
+        QGroupBox *grpParams = new QGroupBox("Search Parameters", mainCanvas->peakSearchParamsDialog);
+        QGridLayout *paramGrid = new QGridLayout(grpParams);
+        paramGrid->setContentsMargins(8, 10, 8, 8);
+        paramGrid->setHorizontalSpacing(10);
+        paramGrid->setVerticalSpacing(8);
+
+        QLabel *lblSigma = new QLabel("Sigma (ch):", grpParams);
+        lblSigma->setStyleSheet("font-weight: bold; color: #abb2bf;");
+
+        mainCanvas->spinPeakSigma = new QDoubleSpinBox(grpParams);
+        mainCanvas->spinPeakSigma->setRange(0.25, 50.0);
+        mainCanvas->spinPeakSigma->setSingleStep(0.25); // 10% of default 2.50
+        mainCanvas->spinPeakSigma->setDecimals(2);
+        mainCanvas->spinPeakSigma->setValue(sigma);
+        mainCanvas->spinPeakSigma->setFixedHeight(28);
+        mainCanvas->spinPeakSigma->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+        mainCanvas->spinPeakSigma->setFocusPolicy(Qt::NoFocus);
+        mainCanvas->spinPeakSigma->setToolTip("Expected peak standard deviation in channels (10% step = 0.25 ch)");
+
+        QLabel *lblThresh = new QLabel("Threshold:", grpParams);
+        lblThresh->setStyleSheet("font-weight: bold; color: #abb2bf;");
+
+        mainCanvas->spinPeakThreshold = new QDoubleSpinBox(grpParams);
+        mainCanvas->spinPeakThreshold->setRange(0.001, 0.990);
+        mainCanvas->spinPeakThreshold->setSingleStep(0.005); // 10% of default 0.050
+        mainCanvas->spinPeakThreshold->setDecimals(3);
+        mainCanvas->spinPeakThreshold->setValue(threshold);
+        mainCanvas->spinPeakThreshold->setFixedHeight(28);
+        mainCanvas->spinPeakThreshold->setButtonSymbols(QAbstractSpinBox::UpDownArrows);
+        mainCanvas->spinPeakThreshold->setFocusPolicy(Qt::NoFocus);
+        mainCanvas->spinPeakThreshold->setToolTip("Relative detection threshold (10% step = 0.005)");
+
+        paramGrid->addWidget(lblSigma, 0, 0);
+        paramGrid->addWidget(mainCanvas->spinPeakSigma, 0, 1);
+        paramGrid->addWidget(lblThresh, 1, 0);
+        paramGrid->addWidget(mainCanvas->spinPeakThreshold, 1, 1);
+        layout->addWidget(grpParams);
+
+        // Debounce timer for interactive parameter tuning
+        mainCanvas->peakSearchDebounceTimer = new QTimer(mainCanvas->peakSearchParamsDialog);
+        mainCanvas->peakSearchDebounceTimer->setSingleShot(true);
+        QObject::connect(mainCanvas->peakSearchDebounceTimer, &QTimer::timeout, mainCanvas, [mainCanvas]() {
+            if (mainCanvas->spinPeakSigma && mainCanvas->spinPeakThreshold) {
+                mainCanvas->searchPeaksWithParams(
+                    mainCanvas->spinPeakSigma->value(),
+                    mainCanvas->spinPeakThreshold->value()
+                );
+            }
+        });
+
+        auto triggerSearchDebounce = [mainCanvas]() {
+            if (mainCanvas->peakSearchDebounceTimer) {
+                mainCanvas->peakSearchDebounceTimer->start(350);
+            }
+        };
+
+        QObject::connect(mainCanvas->spinPeakSigma, QOverload<double>::of(&QDoubleSpinBox::valueChanged), mainCanvas, [triggerSearchDebounce](double) {
+            triggerSearchDebounce();
+        });
+        QObject::connect(mainCanvas->spinPeakThreshold, QOverload<double>::of(&QDoubleSpinBox::valueChanged), mainCanvas, [triggerSearchDebounce](double) {
+            triggerSearchDebounce();
+        });
+
+        // Results text browser
+        mainCanvas->peakSearchBrowser = new QTextBrowser(mainCanvas->peakSearchParamsDialog);
+        mainCanvas->peakSearchBrowser->setReadOnly(true);
+        mainCanvas->peakSearchBrowser->setFixedHeight(190);
+        mainCanvas->peakSearchBrowser->setFocusPolicy(Qt::NoFocus);
+        layout->addWidget(mainCanvas->peakSearchBrowser);
+
+        // Action buttons
+        QHBoxLayout *btnLayout = new QHBoxLayout();
+        btnLayout->setSpacing(6);
+
+        QPushButton *btnLoadFit = new QPushButton("Use for Fit", mainCanvas->peakSearchParamsDialog);
+        btnLoadFit->setFocusPolicy(Qt::NoFocus);
+        btnLoadFit->setToolTip("Load detected peak centroids into multi-peak Gaussian fit markers");
+        QObject::connect(btnLoadFit, &QPushButton::clicked, mainCanvas, &QMainCanvas::transferPeaksToGaussMarkers);
+
+        QPushButton *btnClear = new QPushButton("Clear (Z+P)", mainCanvas->peakSearchParamsDialog);
+        btnClear->setFocusPolicy(Qt::NoFocus);
+        btnClear->setToolTip("Clear all peak search markers (Shortcut: Z+P)");
+        QObject::connect(btnClear, &QPushButton::clicked, mainCanvas, &QMainCanvas::deletePeakMarkers);
+
+        QPushButton *btnClose = new QPushButton("Close", mainCanvas->peakSearchParamsDialog);
+        btnClose->setFocusPolicy(Qt::NoFocus);
+        QObject::connect(btnClose, &QPushButton::clicked, mainCanvas->peakSearchParamsDialog, &QDialog::close);
+
+        btnLayout->addWidget(btnLoadFit);
+        btnLayout->addWidget(btnClear);
+        btnLayout->addStretch();
+        btnLayout->addWidget(btnClose);
+        layout->addLayout(btnLayout);
+    }
+
+    // Update spinboxes without triggering recursive re-search
+    if (mainCanvas->spinPeakSigma) {
+        mainCanvas->spinPeakSigma->blockSignals(true);
+        mainCanvas->spinPeakSigma->setValue(sigma);
+        mainCanvas->spinPeakSigma->blockSignals(false);
+    }
+    if (mainCanvas->spinPeakThreshold) {
+        mainCanvas->spinPeakThreshold->blockSignals(true);
+        mainCanvas->spinPeakThreshold->setValue(threshold);
+        mainCanvas->spinPeakThreshold->blockSignals(false);
+    }
+
+    // Build rich HTML table of detected peaks
+    if (mainCanvas->peakSearchBrowser) {
+        QString html;
+        html += "<div style='font-family:monospace; font-size:11px; margin-bottom:6px;'>";
+        html += QString("Range: <b>[%1, %2]</b> | Found: <b style='color:#98c379;'>%3 peaks</b></div>")
+                    .arg(xMin, 0, 'f', 1)
+                    .arg(xMax, 0, 'f', 1)
+                    .arg(peaks.size());
+
+        html += "<table width='100%' style='border-collapse:collapse; font-family:monospace; font-size:11px;'>";
+        html += "<tr style='background-color:#21252b; color:#61afef;'>";
+        html += "<th style='padding:2px 4px;' align='left'>#</th>";
+        html += "<th style='padding:2px 4px;' align='right'>Channel</th>";
+        html += "<th style='padding:2px 4px;' align='right'>Energy</th>";
+        html += "<th style='padding:2px 4px;' align='right'>Counts</th>";
+        html += "</tr>";
+
+        for (size_t i = 0; i < peaks.size(); ++i) {
+            const auto &p = peaks[i];
+            QString bg = (i % 2 == 0) ? "#181a1f" : "#21252b";
+            html += QString("<tr style='background-color:%1;'>").arg(bg);
+            html += QString("<td style='padding:2px 4px;' align='left'>%1</td>").arg(p.index);
+            html += QString("<td style='padding:2px 4px;' align='right'>%1</td>").arg(p.channel, 0, 'f', 1);
+            if (p.isCalibrated) {
+                html += QString("<td style='padding:2px 4px; color:#e5c07b;' align='right'>%1</td>").arg(p.energy, 0, 'f', 1);
+            } else {
+                html += "<td style='padding:2px 4px; color:#5c6370;' align='right'>-</td>";
+            }
+            html += QString("<td style='padding:2px 4px;' align='right'>%1</td>").arg(static_cast<long long>(p.height));
+            html += "</tr>";
+        }
+        html += "</table>";
+
+        mainCanvas->peakSearchBrowser->setHtml(html);
+    }
+
+    // Always dock in top-right corner of canvas
+    if (mainCanvas->canvas) {
+        QPoint canvasTopRight = mainCanvas->canvas->mapToGlobal(QPoint(mainCanvas->canvas->width(), 0));
+        int posX = canvasTopRight.x() - mainCanvas->peakSearchParamsDialog->width() - 25;
+        int posY = canvasTopRight.y() + 45;
+        mainCanvas->peakSearchParamsDialog->move(posX, posY);
+    }
+
+    mainCanvas->peakSearchParamsDialog->show();
+
+    // Keep focus on the ROOT canvas
+    QWidget *focused = QApplication::focusWidget();
+    bool userEditing = (focused && mainCanvas->peakSearchParamsDialog &&
+                        (focused == mainCanvas->peakSearchParamsDialog || mainCanvas->peakSearchParamsDialog->isAncestorOf(focused)));
     if (!userEditing && mainCanvas->canvas) {
         mainCanvas->canvas->setFocus();
     }

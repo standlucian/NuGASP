@@ -3,6 +3,12 @@
 
 #include "TH1F.h"
 #include <string>
+#include <vector>
+
+struct CalibSegment {
+    Double_t maxChannel{1e9};
+    std::vector<Double_t> coeffs; // [a0, a1, a2, a3, ...]
+};
 
 /**
  * @brief TracknHistogram extends ROOT's TH1F with gamma-spectroscopy metadata,
@@ -18,6 +24,11 @@ public:
     virtual ~TracknHistogram() override = default;
 
     /**
+     * @brief Clones the histogram while preserving the TracknHistogram runtime type.
+     */
+    TObject* Clone(const char *newname = "") const override;
+
+    /**
      * @brief Handles mouse and canvas interaction events for this histogram.
      */
     void ExecuteEvent(Int_t event, Int_t px, Int_t py) override;
@@ -26,6 +37,21 @@ public:
      * @brief Sets the polynomial energy calibration coefficients: E(ch) = a0 + a1*ch + a2*ch^2
      */
     void SetCalibration(Double_t a0, Double_t a1, Double_t a2 = 0.0);
+
+    /**
+     * @brief Sets piecewise polynomial energy calibration segments (e.g. from GASP .mcal).
+     */
+    void SetSegmentedCalibration(const std::vector<CalibSegment> &segments);
+
+    /**
+     * @brief Clears / disables energy calibration, reverting readouts to raw channels.
+     */
+    void ClearCalibration();
+
+    /**
+     * @brief Returns the active calibration segments.
+     */
+    const std::vector<CalibSegment> &GetCalibrationSegments() const { return fCalibSegments; }
 
     /**
      * @brief Converts a spectrum channel number to energy (keV) using current calibration.
@@ -71,6 +97,7 @@ private:
     Double_t fCalibA1{1.0};
     Double_t fCalibA2{0.0};
     std::string fSourceFilePath;
+    std::vector<CalibSegment> fCalibSegments;
 };
 
 #endif // TRACKNHISTOGRAM_H
