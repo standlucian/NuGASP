@@ -162,6 +162,7 @@ protected:
 
 signals:
    void requestEnCalDialog();
+   void requestTrackFitDialog();
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void autoFitRequested(int, int);
@@ -337,8 +338,9 @@ public slots:
     void onSpectrumDecrement();
     void stepSpectrumIndex(int delta);
 
-    // Energy calibration dialog
+    // Energy calibration dialogs
     void openEnCalDialog();
+    void openTrackFitDialog();
 
     TracknHistogram* getActiveTracknHistogram() const {
         if (SelectedElement_i >= 1 && SelectedElement_i <= maxElement_i &&

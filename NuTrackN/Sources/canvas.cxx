@@ -5,6 +5,7 @@
 #include "tracknhistogram.h"
 #include "SpectrumImportDialog.h"
 #include "SpectrumExportDialog.h"
+#include "TrackFitDialog.h"
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -197,10 +198,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     leftBar->addWidget(btnEnCal);
     connect(btnEnCal, &QPushButton::clicked, this, &QMainCanvas::openEnCalDialog);
 
-    QPushButton *btnDT = makeButton("DT", topContainer, false);
+    QPushButton *btnDT = makeButton("DT", topContainer, true);
     btnDT->setFixedWidth(93);
     btnDT->setFixedHeight(36);
+    btnDT->setToolTip("AutoTrace / TrackFit automated recalibration (*T / DT) [Shortcut: D+T]");
     leftBar->addWidget(btnDT);
+    connect(btnDT, &QPushButton::clicked, this, &QMainCanvas::openTrackFitDialog);
 
     QPushButton *btnCal2P = makeButton("Cal2P", topContainer, true);
     btnCal2P->setFixedWidth(93);
@@ -434,6 +437,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestDeletePeakMarkers, this, &QMainCanvas::deletePeakMarkers);
     connect(canvas, &QRootCanvas::requestShowPeakMarkers, this, &QMainCanvas::showPeakMarkers);
     connect(canvas, &QRootCanvas::requestEnCalDialog, this, &QMainCanvas::openEnCalDialog);
+    connect(canvas, &QRootCanvas::requestTrackFitDialog, this, &QMainCanvas::openTrackFitDialog);
     connect(canvas, &QRootCanvas::requestHelp, this, &QMainCanvas::offerHelp);
     connect(canvas, &QRootCanvas::requestToggleLogY, this, &QMainCanvas::toggleLogY);
     connect(canvas, &QRootCanvas::killSwitch, qApp, &QCoreApplication::quit);
@@ -968,6 +972,25 @@ void QMainCanvas::Cal2pMain() {
 //==============================================================================
 void QMainCanvas::openEnCalDialog() {
     runEnergyCalibrationDialog(this, m_currentSpectrumIndex);
+    if (canvas) {
+        canvas->setFocus();
+    }
+}
+
+//==============================================================================
+// QMainCanvas::openTrackFitDialog
+//==============================================================================
+// Opens the AutoTrace / TrackFit automated recalibration dialog (DT).
+// Supported via button 'DT' or shortcut 'D + T'.
+//==============================================================================
+void QMainCanvas::openTrackFitDialog() {
+    TracknHistogram *hist = getActiveTracknHistogram();
+    if (!hist) {
+        QMessageBox::warning(this, "AutoTrace / TrackFit", "No active spectrum loaded in the selected pad.");
+        return;
+    }
+    TrackFitDialog dlg(this, hist, m_currentSpectrumIndex, this);
+    dlg.exec();
     if (canvas) {
         canvas->setFocus();
     }

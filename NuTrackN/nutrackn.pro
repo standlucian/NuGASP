@@ -43,7 +43,8 @@ HEADERS += \
     Include/Design.h \
     Include/PeakFit.h \
     Include/SpectrumImportDialog.h \
-    Include/SpectrumExportDialog.h
+    Include/SpectrumExportDialog.h \
+    Include/TrackFitDialog.h
 
 # Project source files
 SOURCES += \
@@ -61,6 +62,7 @@ SOURCES += \
     Sources/Design.cxx \
     Sources/PeakFit.cxx \
     Sources/SpectrumImportDialog.cxx \
-    Sources/SpectrumExportDialog.cxx
+    Sources/SpectrumExportDialog.cxx \
+    Sources/TrackFitDialog.cxx
 
 

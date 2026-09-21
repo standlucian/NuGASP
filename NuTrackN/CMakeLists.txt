@@ -34,6 +34,7 @@ set(SOURCES
     Sources/PeakFit.cxx
     Sources/SpectrumImportDialog.cxx
     Sources/SpectrumExportDialog.cxx
+    Sources/TrackFitDialog.cxx
 )
 
 set(HEADERS
@@ -45,6 +46,7 @@ set(HEADERS
     Include/PeakFit.h
     Include/SpectrumImportDialog.h
     Include/SpectrumExportDialog.h
+    Include/TrackFitDialog.h
 )
 
 add_executable(nutrackn ${SOURCES} ${HEADERS})

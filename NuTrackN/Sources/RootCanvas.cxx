@@ -730,6 +730,9 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_K:
                 emit requestEnCalDialog();
                 break;
+            case Qt::Key_T:
+                emit requestTrackFitDialog();
+                break;
             default:
                 break;
         }

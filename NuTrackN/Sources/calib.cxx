@@ -763,11 +763,11 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
         }
     });
 
-    // Auto-detect Ge-E(new).mcal if present
+    // Restore previously opened file if user explicitly selected one earlier in the session
     if (!s_lastCalibrationFilePath.isEmpty() && QFile::exists(s_lastCalibrationFilePath)) {
         loadFile(s_lastCalibrationFilePath);
-    } else if (QFile::exists("Ge-E(new).mcal")) {
-        loadFile("Ge-E(new).mcal");
+    } else {
+        lblFormatInfo->setText("No calibration file loaded. Click 'Browse...' to select a .mcal or .cal file.");
     }
 
     tabWidget->addTab(tabFile, "File Calibration (.mcal / .cal)");
@@ -790,25 +790,37 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     formManual->setSpacing(10);
     formManual->setLabelAlignment(Qt::AlignRight);
 
+    double initA0 = activeHist->IsCalibrated() ? activeHist->GetCalibA0() : 0.0;
+    double initA1 = activeHist->IsCalibrated() ? activeHist->GetCalibA1() : 1.0;
+    double initA2 = activeHist->IsCalibrated() ? activeHist->GetCalibA2() : 0.0;
+    double initA3 = 0.0;
+    if (activeHist->IsCalibrated() && !activeHist->GetCalibrationSegments().empty()) {
+        const auto &c = activeHist->GetCalibrationSegments()[0].coeffs;
+        if (c.size() > 0) initA0 = c[0];
+        if (c.size() > 1) initA1 = c[1];
+        if (c.size() > 2) initA2 = c[2];
+        if (c.size() > 3) initA3 = c[3];
+    }
+
     QDoubleSpinBox *spinA0 = new QDoubleSpinBox(tabManual);
     spinA0->setRange(-1e7, 1e7);
     spinA0->setDecimals(6);
-    spinA0->setValue(activeHist->IsCalibrated() ? activeHist->GetCalibA0() : 0.0);
+    spinA0->setValue(initA0);
 
     QDoubleSpinBox *spinA1 = new QDoubleSpinBox(tabManual);
     spinA1->setRange(-1e7, 1e7);
     spinA1->setDecimals(6);
-    spinA1->setValue(activeHist->IsCalibrated() ? activeHist->GetCalibA1() : 1.0);
+    spinA1->setValue(initA1);
 
     QDoubleSpinBox *spinA2 = new QDoubleSpinBox(tabManual);
     spinA2->setRange(-1e7, 1e7);
     spinA2->setDecimals(9);
-    spinA2->setValue(activeHist->IsCalibrated() ? activeHist->GetCalibA2() : 0.0);
+    spinA2->setValue(initA2);
 
     QDoubleSpinBox *spinA3 = new QDoubleSpinBox(tabManual);
     spinA3->setRange(-1e7, 1e7);
     spinA3->setDecimals(12);
-    spinA3->setValue(0.0);
+    spinA3->setValue(initA3);
 
     formManual->addRow("A(0) Offset (keV):", spinA0);
     formManual->addRow("A(1) Slope (keV/ch):", spinA1);
@@ -1028,6 +1040,22 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
 
     tabWidget->addTab(tabPoints, "Reference Fit (2P / N-Points)");
 
+    // Intelligently select initial tab based on current spectrum calibration & markers
+    if (activeHist->IsCalibrated()) {
+        const auto &segs = activeHist->GetCalibrationSegments();
+        if (segs.size() <= 1) {
+            tabWidget->setCurrentIndex(1); // Manual Polynomial for single segment
+        } else {
+            tabWidget->setCurrentIndex(0); // File tab for multi-segment piecewise
+        }
+    } else if (availablePoints >= 2) {
+        tabWidget->setCurrentIndex(2); // Reference Fit if reference markers exist
+    } else if (!loadedDetectors.empty()) {
+        tabWidget->setCurrentIndex(0); // File tab if file was previously loaded
+    } else {
+        tabWidget->setCurrentIndex(1); // Default to Manual Polynomial
+    }
+
     // --- Bottom Action Buttons ---
     QHBoxLayout *actionLayout = new QHBoxLayout();
     actionLayout->setSpacing(10);
@@ -1178,6 +1206,13 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
             det.group = 1;
             det.detectorId = currentDetId;
             det.segments = getCurrentTabSegments();
+            if (det.segments.empty() && activeHist->IsCalibrated()) {
+                det.segments = activeHist->GetCalibrationSegments();
+            }
+            if (det.segments.empty()) {
+                QMessageBox::warning(&dialog, "Save Calibration", "No valid calibration parameters available to save.");
+                return;
+            }
             detsToSave.push_back(det);
         }
 
