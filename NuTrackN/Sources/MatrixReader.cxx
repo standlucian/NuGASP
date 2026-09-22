@@ -537,3 +537,167 @@ std::vector<double> MatrixReader::getGateSlice(int chMin, int chMax, int gateAxi
     }
     return slice;
 }
+
+std::vector<double> MatrixReader::getMultiGateSlice(const std::vector<MatrixGateRegion> &gates,
+                                                    int peakGateIndex,
+                                                    int gateAxis,
+                                                    bool applyBackground,
+                                                    double *outBackfac,
+                                                    double *outBgCounts,
+                                                    std::vector<double> *outBgSlice) const
+{
+    if (outBackfac) *outBackfac = 0.0;
+    if (outBgCounts) *outBgCounts = 0.0;
+    if (!m_isOpen || m_resX <= 0 || m_resY <= 0 || gates.empty()) return {};
+
+    const int resC = (m_matmode == 1 || gateAxis == 1) ? m_resX : m_resY;
+    if (outBgSlice) outBgSlice->assign(resC, 0.0);
+
+    // Single gate fallback
+    if (gates.size() == 1) {
+        if (outBackfac) *outBackfac = 1.0;
+        std::vector<double> raw = getRawGateSlice(gates[0].minCh, gates[0].maxCh, gateAxis);
+        if (!applyBackground || !m_bgConfig.enabled || m_bgConfig.mode == MatrixBgMode::None) {
+            return raw;
+        }
+        double pfacs = 0.0;
+        std::vector<double> bg = computeBackgroundSlice(gates[0].minCh, gates[0].maxCh, gateAxis, &pfacs);
+        if (outBackfac) *outBackfac = pfacs;
+        if (outBgSlice) *outBgSlice = bg;
+        double bgSum = 0.0;
+        for (size_t i = 0; i < raw.size() && i < bg.size(); ++i) {
+            bgSum += bg[i];
+            raw[i] -= bg[i];
+        }
+        if (outBgCounts) *outBgCounts = bgSum;
+        return raw;
+    }
+
+    if (peakGateIndex < 0 || peakGateIndex >= static_cast<int>(gates.size())) {
+        peakGateIndex = 0;
+    }
+
+    // Background disabled: return raw slice of the peak gate
+    if (!applyBackground || !m_bgConfig.enabled || m_bgConfig.mode == MatrixBgMode::None) {
+        return getRawGateSlice(gates[peakGateIndex].minCh, gates[peakGateIndex].maxCh, gateAxis);
+    }
+
+    // 1. Normal Mode: true multi-gate subtraction (GASPware trackn.F:6476)
+    if (m_bgConfig.mode == MatrixBgMode::Normal) {
+        int pMin = std::min(gates[peakGateIndex].minCh, gates[peakGateIndex].maxCh);
+        int pMax = std::max(gates[peakGateIndex].minCh, gates[peakGateIndex].maxCh);
+        int wPeak = pMax - pMin + 1;
+
+        int wBgTotal = 0;
+        for (size_t i = 0; i < gates.size(); ++i) {
+            if (static_cast<int>(i) == peakGateIndex) continue;
+            int bMin = std::min(gates[i].minCh, gates[i].maxCh);
+            int bMax = std::max(gates[i].minCh, gates[i].maxCh);
+            wBgTotal += (bMax - bMin + 1);
+        }
+
+        double backfac = (wBgTotal > 0)
+            ? (static_cast<double>(wPeak) / static_cast<double>(wBgTotal)) * m_bgConfig.correctionFactor
+            : 1.0;
+        if (outBackfac) *outBackfac = backfac;
+
+        std::vector<double> peakSlice = getRawGateSlice(pMin, pMax, gateAxis);
+
+        std::vector<double> bgSliceTotal(resC, 0.0);
+        for (size_t i = 0; i < gates.size(); ++i) {
+            if (static_cast<int>(i) == peakGateIndex) continue;
+            int bMin = std::min(gates[i].minCh, gates[i].maxCh);
+            int bMax = std::max(gates[i].minCh, gates[i].maxCh);
+            std::vector<double> s = getRawGateSlice(bMin, bMax, gateAxis);
+            for (int ch = 0; ch < resC && ch < static_cast<int>(s.size()); ++ch) {
+                bgSliceTotal[ch] += s[ch];
+            }
+        }
+
+        std::vector<double> netSlice = peakSlice;
+        double bgCounts = 0.0;
+        if (outBgSlice) outBgSlice->resize(resC);
+
+        for (int ch = 0; ch < resC && ch < static_cast<int>(netSlice.size()); ++ch) {
+            double sub = std::round(bgSliceTotal[ch] * backfac);
+            bgCounts += sub;
+            if (outBgSlice) (*outBgSlice)[ch] = sub;
+            netSlice[ch] -= sub;
+        }
+
+        if (outBgCounts) *outBgCounts = bgCounts;
+        return netSlice;
+    }
+
+    // 2. Common Mode: sum all gates and subtract common projection background (GASPware trackn.F:6526)
+    if (m_bgConfig.mode == MatrixBgMode::Common) {
+        std::vector<double> sumSlice(resC, 0.0);
+        for (const auto &g : gates) {
+            int g1 = std::min(g.minCh, g.maxCh);
+            int g2 = std::max(g.minCh, g.maxCh);
+            std::vector<double> s = getRawGateSlice(g1, g2, gateAxis);
+            for (int ch = 0; ch < resC && ch < static_cast<int>(s.size()); ++ch) {
+                sumSlice[ch] += s[ch];
+            }
+        }
+
+        const std::vector<double> &projG = (m_matmode == 1 || gateAxis == 1) ? m_projectionY : m_projectionX;
+        const std::vector<double> &projC = (m_matmode == 1 || gateAxis == 1) ? m_projectionX : m_projectionY;
+
+        double pbacks = 0.0;
+        for (const auto &g : gates) {
+            int g1 = std::min(g.minCh, g.maxCh);
+            int g2 = std::max(g.minCh, g.maxCh);
+            for (int ch = g1; ch <= g2 && ch < static_cast<int>(projG.size()); ++ch) {
+                pbacks += projG[ch];
+            }
+        }
+
+        double sbacktot = 0.0;
+        for (double v : projG) sbacktot += v;
+
+        double pfacs = (sbacktot > 0.0) ? (pbacks / sbacktot) * m_bgConfig.correctionFactor : 0.0;
+        if (outBackfac) *outBackfac = pfacs;
+
+        double bgCounts = 0.0;
+        if (outBgSlice) outBgSlice->resize(resC);
+
+        for (int ch = 0; ch < resC && ch < static_cast<int>(sumSlice.size()); ++ch) {
+            double sub = std::round((ch < static_cast<int>(projC.size()) ? projC[ch] : 0.0) * pfacs);
+            bgCounts += sub;
+            if (outBgSlice) (*outBgSlice)[ch] = sub;
+            sumSlice[ch] -= sub;
+        }
+
+        if (outBgCounts) *outBgCounts = bgCounts;
+        return sumSlice;
+    }
+
+    // 3. Auto Mode: SNIP filter on peak slice
+    if (m_bgConfig.mode == MatrixBgMode::Auto) {
+        int pMin = std::min(gates[peakGateIndex].minCh, gates[peakGateIndex].maxCh);
+        int pMax = std::max(gates[peakGateIndex].minCh, gates[peakGateIndex].maxCh);
+        std::vector<double> raw = getRawGateSlice(pMin, pMax, gateAxis);
+        std::vector<double> bg = raw;
+        int n = static_cast<int>(bg.size());
+        int m = 20;
+        for (int p = 1; p <= m; ++p) {
+            for (int i = p; i < n - p; ++i) {
+                double avg = 0.5 * (bg[i - p] + bg[i + p]);
+                if (avg < bg[i]) bg[i] = avg;
+            }
+        }
+        double bgCounts = 0.0;
+        if (outBgSlice) outBgSlice->resize(resC);
+        for (int i = 0; i < n && i < static_cast<int>(raw.size()); ++i) {
+            double sub = std::round(bg[i] * m_bgConfig.correctionFactor);
+            bgCounts += sub;
+            if (outBgSlice) (*outBgSlice)[i] = sub;
+            raw[i] -= sub;
+        }
+        if (outBgCounts) *outBgCounts = bgCounts;
+        return raw;
+    }
+
+    return {};
+}

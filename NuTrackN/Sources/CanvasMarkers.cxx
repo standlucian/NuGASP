@@ -690,9 +690,6 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
     gateLine->Draw("same");
     listOfObjectsDrawnOnScreen.Add(gateLine);
 
-    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
-    bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
-
     // When completing a pair, draw baseline and hatched region
     if (gate_markers.size() % 2 == 0) {
         const Int_t leftBin = static_cast<Int_t>(std::round(gate_markers[gate_markers.size() - 2]));
@@ -710,25 +707,6 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
         gateArea->SetFillStyle(3354);
         gateArea->Draw("same");
         listOfObjectsDrawnOnScreen.Add(gateArea);
-
-        double eMin = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * minB + trackHist->GetCalibA2() * minB * minB) : minB;
-        double eMax = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * maxB + trackHist->GetCalibA2() * maxB * maxB) : maxB;
-        QString msg = QString("Gate #%1 defined: [%2, %3]").arg(gate_markers.size() / 2).arg(minB).arg(maxB);
-        if (isCalib) {
-            msg += QString(" (%.1f - %.1f keV)").arg(eMin, 0, 'f', 1).arg(eMax, 0, 'f', 1);
-        }
-        msg += QString(", width = %1 ch. Press 'C + W' or click 'Gate CM' to slice.\n").arg(maxB - minB + 1);
-        CommandPrompt::getInstance()->appendPlainText(msg);
-        std::cout << msg.toStdString();
-    } else {
-        double eX = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * binX + trackHist->GetCalibA2() * binX * binX) : binX;
-        QString msg = QString("Gate marker #%1 placed at ch %2").arg((gate_markers.size() + 1) / 2).arg(binX);
-        if (isCalib) {
-            msg += QString(" (%.1f keV)").arg(eX, 0, 'f', 1);
-        }
-        msg += ". Place second marker with 'W' to define gate.\n";
-        CommandPrompt::getInstance()->appendPlainText(msg);
-        std::cout << msg.toStdString();
     }
 
     canvas->getCanvas()->Modified();

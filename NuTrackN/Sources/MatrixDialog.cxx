@@ -29,14 +29,17 @@
 Matrix1DPreviewWidget::Matrix1DPreviewWidget(QWidget *parent)
     : QWidget(parent)
 {
-    setMinimumHeight(200);
+    setMinimumHeight(220);
     setMouseTracking(true);
+    setFocusPolicy(Qt::StrongFocus);
 }
 
 void Matrix1DPreviewWidget::setSpectrum(const std::vector<double> &data, const QString &label,
-                                        bool isCalib, double a0, double a1, double a2)
+                                        bool isCalib, double a0, double a1, double a2,
+                                        const std::vector<double> &bgData)
 {
     m_data = data;
+    m_bgData = bgData;
     m_label = label;
     m_isCalibrated = isCalib;
     m_calibA0 = a0;
@@ -47,6 +50,10 @@ void Matrix1DPreviewWidget::setSpectrum(const std::vector<double> &data, const Q
     for (double v : m_data) {
         if (v > m_maxVal) m_maxVal = v;
     }
+    for (double v : m_bgData) {
+        if (v > m_maxVal) m_maxVal = v;
+    }
+
     m_hoverCh = -1;
     update();
 }
@@ -54,35 +61,79 @@ void Matrix1DPreviewWidget::setSpectrum(const std::vector<double> &data, const Q
 void Matrix1DPreviewWidget::clear()
 {
     m_data.clear();
+    m_bgData.clear();
     m_label.clear();
     m_maxVal = 0.0;
     m_hoverCh = -1;
     update();
 }
 
+void Matrix1DPreviewWidget::setLogScale(bool log)
+{
+    if (m_logScale != log) {
+        m_logScale = log;
+        emit scaleModeChanged(m_logScale);
+        update();
+    }
+}
+
+QRect Matrix1DPreviewWidget::getPlotArea() const
+{
+    double effMax = (m_maxVal > 0.0) ? m_maxVal : 10.0;
+    QString yMaxStr = QLocale().toString(static_cast<qlonglong>(std::round(effMax)));
+    QFont tickFont = font();
+    tickFont.setPointSize(8);
+    QFontMetrics fm(tickFont);
+
+    int leftMargin = std::max(64, fm.horizontalAdvance(yMaxStr) + 18);
+    int rightMargin = 20;
+    int topMargin = 26;
+    int bottomMargin = 38;
+
+    return rect().adjusted(leftMargin, topMargin, -rightMargin, -bottomMargin);
+}
+
+int Matrix1DPreviewWidget::pixelToChannel(int px, const QRect &plotArea) const
+{
+    if (m_data.empty() || plotArea.width() <= 0) return 0;
+    int n = static_cast<int>(m_data.size());
+    int relPx = px - plotArea.left();
+    int ch = (relPx * n) / plotArea.width();
+    return std::max(0, std::min(ch, n - 1));
+}
+
+int Matrix1DPreviewWidget::channelToPixel(int ch, const QRect &plotArea) const
+{
+    if (m_data.empty() || plotArea.width() <= 0) return plotArea.left();
+    int n = static_cast<int>(m_data.size());
+    if (n <= 1) return plotArea.left();
+    double frac = static_cast<double>(ch) / static_cast<double>(n - 1);
+    return plotArea.left() + static_cast<int>(std::round(frac * plotArea.width()));
+}
+
 void Matrix1DPreviewWidget::mouseMoveEvent(QMouseEvent *event)
 {
     if (m_data.empty()) return;
 
-    const QRect plotArea = rect().adjusted(46, 16, -16, -26);
+    const QRect plotArea = getPlotArea();
     int mx = event->pos().x();
 
     if (plotArea.contains(event->pos())) {
-        int px = mx - plotArea.left();
-        int ch = (px * static_cast<int>(m_data.size())) / plotArea.width();
-        ch = std::max(0, std::min(ch, static_cast<int>(m_data.size()) - 1));
-
+        int ch = pixelToChannel(mx, plotArea);
         m_hoverCh = ch;
         double counts = m_data[ch];
         double energy = m_isCalibrated
             ? (m_calibA0 + m_calibA1 * ch + m_calibA2 * ch * ch)
             : static_cast<double>(ch);
+        double bgCounts = (!m_bgData.empty() && ch >= 0 && ch < static_cast<int>(m_bgData.size()))
+            ? m_bgData[ch]
+            : -1.0;
 
-        emit hoverInfoChanged(ch, energy, counts);
+        emit hoverInfoChanged(ch, energy, counts, bgCounts);
         update();
     } else {
         m_hoverCh = -1;
-        emit hoverInfoChanged(-1, 0.0, 0.0);
+        emit hoverInfoChanged(-1, 0.0, 0.0, -1.0);
         update();
     }
 }
@@ -90,7 +141,7 @@ void Matrix1DPreviewWidget::mouseMoveEvent(QMouseEvent *event)
 void Matrix1DPreviewWidget::leaveEvent(QEvent *)
 {
     m_hoverCh = -1;
-    emit hoverInfoChanged(-1, 0.0, 0.0);
+    emit hoverInfoChanged(-1, 0.0, 0.0, -1.0);
     update();
 }
 
@@ -104,7 +155,7 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
     p.setPen(QPen(QColor("#2b303c"), 1));
     p.drawRect(rect().adjusted(0, 0, -1, -1));
 
-    const QRect plotArea = rect().adjusted(46, 16, -16, -26);
+    const QRect plotArea = getPlotArea();
 
     // Plot Border
     p.setPen(QPen(QColor("#3d4452"), 1));
@@ -116,11 +167,14 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
         return;
     }
 
-    const int nCh = static_cast<int>(m_data.size());
+    const int nVis = static_cast<int>(m_data.size());
     const int pW = plotArea.width();
     const int pH = plotArea.height();
 
-    // Subtle grid lines
+    double effMax = (m_maxVal > 0.0) ? m_maxVal : 10.0;
+    const double logMax = std::log10(1.0 + effMax);
+
+    // Subtle grid lines (3 horizontal, 3 vertical)
     p.setPen(QPen(QColor(255, 255, 255, 18), 1, Qt::DotLine));
     for (int step = 1; step <= 3; ++step) {
         int y = plotArea.bottom() - (pH * step) / 4;
@@ -130,43 +184,44 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
         p.drawLine(x, plotArea.top(), x, plotArea.bottom());
     }
 
-    // Build curve polylines
+    // Build curve points and fill polygon
     QPolygonF linePoly;
     QPolygonF fillPoly;
     fillPoly << QPointF(plotArea.left(), plotArea.bottom());
 
     for (int px = 0; px < pW; ++px) {
-        int ch1 = (px * nCh) / pW;
-        int ch2 = ((px + 1) * nCh) / pW;
-        if (ch2 <= ch1) ch2 = ch1 + 1;
-        if (ch2 > nCh) ch2 = nCh;
+        int c1 = (px * nVis) / pW;
+        int c2 = ((px + 1) * nVis) / pW;
+        if (c2 <= c1) c2 = c1 + 1;
+        if (c2 > nVis) c2 = nVis;
 
-        double cMin = m_data[ch1];
-        double cMax = m_data[ch1];
-        for (int c = ch1 + 1; c < ch2; ++c) {
-            if (m_data[c] < cMin) cMin = m_data[c];
+        double cMax = m_data[c1];
+        for (int c = c1 + 1; c < c2; ++c) {
             if (m_data[c] > cMax) cMax = m_data[c];
         }
 
-        double yTop = plotArea.bottom() - (cMax / m_maxVal) * (pH - 2);
-        double yBot = plotArea.bottom() - (cMin / m_maxVal) * (pH - 2);
+        double normY = 0.0;
+        if (m_logScale) {
+            normY = (cMax > 0.0 && logMax > 0.0)
+                ? (std::log10(1.0 + cMax) / logMax)
+                : 0.0;
+        } else {
+            normY = cMax / effMax;
+        }
+        normY = std::max(0.0, std::min(1.0, normY));
+
+        double yPos = plotArea.bottom() - normY * (pH - 2);
         double screenX = plotArea.left() + px;
 
-        linePoly << QPointF(screenX, yTop);
-        if (std::abs(yBot - yTop) > 1.0) {
-            linePoly << QPointF(screenX, yBot);
-        }
-    }
-
-    for (int i = 0; i < linePoly.size(); ++i) {
-        fillPoly << linePoly[i];
+        linePoly << QPointF(screenX, yPos);
+        fillPoly << QPointF(screenX, yPos);
     }
     fillPoly << QPointF(plotArea.right(), plotArea.bottom());
 
     // Shaded fill under curve
     QLinearGradient grad(0, plotArea.top(), 0, plotArea.bottom());
-    grad.setColorAt(0.0, QColor(0, 224, 255, 90));
-    grad.setColorAt(1.0, QColor(0, 136, 204, 10));
+    grad.setColorAt(0.0, QColor(0, 224, 255, 110));
+    grad.setColorAt(1.0, QColor(0, 136, 204, 15));
     p.setBrush(grad);
     p.setPen(Qt::NoPen);
     p.drawPolygon(fillPoly);
@@ -176,9 +231,42 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
     p.setPen(QPen(QColor("#00e0ff"), 1.2));
     p.drawPolyline(linePoly);
 
+    // Background curve line (if present)
+    if (!m_bgData.empty()) {
+        QPolygonF bgLinePoly;
+        int nBg = static_cast<int>(m_bgData.size());
+        for (int px = 0; px < pW; ++px) {
+            int c1 = (px * nBg) / pW;
+            int c2 = ((px + 1) * nBg) / pW;
+            if (c2 <= c1) c2 = c1 + 1;
+            if (c2 > nBg) c2 = nBg;
+
+            double cMax = m_bgData[c1];
+            for (int c = c1 + 1; c < c2; ++c) {
+                if (m_bgData[c] > cMax) cMax = m_bgData[c];
+            }
+
+            double normY = 0.0;
+            if (m_logScale) {
+                normY = (cMax > 0.0 && logMax > 0.0)
+                    ? (std::log10(1.0 + cMax) / logMax)
+                    : 0.0;
+            } else {
+                normY = cMax / effMax;
+            }
+            normY = std::max(0.0, std::min(1.0, normY));
+
+            double yPos = plotArea.bottom() - normY * (pH - 2);
+            double screenX = plotArea.left() + px;
+            bgLinePoly << QPointF(screenX, yPos);
+        }
+        p.setPen(QPen(QColor("#ff4d4d"), 1.6));
+        p.drawPolyline(bgLinePoly);
+    }
+
     // Hover hair-line
-    if (m_hoverCh >= 0 && m_hoverCh < nCh) {
-        int hx = plotArea.left() + (m_hoverCh * pW) / nCh;
+    if (m_hoverCh >= 0 && m_hoverCh < nVis) {
+        int hx = channelToPixel(m_hoverCh, plotArea);
         p.setPen(QPen(QColor("#ffaa00"), 1, Qt::DashLine));
         p.drawLine(hx, plotArea.top(), hx, plotArea.bottom());
     }
@@ -189,29 +277,62 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
     badgeFont.setBold(true);
     p.setFont(badgeFont);
 
-    // Label badge (top-left)
+    // Label badge (top-left inside plot)
     p.setPen(QColor("#00e0ff"));
-    p.drawText(plotArea.left() + 8, plotArea.top() + 15, m_label);
+    QString dispLabel = m_label;
+    if (m_logScale) dispLabel += " [Log Y]";
+    p.drawText(plotArea.left() + 8, plotArea.top() + 16, dispLabel);
 
-    // Max counts readout (top-right)
+    if (!m_bgData.empty()) {
+        int labelWidth = p.fontMetrics().horizontalAdvance(dispLabel);
+        p.setPen(QColor("#ff4d4d"));
+        p.drawText(plotArea.left() + 16 + labelWidth, plotArea.top() + 16, tr("[Auto BG: Red]"));
+    }
+
+    // Max counts readout (top-right inside plot)
     QFont infoFont = font();
     infoFont.setPointSize(8);
     infoFont.setBold(false);
     p.setFont(infoFont);
     p.setPen(QColor("#9da4b0"));
-    QString maxStr = QString("Max: %1 counts").arg(QLocale().toString(static_cast<qlonglong>(std::round(m_maxVal))));
-    p.drawText(plotArea.right() - p.fontMetrics().horizontalAdvance(maxStr) - 6, plotArea.top() + 15, maxStr);
+    QString maxStr = QString("Scale Max: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(effMax))));
+    p.drawText(plotArea.right() - p.fontMetrics().horizontalAdvance(maxStr) - 8, plotArea.top() + 16, maxStr);
 
-    // Axis Labels
-    p.drawText(plotArea.left(), plotArea.bottom() + 16, "Ch 0");
-    QString midCh = QString("Ch %1").arg(nCh / 2);
-    p.drawText(plotArea.left() + pW / 2 - p.fontMetrics().horizontalAdvance(midCh) / 2, plotArea.bottom() + 16, midCh);
-    QString endCh = QString("Ch %1").arg(nCh - 1);
-    p.drawText(plotArea.right() - p.fontMetrics().horizontalAdvance(endCh), plotArea.bottom() + 16, endCh);
+    // Axis Labels at Bottom
+    QFont tickFont = font();
+    tickFont.setPointSize(8);
+    p.setFont(tickFont);
+    p.setPen(QColor("#8c94a4"));
 
-    // Y Axis Ticks
-    p.drawText(4, plotArea.top() + 10, QString::number(static_cast<qlonglong>(std::round(m_maxVal))));
-    p.drawText(20, plotArea.bottom(), "0");
+    QString startLabel = QString("Ch 0");
+    if (m_isCalibrated) {
+        double e0 = m_calibA0;
+        startLabel += QString(" (%1 keV)").arg(e0, 0, 'f', 0);
+    }
+    p.drawText(plotArea.left(), plotArea.bottom() + 17, startLabel);
+
+    int midCh = nVis / 2;
+    QString midLabel = QString("Ch %1").arg(midCh);
+    p.drawText(plotArea.left() + pW / 2 - p.fontMetrics().horizontalAdvance(midLabel) / 2, plotArea.bottom() + 17, midLabel);
+
+    int endCh = nVis - 1;
+    QString endLabel = QString("Ch %1").arg(endCh);
+    if (m_isCalibrated) {
+        double e1 = m_calibA0 + m_calibA1 * endCh + m_calibA2 * endCh * endCh;
+        endLabel += QString(" (%1 keV)").arg(e1, 0, 'f', 0);
+    }
+    p.drawText(plotArea.right() - p.fontMetrics().horizontalAdvance(endLabel), plotArea.bottom() + 17, endLabel);
+
+    // Y Axis Ticks (drawn to the left of plotArea border)
+    QString yMaxValStr = QLocale().toString(static_cast<qlonglong>(std::round(effMax)));
+    int yMaxW = p.fontMetrics().horizontalAdvance(yMaxValStr);
+    p.drawText(plotArea.left() - yMaxW - 6, plotArea.top() + 12, yMaxValStr);
+
+    if (m_logScale) {
+        p.drawText(plotArea.left() - p.fontMetrics().horizontalAdvance("1") - 6, plotArea.bottom() - 1, "1");
+    } else {
+        p.drawText(plotArea.left() - p.fontMetrics().horizontalAdvance("0") - 6, plotArea.bottom() - 1, "0");
+    }
 }
 
 //==============================================================================
@@ -232,20 +353,24 @@ MatrixDialog::MatrixDialog(std::shared_ptr<MatrixReader> reader,
       m_calibA2(calibA2)
 {
     setWindowTitle(tr("Open Compressed Matrix (CM)"));
-    resize(740, 520);
-    setMinimumSize(680, 480);
+    resize(880, 680);
+    setMinimumSize(780, 580);
 
     setStyleSheet(
         "QDialog { background-color: #24262b; color: #ffffff; }"
         "QLabel { color: #e6e6e6; font-size: 14px; }"
+        "QLabel:disabled { color: #585f6d; }"
         "QGroupBox { font-size: 14px; font-weight: bold; color: #00e0ff; border: 1px solid #444955; border-radius: 6px; margin-top: 10px; padding-top: 14px; }"
         "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
         "QRadioButton { font-size: 14px; color: #ffffff; spacing: 8px; }"
         "QRadioButton::indicator { width: 18px; height: 18px; }"
         "QCheckBox { font-size: 13px; color: #ffffff; spacing: 8px; }"
         "QComboBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
+        "QComboBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
+        "QComboBox::drop-down:disabled { border: none; background-color: transparent; }"
         "QComboBox QAbstractItemView { background-color: #24262b; color: #ffffff; selection-background-color: #0077b6; }"
-        "QDoubleSpinBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
+        "QDoubleSpinBox, QSpinBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
+        "QDoubleSpinBox:disabled, QSpinBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
         "QPushButton { font-size: 14px; font-weight: bold; border-radius: 4px; padding: 7px 18px; }"
     );
 
@@ -343,17 +468,35 @@ void MatrixDialog::setupUI()
     QGroupBox *grpPreview = new QGroupBox(tr("1D Projection Spectrum Preview"), this);
     QVBoxLayout *previewLayout = new QVBoxLayout(grpPreview);
     previewLayout->setSpacing(6);
-    previewLayout->setContentsMargins(12, 14, 12, 10);
+    previewLayout->setContentsMargins(12, 12, 12, 10);
+
+    // Toolbar above preview
+    QHBoxLayout *previewBar = new QHBoxLayout();
+    previewBar->setSpacing(8);
+
+    m_btnLogScale = new QPushButton(tr("Log Y"), grpPreview);
+    m_btnLogScale->setCheckable(true);
+    m_btnLogScale->setChecked(false);
+    m_btnLogScale->setStyleSheet(
+        "QPushButton { background-color: #2b303c; color: #00e0ff; border: 1px solid #414856; border-radius: 3px; padding: 4px 12px; font-size: 12px; font-weight: bold; } "
+        "QPushButton:checked { background-color: #0077b6; color: #ffffff; border: 1px solid #0096c7; } "
+        "QPushButton:hover { background-color: #3d4452; }"
+    );
+    previewBar->addWidget(m_btnLogScale);
+    previewBar->addStretch(1);
+
+    m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
+    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
+    previewBar->addWidget(m_lblHoverReadout);
+
+    previewLayout->addLayout(previewBar);
 
     m_plotPreview = new Matrix1DPreviewWidget(grpPreview);
     connect(m_plotPreview, &Matrix1DPreviewWidget::hoverInfoChanged,
             this, &MatrixDialog::onHoverInfoChanged);
     previewLayout->addWidget(m_plotPreview, 1);
 
-    m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
-    m_lblHoverReadout->setAlignment(Qt::AlignCenter);
-    previewLayout->addWidget(m_lblHoverReadout);
+    connect(m_btnLogScale, &QPushButton::toggled, m_plotPreview, &Matrix1DPreviewWidget::setLogScale);
 
     mainLayout->addWidget(grpPreview, 1);
 
@@ -371,23 +514,26 @@ void MatrixDialog::setupUI()
     m_chkEnableBg->setStyleSheet("font-weight: bold; color: #ffffff;");
     bgTopRow->addWidget(m_chkEnableBg);
 
-    bgTopRow->addWidget(new QLabel(tr("Mode:"), grpBg));
+    m_lblBgModePrompt = new QLabel(tr("Mode:"), grpBg);
+    bgTopRow->addWidget(m_lblBgModePrompt);
+
     m_comboBgMode = new QComboBox(grpBg);
-    m_comboBgMode->addItem(tr("Common / Projection (GASPware default)"), 1);
-    m_comboBgMode->addItem(tr("Normal / Local (Gate boundary baseline)"), 2);
-    m_comboBgMode->addItem(tr("Auto / SNIP (Iterative peak clipping)"), 3);
-    m_comboBgMode->addItem(tr("None (Raw coincidence slices)"), 0);
+    // User requested order: Normal -> Auto -> Common
+    m_comboBgMode->addItem(tr("Normal / Local (Gate boundary baseline)"), static_cast<int>(MatrixBgMode::Normal));
+    m_comboBgMode->addItem(tr("Auto / SNIP (Iterative peak clipping)"), static_cast<int>(MatrixBgMode::Auto));
+    m_comboBgMode->addItem(tr("Common / Projection (GASPware default)"), static_cast<int>(MatrixBgMode::Common));
 
     if (m_reader) {
         MatrixBgMode mode = m_reader->getBackgroundConfig().mode;
-        int idx = (mode == MatrixBgMode::Common) ? 0 :
-                  (mode == MatrixBgMode::Normal) ? 1 :
-                  (mode == MatrixBgMode::Auto) ? 2 : 3;
+        int idx = (mode == MatrixBgMode::Auto) ? 1 :
+                  (mode == MatrixBgMode::Common) ? 2 : 0;
         m_comboBgMode->setCurrentIndex(idx);
     }
     bgTopRow->addWidget(m_comboBgMode, 1);
 
-    bgTopRow->addWidget(new QLabel(tr("Correction Factor:"), grpBg));
+    m_lblCorrFactorPrompt = new QLabel(tr("Correction Factor:"), grpBg);
+    bgTopRow->addWidget(m_lblCorrFactorPrompt);
+
     m_spinCorrFactor = new QDoubleSpinBox(grpBg);
     m_spinCorrFactor->setRange(0.0, 10.0);
     m_spinCorrFactor->setSingleStep(0.05);
@@ -399,6 +545,7 @@ void MatrixDialog::setupUI()
     bgLayout->addLayout(bgTopRow);
 
     m_lblBgHelp = new QLabel(grpBg);
+    m_lblBgHelp->setWordWrap(true);
     m_lblBgHelp->setStyleSheet("color: #9cb3c9; font-size: 12px; font-style: italic;");
     bgLayout->addWidget(m_lblBgHelp);
 
@@ -479,7 +626,9 @@ void MatrixDialog::onBackgroundConfigChanged()
     if (!m_chkEnableBg || !m_comboBgMode || !m_spinCorrFactor || !m_lblBgHelp) return;
 
     bool enabled = m_chkEnableBg->isChecked();
+    if (m_lblBgModePrompt) m_lblBgModePrompt->setEnabled(enabled);
     m_comboBgMode->setEnabled(enabled);
+    if (m_lblCorrFactorPrompt) m_lblCorrFactorPrompt->setEnabled(enabled);
     m_spinCorrFactor->setEnabled(enabled);
 
     if (!enabled) {
@@ -488,16 +637,14 @@ void MatrixDialog::onBackgroundConfigChanged()
         return;
     }
 
-    int modeIdx = m_comboBgMode->currentIndex();
-    if (modeIdx == 0) {
-        m_lblBgHelp->setText(tr("Common background (GASPware trackn.F): Subtracts total projection scaled by fraction of counts in gate × correction factor: pfacs = (Gate Counts / Total Projection) × %1.")
-            .arg(m_spinCorrFactor->value(), 0, 'f', 2));
-    } else if (modeIdx == 1) {
+    int modeVal = m_comboBgMode->currentData().toInt();
+    if (modeVal == static_cast<int>(MatrixBgMode::Normal)) {
         m_lblBgHelp->setText(tr("Normal/Local background: Estimates local baseline between gate boundaries and subtracts scaled projection."));
-    } else if (modeIdx == 2) {
+    } else if (modeVal == static_cast<int>(MatrixBgMode::Auto)) {
         m_lblBgHelp->setText(tr("Auto/SNIP background: Non-linear iterative peak-clipping filter stripping continuum background from cut spectrum."));
     } else {
-        m_lblBgHelp->setText(tr("No background subtraction will be applied."));
+        m_lblBgHelp->setText(tr("Common background (GASPware trackn.F): Subtracts total projection scaled by fraction of counts in gate × correction factor: pfacs = (Gate Counts / Total Projection) × %1.")
+            .arg(m_spinCorrFactor->value(), 0, 'f', 2));
     }
 
     saveBackgroundConfig();
@@ -509,15 +656,12 @@ void MatrixDialog::saveBackgroundConfig()
 
     MatrixBackgroundConfig cfg;
     cfg.enabled = m_chkEnableBg->isChecked();
-    int modeIdx = m_comboBgMode->currentIndex();
-    cfg.mode = (modeIdx == 0) ? MatrixBgMode::Common :
-               (modeIdx == 1) ? MatrixBgMode::Normal :
-               (modeIdx == 2) ? MatrixBgMode::Auto : MatrixBgMode::None;
+    cfg.mode = static_cast<MatrixBgMode>(m_comboBgMode->currentData().toInt());
     cfg.correctionFactor = m_spinCorrFactor->value();
     m_reader->setBackgroundConfig(cfg);
 }
 
-void MatrixDialog::onHoverInfoChanged(int ch, double energy, double counts)
+void MatrixDialog::onHoverInfoChanged(int ch, double energy, double counts, double bgCounts)
 {
     if (ch < 0) {
         m_lblHoverReadout->setText(tr("Hover over spectrum to inspect channel counts"));
@@ -529,6 +673,9 @@ void MatrixDialog::onHoverInfoChanged(int ch, double energy, double counts)
         info += QString(" | Energy: %1 keV").arg(energy, 0, 'f', 1);
     }
     info += QString(" | Counts: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(counts))));
+    if (bgCounts >= 0.0) {
+        info += QString(" | BG: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))));
+    }
     m_lblHoverReadout->setText(info);
 }
 
@@ -573,47 +720,102 @@ MatrixGateDialog::MatrixGateDialog(std::shared_ptr<MatrixReader> reader,
                                    double calibA0,
                                    double calibA1,
                                    double calibA2,
-                                   int initialGateMin,
-                                   int initialGateMax,
+                                   const std::vector<MatrixGateRegion> &initialGates,
                                    QWidget *parent)
     : QDialog(parent),
       m_reader(reader),
       m_isCalibrated(isCalibrated),
       m_calibA0(calibA0),
       m_calibA1(calibA1),
-      m_calibA2(calibA2)
+      m_calibA2(calibA2),
+      m_gates(initialGates),
+      m_peakGateIndex(0)
 {
     setWindowTitle(tr("Coincidence Gate (Gate CM)"));
-    resize(760, 560);
-    setMinimumSize(700, 500);
+    resize(880, 680);
+    setMinimumSize(780, 580);
 
     setStyleSheet(
         "QDialog { background-color: #24262b; color: #ffffff; }"
         "QLabel { color: #e6e6e6; font-size: 14px; }"
+        "QLabel:disabled { color: #585f6d; }"
         "QGroupBox { font-size: 14px; font-weight: bold; color: #00e0ff; border: 1px solid #444955; border-radius: 6px; margin-top: 10px; padding-top: 14px; }"
         "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
         "QSpinBox { background-color: #323640; color: #ffffff; font-size: 14px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
         "QRadioButton { font-size: 14px; color: #ffffff; spacing: 8px; }"
         "QCheckBox { font-size: 13px; color: #ffffff; spacing: 8px; }"
         "QComboBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
+        "QComboBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
+        "QComboBox::drop-down:disabled { border: none; background-color: transparent; }"
         "QComboBox QAbstractItemView { background-color: #24262b; color: #ffffff; selection-background-color: #0077b6; }"
         "QDoubleSpinBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
+        "QDoubleSpinBox:disabled, QSpinBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
         "QPushButton { font-size: 14px; font-weight: bold; border-radius: 4px; padding: 7px 18px; }"
     );
+
+    int maxCh = (m_reader && m_reader->isOpen()) ? (m_reader->getResolutionY() - 1) : 10239;
+    if (m_gates.empty()) {
+        m_gates.push_back({150, 160});
+    }
+    for (auto &g : m_gates) {
+        if (g.minCh > g.maxCh) std::swap(g.minCh, g.maxCh);
+        g.minCh = std::max(0, std::min(g.minCh, maxCh));
+        g.maxCh = std::max(0, std::min(g.maxCh, maxCh));
+    }
+
+    // Auto-select peak gate with highest projection count density if multiple gates exist
+    if (m_gates.size() > 1 && m_reader && m_reader->isOpen()) {
+        const std::vector<double> &proj = m_reader->getProjectionY();
+        if (!proj.empty()) {
+            double bestDensity = -1.0;
+            int bestIdx = 0;
+            for (size_t i = 0; i < m_gates.size(); ++i) {
+                double sum = 0.0;
+                int w = m_gates[i].maxCh - m_gates[i].minCh + 1;
+                for (int c = m_gates[i].minCh; c <= m_gates[i].maxCh && c < static_cast<int>(proj.size()); ++c) {
+                    sum += proj[c];
+                }
+                double density = (w > 0) ? (sum / w) : 0.0;
+                if (density > bestDensity) {
+                    bestDensity = density;
+                    bestIdx = static_cast<int>(i);
+                }
+            }
+            m_peakGateIndex = bestIdx;
+        }
+    }
 
     setupUI();
 
     if (m_reader && m_reader->isOpen()) {
-        int maxCh = m_reader->getResolutionY() - 1;
-        if (initialGateMin >= 0 && initialGateMax >= 0) {
-            m_spinGateMin->setValue(std::min(initialGateMin, maxCh));
-            m_spinGateMax->setValue(std::min(initialGateMax, maxCh));
-        } else {
-            m_spinGateMin->setValue(150);
-            m_spinGateMax->setValue(160);
+        if (m_peakGateIndex >= 0 && m_peakGateIndex < static_cast<int>(m_gates.size())) {
+            m_spinGateMin->blockSignals(true);
+            m_spinGateMin->setValue(m_gates[m_peakGateIndex].minCh);
+            m_spinGateMin->blockSignals(false);
+
+            m_spinGateMax->blockSignals(true);
+            m_spinGateMax->setValue(m_gates[m_peakGateIndex].maxCh);
+            m_spinGateMax->blockSignals(false);
         }
+        syncGateSpinboxes();
         onGateParametersChanged();
     }
+}
+
+MatrixGateDialog::MatrixGateDialog(std::shared_ptr<MatrixReader> reader,
+                                   bool isCalibrated,
+                                   double calibA0,
+                                   double calibA1,
+                                   double calibA2,
+                                   int initialGateMin,
+                                   int initialGateMax,
+                                   QWidget *parent)
+    : MatrixGateDialog(reader, isCalibrated, calibA0, calibA1, calibA2,
+                       (initialGateMin >= 0 && initialGateMax >= 0)
+                           ? std::vector<MatrixGateRegion>{{initialGateMin, initialGateMax}}
+                           : std::vector<MatrixGateRegion>{{150, 160}},
+                       parent)
+{
 }
 
 void MatrixGateDialog::setupUI()
@@ -671,17 +873,47 @@ void MatrixGateDialog::setupUI()
         gateLayout->addLayout(axisLayout);
     }
 
+    if (m_gates.size() > 1) {
+        QHBoxLayout *peakSelectLayout = new QHBoxLayout();
+        peakSelectLayout->setSpacing(10);
+        m_lblPeakPrompt = new QLabel(tr("Peak Gate:"), grpGate);
+        m_lblPeakPrompt->setStyleSheet("font-weight: bold; color: #00e0ff; font-size: 13px;");
+        peakSelectLayout->addWidget(m_lblPeakPrompt);
+
+        m_comboPeakGate = new QComboBox(grpGate);
+        m_comboPeakGate->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        for (size_t i = 0; i < m_gates.size(); ++i) {
+            QString gTxt = QString("Gate %1: [%2 - %3 ch]").arg(i + 1).arg(m_gates[i].minCh).arg(m_gates[i].maxCh);
+            if (m_isCalibrated) {
+                gTxt += QString(" (%1 - %2 keV)").arg(channelToEnergy(m_gates[i].minCh), 0, 'f', 1)
+                                                 .arg(channelToEnergy(m_gates[i].maxCh), 0, 'f', 1);
+            }
+            m_comboPeakGate->addItem(gTxt);
+        }
+        m_comboPeakGate->setCurrentIndex(m_peakGateIndex);
+        connect(m_comboPeakGate, QOverload<int>::of(&QComboBox::currentIndexChanged),
+                this, &MatrixGateDialog::onPeakGateChanged);
+        peakSelectLayout->addWidget(m_comboPeakGate);
+        peakSelectLayout->addStretch(1);
+        gateLayout->addLayout(peakSelectLayout);
+
+        m_lblGatesDetail = new QLabel(grpGate);
+        m_lblGatesDetail->setWordWrap(true);
+        m_lblGatesDetail->setStyleSheet("color: #b0c4de; font-size: 12px; font-family: monospace;");
+        gateLayout->addWidget(m_lblGatesDetail);
+    }
+
     QGridLayout *paramGrid = new QGridLayout();
     paramGrid->setSpacing(10);
 
-    paramGrid->addWidget(new QLabel(tr("Gate Channel Min:"), grpGate), 0, 0);
+    paramGrid->addWidget(new QLabel(m_gates.size() > 1 ? tr("Peak Channel Min:") : tr("Gate Channel Min:"), grpGate), 0, 0);
     m_spinGateMin = new QSpinBox(grpGate);
     m_spinGateMin->setRange(0, m_reader ? m_reader->getResolutionY() - 1 : 10239);
     connect(m_spinGateMin, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &MatrixGateDialog::onGateParametersChanged);
     paramGrid->addWidget(m_spinGateMin, 0, 1);
 
-    paramGrid->addWidget(new QLabel(tr("Gate Channel Max:"), grpGate), 0, 2);
+    paramGrid->addWidget(new QLabel(m_gates.size() > 1 ? tr("Peak Channel Max:") : tr("Gate Channel Max:"), grpGate), 0, 2);
     m_spinGateMax = new QSpinBox(grpGate);
     m_spinGateMax->setRange(0, m_reader ? m_reader->getResolutionY() - 1 : 10239);
     connect(m_spinGateMax, QOverload<int>::of(&QSpinBox::valueChanged),
@@ -707,22 +939,26 @@ void MatrixGateDialog::setupUI()
     m_chkEnableBg->setStyleSheet("font-weight: bold; color: #ffffff;");
     bgRow->addWidget(m_chkEnableBg);
 
+    m_lblBgModePrompt = new QLabel(tr("Mode:"), grpGate);
+    bgRow->addWidget(m_lblBgModePrompt);
+
     m_comboBgMode = new QComboBox(grpGate);
-    m_comboBgMode->addItem(tr("Common (Projection)"), 1);
-    m_comboBgMode->addItem(tr("Normal (Local Baseline)"), 2);
-    m_comboBgMode->addItem(tr("Auto (SNIP Filter)"), 3);
-    m_comboBgMode->addItem(tr("None (Raw)"), 0);
+    // User requested order: Normal -> Auto -> Common
+    m_comboBgMode->addItem(tr("Normal (Local Baseline)"), static_cast<int>(MatrixBgMode::Normal));
+    m_comboBgMode->addItem(tr("Auto (SNIP Filter)"), static_cast<int>(MatrixBgMode::Auto));
+    m_comboBgMode->addItem(tr("Common (Projection)"), static_cast<int>(MatrixBgMode::Common));
 
     if (m_reader) {
         MatrixBgMode mode = m_reader->getBackgroundConfig().mode;
-        int idx = (mode == MatrixBgMode::Common) ? 0 :
-                  (mode == MatrixBgMode::Normal) ? 1 :
-                  (mode == MatrixBgMode::Auto) ? 2 : 3;
+        int idx = (mode == MatrixBgMode::Auto) ? 1 :
+                  (mode == MatrixBgMode::Common) ? 2 : 0;
         m_comboBgMode->setCurrentIndex(idx);
     }
     bgRow->addWidget(m_comboBgMode);
 
-    bgRow->addWidget(new QLabel(tr("Factor:"), grpGate));
+    m_lblCorrFactorPrompt = new QLabel(tr("Factor:"), grpGate);
+    bgRow->addWidget(m_lblCorrFactorPrompt);
+
     m_spinCorrFactor = new QDoubleSpinBox(grpGate);
     m_spinCorrFactor->setRange(0.0, 10.0);
     m_spinCorrFactor->setSingleStep(0.05);
@@ -735,6 +971,7 @@ void MatrixGateDialog::setupUI()
     gateLayout->addLayout(bgRow);
 
     m_lblBgStats = new QLabel(grpGate);
+    m_lblBgStats->setWordWrap(true);
     m_lblBgStats->setStyleSheet("color: #44ffaa; font-size: 12px; font-family: monospace;");
     gateLayout->addWidget(m_lblBgStats);
 
@@ -744,23 +981,43 @@ void MatrixGateDialog::setupUI()
     connect(m_spinCorrFactor, QOverload<double>::of(&QDoubleSpinBox::valueChanged),
             this, &MatrixGateDialog::onBackgroundSettingsChanged);
 
+    onBackgroundSettingsChanged();
+
     mainLayout->addWidget(grpGate);
 
     // 3. Sliced Gate 1D Preview
     QGroupBox *grpPreview = new QGroupBox(tr("Gated Coincidence Spectrum Preview"), this);
     QVBoxLayout *previewLayout = new QVBoxLayout(grpPreview);
-    previewLayout->setSpacing(6);
-    previewLayout->setContentsMargins(12, 14, 12, 10);
+    previewLayout->setSpacing(10);
+    previewLayout->setContentsMargins(12, 12, 12, 10);
+
+    // Toolbar above preview
+    QHBoxLayout *previewBar = new QHBoxLayout();
+    previewBar->setSpacing(8);
+
+    m_btnLogScale = new QPushButton(tr("Log Y"), grpPreview);
+    m_btnLogScale->setCheckable(true);
+    m_btnLogScale->setChecked(false);
+    m_btnLogScale->setStyleSheet(
+        "QPushButton { background-color: #2b303c; color: #00e0ff; border: 1px solid #414856; border-radius: 3px; padding: 4px 12px; font-size: 12px; font-weight: bold; } "
+        "QPushButton:checked { background-color: #0077b6; color: #ffffff; border: 1px solid #0096c7; } "
+        "QPushButton:hover { background-color: #3d4452; }"
+    );
+    previewBar->addWidget(m_btnLogScale);
+    previewBar->addStretch(1);
+
+    m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
+    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
+    previewBar->addWidget(m_lblHoverReadout);
+
+    previewLayout->addLayout(previewBar);
 
     m_plotPreview = new Matrix1DPreviewWidget(grpPreview);
     connect(m_plotPreview, &Matrix1DPreviewWidget::hoverInfoChanged,
             this, &MatrixGateDialog::onHoverInfoChanged);
     previewLayout->addWidget(m_plotPreview, 1);
 
-    m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
-    m_lblHoverReadout->setAlignment(Qt::AlignCenter);
-    previewLayout->addWidget(m_lblHoverReadout);
+    connect(m_btnLogScale, &QPushButton::toggled, m_plotPreview, &Matrix1DPreviewWidget::setLogScale);
 
     mainLayout->addWidget(grpPreview, 1);
 
@@ -770,7 +1027,7 @@ void MatrixGateDialog::setupUI()
 
     bottomLayout->addStretch(1);
 
-    m_btnSliceGate = new QPushButton(tr("Slice & Load into Pad"), this);
+    m_btnSliceGate = new QPushButton(tr("Slice && Load into Pad"), this);
     m_btnSliceGate->setStyleSheet(
         "QPushButton { background-color: #1e7040; color: #ffffff; border: 1px solid #2e9e5d; font-size: 14px; padding: 7px 20px; } "
         "QPushButton:hover { background-color: #278d52; }"
@@ -803,22 +1060,73 @@ double MatrixGateDialog::channelToEnergy(double ch) const
     return m_calibA0 + m_calibA1 * ch + m_calibA2 * ch * ch;
 }
 
+void MatrixGateDialog::syncGateSpinboxes()
+{
+    if (m_gates.size() > 1 && m_lblGatesDetail) {
+        QString detail = QString("<b>Peak:</b> Gate %1 [%2-%3 ch, w=%4] | <b>Background:</b> ")
+                             .arg(m_peakGateIndex + 1)
+                             .arg(m_gates[m_peakGateIndex].minCh)
+                             .arg(m_gates[m_peakGateIndex].maxCh)
+                             .arg(m_gates[m_peakGateIndex].maxCh - m_gates[m_peakGateIndex].minCh + 1);
+        int totalBgW = 0;
+        bool first = true;
+        for (size_t i = 0; i < m_gates.size(); ++i) {
+            if (static_cast<int>(i) == m_peakGateIndex) continue;
+            int w = m_gates[i].maxCh - m_gates[i].minCh + 1;
+            totalBgW += w;
+            if (!first) detail += ", ";
+            detail += QString("Gate %1 [%2-%3 ch, w=%4]").arg(i + 1).arg(m_gates[i].minCh).arg(m_gates[i].maxCh).arg(w);
+            first = false;
+        }
+        detail += QString(" (Total BG w=%1)").arg(totalBgW);
+        m_lblGatesDetail->setText(detail);
+
+        if (m_comboPeakGate && m_peakGateIndex >= 0 && m_peakGateIndex < m_comboPeakGate->count()) {
+            QString gTxt = QString("Gate %1: [%2 - %3 ch]")
+                               .arg(m_peakGateIndex + 1)
+                               .arg(m_gates[m_peakGateIndex].minCh)
+                               .arg(m_gates[m_peakGateIndex].maxCh);
+            if (m_isCalibrated) {
+                gTxt += QString(" (%1 - %2 keV)")
+                            .arg(channelToEnergy(m_gates[m_peakGateIndex].minCh), 0, 'f', 1)
+                            .arg(channelToEnergy(m_gates[m_peakGateIndex].maxCh), 0, 'f', 1);
+            }
+            m_comboPeakGate->setItemText(m_peakGateIndex, gTxt);
+        }
+    }
+}
+
+void MatrixGateDialog::onPeakGateChanged(int index)
+{
+    if (index < 0 || index >= static_cast<int>(m_gates.size())) return;
+    m_peakGateIndex = index;
+
+    m_spinGateMin->blockSignals(true);
+    m_spinGateMin->setValue(m_gates[m_peakGateIndex].minCh);
+    m_spinGateMin->blockSignals(false);
+
+    m_spinGateMax->blockSignals(true);
+    m_spinGateMax->setValue(m_gates[m_peakGateIndex].maxCh);
+    m_spinGateMax->blockSignals(false);
+
+    syncGateSpinboxes();
+    onGateParametersChanged();
+}
+
 void MatrixGateDialog::onBackgroundSettingsChanged()
 {
+    bool enabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
+    if (m_lblBgModePrompt) m_lblBgModePrompt->setEnabled(enabled);
+    if (m_comboBgMode) m_comboBgMode->setEnabled(enabled);
+    if (m_lblCorrFactorPrompt) m_lblCorrFactorPrompt->setEnabled(enabled);
+    if (m_spinCorrFactor) m_spinCorrFactor->setEnabled(enabled);
+
     if (m_reader && m_chkEnableBg && m_comboBgMode && m_spinCorrFactor) {
         MatrixBackgroundConfig cfg;
-        cfg.enabled = m_chkEnableBg->isChecked();
-        int modeIdx = m_comboBgMode->currentIndex();
-        cfg.mode = (modeIdx == 0) ? MatrixBgMode::Common :
-                   (modeIdx == 1) ? MatrixBgMode::Normal :
-                   (modeIdx == 2) ? MatrixBgMode::Auto : MatrixBgMode::None;
+        cfg.enabled = enabled;
+        cfg.mode = static_cast<MatrixBgMode>(m_comboBgMode->currentData().toInt());
         cfg.correctionFactor = m_spinCorrFactor->value();
         m_reader->setBackgroundConfig(cfg);
-    }
-
-    if (m_comboBgMode && m_spinCorrFactor && m_chkEnableBg) {
-        m_comboBgMode->setEnabled(m_chkEnableBg->isChecked());
-        m_spinCorrFactor->setEnabled(m_chkEnableBg->isChecked());
     }
 
     updateGatePreview();
@@ -828,38 +1136,70 @@ void MatrixGateDialog::updateGatePreview()
 {
     if (!m_reader || !m_reader->isOpen() || !m_plotPreview) return;
 
-    int ch1 = m_spinGateMin->value();
-    int ch2 = m_spinGateMax->value();
-    if (ch1 > ch2) std::swap(ch1, ch2);
-
     int gateAxis = 1;
     if (m_radioGateX && m_radioGateX->isChecked()) {
         gateAxis = 0;
     }
 
-    double pfacs = 0.0;
     bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
-    m_currentSlice = m_reader->getGateSlice(ch1, ch2, gateAxis, bgEnabled);
-    std::vector<double> rawSlice = m_reader->getRawGateSlice(ch1, ch2, gateAxis);
-    std::vector<double> bgSlice = m_reader->computeBackgroundSlice(ch1, ch2, gateAxis, &pfacs);
+    double backfac = 0.0;
+    double bgCounts = 0.0;
+    std::vector<double> bgSlice;
 
+    m_currentSlice = m_reader->getMultiGateSlice(
+        m_gates, m_peakGateIndex, gateAxis, bgEnabled,
+        &backfac, &bgCounts, &bgSlice);
+
+    m_currentBgSlice = bgSlice;
+
+    int pMin = m_gates.empty() ? m_spinGateMin->value() : m_gates[m_peakGateIndex].minCh;
+    int pMax = m_gates.empty() ? m_spinGateMax->value() : m_gates[m_peakGateIndex].maxCh;
+    if (pMin > pMax) std::swap(pMin, pMax);
+
+    std::vector<double> rawSlice = m_reader->getRawGateSlice(pMin, pMax, gateAxis);
     double rawCounts = 0.0;
     for (double v : rawSlice) rawCounts += v;
-    double bgCounts = 0.0;
-    for (double v : bgSlice) bgCounts += v;
     double netCounts = 0.0;
     for (double v : m_currentSlice) netCounts += v;
 
     if (m_lblBgStats) {
         if (bgEnabled && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
-            m_lblBgStats->setText(
-                QString("BG Mode: %1 | pfacs = %2 (%3%) | Subtracted BG: %4 cts | Net: %5 cts")
-                    .arg(m_comboBgMode ? m_comboBgMode->currentText() : "Common")
-                    .arg(pfacs, 0, 'f', 4)
-                    .arg(pfacs * 100.0, 0, 'f', 2)
-                    .arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))))
-                    .arg(QLocale().toString(static_cast<qlonglong>(std::round(netCounts))))
-            );
+            MatrixBgMode mode = m_reader->getBackgroundConfig().mode;
+            if (mode == MatrixBgMode::Auto) {
+                m_lblBgStats->setText(
+                    QString("BG Mode: Auto (SNIP) | Subtracted BG: %1 cts | Net: %2 cts")
+                        .arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))))
+                        .arg(QLocale().toString(static_cast<qlonglong>(std::round(netCounts))))
+                );
+            } else if (mode == MatrixBgMode::Common) {
+                m_lblBgStats->setText(
+                    QString("BG Mode: Common Projection | Subtracted BG: %1 cts | Net: %2 cts")
+                        .arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))))
+                        .arg(QLocale().toString(static_cast<qlonglong>(std::round(netCounts))))
+                );
+            } else {
+                // Normal Mode
+                if (m_gates.size() > 1) {
+                    m_lblBgStats->setText(
+                        QString("Normal BG (%1 gates): Peak Gate %2 [%3-%4 ch] | backfac = %5 (%6%) | Subtracted BG: %7 cts | Net: %8 cts")
+                            .arg(m_gates.size())
+                            .arg(m_peakGateIndex + 1)
+                            .arg(pMin).arg(pMax)
+                            .arg(backfac, 0, 'f', 4)
+                            .arg(backfac * 100.0, 0, 'f', 2)
+                            .arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))))
+                            .arg(QLocale().toString(static_cast<qlonglong>(std::round(netCounts))))
+                    );
+                } else {
+                    m_lblBgStats->setText(
+                        QString("Normal BG (Single gate trapezoid) | pfacs = %1 (%2%) | Subtracted BG: %3 cts | Net: %4 cts")
+                            .arg(backfac, 0, 'f', 4)
+                            .arg(backfac * 100.0, 0, 'f', 2)
+                            .arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))))
+                            .arg(QLocale().toString(static_cast<qlonglong>(std::round(netCounts))))
+                    );
+                }
+            }
         } else {
             m_lblBgStats->setText(
                 QString("Raw Coincidence Gate (No Subtraction) | Counts: %1")
@@ -868,14 +1208,24 @@ void MatrixGateDialog::updateGatePreview()
         }
     }
 
-    QString label = QString("Gate [%1 - %2 ch]").arg(ch1).arg(ch2);
+    QString label;
+    if (m_gates.size() > 1) {
+        label = QString("Peak Gate %1 [%2 - %3 ch]").arg(m_peakGateIndex + 1).arg(pMin).arg(pMax);
+    } else {
+        label = QString("Gate [%1 - %2 ch]").arg(pMin).arg(pMax);
+    }
     if (m_isCalibrated) {
-        label += QString(" (%1 - %2 keV)").arg(channelToEnergy(ch1), 0, 'f', 1).arg(channelToEnergy(ch2), 0, 'f', 1);
+        label += QString(" (%1 - %2 keV)").arg(channelToEnergy(pMin), 0, 'f', 1).arg(channelToEnergy(pMax), 0, 'f', 1);
     }
     if (bgEnabled && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
         label += " [Net BG-Sub]";
     }
-    m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
+
+    if (bgEnabled && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto && !m_currentBgSlice.empty()) {
+        m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2, m_currentBgSlice);
+    } else {
+        m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
+    }
 }
 
 void MatrixGateDialog::onGateParametersChanged()
@@ -883,6 +1233,11 @@ void MatrixGateDialog::onGateParametersChanged()
     int ch1 = m_spinGateMin->value();
     int ch2 = m_spinGateMax->value();
     if (ch1 > ch2) std::swap(ch1, ch2);
+
+    if (!m_gates.empty() && m_peakGateIndex >= 0 && m_peakGateIndex < static_cast<int>(m_gates.size())) {
+        m_gates[m_peakGateIndex].minCh = ch1;
+        m_gates[m_peakGateIndex].maxCh = ch2;
+    }
 
     int width = ch2 - ch1 + 1;
     m_lblGateWidth->setText(tr("Width: %1 channels").arg(width));
@@ -897,10 +1252,11 @@ void MatrixGateDialog::onGateParametersChanged()
         m_lblGateEnergy->setText(tr("Uncalibrated"));
     }
 
+    syncGateSpinboxes();
     updateGatePreview();
 }
 
-void MatrixGateDialog::onHoverInfoChanged(int ch, double energy, double counts)
+void MatrixGateDialog::onHoverInfoChanged(int ch, double energy, double counts, double bgCounts)
 {
     if (ch < 0) {
         m_lblHoverReadout->setText(tr("Hover over spectrum to inspect channel counts"));
@@ -912,6 +1268,9 @@ void MatrixGateDialog::onHoverInfoChanged(int ch, double energy, double counts)
         info += QString(" | Energy: %1 keV").arg(energy, 0, 'f', 1);
     }
     info += QString(" | Counts: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(counts))));
+    if (bgCounts >= 0.0) {
+        info += QString(" | BG: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))));
+    }
     m_lblHoverReadout->setText(info);
 }
 
@@ -919,24 +1278,51 @@ void MatrixGateDialog::onSliceGateClicked()
 {
     if (m_currentSlice.empty()) return;
 
-    int ch1 = m_spinGateMin->value();
-    int ch2 = m_spinGateMax->value();
-    if (ch1 > ch2) std::swap(ch1, ch2);
+    int pMin = m_gates.empty() ? m_spinGateMin->value() : m_gates[m_peakGateIndex].minCh;
+    int pMax = m_gates.empty() ? m_spinGateMax->value() : m_gates[m_peakGateIndex].maxCh;
+    if (pMin > pMax) std::swap(pMin, pMax);
+
+    bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
+    bool isAutoBg = (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
+
+    QString bgTag;
+    if (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
+        bgTag = isAutoBg ? " [Auto BG]" :
+                (m_reader->getBackgroundConfig().mode == MatrixBgMode::Common) ? " [Common BG]" : " [Net BG]";
+    }
 
     QString title;
     if (m_isCalibrated) {
-        title = QString("[Gate %1-%2 keV] %3")
-                    .arg(channelToEnergy(ch1), 0, 'f', 1)
-                    .arg(channelToEnergy(ch2), 0, 'f', 1)
+        title = QString("[Gate %1-%2 keV%3] %4")
+                    .arg(channelToEnergy(pMin), 0, 'f', 1)
+                    .arg(channelToEnergy(pMax), 0, 'f', 1)
+                    .arg(bgTag)
                     .arg(m_reader->getFileName());
     } else {
-        title = QString("[Gate %1-%2 ch] %3")
-                    .arg(ch1)
-                    .arg(ch2)
+        title = QString("[Gate %1-%2 ch%3] %4")
+                    .arg(pMin)
+                    .arg(pMax)
+                    .arg(bgTag)
                     .arg(m_reader->getFileName());
     }
 
-    emit loadGateSliceRequested(m_currentSlice, title, false);
+    if (isAutoBg && !m_currentBgSlice.empty()) {
+        QString bgTitle;
+        if (m_isCalibrated) {
+            bgTitle = QString("[Gate %1-%2 keV [Auto BG]] %3")
+                        .arg(channelToEnergy(pMin), 0, 'f', 1)
+                        .arg(channelToEnergy(pMax), 0, 'f', 1)
+                        .arg(m_reader->getFileName());
+        } else {
+            bgTitle = QString("[Gate %1-%2 ch [Auto BG]] %3")
+                        .arg(pMin)
+                        .arg(pMax)
+                        .arg(m_reader->getFileName());
+        }
+        emit loadGateSliceRequested(m_currentSlice, title, false, m_currentBgSlice, bgTitle);
+    } else {
+        emit loadGateSliceRequested(m_currentSlice, title, false);
+    }
     accept();
 }
 
@@ -944,23 +1330,50 @@ void MatrixGateDialog::onOverlayGateClicked()
 {
     if (m_currentSlice.empty()) return;
 
-    int ch1 = m_spinGateMin->value();
-    int ch2 = m_spinGateMax->value();
-    if (ch1 > ch2) std::swap(ch1, ch2);
+    int pMin = m_gates.empty() ? m_spinGateMin->value() : m_gates[m_peakGateIndex].minCh;
+    int pMax = m_gates.empty() ? m_spinGateMax->value() : m_gates[m_peakGateIndex].maxCh;
+    if (pMin > pMax) std::swap(pMin, pMax);
+
+    bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
+    bool isAutoBg = (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
+
+    QString bgTag;
+    if (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
+        bgTag = isAutoBg ? " [Auto BG]" :
+                (m_reader->getBackgroundConfig().mode == MatrixBgMode::Common) ? " [Common BG]" : " [Net BG]";
+    }
 
     QString title;
     if (m_isCalibrated) {
-        title = QString("[Gate %1-%2 keV] %3")
-                    .arg(channelToEnergy(ch1), 0, 'f', 1)
-                    .arg(channelToEnergy(ch2), 0, 'f', 1)
+        title = QString("[Gate %1-%2 keV%3] %4")
+                    .arg(channelToEnergy(pMin), 0, 'f', 1)
+                    .arg(channelToEnergy(pMax), 0, 'f', 1)
+                    .arg(bgTag)
                     .arg(m_reader->getFileName());
     } else {
-        title = QString("[Gate %1-%2 ch] %3")
-                    .arg(ch1)
-                    .arg(ch2)
+        title = QString("[Gate %1-%2 ch%3] %4")
+                    .arg(pMin)
+                    .arg(pMax)
+                    .arg(bgTag)
                     .arg(m_reader->getFileName());
     }
 
-    emit loadGateSliceRequested(m_currentSlice, title, true);
+    if (isAutoBg && !m_currentBgSlice.empty()) {
+        QString bgTitle;
+        if (m_isCalibrated) {
+            bgTitle = QString("[Gate %1-%2 keV [Auto BG]] %3")
+                        .arg(channelToEnergy(pMin), 0, 'f', 1)
+                        .arg(channelToEnergy(pMax), 0, 'f', 1)
+                        .arg(m_reader->getFileName());
+        } else {
+            bgTitle = QString("[Gate %1-%2 ch [Auto BG]] %3")
+                        .arg(pMin)
+                        .arg(pMax)
+                        .arg(m_reader->getFileName());
+        }
+        emit loadGateSliceRequested(m_currentSlice, title, true, m_currentBgSlice, bgTitle);
+    } else {
+        emit loadGateSliceRequested(m_currentSlice, title, true);
+    }
     accept();
 }

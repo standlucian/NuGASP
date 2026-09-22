@@ -1161,28 +1161,42 @@ void QMainCanvas::onGateCMClicked()
     double a1 = trackHist ? trackHist->GetCalibA1() : 1.0;
     double a2 = trackHist ? trackHist->GetCalibA2() : 0.0;
 
-    int initGateMin = -1, initGateMax = -1;
-    if (gate_markers.size() >= 2) {
-        double g1 = gate_markers[gate_markers.size() - 2];
-        double g2 = gate_markers[gate_markers.size() - 1];
-        initGateMin = static_cast<int>(std::round(std::min(g1, g2)));
-        initGateMax = static_cast<int>(std::round(std::max(g1, g2)));
-    } else if (zoom_markers.size() >= 2) {
-        double z1 = zoom_markers[zoom_markers.size() - 2];
-        double z2 = zoom_markers[zoom_markers.size() - 1];
-        initGateMin = static_cast<int>(std::round(std::min(z1, z2)));
-        initGateMax = static_cast<int>(std::round(std::max(z1, z2)));
-    } else if (range_markers.size() >= 2) {
-        double r1 = range_markers[range_markers.size() - 2];
-        double r2 = range_markers[range_markers.size() - 1];
-        initGateMin = static_cast<int>(std::round(std::min(r1, r2)));
-        initGateMax = static_cast<int>(std::round(std::max(r1, r2)));
+    std::vector<MatrixGateRegion> initialGates;
+    for (size_t i = 0; i + 1 < gate_markers.size(); i += 2) {
+        int g1 = static_cast<int>(std::round(gate_markers[i]));
+        int g2 = static_cast<int>(std::round(gate_markers[i + 1]));
+        if (g1 > g2) std::swap(g1, g2);
+        initialGates.push_back({g1, g2});
     }
 
-    MatrixGateDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, initGateMin, initGateMax, this);
+    if (initialGates.empty()) {
+        if (zoom_markers.size() >= 2) {
+            int z1 = static_cast<int>(std::round(zoom_markers[zoom_markers.size() - 2]));
+            int z2 = static_cast<int>(std::round(zoom_markers[zoom_markers.size() - 1]));
+            if (z1 > z2) std::swap(z1, z2);
+            initialGates.push_back({z1, z2});
+        } else if (range_markers.size() >= 2) {
+            int r1 = static_cast<int>(std::round(range_markers[range_markers.size() - 2]));
+            int r2 = static_cast<int>(std::round(range_markers[range_markers.size() - 1]));
+            if (r1 > r2) std::swap(r1, r2);
+            initialGates.push_back({r1, r2});
+        } else {
+            initialGates.push_back({150, 160});
+        }
+    }
+
+    MatrixGateDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, initialGates, this);
     connect(&dlg, &MatrixGateDialog::loadGateSliceRequested, this,
-            [this](const std::vector<double> &data, const QString &title, bool asOverlay) {
+            [this](const std::vector<double> &data, const QString &title, bool asOverlay,
+                   const std::vector<double> &bgData, const QString &bgTitle,
+                   const std::vector<double> &netData, const QString &netTitle) {
                 loadSpectrumDataToPad(data, title, asOverlay);
+                if (!bgData.empty()) {
+                    loadSpectrumDataToPad(bgData, bgTitle, true);
+                }
+                if (!netData.empty()) {
+                    loadSpectrumDataToPad(netData, netTitle, true);
+                }
             });
 
     dlg.exec();

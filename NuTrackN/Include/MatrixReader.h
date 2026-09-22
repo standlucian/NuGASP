@@ -15,8 +15,13 @@ enum class MatrixBgMode {
 
 struct MatrixBackgroundConfig {
     bool enabled{true};
-    MatrixBgMode mode{MatrixBgMode::Common};
+    MatrixBgMode mode{MatrixBgMode::Normal};
     double correctionFactor{1.0};
+};
+
+struct MatrixGateRegion {
+    int minCh{0};
+    int maxCh{0};
 };
 
 /**
@@ -103,6 +108,21 @@ public:
      * @param applyBackground If true and background is enabled, subtracts estimated background
      */
     std::vector<double> getGateSlice(int chMin, int chMax, int gateAxis = 1, bool applyBackground = true) const;
+
+    /**
+     * @brief Slices a 1D coincidence spectrum from multiple gate regions (e.g. 1 peak gate + 2 background gates).
+     *        For MatrixBgMode::Normal, subtracts the normalized background gates slices from the peak gate slice
+     *        following GASPware trackn.F:6476.
+     *        For MatrixBgMode::Common, sums all gates and subtracts scaled projection background.
+     *        For MatrixBgMode::Auto, sums gates and applies SNIP continuum filter.
+     */
+    std::vector<double> getMultiGateSlice(const std::vector<MatrixGateRegion> &gates,
+                                          int peakGateIndex = 0,
+                                          int gateAxis = 1,
+                                          bool applyBackground = true,
+                                          double *outBackfac = nullptr,
+                                          double *outBgCounts = nullptr,
+                                          std::vector<double> *outBgSlice = nullptr) const;
 
 private:
     bool readDescriptorTable(FILE *f);
