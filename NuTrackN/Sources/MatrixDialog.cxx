@@ -613,7 +613,16 @@ void MatrixDialog::updatePreview()
         label = tr("Total 1D Projection");
     }
 
-    m_plotPreview->setSpectrum(data, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
+    bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : false;
+    bool isAutoBg = (bgEnabled && m_comboBgMode && static_cast<MatrixBgMode>(m_comboBgMode->currentData().toInt()) == MatrixBgMode::Auto);
+
+    if (isAutoBg && !data.empty()) {
+        double corrFactor = m_spinCorrFactor ? m_spinCorrFactor->value() : 1.0;
+        std::vector<double> bgData = m_reader->computeSnipBackground(data, 20, corrFactor);
+        m_plotPreview->setSpectrum(data, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2, bgData);
+    } else {
+        m_plotPreview->setSpectrum(data, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
+    }
 }
 
 void MatrixDialog::onProjectionSelectionChanged()
@@ -634,6 +643,7 @@ void MatrixDialog::onBackgroundConfigChanged()
     if (!enabled) {
         m_lblBgHelp->setText(tr("Background subtraction disabled. Coincidence cuts will extract raw, unsubtracted slices."));
         saveBackgroundConfig();
+        updatePreview();
         return;
     }
 
@@ -648,6 +658,7 @@ void MatrixDialog::onBackgroundConfigChanged()
     }
 
     saveBackgroundConfig();
+    updatePreview();
 }
 
 void MatrixDialog::saveBackgroundConfig()
@@ -702,12 +713,24 @@ void MatrixDialog::onLoadProjectionClicked()
                  (mode == MatrixBgMode::Normal) ? "Normal/Local" :
                  (mode == MatrixBgMode::Auto) ? "Auto/SNIP" : "None";
     }
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Matrix loaded: %1. Coincidence background subtraction: %2. Use 'W' to place gate markers.\n")
-            .arg(m_reader->getFileName())
-            .arg(bgDesc));
+    CommandPrompt *prompt = CommandPrompt::getInstance();
+    if (prompt) {
+        prompt->appendPlainText(
+            QString("Matrix loaded: %1. Coincidence background subtraction: %2. Use 'W' to place gate markers.\n")
+                .arg(m_reader->getFileName())
+                .arg(bgDesc));
+    }
 
-    emit loadProjectionRequested(data, title);
+    bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : false;
+    bool isAutoBg = (bgEnabled && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
+
+    if (isAutoBg) {
+        std::vector<double> bgData = m_reader->computeSnipBackground(data, 20, m_reader->getBackgroundConfig().correctionFactor);
+        QString bgTitle = QString("%1 [Auto BG] %2").arg(suffix).arg(m_reader->getFileName());
+        emit loadProjectionRequested(data, title, bgData, bgTitle);
+    } else {
+        emit loadProjectionRequested(data, title);
+    }
     accept();
 }
 
@@ -1150,8 +1173,6 @@ void MatrixGateDialog::updateGatePreview()
         m_gates, m_peakGateIndex, gateAxis, bgEnabled,
         &backfac, &bgCounts, &bgSlice);
 
-    m_currentBgSlice = bgSlice;
-
     int pMin = m_gates.empty() ? m_spinGateMin->value() : m_gates[m_peakGateIndex].minCh;
     int pMax = m_gates.empty() ? m_spinGateMax->value() : m_gates[m_peakGateIndex].maxCh;
     if (pMin > pMax) std::swap(pMin, pMax);
@@ -1221,11 +1242,7 @@ void MatrixGateDialog::updateGatePreview()
         label += " [Net BG-Sub]";
     }
 
-    if (bgEnabled && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto && !m_currentBgSlice.empty()) {
-        m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2, m_currentBgSlice);
-    } else {
-        m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
-    }
+    m_plotPreview->setSpectrum(m_currentSlice, label, m_isCalibrated, m_calibA0, m_calibA1, m_calibA2);
 }
 
 void MatrixGateDialog::onGateParametersChanged()
@@ -1258,6 +1275,7 @@ void MatrixGateDialog::onGateParametersChanged()
 
 void MatrixGateDialog::onHoverInfoChanged(int ch, double energy, double counts, double bgCounts)
 {
+    Q_UNUSED(bgCounts);
     if (ch < 0) {
         m_lblHoverReadout->setText(tr("Hover over spectrum to inspect channel counts"));
         return;
@@ -1268,9 +1286,6 @@ void MatrixGateDialog::onHoverInfoChanged(int ch, double energy, double counts, 
         info += QString(" | Energy: %1 keV").arg(energy, 0, 'f', 1);
     }
     info += QString(" | Counts: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(counts))));
-    if (bgCounts >= 0.0) {
-        info += QString(" | BG: %1").arg(QLocale().toString(static_cast<qlonglong>(std::round(bgCounts))));
-    }
     m_lblHoverReadout->setText(info);
 }
 
@@ -1283,11 +1298,9 @@ void MatrixGateDialog::onSliceGateClicked()
     if (pMin > pMax) std::swap(pMin, pMax);
 
     bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
-    bool isAutoBg = (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
-
     QString bgTag;
     if (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
-        bgTag = isAutoBg ? " [Auto BG]" :
+        bgTag = (m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto) ? " [Auto BG]" :
                 (m_reader->getBackgroundConfig().mode == MatrixBgMode::Common) ? " [Common BG]" : " [Net BG]";
     }
 
@@ -1306,23 +1319,7 @@ void MatrixGateDialog::onSliceGateClicked()
                     .arg(m_reader->getFileName());
     }
 
-    if (isAutoBg && !m_currentBgSlice.empty()) {
-        QString bgTitle;
-        if (m_isCalibrated) {
-            bgTitle = QString("[Gate %1-%2 keV [Auto BG]] %3")
-                        .arg(channelToEnergy(pMin), 0, 'f', 1)
-                        .arg(channelToEnergy(pMax), 0, 'f', 1)
-                        .arg(m_reader->getFileName());
-        } else {
-            bgTitle = QString("[Gate %1-%2 ch [Auto BG]] %3")
-                        .arg(pMin)
-                        .arg(pMax)
-                        .arg(m_reader->getFileName());
-        }
-        emit loadGateSliceRequested(m_currentSlice, title, false, m_currentBgSlice, bgTitle);
-    } else {
-        emit loadGateSliceRequested(m_currentSlice, title, false);
-    }
+    emit loadGateSliceRequested(m_currentSlice, title, false);
     accept();
 }
 
@@ -1335,11 +1332,9 @@ void MatrixGateDialog::onOverlayGateClicked()
     if (pMin > pMax) std::swap(pMin, pMax);
 
     bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : true;
-    bool isAutoBg = (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
-
     QString bgTag;
     if (bgEnabled && m_reader && m_reader->getBackgroundConfig().mode != MatrixBgMode::None) {
-        bgTag = isAutoBg ? " [Auto BG]" :
+        bgTag = (m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto) ? " [Auto BG]" :
                 (m_reader->getBackgroundConfig().mode == MatrixBgMode::Common) ? " [Common BG]" : " [Net BG]";
     }
 
@@ -1358,22 +1353,6 @@ void MatrixGateDialog::onOverlayGateClicked()
                     .arg(m_reader->getFileName());
     }
 
-    if (isAutoBg && !m_currentBgSlice.empty()) {
-        QString bgTitle;
-        if (m_isCalibrated) {
-            bgTitle = QString("[Gate %1-%2 keV [Auto BG]] %3")
-                        .arg(channelToEnergy(pMin), 0, 'f', 1)
-                        .arg(channelToEnergy(pMax), 0, 'f', 1)
-                        .arg(m_reader->getFileName());
-        } else {
-            bgTitle = QString("[Gate %1-%2 ch [Auto BG]] %3")
-                        .arg(pMin)
-                        .arg(pMax)
-                        .arg(m_reader->getFileName());
-        }
-        emit loadGateSliceRequested(m_currentSlice, title, true, m_currentBgSlice, bgTitle);
-    } else {
-        emit loadGateSliceRequested(m_currentSlice, title, true);
-    }
+    emit loadGateSliceRequested(m_currentSlice, title, true);
     accept();
 }

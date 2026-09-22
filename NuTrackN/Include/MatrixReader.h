@@ -124,6 +124,13 @@ public:
                                           double *outBgCounts = nullptr,
                                           std::vector<double> *outBgSlice = nullptr) const;
 
+    /**
+     * @brief Computes automated SNIP background filter for a 1D spectrum or projection.
+     */
+    std::vector<double> computeSnipBackground(const std::vector<double> &spectrum,
+                                              int iterations = 20,
+                                              double factor = 1.0) const;
+
 private:
     bool readDescriptorTable(FILE *f);
     bool readCmtHeader(FILE *f);

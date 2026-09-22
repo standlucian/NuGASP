@@ -74,7 +74,8 @@ public:
     ~MatrixDialog() override = default;
 
 signals:
-    void loadProjectionRequested(const std::vector<double> &data, const QString &title);
+    void loadProjectionRequested(const std::vector<double> &data, const QString &title,
+                                 const std::vector<double> &bgData = {}, const QString &bgTitle = QString());
 
 private slots:
     void onProjectionSelectionChanged();
@@ -146,9 +147,7 @@ public:
     ~MatrixGateDialog() override = default;
 
 signals:
-    void loadGateSliceRequested(const std::vector<double> &data, const QString &title, bool asOverlay,
-                                const std::vector<double> &bgData = {}, const QString &bgTitle = QString(),
-                                const std::vector<double> &netData = {}, const QString &netTitle = QString());
+    void loadGateSliceRequested(const std::vector<double> &data, const QString &title, bool asOverlay);
 
 private slots:
     void onGateParametersChanged();
@@ -202,7 +201,6 @@ private:
     QPushButton *m_btnClose{nullptr};
 
     std::vector<double> m_currentSlice;
-    std::vector<double> m_currentBgSlice;
 };
 
 #endif // MATRIXDIALOG_H

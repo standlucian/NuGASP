@@ -1137,8 +1137,12 @@ void QMainCanvas::onOpenCMClicked()
 
     MatrixDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, this);
     connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
-            [this](const std::vector<double> &data, const QString &title) {
+            [this](const std::vector<double> &data, const QString &title,
+                   const std::vector<double> &bgData, const QString &bgTitle) {
                 loadSpectrumDataToPad(data, title, false);
+                if (!bgData.empty()) {
+                    loadSpectrumDataToPad(bgData, bgTitle, true);
+                }
             });
 
     dlg.exec();
@@ -1187,16 +1191,20 @@ void QMainCanvas::onGateCMClicked()
 
     MatrixGateDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, initialGates, this);
     connect(&dlg, &MatrixGateDialog::loadGateSliceRequested, this,
-            [this](const std::vector<double> &data, const QString &title, bool asOverlay,
-                   const std::vector<double> &bgData, const QString &bgTitle,
-                   const std::vector<double> &netData, const QString &netTitle) {
+            [this](const std::vector<double> &data, const QString &title, bool asOverlay) {
+                if (asOverlay) {
+                    // If gating as overlay, remove any previous auto-background overlay from the base spectrum
+                    auto &clones = HijC[SelectedElement_i][SelectedElement_j];
+                    for (auto it = clones.begin(); it != clones.end(); ) {
+                        if (*it && QString((*it)->GetTitle()).contains("[Auto BG]")) {
+                            delete *it;
+                            it = clones.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
+                }
                 loadSpectrumDataToPad(data, title, asOverlay);
-                if (!bgData.empty()) {
-                    loadSpectrumDataToPad(bgData, bgTitle, true);
-                }
-                if (!netData.empty()) {
-                    loadSpectrumDataToPad(netData, netTitle, true);
-                }
             });
 
     dlg.exec();

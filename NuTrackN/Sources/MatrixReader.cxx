@@ -701,3 +701,23 @@ std::vector<double> MatrixReader::getMultiGateSlice(const std::vector<MatrixGate
 
     return {};
 }
+
+std::vector<double> MatrixReader::computeSnipBackground(const std::vector<double> &spectrum,
+                                                        int iterations,
+                                                        double factor) const
+{
+    if (spectrum.empty()) return {};
+    std::vector<double> bg = spectrum;
+    int n = static_cast<int>(bg.size());
+    int m = (iterations > 0) ? iterations : 20;
+    for (int p = 1; p <= m; ++p) {
+        for (int i = p; i < n - p; ++i) {
+            double avg = 0.5 * (bg[i - p] + bg[i + p]);
+            if (avg < bg[i]) bg[i] = avg;
+        }
+    }
+    for (int i = 0; i < n; ++i) {
+        bg[i] = std::round(bg[i] * factor);
+    }
+    return bg;
+}
