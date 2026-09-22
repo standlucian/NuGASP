@@ -163,6 +163,15 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     labelYMin = makeLabel("Y Min:  0.00", topContainer);
     labelYMax = makeLabel("Y Max:  0.00", topContainer);
 
+    for (QLabel *lbl : {labelXMin, labelXMax, labelYMin, labelYMax}) {
+        lbl->setCursor(Qt::PointingHandCursor);
+        lbl->installEventFilter(this);
+    }
+    labelXMin->setToolTip(tr("X Min range:\nLeft click: Shift right (+20%)\nRight click: Shift left (-20%)\nHold Ctrl for fine step (2.5%)"));
+    labelXMax->setToolTip(tr("X Max range:\nLeft click: Shift right (+20%)\nRight click: Shift left (-20%)\nHold Ctrl for fine step (2.5%)"));
+    labelYMin->setToolTip(tr("Y Min range:\nLeft click: Shift up (+20%)\nRight click: Shift down (-20%)\nHold Ctrl for fine step (2.5%)"));
+    labelYMax->setToolTip(tr("Y Max range:\nLeft click: Shift up (+20%)\nRight click: Shift down (-20%)\nHold Ctrl for fine step (2.5%)"));
+
     labelChannel = makeLabel("Channel", topContainer);
     labelEnergy = makeLabel("Energy", topContainer);
     labelCounts = makeLabel("Counts", topContainer);
@@ -200,10 +209,11 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     leftBar->addWidget(btnEnCal);
     connect(btnEnCal, &QPushButton::clicked, this, &QMainCanvas::openEnCalDialog);
 
-    QPushButton *btnDT = makeButton("DT", topContainer, true);
+    btnDT = makeButton("DT", topContainer, true);
     btnDT->setFixedWidth(93);
     btnDT->setFixedHeight(36);
-    btnDT->setToolTip("AutoTrace / TrackFit automated recalibration (*T / DT) [Shortcut: D+T]");
+    btnDT->setToolTip(tr("AutoTrace / TrackFit automated recalibration (*T / DT) [Shortcut: D+T]\nClick: Define/interactive dialog\nCtrl+Click: Direct AutoTrace fit (*T)"));
+    btnDT->installEventFilter(this);
     leftBar->addWidget(btnDT);
     connect(btnDT, &QPushButton::clicked, this, &QMainCanvas::openTrackFitDialog);
 
@@ -340,17 +350,19 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnW, &QPushButton::clicked, this, &QMainCanvas::clickedW);
     bottomBtnGrid->addWidget(btnW, 0, 1);
 
-    QPushButton *btnDec = makeButton("# -", topContainer, true);
+    btnDec = makeButton("# -", topContainer, true);
     btnDec->setFixedWidth(54);
     btnDec->setFixedHeight(36);
-    btnDec->setToolTip(tr("Load previous spectrum from multi-spectrum file."));
+    btnDec->setToolTip(tr("Previous spectrum in file:\nLeft click: Revert spectrum (*2)\nRight click: Same scale/limits (*4)\nCtrl + Left click: Macro 2\nCtrl + Right click: Macro 4"));
+    btnDec->installEventFilter(this);
     connect(btnDec, &QPushButton::clicked, this, &QMainCanvas::onSpectrumDecrement);
     bottomBtnGrid->addWidget(btnDec, 0, 2);
 
-    QPushButton *btnInc = makeButton("# +", topContainer, true);
+    btnInc = makeButton("# +", topContainer, true);
     btnInc->setFixedWidth(54);
     btnInc->setFixedHeight(36);
-    btnInc->setToolTip(tr("Load next spectrum from multi-spectrum file."));
+    btnInc->setToolTip(tr("Next spectrum in file:\nLeft click: Advance spectrum (*1)\nRight click: Same scale/limits (*3)\nCtrl + Left click: Macro 1\nCtrl + Right click: Macro 3"));
+    btnInc->installEventFilter(this);
     connect(btnInc, &QPushButton::clicked, this, &QMainCanvas::onSpectrumIncrement);
     bottomBtnGrid->addWidget(btnInc, 0, 3);
 
@@ -774,15 +786,40 @@ void QMainCanvas::clickedW()
 //==============================================================================
 void QMainCanvas::onSpectrumIncrement()
 {
-    stepSpectrumIndex(+1);
+    stepSpectrumIndex(+1, false);
 }
 
 void QMainCanvas::onSpectrumDecrement()
 {
-    stepSpectrumIndex(-1);
+    stepSpectrumIndex(-1, false);
 }
 
-void QMainCanvas::stepSpectrumIndex(int delta)
+void QMainCanvas::onSpectrumIncrementSameScale()
+{
+    stepSpectrumIndex(+1, true);
+}
+
+void QMainCanvas::onSpectrumDecrementSameScale()
+{
+    stepSpectrumIndex(-1, true);
+}
+
+void QMainCanvas::executeMacro(int macroId)
+{
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Executing Macro %1 (*%1 / %1 hook)\n").arg(macroId));
+    if (macroId == 1) {
+        onSpectrumIncrement();
+    } else if (macroId == 2) {
+        onSpectrumDecrement();
+    } else if (macroId == 3) {
+        onSpectrumIncrementSameScale();
+    } else if (macroId == 4) {
+        onSpectrumDecrementSameScale();
+    }
+}
+
+void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
 {
     if (m_currentSpectrumFile.isEmpty()) {
         CommandPrompt::getInstance()->appendPlainText("No spectrum file currently loaded.\n");
@@ -820,7 +857,7 @@ void QMainCanvas::stepSpectrumIndex(int delta)
         return;
     }
 
-    // Preserve active zoom window before loading new data (LoadFromData unzooms by default)
+    // Preserve active zoom window and vertical scale before loading new data
     TAxis *xAxis = HijF[SelectedElement_i][SelectedElement_j]->GetXaxis();
     bool wasZoomed = false;
     double prevXmin = 0.0, prevXmax = 0.0;
@@ -829,6 +866,8 @@ void QMainCanvas::stepSpectrumIndex(int delta)
         prevXmin = xAxis->GetBinLowEdge(xAxis->GetFirst());
         prevXmax = xAxis->GetBinUpEdge(xAxis->GetLast());
     }
+    const double prevYmin = HijF[SelectedElement_i][SelectedElement_j]->GetMinimum();
+    const double prevYmax = HijF[SelectedElement_i][SelectedElement_j]->GetMaximum();
 
     // Ensure baseline spectrum is present in HijC if it was previously empty
     if (HijC[SelectedElement_i][SelectedElement_j].empty()) {
@@ -880,9 +919,11 @@ void QMainCanvas::stepSpectrumIndex(int delta)
     const int activeColorIdx = (HijC[SelectedElement_i][SelectedElement_j].size() - 1) % colors_hist.size();
     HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[activeColorIdx]);
 
-    // Restore zoom range if active
-    if (wasZoomed) {
-        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(prevXmin, prevXmax);
+    // Restore zoom range if active or requested
+    if (preserveScale || wasZoomed) {
+        if (wasZoomed) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(prevXmin, prevXmax);
+        }
     } else if (zoom_markers.size() >= 2) {
         std::size_t zm = zoom_markers.size();
         double zLow = std::min(zoom_markers[zm - 2], zoom_markers[zm - 1]);
@@ -890,8 +931,14 @@ void QMainCanvas::stepSpectrumIndex(int delta)
         HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(zLow, zHigh);
     }
 
-    // Update axes and canvas considering all visible overlaid spectra
-    adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+    if (preserveScale && prevYmax > prevYmin) {
+        HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(prevYmin, prevYmax);
+        HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYmin);
+        HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYmax);
+    } else {
+        // Update axes and canvas considering all visible overlaid spectra
+        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+    }
     maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
         HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
 
@@ -1007,6 +1054,26 @@ void QMainCanvas::openTrackFitDialog() {
 }
 
 //==============================================================================
+// QMainCanvas::onDirectAutoTrace
+//==============================================================================
+// Direct AutoTrace fit (*T): Triggered via Ctrl + Click on the DT button.
+// Directly runs the automated track fit routine.
+//==============================================================================
+void QMainCanvas::onDirectAutoTrace() {
+    TracknHistogram *hist = getActiveTracknHistogram();
+    if (!hist) {
+        QMessageBox::warning(this, "AutoTrace / TrackFit", "No active spectrum loaded in the selected pad.");
+        return;
+    }
+    CommandPrompt::getInstance()->appendPlainText("Executing Direct AutoTrace (*T)...\n");
+    TrackFitDialog dlg(this, hist, m_currentSpectrumIndex, this);
+    dlg.onAutoTraceClicked();
+    if (canvas) {
+        canvas->setFocus();
+    }
+}
+
+//==============================================================================
 // QMainCanvas::handle_root_events
 //==============================================================================
 // Processes pending ROOT events by invoking gSystem->ProcessEvents().
@@ -1097,6 +1164,83 @@ void QMainCanvas::keyReleaseEvent(QKeyEvent *event)
         return;
     }
     QWidget::keyReleaseEvent(event);
+}
+
+//==============================================================================
+// QMainCanvas::eventFilter
+//==============================================================================
+// Intercepts mouse and keyboard modifier combinations for:
+// - Table 2: Clickable Axis Range Labels (X Min, X Max, Y Min, Y Max)
+// - Table 3: Buttons with modifiers (btnDT, btnInc, btnDec)
+//==============================================================================
+bool QMainCanvas::eventFilter(QObject *watched, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonPress) {
+        QMouseEvent *me = static_cast<QMouseEvent*>(event);
+        const bool isLeft = (me->button() == Qt::LeftButton);
+        const bool isRight = (me->button() == Qt::RightButton);
+        const bool hasCtrl = (me->modifiers() & Qt::ControlModifier) || (QApplication::keyboardModifiers() & Qt::ControlModifier);
+
+        // Table 2: Clickable Axis Range Labels
+        if (watched == labelXMin && (isLeft || isRight)) {
+            adjustAxisRange("XMin", isLeft, hasCtrl);
+            return true;
+        } else if (watched == labelXMax && (isLeft || isRight)) {
+            adjustAxisRange("XMax", isLeft, hasCtrl);
+            return true;
+        } else if (watched == labelYMin && (isLeft || isRight)) {
+            adjustAxisRange("YMin", isLeft, hasCtrl);
+            return true;
+        } else if (watched == labelYMax && (isLeft || isRight)) {
+            adjustAxisRange("YMax", isLeft, hasCtrl);
+            return true;
+        }
+
+        // Table 3: Buttons with Ctrl or Right Click
+        if (watched == btnDT) {
+            if (isLeft && hasCtrl) {
+                onDirectAutoTrace();
+                return true;
+            }
+        } else if (watched == btnInc) {
+            if (isLeft && hasCtrl) {
+                executeMacro(1);
+                return true;
+            } else if (isRight) {
+                if (hasCtrl) {
+                    executeMacro(3);
+                } else {
+                    onSpectrumIncrementSameScale();
+                }
+                return true;
+            }
+        } else if (watched == btnDec) {
+            if (isLeft && hasCtrl) {
+                executeMacro(2);
+                return true;
+            } else if (isRight) {
+                if (hasCtrl) {
+                    executeMacro(4);
+                } else {
+                    onSpectrumDecrementSameScale();
+                }
+                return true;
+            }
+        }
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+        QMouseEvent *me = static_cast<QMouseEvent*>(event);
+        const bool isLeft = (me->button() == Qt::LeftButton);
+        const bool isRight = (me->button() == Qt::RightButton);
+        const bool hasCtrl = (me->modifiers() & Qt::ControlModifier) || (QApplication::keyboardModifiers() & Qt::ControlModifier);
+
+        if (watched == btnDT && isLeft && hasCtrl) {
+            return true;
+        }
+        if ((watched == btnInc || watched == btnDec) && (isRight || hasCtrl)) {
+            return true;
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 void QMainCanvas::onOpenCMClicked()

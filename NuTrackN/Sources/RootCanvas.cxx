@@ -407,11 +407,24 @@ void QRootCanvas::wheelEvent(QWheelEvent *e)
 {
     const QPoint mousePos = e->position().toPoint();
     emit mousePilgrimCoordRequest(mousePos.x(), mousePos.y());
-    const int delta = e->angleDelta().y();
-    if (delta > 0) { // Wheel scrolled up: zoom out / expand Y range
-        emit requesttranslatedownTheScreen();
-    } else if (delta < 0) { // Wheel scrolled down: zoom in / compress Y range
-        emit requesttranslateupTheScreen();
+    const int deltaY = e->angleDelta().y();
+    const int deltaX = e->angleDelta().x();
+
+    if ((e->modifiers() & Qt::ShiftModifier) || std::abs(deltaX) > std::abs(deltaY)) {
+        // Horizontal wheel or Shift + Wheel: Pan spectrum horizontally left/right (< / >)
+        const int delta = (std::abs(deltaX) > std::abs(deltaY)) ? deltaX : deltaY;
+        if (delta > 0) {
+            emit requesttranslateminusTheScreen();
+        } else if (delta < 0) {
+            emit requesttranslateplusTheScreen();
+        }
+    } else {
+        // Vertical wheel: Zoom out / in Y range
+        if (deltaY > 0) { // Wheel scrolled up: zoom out / expand Y range
+            emit requesttranslatedownTheScreen();
+        } else if (deltaY < 0) { // Wheel scrolled down: zoom in / compress Y range
+            emit requesttranslateupTheScreen();
+        }
     }
 }
 
@@ -800,8 +813,8 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 emit requesttranslatedownTheScreen();
                 break;
             case Qt::Key_Up:
-                // Up Arrow: Pan spectrum vertical scale upward
-                emit requesttranslateupTheScreen();
+                // Up Arrow: Auto-scale Y axis for current plot (FY) matching legacy Xtrackn
+                emit requestFullY();
                 break;
             case Qt::Key_B:
                 // 'B': Place background sample marker at cursor

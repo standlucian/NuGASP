@@ -676,3 +676,100 @@ void QMainCanvas::translateupTheScreen()
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
 }
+
+//==============================================================================
+// QMainCanvas::adjustAxisRange
+//==============================================================================
+// Implements Xtrackn Table 2 interactive mouse clicking on axis range labels:
+// - Left Click: increases / shifts range limit positively
+// - Right Click: decreases / shifts range limit negatively
+// - No modifier: Coarse step of 20.0% of the active span
+// - Ctrl modifier: Fine step of 2.5% of the active span
+//==============================================================================
+void QMainCanvas::adjustAxisRange(const QString &axisName, bool increase, bool fineStep)
+{
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) {
+        return;
+    }
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    clearDrawnObjects();
+
+    TAxis *xAxis = hist->GetXaxis();
+    if (!xAxis) return;
+
+    double xMin = xAxis->GetBinLowEdge(xAxis->GetFirst());
+    double xMax = xAxis->GetBinUpEdge(xAxis->GetLast());
+    double yMin = hist->GetMinimum();
+    double yMax = hist->GetMaximum();
+
+    TVirtualPad *pad = nullptr;
+    if (canvas && canvas->getCanvas()) {
+        pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        if (!pad) pad = canvas->getCanvas();
+    }
+    const bool isLog = (pad && pad->GetLogy() != 0);
+    const double logFloor = 0.5;
+    if (yMin < 0.0 || yMin == -1111.0) {
+        yMin = isLog ? logFloor : 0.0;
+    }
+    if (yMax <= yMin || yMax == -1111.0) {
+        yMax = hist->GetBinContent(hist->GetMaximumBin()) * (isLog ? 1.30 : 1.10);
+        if (yMax <= yMin) yMax = yMin + 10.0;
+    }
+
+    const double shiftFactor = fineStep ? 0.025 : 0.200;
+    const double xSpan = std::max(1.0, xMax - xMin);
+    const double ySpan = std::max(1.0, yMax - yMin);
+    const double maxChannel = hist->GetNbinsX();
+
+    if (axisName == "XMin") {
+        if (increase) {
+            xMin += std::round(shiftFactor * xSpan) + 1.0;
+            if (xMin >= xMax) xMin = xMax - 1.0;
+        } else {
+            xMin -= std::round(shiftFactor * xSpan) + 1.0;
+            if (xMin < 0.0) xMin = 0.0;
+        }
+        xAxis->SetRangeUser(xMin, xMax);
+    } else if (axisName == "XMax") {
+        if (increase) {
+            xMax += std::round(shiftFactor * xSpan) + 1.0;
+            if (xMax > maxChannel) xMax = maxChannel;
+        } else {
+            xMax -= std::round(shiftFactor * xSpan) + 1.0;
+            if (xMax <= xMin) xMax = xMin + 1.0;
+        }
+        xAxis->SetRangeUser(xMin, xMax);
+    } else if (axisName == "YMin") {
+        if (increase) {
+            yMin += shiftFactor * ySpan;
+            if (yMin >= yMax) yMin = yMax - 1.0;
+        } else {
+            yMin -= shiftFactor * ySpan;
+            if (isLog && yMin < logFloor) yMin = logFloor;
+            else if (!isLog && yMin < 0.0) yMin = 0.0;
+        }
+        hist->GetYaxis()->SetRangeUser(yMin, yMax);
+        hist->SetMinimum(yMin);
+        hist->SetMaximum(yMax);
+    } else if (axisName == "YMax") {
+        if (increase) {
+            yMax += shiftFactor * ySpan;
+        } else {
+            yMax -= shiftFactor * ySpan;
+            if (yMax <= yMin) yMax = yMin + 1.0;
+        }
+        hist->GetYaxis()->SetRangeUser(yMin, yMax);
+        hist->SetMinimum(yMin);
+        hist->SetMaximum(yMax);
+    }
+
+    ColorTheFrameOfTheHistogram();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    updateAxisStatusLabels();
+}

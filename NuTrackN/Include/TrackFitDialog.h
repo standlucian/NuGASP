@@ -154,11 +154,13 @@ public:
                             QWidget *parent = nullptr);
     ~TrackFitDialog() override = default;
 
+public slots:
+    void onAutoTraceClicked();
+
 private slots:
     void onSourcePresetChanged(int index);
     void onAddCustomLine();
     void onRemoveSelectedLine();
-    void onAutoTraceClicked();
     void onViewAllFitsClicked();
     void onPolyOrderChanged(int order);
     void onTableItemChanged(QTableWidgetItem *item);

@@ -1669,8 +1669,6 @@ void TrackFitDialog::onApplyActiveClicked()
                          .arg(sel_i).arg(sel_j).arg(m_rmsResidualKeV, 0, 'f', 4);
     CommandPrompt::getInstance()->appendPlainText(logMsg);
     std::cout << logMsg.toStdString();
-
-    QMessageBox::information(this, "AutoTrace / TrackFit", "Calibration successfully applied to active spectrum.");
 }
 
 //==============================================================================

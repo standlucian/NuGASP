@@ -261,6 +261,7 @@ public:
    virtual void closeEvent(QCloseEvent *e);
    virtual void keyPressEvent(QKeyEvent *event);
    virtual void keyReleaseEvent(QKeyEvent *event);
+   bool eventFilter(QObject *watched, QEvent *event) override;
    int getBinFromClick(int x, int y);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
@@ -343,14 +344,21 @@ public slots:
     void renderPeakLabels(int z, int g);
     QSplitter* getMainSplitter() const { return mainSplitter; }
 
-    // Multi-spectrum navigation slots (# - and # +)
+    // Axis range adjustment slots (Table 2)
+    void adjustAxisRange(const QString &axisName, bool increase, bool fineStep);
+
+    // Multi-spectrum navigation slots (# - and # +) (Table 3)
     void onSpectrumIncrement();
     void onSpectrumDecrement();
-    void stepSpectrumIndex(int delta);
+    void onSpectrumIncrementSameScale();
+    void onSpectrumDecrementSameScale();
+    void stepSpectrumIndex(int delta, bool preserveScale = false);
+    void executeMacro(int macroId);
 
     // Energy calibration dialogs
     void openEnCalDialog();
     void openTrackFitDialog();
+    void onDirectAutoTrace();
 
     // GASPware Compressed Matrix slots
     void onOpenCMClicked();
@@ -478,7 +486,10 @@ protected:
     int            m_currentSpectrumLength{10240};
     SpectrumFormat m_currentSpectrumFormat{SpectrumFormat::LongInt32};
 
-    // GASPware Compressed Matrix state
+    // Interactive buttons for modifier event filtering (Table 3)
+    QPushButton                   *btnDT{nullptr};
+    QPushButton                   *btnInc{nullptr};
+    QPushButton                   *btnDec{nullptr};
     QPushButton                   *btnOpenCM{nullptr};
     QPushButton                   *btnGateCM{nullptr};
     std::shared_ptr<MatrixReader>  m_currentMatrix;
