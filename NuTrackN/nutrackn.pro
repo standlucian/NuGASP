@@ -44,7 +44,10 @@ HEADERS += \
     Include/PeakFit.h \
     Include/SpectrumImportDialog.h \
     Include/SpectrumExportDialog.h \
-    Include/TrackFitDialog.h
+    Include/TrackFitDialog.h \
+    Include/complib.h \
+    Include/MatrixReader.h \
+    Include/MatrixDialog.h
 
 # Project source files
 SOURCES += \
@@ -63,6 +66,9 @@ SOURCES += \
     Sources/PeakFit.cxx \
     Sources/SpectrumImportDialog.cxx \
     Sources/SpectrumExportDialog.cxx \
-    Sources/TrackFitDialog.cxx
+    Sources/TrackFitDialog.cxx \
+    Sources/complib.c \
+    Sources/MatrixReader.cxx \
+    Sources/MatrixDialog.cxx
 
 

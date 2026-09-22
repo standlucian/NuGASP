@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12 FATAL_ERROR)
 
-project(NuTrackN LANGUAGES CXX)
+project(NuTrackN LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -35,6 +35,9 @@ set(SOURCES
     Sources/SpectrumImportDialog.cxx
     Sources/SpectrumExportDialog.cxx
     Sources/TrackFitDialog.cxx
+    Sources/complib.c
+    Sources/MatrixReader.cxx
+    Sources/MatrixDialog.cxx
 )
 
 set(HEADERS
@@ -47,6 +50,9 @@ set(HEADERS
     Include/SpectrumImportDialog.h
     Include/SpectrumExportDialog.h
     Include/TrackFitDialog.h
+    Include/complib.h
+    Include/MatrixReader.h
+    Include/MatrixDialog.h
 )
 
 add_executable(nutrackn ${SOURCES} ${HEADERS})

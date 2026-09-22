@@ -608,6 +608,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // C + P: Peak Search using TSpectrum
                 emit requestPeakSearch();
                 break;
+            case Qt::Key_W:
+                // C + W: Cut / slice gate from compressed matrix
+                emit requestGateCut();
+                break;
             case Qt::Key_C:
                 // Redundant C press: cancel prefix
                 break;
@@ -640,6 +644,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_P:
                 // Z + P: Delete Peak Search markers
                 emit requestDeletePeakMarkers();
+                break;
+            case Qt::Key_W:
+                // Z + W: Delete gate markers
+                emit requestDeleteGateMarkers();
                 break;
             case Qt::Key_A:
                 // Z + A: Delete all active markers
@@ -677,6 +685,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_P:
                 // M + P: Redraw Peak Search markers
                 emit requestShowPeakMarkers();
+                break;
+            case Qt::Key_W:
+                // M + W: Redraw gate markers
+                emit requestShowGateMarkers();
                 break;
             case Qt::Key_A:
                 // M + A: Redraw all markers
@@ -732,6 +744,9 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_T:
                 emit requestTrackFitDialog();
+                break;
+            case Qt::Key_W:
+                emit requestGateCut();
                 break;
             default:
                 break;
@@ -811,6 +826,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_E:
                 // 'E': Execute zoom between spacebar markers
                 emit requestZoomTheScreen();
+                break;
+            case Qt::Key_W:
+                // 'W': Place coincidence gate boundary marker at cursor
+                emit addGateMarkerRequested(xMousePosition, yMousePosition);
                 break;
             default:
                 QWidget::keyPressEvent(event);

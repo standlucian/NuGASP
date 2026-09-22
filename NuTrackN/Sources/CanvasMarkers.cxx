@@ -395,6 +395,7 @@ void QMainCanvas::deleteAllMarkers()
     deleteIntegralMarkers();
     deleteRangeMarkers();
     deleteGaussMarkers();
+    deleteGateMarkers();
 }
 
 //==============================================================================
@@ -477,6 +478,7 @@ void QMainCanvas::showAllMarkers()
     showIntegralMarkers();
     showRangeMarkers();
     showGaussMarkers();
+    showGateMarkers();
 }
 
 //==============================================================================
@@ -648,6 +650,146 @@ void QMainCanvas::showGaussMarkers()
         gaussLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(gaussLine);
     }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//==============================================================================
+// QMainCanvas::addGateMarker
+//==============================================================================
+// Drops a magenta vertical coincidence gate marker at clicked channel (shortcut: 'W').
+// Even markers complete a coincidence gate window [minB, maxB], drawing a baseline
+// and shaded hatched area (fill style 3354).
+//==============================================================================
+void QMainCanvas::addGateMarker(Int_t x, Int_t y)
+{
+    int binX = getBinFromClick(x, y);
+    gate_markers.push_back(static_cast<Double_t>(binX));
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    // When placing the second marker of a pair, ensure previous boundary is redrawn
+    if (gate_markers.size() % 2 == 0 && !gate_markers.empty()) {
+        const std::size_t i = gate_markers.size();
+        TLine *gateLineSecond = new TLine(gate_markers[i - 2] - 0.5, 0.0,
+                                          gate_markers[i - 2] - 0.5, yMax);
+        gateLineSecond->SetLineColor(kMagenta);
+        gateLineSecond->SetLineWidth(2);
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        gateLineSecond->Draw();
+        listOfObjectsDrawnOnScreen.Add(gateLineSecond);
+    }
+
+    TLine *gateLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    gateLine->SetLineColor(kMagenta);
+    gateLine->SetLineWidth(2);
+    gateLine->Draw("same");
+    listOfObjectsDrawnOnScreen.Add(gateLine);
+
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
+    bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
+
+    // When completing a pair, draw baseline and hatched region
+    if (gate_markers.size() % 2 == 0) {
+        const Int_t leftBin = static_cast<Int_t>(std::round(gate_markers[gate_markers.size() - 2]));
+        const Int_t minB = std::min(leftBin, binX);
+        const Int_t maxB = std::max(leftBin, binX);
+
+        TLine *bottomGateLine = new TLine(minB - 0.5, 0.0, maxB - 0.5, 0.0);
+        bottomGateLine->SetLineColor(kMagenta);
+        bottomGateLine->SetLineWidth(2);
+        bottomGateLine->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(bottomGateLine);
+
+        TBox *gateArea = new TBox(minB - 0.5, 0.0, maxB - 0.5, yMax);
+        gateArea->SetFillColor(kMagenta);
+        gateArea->SetFillStyle(3354);
+        gateArea->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(gateArea);
+
+        double eMin = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * minB + trackHist->GetCalibA2() * minB * minB) : minB;
+        double eMax = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * maxB + trackHist->GetCalibA2() * maxB * maxB) : maxB;
+        QString msg = QString("Gate #%1 defined: [%2, %3]").arg(gate_markers.size() / 2).arg(minB).arg(maxB);
+        if (isCalib) {
+            msg += QString(" (%.1f - %.1f keV)").arg(eMin, 0, 'f', 1).arg(eMax, 0, 'f', 1);
+        }
+        msg += QString(", width = %1 ch. Press 'C + W' or click 'Gate CM' to slice.\n").arg(maxB - minB + 1);
+        CommandPrompt::getInstance()->appendPlainText(msg);
+        std::cout << msg.toStdString();
+    } else {
+        double eX = isCalib ? (trackHist->GetCalibA0() + trackHist->GetCalibA1() * binX + trackHist->GetCalibA2() * binX * binX) : binX;
+        QString msg = QString("Gate marker #%1 placed at ch %2").arg((gate_markers.size() + 1) / 2).arg(binX);
+        if (isCalib) {
+            msg += QString(" (%.1f keV)").arg(eX, 0, 'f', 1);
+        }
+        msg += ". Place second marker with 'W' to define gate.\n";
+        CommandPrompt::getInstance()->appendPlainText(msg);
+        std::cout << msg.toStdString();
+    }
+
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//==============================================================================
+// QMainCanvas::deleteGateMarkers
+//==============================================================================
+// Clears all stored coincidence gate markers (shortcut: 'Z + W').
+//==============================================================================
+void QMainCanvas::deleteGateMarkers()
+{
+    gate_markers.clear();
+    const QString msg = "Coincidence gate markers cleared ('Z + W').\n";
+    CommandPrompt::getInstance()->appendPlainText(msg);
+    std::cout << msg.toStdString();
+}
+
+//==============================================================================
+// QMainCanvas::showGateMarkers
+//==============================================================================
+// Re-renders all stored magenta coincidence gate markers and hatched intervals
+// on the canvas (shortcut: 'M + W').
+//==============================================================================
+void QMainCanvas::showGateMarkers()
+{
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    for (std::size_t i = 0; i < gate_markers.size(); ++i) {
+        TLine *gateLine = new TLine(gate_markers[i] - 0.5, 0.0,
+                                    gate_markers[i] - 0.5, yMax);
+        gateLine->SetLineColor(kMagenta);
+        gateLine->SetLineWidth(2);
+        gateLine->Draw("same");
+        listOfObjectsDrawnOnScreen.Add(gateLine);
+
+        if (i % 2 == 1) {
+            const Int_t minB = static_cast<Int_t>(std::round(std::min(gate_markers[i - 1], gate_markers[i])));
+            const Int_t maxB = static_cast<Int_t>(std::round(std::max(gate_markers[i - 1], gate_markers[i])));
+
+            TLine *bottomGateLine = new TLine(minB - 0.5, 0.0, maxB - 0.5, 0.0);
+            bottomGateLine->SetLineColor(kMagenta);
+            bottomGateLine->SetLineWidth(2);
+            bottomGateLine->Draw("same");
+            listOfObjectsDrawnOnScreen.Add(bottomGateLine);
+
+            TBox *gateArea = new TBox(minB - 0.5, 0.0, maxB - 0.5, yMax);
+            gateArea->SetFillColor(kMagenta);
+            gateArea->SetFillStyle(3354);
+            gateArea->Draw("same");
+            listOfObjectsDrawnOnScreen.Add(gateArea);
+        }
+    }
+
+    const QString msg = "Redrawing coincidence gate markers ('M + W').\n";
+    CommandPrompt::getInstance()->appendPlainText(msg);
+    std::cout << msg.toStdString();
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();

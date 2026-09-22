@@ -16,6 +16,9 @@
 #include "calib.h"
 #include "PeakFit.h"
 #include "SpectrumImportDialog.h"
+#include <memory>
+
+class MatrixReader;
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
@@ -197,6 +200,10 @@ signals:
    void requestAddGaussMarker(Int_t, Int_t);
    void requestDeleteGaussMarkers();
    void requestShowGaussMarkers();
+   void addGateMarkerRequested(Int_t, Int_t);
+   void requestDeleteGateMarkers();
+   void requestShowGateMarkers();
+   void requestGateCut();
     void requestFitGauss();
     void requestPeakSearch();
     void requestDeletePeakMarkers();
@@ -296,6 +303,9 @@ public slots:
    void addGaussMarker(Int_t, Int_t);
    void deleteGaussMarkers();
    void showGaussMarkers();
+    void addGateMarker(Int_t, Int_t);
+    void deleteGateMarkers();
+    void showGateMarkers();
     void fitGauss();
     void searchPeaks();
     void searchPeaksWithParams(double sigma, double threshold);
@@ -342,6 +352,11 @@ public slots:
     void openEnCalDialog();
     void openTrackFitDialog();
 
+    // GASPware Compressed Matrix slots
+    void onOpenCMClicked();
+    void onGateCMClicked();
+    void loadSpectrumDataToPad(const std::vector<double> &data, const QString &title, bool asOverlay = false);
+
     TracknHistogram* getActiveTracknHistogram() const {
         if (SelectedElement_i >= 1 && SelectedElement_i <= maxElement_i &&
             SelectedElement_j >= 1 && SelectedElement_j <= maxElement_j) {
@@ -351,6 +366,7 @@ public slots:
     }
     const std::vector<Float_t>& getPuncteCalib2p() const { return puncte_calib2p; }
     const std::vector<Double_t>& getSpacebarMarkers() const { return spacebar_markers; }
+    const std::vector<Double_t>& getGateMarkers() const { return gate_markers; }
     const std::vector<Double_t>& getGaussCenters(int i, int j) const { return gaussCenters[i][j]; }
     int getCurrentSpectrumIndex() const { return m_currentSpectrumIndex; }
     QRootCanvas* getRootCanvas() const { return canvas; }
@@ -361,15 +377,16 @@ protected:
 
     QSplitter      *mainSplitter = nullptr;
     QRootCanvas    *canvas = nullptr;
-   QPushButton    *b;
-   QTimer         *fRootTimer;
-   TList listOfObjectsDrawnOnScreen;
-   std::vector<Int_t> integral_markers;
-   std::vector<Int_t> background_markers;
-   std::vector<Double_t> spacebar_markers;
-   std::vector<Double_t> range_markers;
-   std::vector<Double_t> gauss_markers;
-   std::vector<Double_t> zoom_markers;
+    QPushButton    *b;
+    QTimer         *fRootTimer;
+    TList listOfObjectsDrawnOnScreen;
+    std::vector<Int_t> integral_markers;
+    std::vector<Int_t> background_markers;
+    std::vector<Double_t> spacebar_markers;
+    std::vector<Double_t> range_markers;
+    std::vector<Double_t> gauss_markers;
+    std::vector<Double_t> zoom_markers;
+    std::vector<Double_t> gate_markers;
    std::vector<TF1> backgroundFunctionVector;
    std::vector<TF1> gaussianWithBackgroundFunctionVector;
    std::vector<TObject*> autoFitMarkers[12][12];
@@ -460,6 +477,11 @@ protected:
     int            m_currentSpectrumCount{1};
     int            m_currentSpectrumLength{10240};
     SpectrumFormat m_currentSpectrumFormat{SpectrumFormat::LongInt32};
+
+    // GASPware Compressed Matrix state
+    QPushButton                   *btnOpenCM{nullptr};
+    QPushButton                   *btnGateCM{nullptr};
+    std::shared_ptr<MatrixReader>  m_currentMatrix;
 };
 
 

@@ -6,6 +6,8 @@
 #include "SpectrumImportDialog.h"
 #include "SpectrumExportDialog.h"
 #include "TrackFitDialog.h"
+#include "MatrixReader.h"
+#include "MatrixDialog.h"
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -352,12 +354,16 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnInc, &QPushButton::clicked, this, &QMainCanvas::onSpectrumIncrement);
     bottomBtnGrid->addWidget(btnInc, 0, 3);
 
-    QPushButton *btnOpenCM = makeButton("Open CM", topContainer, false);
+    btnOpenCM = makeButton("Open CM", topContainer, true);
     btnOpenCM->setFixedHeight(36);
+    btnOpenCM->setToolTip(tr("Open GASPware compressed coincidence matrix (.cmat)."));
+    connect(btnOpenCM, &QPushButton::clicked, this, &QMainCanvas::onOpenCMClicked);
     bottomBtnGrid->addWidget(btnOpenCM, 1, 0, 1, 2);
 
-    QPushButton *btnGateCM = makeButton("Gate CM", topContainer, false);
+    btnGateCM = makeButton("Gate CM", topContainer, true);
     btnGateCM->setFixedHeight(36);
+    btnGateCM->setToolTip(tr("Project 1D coincidence gate from loaded matrix."));
+    connect(btnGateCM, &QPushButton::clicked, this, &QMainCanvas::onGateCMClicked);
     bottomBtnGrid->addWidget(btnGateCM, 1, 2, 1, 2);
 
     bottomLayout->addLayout(bottomBtnGrid);
@@ -432,6 +438,10 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestAddGaussMarker, this, &QMainCanvas::addGaussMarker);
     connect(canvas, &QRootCanvas::requestDeleteGaussMarkers, this, &QMainCanvas::deleteGaussMarkers);
     connect(canvas, &QRootCanvas::requestShowGaussMarkers, this, &QMainCanvas::showGaussMarkers);
+    connect(canvas, &QRootCanvas::addGateMarkerRequested, this, &QMainCanvas::addGateMarker);
+    connect(canvas, &QRootCanvas::requestDeleteGateMarkers, this, &QMainCanvas::deleteGateMarkers);
+    connect(canvas, &QRootCanvas::requestShowGateMarkers, this, &QMainCanvas::showGateMarkers);
+    connect(canvas, &QRootCanvas::requestGateCut, this, &QMainCanvas::onGateCMClicked);
     connect(canvas, &QRootCanvas::requestFitGauss, this, &QMainCanvas::fitGauss);
     connect(canvas, &QRootCanvas::requestPeakSearch, this, &QMainCanvas::searchPeaks);
     connect(canvas, &QRootCanvas::requestDeletePeakMarkers, this, &QMainCanvas::deletePeakMarkers);
@@ -1053,8 +1063,10 @@ void QMainCanvas::offerHelp()
     prompt->appendPlainText(" Q                      Display projection of compressed matrix\n");
     prompt->appendPlainText(" V                      Marker writing also counts in channel\n");
     prompt->appendPlainText(" MZ                     Draw a line at zero counts\n");
-    prompt->appendPlainText(" ZA                     Delete all B/G/I markers\n");
-    prompt->appendPlainText(" ZB ZI ZJ ZG ZV         Delete corresponding type of markers\n");
+    prompt->appendPlainText(" ZA                     Delete all active markers\n");
+    prompt->appendPlainText(" ZB ZI ZJ ZG ZV ZW     Delete corresponding type of markers (ZW for gate markers)\n");
+    prompt->appendPlainText(" MW                    Redraw coincidence gate markers\n");
+    prompt->appendPlainText(" CW                    Extract coincidence cut from compressed matrix\n");
     prompt->appendPlainText(" ZF ZL                  Close output file for Area calculations\n");
     prompt->appendPlainText(" DP MP ZP               Define, Show, Delete peaks in buffer\n");
     prompt->appendPlainText(" + -                    Insert/delete a peak by marker\n");
@@ -1085,4 +1097,186 @@ void QMainCanvas::keyReleaseEvent(QKeyEvent *event)
         return;
     }
     QWidget::keyReleaseEvent(event);
+}
+
+void QMainCanvas::onOpenCMClicked()
+{
+    QString initialDir = m_currentSpectrumFile.isEmpty()
+        ? QDir::currentPath()
+        : QFileInfo(m_currentSpectrumFile).absolutePath();
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this, tr("Open Compressed Matrix (CM)"), initialDir,
+        tr("GASPware Matrix (*.cmat *.mat);;All Files (*)"));
+
+    if (fileName.isEmpty()) {
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    if (!m_currentMatrix) {
+        m_currentMatrix = std::make_shared<MatrixReader>();
+    }
+
+    QString errMsg;
+    if (!m_currentMatrix->open(fileName, &errMsg)) {
+        QMessageBox::critical(this, tr("Open Matrix Error"), errMsg);
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    if (btnGateCM) {
+        btnGateCM->setEnabled(true);
+    }
+
+    TracknHistogram *trackHist = getActiveTracknHistogram();
+    bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
+    double a0 = trackHist ? trackHist->GetCalibA0() : 0.0;
+    double a1 = trackHist ? trackHist->GetCalibA1() : 1.0;
+    double a2 = trackHist ? trackHist->GetCalibA2() : 0.0;
+
+    MatrixDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, this);
+    connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
+            [this](const std::vector<double> &data, const QString &title) {
+                loadSpectrumDataToPad(data, title, false);
+            });
+
+    dlg.exec();
+
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::onGateCMClicked()
+{
+    if (!m_currentMatrix || !m_currentMatrix->isOpen()) {
+        QMessageBox::information(this, tr("No Matrix Loaded"),
+            tr("Please open a compressed coincidence matrix (.cmat) first using 'Open CM'."));
+        onOpenCMClicked();
+        return;
+    }
+
+    TracknHistogram *trackHist = getActiveTracknHistogram();
+    bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
+    double a0 = trackHist ? trackHist->GetCalibA0() : 0.0;
+    double a1 = trackHist ? trackHist->GetCalibA1() : 1.0;
+    double a2 = trackHist ? trackHist->GetCalibA2() : 0.0;
+
+    int initGateMin = -1, initGateMax = -1;
+    if (gate_markers.size() >= 2) {
+        double g1 = gate_markers[gate_markers.size() - 2];
+        double g2 = gate_markers[gate_markers.size() - 1];
+        initGateMin = static_cast<int>(std::round(std::min(g1, g2)));
+        initGateMax = static_cast<int>(std::round(std::max(g1, g2)));
+    } else if (zoom_markers.size() >= 2) {
+        double z1 = zoom_markers[zoom_markers.size() - 2];
+        double z2 = zoom_markers[zoom_markers.size() - 1];
+        initGateMin = static_cast<int>(std::round(std::min(z1, z2)));
+        initGateMax = static_cast<int>(std::round(std::max(z1, z2)));
+    } else if (range_markers.size() >= 2) {
+        double r1 = range_markers[range_markers.size() - 2];
+        double r2 = range_markers[range_markers.size() - 1];
+        initGateMin = static_cast<int>(std::round(std::min(r1, r2)));
+        initGateMax = static_cast<int>(std::round(std::max(r1, r2)));
+    }
+
+    MatrixGateDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, initGateMin, initGateMax, this);
+    connect(&dlg, &MatrixGateDialog::loadGateSliceRequested, this,
+            [this](const std::vector<double> &data, const QString &title, bool asOverlay) {
+                loadSpectrumDataToPad(data, title, asOverlay);
+            });
+
+    dlg.exec();
+
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const QString &title, bool asOverlay)
+{
+    if (data.empty()) return;
+
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+    if (!trackHist) return;
+
+    if (!asOverlay) {
+        if (!trackHist->LoadFromData(data, title.toStdString())) {
+            std::cerr << "Failed to load spectrum into active histogram: " << title.toStdString() << std::endl;
+            return;
+        }
+
+        canvas->getCanvas()->SetBorderMode(0);
+        canvas->getCanvas()->SetFillColor(0);
+
+        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
+        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
+            HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
+
+        for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
+            delete h;
+        }
+        HijC[SelectedElement_i][SelectedElement_j].clear();
+        HijC[SelectedElement_i][SelectedElement_j].push_back(
+            (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
+
+        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
+        HijC[SelectedElement_i][SelectedElement_j].back()->SetLineColor(colors_hist[0]);
+
+        if (maxElement_i > 1 || maxElement_j > 1) {
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        } else {
+            canvas->getCanvas()->cd();
+        }
+        HijF[SelectedElement_i][SelectedElement_j]->Draw();
+
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+
+        if (labelSpectrumFile) {
+            labelSpectrumFile->setText(title);
+        }
+
+        m_currentSpectrumFile = title;
+        m_currentSpectrumCount = 1;
+        m_currentSpectrumIndex = 0;
+        m_currentSpectrumLength = static_cast<int>(data.size());
+
+        CommandPrompt *prompt = CommandPrompt::getInstance();
+        if (prompt) {
+            prompt->appendPlainText(QString("Loaded matrix spectrum: %1 (%2 channels)\n")
+                                        .arg(title)
+                                        .arg(data.size()));
+        }
+    } else {
+        TracknHistogram *overlayHist = dynamic_cast<TracknHistogram*>(trackHist->Clone());
+        if (!overlayHist) return;
+
+        overlayHist->LoadFromData(data, title.toStdString());
+        const int colorIdx = HijC[SelectedElement_i][SelectedElement_j].size() % colors_hist.size();
+        overlayHist->SetLineColor(colors_hist[colorIdx]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(overlayHist);
+
+        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        if (maxElement_i > 1 || maxElement_j > 1) {
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        } else {
+            canvas->getCanvas()->cd();
+        }
+        HijF[SelectedElement_i][SelectedElement_j]->Draw();
+        for (size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size(); ++k) {
+            if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+                HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
+            }
+        }
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+
+        CommandPrompt *prompt = CommandPrompt::getInstance();
+        if (prompt) {
+            prompt->appendPlainText(QString("Overlaid matrix gate: %1 (color index %2)\n")
+                                        .arg(title)
+                                        .arg(colorIdx));
+        }
+    }
+
+    updateAxisStatusLabels();
 }

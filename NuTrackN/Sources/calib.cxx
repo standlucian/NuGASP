@@ -612,18 +612,8 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
             if (segs.size() > 1) {
                 lblStatus->setText(QString("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; Piecewise polynomial (%1 segments loaded).")
                     .arg(segs.size()));
-            } else if (!segs.empty()) {
-                const auto &c = segs[0].coeffs;
-                QString cStr;
-                for (size_t i = 0; i < c.size(); ++i) {
-                    cStr += QString("A(%1)=%2 ").arg(i).arg(c[i], 0, 'g', 5);
-                }
-                lblStatus->setText(QString("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; Single segment: %1").arg(cStr));
             } else {
-                lblStatus->setText(QString("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; A0=%1, A1=%2, A2=%3")
-                    .arg(activeHist->GetCalibA0(), 0, 'g', 5)
-                    .arg(activeHist->GetCalibA1(), 0, 'g', 5)
-                    .arg(activeHist->GetCalibA2(), 0, 'g', 5));
+                lblStatus->setText("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; Single segment: Polynomial");
             }
         } else {
             lblStatus->setText("<b>Status:</b> <span style='color:#f48771;'>UNCALIBRATED</span> &mdash; Displaying raw spectrum channels.");

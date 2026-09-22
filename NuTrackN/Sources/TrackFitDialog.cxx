@@ -167,7 +167,7 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
     const qreal plotLeft = 10.0;
     const qreal plotRight = w - 10.0;
     const qreal plotTop = 30.0;
-    const qreal plotBottom = h - 22.0;
+    const qreal plotBottom = m_showFooter ? (h - 22.0) : (h - 10.0);
     const qreal plotW = plotRight - plotLeft;
     const qreal plotH = plotBottom - plotTop;
 
@@ -266,22 +266,24 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
     }
 
     // 6. Footer Readout
-    QFont footerFont("sans-serif", 8, QFont::Normal);
-    painter.setFont(footerFont);
-    painter.setPen(QColor("#cccccc"));
+    if (m_showFooter) {
+        QFont footerFont("sans-serif", 8, QFont::Normal);
+        painter.setFont(footerFont);
+        painter.setPen(QColor("#cccccc"));
 
-    QString footerLeft;
-    if (isFitted) {
-        footerLeft = QString("Ch: %1 | FWHM: %2 keV")
-                         .arg(m_res.fittedCentroid, 0, 'f', 1)
-                         .arg(m_res.fwhmEnergy, 0, 'f', 2);
-    } else {
-        footerLeft = QString("Pred Ch: %1").arg(m_res.expectedChannel, 0, 'f', 1);
+        QString footerLeft;
+        if (isFitted) {
+            footerLeft = QString("Ch: %1 | FWHM: %2 keV")
+                             .arg(m_res.fittedCentroid, 0, 'f', 1)
+                             .arg(m_res.fwhmEnergy, 0, 'f', 2);
+        } else {
+            footerLeft = QString("Pred Ch: %1").arg(m_res.expectedChannel, 0, 'f', 1);
+        }
+        painter.drawText(QRectF(10, h - 20, w * 0.6, 16), Qt::AlignLeft | Qt::AlignVCenter, footerLeft);
+
+        QString footerRight = (m_res.netArea > 0.0) ? QString("Area: %1").arg(m_res.netArea, 0, 'f', 0) : "";
+        painter.drawText(QRectF(w * 0.6, h - 20, w * 0.4 - 10, 16), Qt::AlignRight | Qt::AlignVCenter, footerRight);
     }
-    painter.drawText(QRectF(10, h - 20, w * 0.6, 16), Qt::AlignLeft | Qt::AlignVCenter, footerLeft);
-
-    QString footerRight = (m_res.netArea > 0.0) ? QString("Area: %1").arg(m_res.netArea, 0, 'f', 0) : "";
-    painter.drawText(QRectF(w * 0.6, h - 20, w * 0.4 - 10, 16), Qt::AlignRight | Qt::AlignVCenter, footerRight);
 }
 
 //==============================================================================
@@ -689,11 +691,9 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
 
     QString statusText;
     if (m_activeHist && m_activeHist->IsCalibrated()) {
-        statusText = QString("<span style='color:#4ec9b0;'>CALIBRATED</span> (Gain: %1 keV/ch, Offset: %2 keV)")
-                         .arg(m_activeHist->GetCalibA1(), 0, 'g', 5)
-                         .arg(m_activeHist->GetCalibA0(), 0, 'g', 5);
+        statusText = "<span style='color:#4ec9b0;'>CALIBRATED</span>";
     } else {
-        statusText = "<span style='color:#f48771;'>UNCALIBRATED</span> (Raw channels)";
+        statusText = "<span style='color:#f48771;'>UNCALIBRATED</span>";
     }
 
     QLabel *lblPadInfo = new QLabel(
@@ -828,6 +828,7 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     inspectorLayout->setContentsMargins(8, 8, 8, 8);
 
     m_inspectorTile = new PeakFitTileWidget(-1, false, inspectorBox);
+    m_inspectorTile->setShowFooter(false);
     inspectorLayout->addWidget(m_inspectorTile, 1);
 
     m_lblInspectorDetails = new QLabel(inspectorBox);

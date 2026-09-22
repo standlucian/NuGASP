@@ -72,6 +72,8 @@ public:
     void setPeakData(const TrackFitPeakResult &res, int peakIndex);
     void clearData();
     int getPeakIndex() const { return m_peakIndex; }
+    void setShowFooter(bool show) { m_showFooter = show; update(); }
+    bool getShowFooter() const { return m_showFooter; }
 
 signals:
     void tileClicked(int peakIndex);
@@ -84,6 +86,7 @@ private:
     int m_peakIndex{-1};
     bool m_isInteractive{false};
     bool m_hasData{false};
+    bool m_showFooter{true};
     TrackFitPeakResult m_res;
 };
 
