@@ -601,6 +601,73 @@ void QMainCanvas::translateminusTheScreen()
 }
 
 //==============================================================================
+// QMainCanvas::shiftDisplayLeft75
+//==============================================================================
+// Pans the spectrum display horizontally to the left (toward lower channels)
+// by 75% (3/4) of the visible window width. Triggered by '<' or ','.
+//==============================================================================
+void QMainCanvas::shiftDisplayLeft75()
+{
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    clearDrawnObjects();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        TAxis *xAxis = hist->GetXaxis();
+        const Int_t first    = xAxis->GetFirst();
+        const Int_t last     = xAxis->GetLast();
+        const Int_t width    = last - first;
+        const Int_t step     = std::max(1, static_cast<Int_t>(width * 0.75));
+        const Int_t newFirst = std::max(1, first - step);
+        const Int_t newLast  = std::max(newFirst + 2, last - step);
+        xAxis->SetRange(newFirst, newLast);
+        adjustYAxisToVisibleMax(hist);
+    }
+
+    ColorTheFrameOfTheHistogram();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    updateAxisStatusLabels();
+    CommandPrompt::getInstance()->appendPlainText("Shifted display 3/4 left (<).\n");
+}
+
+//==============================================================================
+// QMainCanvas::shiftDisplayRight75
+//==============================================================================
+// Pans the spectrum display horizontally to the right (toward higher channels)
+// by 75% (3/4) of the visible window width. Triggered by '>' or '.'.
+//==============================================================================
+void QMainCanvas::shiftDisplayRight75()
+{
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    clearDrawnObjects();
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist) {
+        TAxis *xAxis = hist->GetXaxis();
+        const Int_t first    = xAxis->GetFirst();
+        const Int_t last     = xAxis->GetLast();
+        const Int_t width    = last - first;
+        const Int_t step     = std::max(1, static_cast<Int_t>(width * 0.75));
+        const Int_t maxBin   = hist->GetNbinsX();
+        const Int_t newLast  = std::min(maxBin, last + step);
+        const Int_t newFirst = std::min(newLast - 2, first + step);
+        xAxis->SetRange(std::max(1, newFirst), newLast);
+        adjustYAxisToVisibleMax(hist);
+    }
+
+    ColorTheFrameOfTheHistogram();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    updateAxisStatusLabels();
+    CommandPrompt::getInstance()->appendPlainText("Shifted display 3/4 right (>).\n");
+}
+
+//==============================================================================
 // QMainCanvas::translatedownTheScreen
 //==============================================================================
 // Expands the vertical count scale (zooms out vertically by 1.10x).

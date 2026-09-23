@@ -448,6 +448,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestShowAllMarkers, this, &QMainCanvas::showAllMarkers);
     connect(canvas, &QRootCanvas::requestMJMarkers, this, &QMainCanvas::showMJMarkers);
     connect(canvas, &QRootCanvas::requestMVMarkers, this, &QMainCanvas::showMVMarkers);
+    connect(canvas, &QRootCanvas::requestDeleteZJMarkers, this, &QMainCanvas::deleteZJMarkers);
+    connect(canvas, &QRootCanvas::requestDeleteZVMarkers, this, &QMainCanvas::deleteZVMarkers);
+    connect(canvas, &QRootCanvas::requestDrawZeroLine, this, &QMainCanvas::drawZeroLine);
+    connect(canvas, &QRootCanvas::requestShiftDisplayLeft75, this, &QMainCanvas::shiftDisplayLeft75);
+    connect(canvas, &QRootCanvas::requestShiftDisplayRight75, this, &QMainCanvas::shiftDisplayRight75);
+    connect(canvas, &QRootCanvas::requestDeleteNearestGaussMarker, this, &QMainCanvas::deleteNearestGaussMarker);
     connect(canvas, &QRootCanvas::requestQuickCalibration, this, &QMainCanvas::quickEnergyCalibration);
     connect(canvas, &QRootCanvas::requestMatrixProjection, this, &QMainCanvas::showMatrixProjection);
     connect(canvas, &QRootCanvas::requestFitBackground, this, [this]() { fitBackgroundHelper(this); });

@@ -917,6 +917,119 @@ void QMainCanvas::showMVMarkers()
     canvas->getCanvas()->Update();
 }
 
+//==============================================================================
+// QMainCanvas::deleteZJMarkers
+//==============================================================================
+// Clears Background and Integral markers simultaneously (shortcut: 'Z + J').
+//==============================================================================
+void QMainCanvas::deleteZJMarkers()
+{
+    deleteBackgroundMarkers();
+    deleteIntegralMarkers();
+    clearDrawnObjects();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+    CommandPrompt::getInstance()->appendPlainText("Background and Integral markers deleted (ZJ).\n");
+}
+
+//==============================================================================
+// QMainCanvas::deleteZVMarkers
+//==============================================================================
+// Clears Background, Range, and Gauss markers simultaneously (shortcut: 'Z + V').
+//==============================================================================
+void QMainCanvas::deleteZVMarkers()
+{
+    deleteBackgroundMarkers();
+    deleteRangeMarkers();
+    deleteGaussMarkers();
+    clearDrawnObjects();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+    CommandPrompt::getInstance()->appendPlainText("Background, Range, and Gauss markers deleted (ZV).\n");
+}
+
+//==============================================================================
+// QMainCanvas::drawZeroLine
+//==============================================================================
+// Draws a horizontal reference dashed line at zero counts across the visible
+// spectrum window (shortcut: 'M + Z').
+//==============================================================================
+void QMainCanvas::drawZeroLine()
+{
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
+
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist || !canvas || !canvas->getCanvas()) return;
+
+    TVirtualPad *pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    if (!pad) pad = canvas->getCanvas();
+    if (!pad) return;
+
+    pad->cd();
+    double xMin = hist->GetXaxis()->GetXmin();
+    double xMax = hist->GetXaxis()->GetXmax();
+    if (hist->GetXaxis()->GetFirst() > 1 || hist->GetXaxis()->GetLast() < hist->GetNbinsX()) {
+        xMin = hist->GetXaxis()->GetBinLowEdge(hist->GetXaxis()->GetFirst());
+        xMax = hist->GetXaxis()->GetBinUpEdge(hist->GetXaxis()->GetLast());
+    }
+
+    TLine *zeroLine = new TLine(xMin, 0.0, xMax, 0.0);
+    zeroLine->SetLineColor(kGray + 2);
+    zeroLine->SetLineStyle(2); // dashed
+    zeroLine->SetLineWidth(2);
+    zeroLine->Draw("same");
+    listOfObjectsDrawnOnScreen.Add(zeroLine);
+
+    pad->Modified();
+    pad->Update();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+
+    CommandPrompt::getInstance()->appendPlainText("Zero-level baseline line drawn (MZ).\n");
+}
+
+//==============================================================================
+// QMainCanvas::deleteNearestGaussMarker
+//==============================================================================
+// Locates and deletes the Gaussian peak marker closest to the cursor position (shortcut: '-').
+//==============================================================================
+void QMainCanvas::deleteNearestGaussMarker(Int_t x, Int_t y)
+{
+    if (gauss_markers.empty()) {
+        CommandPrompt::getInstance()->appendPlainText("No Gaussian peak centroid markers to delete (-).\n");
+        return;
+    }
+
+    int binX = getBinFromClick(x, y);
+    auto closestIt = gauss_markers.begin();
+    int minDiff = std::abs(*closestIt - binX);
+
+    for (auto it = gauss_markers.begin(); it != gauss_markers.end(); ++it) {
+        int diff = std::abs(*it - binX);
+        if (diff < minDiff) {
+            minDiff = diff;
+            closestIt = it;
+        }
+    }
+
+    int deletedBin = *closestIt;
+    gauss_markers.erase(closestIt);
+
+    clearDrawnObjects();
+    showGaussMarkers();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+
+    CommandPrompt::getInstance()->appendPlainText(QString("Deleted nearest Gauss marker at channel %1 (-).\n").arg(deletedBin));
+}
+
 #include <QInputDialog>
 #include <QMessageBox>
 

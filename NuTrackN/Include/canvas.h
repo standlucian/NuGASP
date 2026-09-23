@@ -234,6 +234,12 @@ signals:
    void requestSetYMin(double);
    void requestCTCalibration();
    void requestATCalibration();
+   void requestDeleteZJMarkers();
+   void requestDeleteZVMarkers();
+   void requestDrawZeroLine();
+   void requestShiftDisplayLeft75();
+   void requestShiftDisplayRight75();
+   void requestDeleteNearestGaussMarker(Int_t, Int_t);
 };
 
 struct PeakParamState {
@@ -322,6 +328,10 @@ public slots:
    void showAllMarkers();
    void showMJMarkers();
    void showMVMarkers();
+   void deleteZJMarkers();
+   void deleteZVMarkers();
+   void drawZeroLine();
+   void deleteNearestGaussMarker(Int_t, Int_t);
    void quickEnergyCalibration();
    void showMatrixProjection();
    void addRangeMarker(Int_t, Int_t);
@@ -347,6 +357,8 @@ public slots:
    void autoIntegrationAtCursor(Int_t x, Int_t y);
    void translateplusTheScreen();
    void translateminusTheScreen();
+   void shiftDisplayLeft75();
+   void shiftDisplayRight75();
    void translatedownTheScreen();
    void translateupTheScreen();
    void zoomOut();

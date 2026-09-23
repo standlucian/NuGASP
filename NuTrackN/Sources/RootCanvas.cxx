@@ -702,8 +702,9 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // C + J: Integration with linear background subtraction
                 emit requestIntegrationWithBackground();
                 break;
+            case Qt::Key_G:
             case Qt::Key_V:
-                // C + V: Gaussian multi-peak fit over marked region
+                // C + G or C + V: Gaussian multi-peak fit over marked region
                 emit requestFitGauss();
                 break;
             case Qt::Key_P:
@@ -758,6 +759,14 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_A:
                 // Z + A: Delete all active markers
                 emit requestDeleteAllMarkers();
+                break;
+            case Qt::Key_J:
+                // Z + J: Delete Background and Integral markers
+                emit requestDeleteZJMarkers();
+                break;
+            case Qt::Key_V:
+                // Z + V: Delete Background, Range, and Gauss markers
+                emit requestDeleteZVMarkers();
                 break;
             case Qt::Key_Z:
                 // Redundant Z press: cancel prefix
@@ -820,6 +829,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // M + N: Set load behavior to Preserve Scale
                 if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
                 CommandPrompt::getInstance()->appendPlainText("Display behavior: Preserve Scale on new spectrum.\n");
+                break;
+            case Qt::Key_Z:
+                // M + Z: Draw a line at zero counts
+                emit requestDrawZeroLine();
                 break;
             default:
                 std::cout << "Waited for show command after M was pressed but no valid command arrived after it" << std::endl;
@@ -1003,6 +1016,24 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_W:
                 // 'W': Place coincidence gate boundary marker at cursor
                 emit addGateMarkerRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_Less:
+            case Qt::Key_Comma:
+                // '<' or ',': Shift spectrum view 3/4 (75%) to Left
+                emit requestShiftDisplayLeft75();
+                break;
+            case Qt::Key_Greater:
+            case Qt::Key_Period:
+                // '>' or '.': Shift spectrum view 3/4 (75%) to Right
+                emit requestShiftDisplayRight75();
+                break;
+            case Qt::Key_Plus:
+                // '+': Add peak marker at cursor (same as 'G')
+                emit requestAddGaussMarker(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_Minus:
+                // '-': Delete nearest peak marker to cursor
+                emit requestDeleteNearestGaussMarker(xMousePosition, yMousePosition);
                 break;
             default:
                 QWidget::keyPressEvent(event);
