@@ -1552,25 +1552,60 @@ void QMainCanvas::printPlot()
 //==============================================================================
 void QMainCanvas::setYMax(double yVal)
 {
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
+
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist && canvas && canvas->getCanvas()) {
-        int bin = getBinFromClick(0, yVal); // dummy x
-        double yCursor = yVal; // Wait, getBinFromClick takes mouse coords and transforms them.
-        
         // Convert mouse coordinate Y to pad coordinate
         TVirtualPad *pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        if (!pad) pad = canvas->getCanvas();
         if (!pad) return;
-        
-        // Find the y-value at the cursor
-        Double_t yCursorVal = pad->AbsPixeltoY(static_cast<Int_t>(yVal));
-        if (pad->GetLogy()) {
-            yCursorVal = std::pow(10.0, yCursorVal);
+
+        pad->cd();
+        Double_t yCursorVal = pad->PadtoY(pad->AbsPixeltoY(static_cast<Int_t>(yVal)));
+        const bool isLog = (pad->GetLogy() != 0);
+
+        if (isLog && yCursorVal <= 0.0) {
+            yCursorVal = 1.0;
         }
-        
+
+        double curMin = hist->GetMinimum();
+        if (curMin == -1111.0 || (isLog && curMin <= 0.0)) {
+            curMin = isLog ? 0.5 : 0.0;
+        }
+        if (yCursorVal <= curMin) {
+            curMin = isLog ? std::max(0.1, yCursorVal * 0.1) : 0.0;
+            if (yCursorVal <= curMin) {
+                yCursorVal = curMin + 10.0;
+            }
+        }
+
+        hist->GetYaxis()->SetRangeUser(curMin, yCursorVal);
         hist->SetMaximum(yCursorVal);
+        hist->SetMinimum(curMin);
+
+        for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->GetYaxis()->SetRangeUser(curMin, yCursorVal);
+            overlay->SetMaximum(yCursorVal);
+            overlay->SetMinimum(curMin);
+        }
+
+        ColorTheFrameOfTheHistogram();
+        renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+        renderPeakLabels(SelectedElement_i, SelectedElement_j);
         pad->Modified();
         pad->Update();
-        CommandPrompt::getInstance()->appendPlainText(QString("Y-Max forced to %1\n").arg(yCursorVal));
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+        updateAxisStatusLabels();
+        if (canvas) {
+            canvas->setFocus();
+        }
+
+        CommandPrompt::getInstance()->appendPlainText(QString("Y-Max forced to %1 (FO)\n").arg(yCursorVal));
     }
 }
 
@@ -1579,19 +1614,52 @@ void QMainCanvas::setYMax(double yVal)
 //==============================================================================
 void QMainCanvas::setYMin(double yVal)
 {
+    IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
+
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist && canvas && canvas->getCanvas()) {
         TVirtualPad *pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        if (!pad) pad = canvas->getCanvas();
         if (!pad) return;
-        
-        Double_t yCursorVal = pad->AbsPixeltoY(static_cast<Int_t>(yVal));
-        if (pad->GetLogy()) {
-            yCursorVal = std::pow(10.0, yCursorVal);
+
+        pad->cd();
+        Double_t yCursorVal = pad->PadtoY(pad->AbsPixeltoY(static_cast<Int_t>(yVal)));
+        const bool isLog = (pad->GetLogy() != 0);
+
+        if (isLog && yCursorVal <= 0.0) {
+            yCursorVal = 0.5;
         }
-        
+
+        double curMax = hist->GetMaximum();
+        if (curMax <= yCursorVal || curMax == -1111.0) {
+            curMax = isLog ? yCursorVal * 10.0 : yCursorVal + 10.0;
+        }
+
+        hist->GetYaxis()->SetRangeUser(yCursorVal, curMax);
         hist->SetMinimum(yCursorVal);
+        hist->SetMaximum(curMax);
+
+        for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->GetYaxis()->SetRangeUser(yCursorVal, curMax);
+            overlay->SetMinimum(yCursorVal);
+            overlay->SetMaximum(curMax);
+        }
+
+        ColorTheFrameOfTheHistogram();
+        renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+        renderPeakLabels(SelectedElement_i, SelectedElement_j);
         pad->Modified();
         pad->Update();
-        CommandPrompt::getInstance()->appendPlainText(QString("Y-Min forced to %1\n").arg(yCursorVal));
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+        updateAxisStatusLabels();
+        if (canvas) {
+            canvas->setFocus();
+        }
+
+        CommandPrompt::getInstance()->appendPlainText(QString("Y-Min forced to %1 (FU)\n").arg(yCursorVal));
     }
 }

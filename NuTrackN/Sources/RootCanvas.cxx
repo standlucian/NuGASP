@@ -587,10 +587,17 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         m_mainCanvas->peakSearchParamsDialog->hide();
     }
 
+    // Always keep mouse coordinates fresh on any key press
+    QPoint curPos = mapFromGlobal(QCursor::pos());
+    if (rect().contains(curPos)) {
+        xMousePosition = curPos.x();
+        yMousePosition = curPos.y();
+        emit mousePilgrimCoordRequest(xMousePosition, yMousePosition);
+    }
+
     if (event->key() == Qt::Key_Control) {
         controlKeyIsPressed = true;
-        QPoint localPos = mapFromGlobal(QCursor::pos());
-        updateZoomHUD(localPos.x(), localPos.y());
+        updateZoomHUD(xMousePosition, yMousePosition);
         return;
     }
     
@@ -843,6 +850,8 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 emit requestSetYMin(yMousePosition);
                 break;
             default:
+                std::cout << "Waited for command after F was pressed but no valid command arrived" << std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for command after F was pressed (valid: F, S, X, Y, O, U)\n");
                 break;
         }
         fKeyWasPressed = false;
