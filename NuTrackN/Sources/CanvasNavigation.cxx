@@ -773,3 +773,90 @@ void QMainCanvas::adjustAxisRange(const QString &axisName, bool increase, bool f
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
 }
+
+#include <QInputDialog>
+
+//==============================================================================
+// QMainCanvas::zoomAroundCursor
+//==============================================================================
+// Triggered by 'X'. Zooms around the current cursor position, maintaining
+// the current zoom width if possible, or defaulting to a window if fully unzoomed.
+//==============================================================================
+void QMainCanvas::zoomAroundCursor(Int_t x, Int_t y)
+{
+    int binX = getBinFromClick(x, y);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+    
+    TAxis *xAxis = hist->GetXaxis();
+    int currentMin = xAxis->GetFirst();
+    int currentMax = xAxis->GetLast();
+    int width = currentMax - currentMin;
+    
+    if (width >= xAxis->GetNbins() - 2) {
+        width = 200; // Default zoom window width if fully unzoomed
+    }
+    
+    int newMin = std::max(1, binX - width / 2);
+    int newMax = std::min(xAxis->GetNbins(), binX + width / 2);
+    
+    xAxis->SetRange(newMin, newMax);
+    adjustYAxisToVisibleMax(hist);
+    
+    ColorTheFrameOfTheHistogram();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    updateAxisStatusLabels();
+}
+
+//==============================================================================
+// QMainCanvas::goToEnergy
+//==============================================================================
+// Triggered by 'P'. Prompts user for energy, converts to channel using
+// active calibration, and zooms around that channel.
+//==============================================================================
+void QMainCanvas::goToEnergy()
+{
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    bool ok;
+    double val = QInputDialog::getDouble(this, tr("Go To Energy/Channel"),
+                                         tr("Enter energy or channel:"),
+                                         0, 0, 100000, 2, &ok);
+    if (!ok) return;
+
+    int targetBin = 0;
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
+    if (trackHist && trackHist->IsCalibrated()) {
+        targetBin = trackHist->EnergyToChannel(val);
+    } else {
+        targetBin = static_cast<int>(std::round(val));
+    }
+    
+    // Validate bounds
+    TAxis *xAxis = hist->GetXaxis();
+    if (targetBin < 1) targetBin = 1;
+    if (targetBin > xAxis->GetNbins()) targetBin = xAxis->GetNbins();
+
+    int currentMin = xAxis->GetFirst();
+    int currentMax = xAxis->GetLast();
+    int width = currentMax - currentMin;
+    
+    if (width >= xAxis->GetNbins() - 2) {
+        width = 200; // Default zoom window width if fully unzoomed
+    }
+    
+    int newMin = std::max(1, targetBin - width / 2);
+    int newMax = std::min(xAxis->GetNbins(), targetBin + width / 2);
+    
+    xAxis->SetRange(newMin, newMax);
+    adjustYAxisToVisibleMax(hist);
+    
+    ColorTheFrameOfTheHistogram();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+    updateAxisStatusLabels();
+}

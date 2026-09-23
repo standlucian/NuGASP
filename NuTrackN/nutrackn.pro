@@ -47,7 +47,8 @@ HEADERS += \
     Include/TrackFitDialog.h \
     Include/complib.h \
     Include/MatrixReader.h \
-    Include/MatrixDialog.h
+    Include/MatrixDialog.h \
+    Include/IntegralDialog.h
 
 # Project source files
 SOURCES += \
@@ -69,6 +70,7 @@ SOURCES += \
     Sources/TrackFitDialog.cxx \
     Sources/complib.c \
     Sources/MatrixReader.cxx \
-    Sources/MatrixDialog.cxx
+    Sources/MatrixDialog.cxx \
+    Sources/IntegralDialog.cxx
 
 

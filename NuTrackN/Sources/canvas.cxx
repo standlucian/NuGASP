@@ -421,12 +421,15 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     // 5. Connect user interaction signals from canvas to analysis slots
     connect(canvas, &QRootCanvas::requestIntegrationNoBackground, this, &QMainCanvas::areaFunction);
-    connect(canvas, &QRootCanvas::requestIntegrationWithBackground, this, &QMainCanvas::areaFunctionWithBackground);
+    connect(canvas, &QRootCanvas::requestIntegrationWithBackground, this, [this]() { areaFunctionWithBackground(true); });
     connect(canvas, &QRootCanvas::autoFitRequested, this, &QMainCanvas::autoFit);
     connect(canvas, &QRootCanvas::requestClearTheScreen, this, &QMainCanvas::clearTheScreen);
     connect(canvas, &QRootCanvas::addBackgroundMarkerRequested, this, &QMainCanvas::addBackgroundMarker);
     connect(canvas, &QRootCanvas::addIntegralMarkerRequested, this, &QMainCanvas::addIntegralMarker);
     connect(canvas, &QRootCanvas::showXY, this, &QMainCanvas::showXYcoord);
+    connect(canvas, &QRootCanvas::requestGoToEnergy, this, &QMainCanvas::goToEnergy);
+    connect(canvas, &QRootCanvas::requestZoomAroundCursor, this, &QMainCanvas::zoomAroundCursor);
+    connect(canvas, &QRootCanvas::requestAutoIntegration, this, &QMainCanvas::autoIntegrationAtCursor);
     connect(canvas, &QRootCanvas::requestZoomTheScreen, this, &QMainCanvas::zoomTheScreen);
     connect(canvas, &QRootCanvas::requesttranslateplusTheScreen, this, &QMainCanvas::translateplusTheScreen);
     connect(canvas, &QRootCanvas::requesttranslateminusTheScreen, this, &QMainCanvas::translateminusTheScreen);
@@ -443,6 +446,11 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestShowBackgroundMarkers, this, &QMainCanvas::showBackgroundMarkers);
     connect(canvas, &QRootCanvas::requestShowIntegralMarkers, this, &QMainCanvas::showIntegralMarkers);
     connect(canvas, &QRootCanvas::requestShowAllMarkers, this, &QMainCanvas::showAllMarkers);
+    connect(canvas, &QRootCanvas::requestMJMarkers, this, &QMainCanvas::showMJMarkers);
+    connect(canvas, &QRootCanvas::requestMVMarkers, this, &QMainCanvas::showMVMarkers);
+    connect(canvas, &QRootCanvas::requestQuickCalibration, this, &QMainCanvas::quickEnergyCalibration);
+    connect(canvas, &QRootCanvas::requestMatrixProjection, this, &QMainCanvas::showMatrixProjection);
+    connect(canvas, &QRootCanvas::requestFitBackground, this, [this]() { fitBackgroundHelper(this); });
     connect(canvas, &QRootCanvas::addSpaceBarMarkerRequested, this, &QMainCanvas::addSpaceBarMarker);
     connect(canvas, &QRootCanvas::requestAddRangeMarker, this, &QMainCanvas::addRangeMarker);
     connect(canvas, &QRootCanvas::requestDeleteRangeMarkers, this, &QMainCanvas::deleteRangeMarkers);
@@ -460,6 +468,16 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestShowPeakMarkers, this, &QMainCanvas::showPeakMarkers);
     connect(canvas, &QRootCanvas::requestEnCalDialog, this, &QMainCanvas::openEnCalDialog);
     connect(canvas, &QRootCanvas::requestTrackFitDialog, this, &QMainCanvas::openTrackFitDialog);
+    connect(canvas, &QRootCanvas::requestCTCalibration, this, &QMainCanvas::openTrackFitDialog);
+    connect(canvas, &QRootCanvas::requestATCalibration, this, &QMainCanvas::executeATCalibration);
+    
+    // File I/O
+    connect(canvas, &QRootCanvas::requestOpenSpectrumDialog, this, &QMainCanvas::clicked1);
+    connect(canvas, &QRootCanvas::requestExportSpectrumDialog, this, &QMainCanvas::clickedW);
+    connect(canvas, &QRootCanvas::requestPrintPlot, this, &QMainCanvas::printPlot);
+    connect(canvas, &QRootCanvas::requestSetYMax, this, &QMainCanvas::setYMax);
+    connect(canvas, &QRootCanvas::requestSetYMin, this, &QMainCanvas::setYMin);
+
     connect(canvas, &QRootCanvas::requestHelp, this, &QMainCanvas::offerHelp);
     connect(canvas, &QRootCanvas::requestToggleLogY, this, &QMainCanvas::toggleLogY);
     connect(canvas, &QRootCanvas::killSwitch, qApp, &QCoreApplication::quit);
@@ -611,6 +629,16 @@ void QMainCanvas::clicked1()
         }
         return;
     }
+    
+    double prevXMin = 0, prevXMax = 0, prevYMin = 0, prevYMax = 0;
+    bool hasPrevScale = false;
+    if (m_loadBehavior == LoadBehavior::PreserveScale && trackHist->GetXaxis()) {
+        prevXMin = trackHist->GetXaxis()->GetFirst();
+        prevXMax = trackHist->GetXaxis()->GetLast();
+        prevYMin = trackHist->GetMinimum();
+        prevYMax = trackHist->GetMaximum();
+        hasPrevScale = true;
+    }
 
     SpectrumImportDialog importDlg(fileName, this);
     if (importDlg.exec() != QDialog::Accepted) {
@@ -657,17 +685,26 @@ void QMainCanvas::clicked1()
     }
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
-    // If zoom markers are present, preserve the zoomed region and adjust Ymax
-    int i = zoom_markers.size();
-    if (i >= 2) {
-        if (zoom_markers[i - 2] < zoom_markers[i - 1]) {
-            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
-                zoom_markers[i - 2], zoom_markers[i - 1]);
-        } else if (zoom_markers[i - 1] < zoom_markers[i - 2]) {
-            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
-                zoom_markers[i - 1], zoom_markers[i - 2]);
+    if (m_loadBehavior == LoadBehavior::PreserveScale && hasPrevScale) {
+        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
+            trackHist->GetXaxis()->GetBinLowEdge(prevXMin), 
+            trackHist->GetXaxis()->GetBinUpEdge(prevXMax));
+        HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYMin);
+        HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYMax);
+    } else {
+        // Autoscale behavior
+        // If zoom markers are present, preserve the zoomed region and adjust Ymax
+        int i = zoom_markers.size();
+        if (i >= 2) {
+            if (zoom_markers[i - 2] < zoom_markers[i - 1]) {
+                HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
+                    zoom_markers[i - 2], zoom_markers[i - 1]);
+            } else if (zoom_markers[i - 1] < zoom_markers[i - 2]) {
+                HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
+                    zoom_markers[i - 1], zoom_markers[i - 2]);
+            }
+            adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
         }
-        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
     }
 
     selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
@@ -787,6 +824,22 @@ void QMainCanvas::clickedW()
 void QMainCanvas::onSpectrumIncrement()
 {
     stepSpectrumIndex(+1, false);
+}
+
+//==============================================================================
+// QMainCanvas::executeATCalibration
+//==============================================================================
+void QMainCanvas::executeATCalibration()
+{
+    // Auto trackfit calibration
+    if (range_markers.size() < 2) {
+        CommandPrompt::getInstance()->appendPlainText("Error: AT calibration requires at least 2 range markers.\n");
+        return;
+    }
+    
+    // Simulate auto trackfit by opening dialog and auto-triggering it (or directly triggering it if we had the backend logic)
+    // For now we will open the dialog, but we could bypass it.
+    openTrackFitDialog();
 }
 
 void QMainCanvas::onSpectrumDecrement()
@@ -1445,4 +1498,100 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
     }
 
     updateAxisStatusLabels();
+}
+
+#include "IntegralDialog.h"
+
+//==============================================================================
+// QMainCanvas::openIntegralDialog
+//==============================================================================
+void QMainCanvas::openIntegralDialog()
+{
+    if (!m_integralDialog) {
+        m_integralDialog = new IntegralDialog(this, this);
+    }
+    m_integralDialog->updateFromCanvas();
+    
+    // Position at the top right of the main canvas
+    m_integralDialog->move(this->mapToGlobal(QPoint(this->width() - m_integralDialog->sizeHint().width() - 40, 40)));
+    
+    m_integralDialog->show();
+}
+
+//==============================================================================
+// QMainCanvas::closeIntegralDialog
+//==============================================================================
+void QMainCanvas::closeIntegralDialog()
+{
+    if (m_integralDialog) {
+        m_integralDialog->hide();
+    }
+}
+
+//==============================================================================
+// QMainCanvas::printPlot
+//==============================================================================
+void QMainCanvas::printPlot()
+{
+    QString selectedFilter = tr("PDF Files (*.pdf)");
+    QString fileName = QFileDialog::getSaveFileName(
+        this, tr("Save Plot as Postscript/PDF"), QString(),
+        tr("PDF Files (*.pdf);;Postscript (*.ps);;PNG Image (*.png)"),
+        &selectedFilter);
+
+    if (fileName.isEmpty()) return;
+    
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->SaveAs(fileName.toStdString().c_str());
+        CommandPrompt::getInstance()->appendPlainText("Plot saved to " + fileName + "\n");
+    }
+}
+
+//==============================================================================
+// QMainCanvas::setYMax
+//==============================================================================
+void QMainCanvas::setYMax(double yVal)
+{
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist && canvas && canvas->getCanvas()) {
+        int bin = getBinFromClick(0, yVal); // dummy x
+        double yCursor = yVal; // Wait, getBinFromClick takes mouse coords and transforms them.
+        
+        // Convert mouse coordinate Y to pad coordinate
+        TVirtualPad *pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        if (!pad) return;
+        
+        // Find the y-value at the cursor
+        Double_t yCursorVal = pad->AbsPixeltoY(static_cast<Int_t>(yVal));
+        if (pad->GetLogy()) {
+            yCursorVal = std::pow(10.0, yCursorVal);
+        }
+        
+        hist->SetMaximum(yCursorVal);
+        pad->Modified();
+        pad->Update();
+        CommandPrompt::getInstance()->appendPlainText(QString("Y-Max forced to %1\n").arg(yCursorVal));
+    }
+}
+
+//==============================================================================
+// QMainCanvas::setYMin
+//==============================================================================
+void QMainCanvas::setYMin(double yVal)
+{
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (hist && canvas && canvas->getCanvas()) {
+        TVirtualPad *pad = canvas->getCanvas()->GetPad((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        if (!pad) return;
+        
+        Double_t yCursorVal = pad->AbsPixeltoY(static_cast<Int_t>(yVal));
+        if (pad->GetLogy()) {
+            yCursorVal = std::pow(10.0, yCursorVal);
+        }
+        
+        hist->SetMinimum(yCursorVal);
+        pad->Modified();
+        pad->Update();
+        CommandPrompt::getInstance()->appendPlainText(QString("Y-Min forced to %1\n").arg(yCursorVal));
+    }
 }

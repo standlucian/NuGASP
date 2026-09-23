@@ -146,7 +146,7 @@ public:
 protected:
    TCanvas        *fCanvas;
    Double_t       xMousePosition, yMousePosition;
-   bool           controlKeyIsPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed, sKeyWasPressed, dKeyWasPressed;
+   bool           controlKeyIsPressed, aKeyWasPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed, sKeyWasPressed, dKeyWasPressed, oKeyWasPressed;
    QZoomHUD       *m_zoomHUD;
    QMainCanvas    *m_mainCanvas;
 
@@ -168,6 +168,9 @@ signals:
    void requestTrackFitDialog();
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
+   void requestGoToEnergy();
+   void requestZoomAroundCursor(Int_t, Int_t);
+   void requestAutoIntegration(Int_t, Int_t);
    void autoFitRequested(int, int);
    void requestClearTheScreen();
    void addBackgroundMarkerRequested(Int_t, Int_t);
@@ -211,6 +214,11 @@ signals:
     void requestHelp();
     void requestToggleLogY();
    void killSwitch();
+   void requestMJMarkers();
+   void requestMVMarkers();
+   void requestQuickCalibration();
+   void requestMatrixProjection();
+   void requestFitBackground();
    void mousePilgrimCoordRequest(Double_t , Double_t );
    void mouseLeftClickCoordRequest(Double_t , Double_t );
    void AddLineRequest();
@@ -219,6 +227,13 @@ signals:
    void DeleteCulomnRequest();
    void RefreshScreenRequest();
    void showXY(Double_t , Double_t);
+   void requestOpenSpectrumDialog();
+   void requestExportSpectrumDialog();
+   void requestPrintPlot();
+   void requestSetYMax(double);
+   void requestSetYMin(double);
+   void requestCTCalibration();
+   void requestATCalibration();
 };
 
 struct PeakParamState {
@@ -242,6 +257,7 @@ struct PeakUIControls {
 };
 
 struct DetectedPeak;
+class IntegralDialog;
 
 class QMainCanvas : public QWidget
 {
@@ -253,8 +269,14 @@ class QMainCanvas : public QWidget
    friend void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks);
    friend void showPeakSearchParamsDialog(QMainCanvas *mainCanvas, double sigma, double threshold, const std::vector<DetectedPeak> &peaks, double xMin, double xMax);
    friend class QRootCanvas;
+   friend class IntegralDialog;
 
 public:
+    enum class LoadBehavior {
+        Autoscale,
+        PreserveScale
+    };
+
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas();
    virtual void changeEvent(QEvent * e);
@@ -286,7 +308,7 @@ public slots:
    void clicked1();
    void clickedW();
    void areaFunction();
-   void areaFunctionWithBackground();
+   void areaFunctionWithBackground(bool openDialog = true);
    void handle_root_events();
    void autoFit(int, int);
    void clearTheScreen();
@@ -298,6 +320,10 @@ public slots:
    void showBackgroundMarkers();
    void showIntegralMarkers();
    void showAllMarkers();
+   void showMJMarkers();
+   void showMVMarkers();
+   void quickEnergyCalibration();
+   void showMatrixProjection();
    void addRangeMarker(Int_t, Int_t);
    void deleteRangeMarkers();
    void showRangeMarkers();
@@ -316,6 +342,9 @@ public slots:
     void transferPeaksToGaussMarkers();
     void Cal2pMain();
    void zoomTheScreen();
+   void goToEnergy();
+   void zoomAroundCursor(Int_t x, Int_t y);
+   void autoIntegrationAtCursor(Int_t x, Int_t y);
    void translateplusTheScreen();
    void translateminusTheScreen();
    void translatedownTheScreen();
@@ -358,7 +387,16 @@ public slots:
     // Energy calibration dialogs
     void openEnCalDialog();
     void openTrackFitDialog();
+    void executeATCalibration();
+    void openIntegralDialog();
+    void closeIntegralDialog();
     void onDirectAutoTrace();
+    
+    // File & I/O methods
+    void printPlot();
+    void setYMax(double yVal);
+    void setYMin(double yVal);
+    void setLoadBehavior(LoadBehavior behavior) { m_loadBehavior = behavior; }
 
     // GASPware Compressed Matrix slots
     void onOpenCMClicked();
@@ -418,6 +456,8 @@ protected:
       //Tline *backgroundLine;
       QLabel *labelX = nullptr;
       QLabel *labelY = nullptr;
+      
+      IntegralDialog *m_integralDialog = nullptr;
 
       // Xtrackn top status header labels
       QLabel *labelXMin = nullptr;
@@ -479,6 +519,8 @@ protected:
     std::vector<PeakParamState> m_peakFixedStates;
 
     // Multi-spectrum file state
+    LoadBehavior   m_loadBehavior{LoadBehavior::Autoscale};
+    
     QString        m_currentSpectrumFile;
     QString        m_currentOutputFile;
     int            m_currentSpectrumIndex{0};

@@ -55,6 +55,10 @@ struct IntegratedPeak {
     int index{0};
     Double_t centroid{0.0};
     Double_t centroidError{0.0};
+    Double_t grossArea{0.0};
+    Double_t grossAreaError{0.0};
+    Double_t bgArea{0.0};
+    Double_t bgAreaError{0.0};
     Double_t area{0.0};
     Double_t areaError{0.0};
     Double_t fwhm{0.0};

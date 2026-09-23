@@ -227,6 +227,11 @@ void integral_function(TH1F* histogram,
         Double_t xd2 = 0.0;
         Double_t xd4 = 0.0;
 
+        Double_t xGross0 = 0.0;
+        Double_t xBg0 = 0.0;
+        Double_t xdGross0 = 0.0;
+        Double_t xdBg0 = 0.0;
+
         for (Int_t bin = leftBin; bin <= rightBin; ++bin) {
             const Double_t w = bin - midBin;
             const Double_t y = histogram->GetBinContent(bin);
@@ -234,12 +239,17 @@ void integral_function(TH1F* histogram,
 
             Double_t yNet = y;
             Double_t varNet = varY;
+            xGross0 += y;
+            xdGross0 += varY;
 
             if (hasBackground) {
                 const Double_t bg = slope * bin + addition;
                 yNet -= bg;
                 const Double_t varBg = std::max(bg, 0.0);
                 varNet += varBg; // Net variance = Var(Gross) + Var(Background)
+                
+                xBg0 += bg;
+                xdBg0 += varBg;
             }
 
             xc0 += yNet;
@@ -338,6 +348,10 @@ void integral_function(TH1F* histogram,
             p.index = peakIndex;
             p.centroid = centroid;
             p.centroidError = centroidError;
+            p.grossArea = xGross0;
+            p.grossAreaError = std::sqrt(std::max(xdGross0, 0.0));
+            p.bgArea = xBg0;
+            p.bgAreaError = std::sqrt(std::max(xdBg0, 0.0));
             p.area = area;
             p.areaError = areaError;
             p.fwhm = fwhm;

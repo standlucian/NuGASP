@@ -227,39 +227,66 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
 
     Double_t minimum = mainCanvas->maxValueInHistogram;
 
-    // Temporary histogram accumulating background intervals
-    TracknHistogram tempHist("tempHist", "", 10240, 0, 10240);
+    // Analytical Least Squares Fit (avoids TH1::Fit artifacts with zero bins)
+    Double_t S1 = 0.0, SX = 0.0, SXX = 0.0, SY = 0.0, SXY = 0.0;
     for (std::size_t i = 0; i < mainCanvas->background_markers.size() / 2; ++i) {
         const Int_t start  = mainCanvas->background_markers[2 * i];
         const Int_t finish = mainCanvas->background_markers[2 * i + 1];
         for (Int_t j = start; j <= finish; ++j) {
-            tempHist.AddBinContent(j, activeHist->GetBinContent(j));
+            Double_t xx = j; // Use exact bin
+            Double_t yy = activeHist->GetBinContent(j);
+            Double_t ei = 1.0; // In trackn.F: 1./ERR2(jj). We use uniform weighting for simplicity, or 1/max(yy,1)
+            if (yy > 0) ei = 1.0 / yy; // Poisson weighting
+            S1 += ei;
+            SX += xx * ei;
+            SXX += xx * xx * ei;
+            SY += yy * ei;
+            SXY += xx * yy * ei;
         }
+    }
 
-        const Double_t localMin = findMinValueInInterval(activeHist, start, finish);
-        if (localMin < minimum) {
-            minimum = localMin;
-        }
+    Double_t deter = S1 * SXX - SX * SX;
+    if (deter > 0.0) {
+        mainCanvas->backgroundA0 = (SXX * SY - SX * SXY) / deter; // Intercept
+        mainCanvas->backgroundA1 = (S1 * SXY - SX * SY) / deter;  // Slope
+    } else {
+        mainCanvas->backgroundA0 = minimum;
+        mainCanvas->backgroundA1 = 0.0;
+    }
+
+    if (mainCanvas->backgroundFunction) {
+        delete mainCanvas->backgroundFunction;
+    }
+    if (mainCanvas->background) {
+        delete mainCanvas->background;
     }
 
     mainCanvas->background = new TFormula("background", "[0]*x+[1]");
     mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", 0, 10240);
-    mainCanvas->backgroundFunction->SetParameter(0, 0.0);
-    mainCanvas->backgroundFunction->SetParameter(1, minimum);
-
-    TFitResultPtr fitResult = tempHist.Fit(mainCanvas->backgroundFunction, "QMSW", "same");
-
-    mainCanvas->backgroundA0 = mainCanvas->backgroundFunction->GetParameter(1);
-    mainCanvas->backgroundA1 = mainCanvas->backgroundFunction->GetParameter(0);
-
-    const Double_t r0 = mainCanvas->range_markers[0];
-    const Double_t r1 = mainCanvas->range_markers[1];
-    mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0, r1);
-    mainCanvas->backgroundIntegralError = mainCanvas->backgroundFunction->IntegralError(
-        r0, r1, fitResult->GetParams(), fitResult->GetCovarianceMatrix().GetMatrixArray());
+    mainCanvas->backgroundFunction->SetParameter(0, mainCanvas->backgroundA1);
+    mainCanvas->backgroundFunction->SetParameter(1, mainCanvas->backgroundA0);
 
     delete mainCanvas->backgroundCovarianceMatrix;
-    mainCanvas->backgroundCovarianceMatrix = new TMatrixD(fitResult->GetCovarianceMatrix());
+    mainCanvas->backgroundCovarianceMatrix = new TMatrixD(2, 2);
+    if (deter > 0.0) {
+        (*mainCanvas->backgroundCovarianceMatrix)(0,0) = S1 / deter; // Var(Slope)
+        (*mainCanvas->backgroundCovarianceMatrix)(1,1) = SXX / deter; // Var(Intercept)
+        (*mainCanvas->backgroundCovarianceMatrix)(0,1) = -SX / deter; // Cov
+        (*mainCanvas->backgroundCovarianceMatrix)(1,0) = -SX / deter;
+    }
+
+    if (mainCanvas->range_markers.size() >= 2) {
+        const Double_t r0 = mainCanvas->range_markers[0];
+        const Double_t r1 = mainCanvas->range_markers[1];
+        mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0, r1);
+        
+        Double_t params[2] = {mainCanvas->backgroundA1, mainCanvas->backgroundA0};
+        mainCanvas->backgroundIntegralError = mainCanvas->backgroundFunction->IntegralError(
+            r0, r1, params, mainCanvas->backgroundCovarianceMatrix->GetMatrixArray());
+    } else {
+        mainCanvas->backgroundIntegral = 0.0;
+        mainCanvas->backgroundIntegralError = 0.0;
+    }
 
     // Draw background line on canvas
     const Double_t xStart = mainCanvas->background_markers[0] - 0.5;

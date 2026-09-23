@@ -1,8 +1,10 @@
+#include "IntegralDialog.h"
 #include "canvas.h"
 #include "Design.h"
 #include "Integral.h"
 #include "PeakFit.h"
 #include "tracknhistogram.h"
+#include "MatrixReader.h"
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -16,6 +18,7 @@
 #include <cmath>
 #include <algorithm>
 #include <vector>
+#include <QInputDialog>
 
 //==============================================================================
 // QMainCanvas::addSpaceBarMarker
@@ -115,7 +118,7 @@ void QMainCanvas::areaFunction()
 // if no background markers exist, gracefully falls back to gross peak integration.
 // Labels peak index above peak centroid on the canvas.
 //==============================================================================
-void QMainCanvas::areaFunctionWithBackground()
+void QMainCanvas::areaFunctionWithBackground(bool openDialog)
 {
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
@@ -171,9 +174,13 @@ void QMainCanvas::areaFunctionWithBackground()
         lbl->Draw("same");
         listOfObjectsDrawnOnScreen.Add(lbl);
     }
-
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+
+    // Show the interactive dialog to allow tweaking
+    if (openDialog) {
+        openIntegralDialog();
+    }
 }
 
 //==============================================================================
@@ -411,6 +418,8 @@ void QMainCanvas::showBackgroundMarkers()
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
 
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+
     for (std::size_t i = 0; i < background_markers.size(); ++i) {
         TLine *backgroundLine = new TLine(background_markers[i] - 0.5, 0.0,
                                           background_markers[i] - 0.5, yMax);
@@ -452,6 +461,8 @@ void QMainCanvas::showIntegralMarkers()
     if (!hist) return;
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
 
     for (std::size_t i = 0; i < integral_markers.size(); ++i) {
         TLine *integralLine = new TLine(integral_markers[i] - 0.5, 0.0,
@@ -564,6 +575,8 @@ void QMainCanvas::showRangeMarkers()
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
 
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+
     for (std::size_t i = 0; i < range_markers.size(); ++i) {
         TLine *rangeLine = new TLine(range_markers[i] - 0.5, 0.0,
                                      range_markers[i] - 0.5, yMax);
@@ -641,6 +654,8 @@ void QMainCanvas::showGaussMarkers()
     if (!hist) return;
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
+
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
 
     for (std::size_t i = 0; i < gauss_markers.size(); ++i) {
         TLine *gaussLine = new TLine(gauss_markers[i] - 0.5, 0.0,
@@ -739,6 +754,8 @@ void QMainCanvas::showGateMarkers()
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
 
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+
     for (std::size_t i = 0; i < gate_markers.size(); ++i) {
         TLine *gateLine = new TLine(gate_markers[i] - 0.5, 0.0,
                                     gate_markers[i] - 0.5, yMax);
@@ -771,4 +788,230 @@ void QMainCanvas::showGateMarkers()
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+}
+
+//==============================================================================
+// QMainCanvas::autoIntegrationAtCursor
+//==============================================================================
+// Triggered by 'A' then 'J'. Automatically finds the local peak maximum near
+// the cursor, walks down to the valleys to set background markers, and 
+// executes the area/integration calculation.
+//==============================================================================
+void QMainCanvas::autoIntegrationAtCursor(Int_t x, Int_t y)
+{
+    int binX = getBinFromClick(x, y);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    int searchWindow = 15; // Local max search window
+    int maxBin = binX;
+    double maxVal = hist->GetBinContent(binX);
+    
+    // Simple 3-point smoothing for finding the peak center
+    auto getSmoothed = [&](int b) {
+        if (b <= 1 || b >= hist->GetNbinsX()) return hist->GetBinContent(b);
+        return (hist->GetBinContent(b-1) + 2*hist->GetBinContent(b) + hist->GetBinContent(b+1)) / 4.0;
+    };
+
+    // 1. Find true local maximum
+    for (int b = std::max(1, binX - searchWindow); b <= std::min(hist->GetNbinsX(), binX + searchWindow); ++b) {
+        double val = getSmoothed(b);
+        if (val > maxVal) {
+            maxVal = val;
+            maxBin = b;
+        }
+    }
+
+    // 2. Legacy-style walk down to valleys
+    // We walk until the spectrum is concave-up (hit the tail) AND starts increasing,
+    // using statistical error (sqrt) to prevent stopping on noise.
+    int leftValley = maxBin - 1;
+    while (leftValley > 1) {
+        double vMinp = hist->GetBinContent(leftValley);
+        double vMinpPrev = hist->GetBinContent(leftValley - 1);
+        double vInpos = hist->GetBinContent(maxBin);
+        int midBin = (leftValley + maxBin) / 2;
+        double vMid = hist->GetBinContent(midBin);
+        
+        bool isConcaveUp = (vMinp + vInpos) > 2.0 * (vMid + 2.0 * std::sqrt(std::abs(vMid) + 1.0));
+        bool isIncreasing = vMinp < vMinpPrev;
+        
+        if (isConcaveUp && isIncreasing) {
+            break; 
+        }
+        leftValley--;
+        if (maxBin - leftValley > 40) break; // sanity limit
+    }
+
+    int rightValley = maxBin + 1;
+    while (rightValley < hist->GetNbinsX()) {
+        double vMaxp = hist->GetBinContent(rightValley);
+        double vMaxpNext = hist->GetBinContent(rightValley + 1);
+        double vInpos = hist->GetBinContent(maxBin);
+        int midBin = (rightValley + maxBin) / 2;
+        double vMid = hist->GetBinContent(midBin);
+        
+        bool isConcaveUp = (vMaxp + vInpos) > 2.0 * (vMid + 2.0 * std::sqrt(std::abs(vMid) + 1.0));
+        bool isIncreasing = vMaxp < vMaxpNext;
+        
+        if (isConcaveUp && isIncreasing) {
+            break;
+        }
+        rightValley++;
+        if (rightValley - maxBin > 40) break; // sanity limit
+    }
+
+    // Adjust in case of extremely narrow peak
+    if (maxBin - leftValley < 3) leftValley = maxBin - 3;
+    if (rightValley - maxBin < 3) rightValley = maxBin + 3;
+
+    // Clear old markers
+    background_markers.clear();
+    integral_markers.clear();
+    clearDrawnObjects();
+
+    // Calculate background width based on peak width (min 2 channels)
+    int peakWidth = rightValley - leftValley + 1;
+    int bgWidth = std::max(2, peakWidth / 5);
+
+    // Set background markers at valleys (two pairs: left region and right region)
+    background_markers.push_back(static_cast<Double_t>(leftValley - bgWidth + 1));
+    background_markers.push_back(static_cast<Double_t>(leftValley));
+    background_markers.push_back(static_cast<Double_t>(rightValley));
+    background_markers.push_back(static_cast<Double_t>(rightValley + bgWidth - 1));
+    
+    // Set integral markers inside the valleys
+    integral_markers.push_back(static_cast<Double_t>(leftValley));
+    integral_markers.push_back(static_cast<Double_t>(rightValley));
+
+    // Draw the markers visually
+    showBackgroundMarkers();
+    showIntegralMarkers();
+
+    // Execute integration with background (this will also open the dialog)
+    areaFunctionWithBackground();
+}
+
+//==============================================================================
+// QMainCanvas::showMJMarkers
+//==============================================================================
+void QMainCanvas::showMJMarkers()
+{
+    clearDrawnObjects();
+    showBackgroundMarkers();
+    showIntegralMarkers();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+//==============================================================================
+// QMainCanvas::showMVMarkers
+//==============================================================================
+void QMainCanvas::showMVMarkers()
+{
+    clearDrawnObjects();
+    showBackgroundMarkers();
+    showRangeMarkers();
+    showGaussMarkers();
+    canvas->getCanvas()->Modified();
+    canvas->getCanvas()->Update();
+}
+
+#include <QInputDialog>
+#include <QMessageBox>
+
+//==============================================================================
+// QMainCanvas::quickEnergyCalibration
+//==============================================================================
+void QMainCanvas::quickEnergyCalibration()
+{
+    if (range_markers.size() < 2) {
+        CommandPrompt::getInstance()->appendPlainText("Error: Quick calibration requires 2 range markers (use 'R').\n");
+        return;
+    }
+
+    // Sort markers to ensure left < right
+    std::vector<double> sortedMarkers = range_markers;
+    std::sort(sortedMarkers.begin(), sortedMarkers.end());
+    
+    // We only use the first two range markers.
+    int bin1 = sortedMarkers[0];
+    int bin2 = sortedMarkers[1];
+
+    TracknHistogram *hist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+    if (!hist) return;
+
+    // Snap to the local maximum within +/- 15 bins to ensure we hit the true peak centroid
+    int searchWindow = 15;
+    
+    auto findLocalMax = [&](int startBin) -> int {
+        int bestBin = startBin;
+        double maxVal = -1e9;
+        int minSearch = std::max(1, startBin - searchWindow);
+        int maxSearch = std::min(hist->GetNbinsX(), startBin + searchWindow);
+        for (int b = minSearch; b <= maxSearch; ++b) {
+            double val = hist->GetBinContent(b);
+            if (val > maxVal) {
+                maxVal = val;
+                bestBin = b;
+            }
+        }
+        return bestBin;
+    };
+
+    bin1 = findLocalMax(bin1);
+    bin2 = findLocalMax(bin2);
+
+    if (bin1 == bin2) {
+        CommandPrompt::getInstance()->appendPlainText("Error: Markers snapped to the same peak.\n");
+        return;
+    }
+
+    // Convert bin to 0-indexed channel (ROOT bin N corresponds to X-axis [N-1, N], center N-0.5. True channel = N - 1)
+    double ch1 = bin1 - 1.0;
+    double ch2 = bin2 - 1.0;
+
+    bool ok1, ok2;
+    double e1 = QInputDialog::getDouble(this, "Quick Calibration",
+                                        QString("Energy for peak at channel %1:").arg(ch1),
+                                        1173.238, 0, 100000, 3, &ok1);
+    if (!ok1) return;
+
+    double e2 = QInputDialog::getDouble(this, "Quick Calibration",
+                                        QString("Energy for peak at channel %1:").arg(ch2),
+                                        1332.513, 0, 100000, 3, &ok2);
+    if (!ok2) return;
+
+    if (e1 == e2) {
+        CommandPrompt::getInstance()->appendPlainText("Error: Energies must be different.\n");
+        return;
+    }
+
+    double slope = (e2 - e1) / (ch2 - ch1);
+    double intercept = e1 - slope * ch1;
+
+    if (hist) {
+        hist->SetCalibration(intercept, slope, 0.0);
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Calibration applied: A(0)=%1, A(1)=%2\n").arg(intercept).arg(slope)
+        );
+        clearTheScreen();
+    }
+}
+
+//==============================================================================
+// QMainCanvas::showMatrixProjection
+//==============================================================================
+void QMainCanvas::showMatrixProjection()
+{
+    if (!m_currentMatrix || !m_currentMatrix->isOpen()) {
+        CommandPrompt::getInstance()->appendPlainText("Error: No compressed matrix loaded (use Open CM).\n");
+        return;
+    }
+
+    const std::vector<double> &proj = m_currentMatrix->getProjection();
+    QString title = m_currentMatrix->getFileName() + " Projection";
+
+    loadSpectrumDataToPad(proj, title, false);
+    CommandPrompt::getInstance()->appendPlainText("Loaded full matrix projection.\n");
 }

@@ -1,3 +1,4 @@
+#include "IntegralDialog.h"
 #include "canvas.h"
 #include "Design.h"
 #include "PeakFit.h"
@@ -42,6 +43,7 @@ QRootCanvas::QRootCanvas(QWidget *parent)
       xMousePosition(0),
       yMousePosition(0),
       controlKeyIsPressed(false),
+      aKeyWasPressed(false),
       cKeyWasPressed(false),
       zKeyWasPressed(false),
       mKeyWasPressed(false),
@@ -148,6 +150,29 @@ bool QRootCanvas::eventFilter(QObject *watched, QEvent *event)
                 return false;
             }
             m_mainCanvas->peakSearchParamsDialog->hide();
+        }
+    }
+
+    // Auto-dismiss integral dialog on key press or mouse click outside the dialog
+    if (m_mainCanvas && m_mainCanvas->m_integralDialog && m_mainCanvas->m_integralDialog->isVisible()) {
+        if (event->type() == QEvent::MouseButtonPress) {
+            QMouseEvent *me = static_cast<QMouseEvent*>(event);
+            QWidget *w = qobject_cast<QWidget*>(watched);
+            const bool isInside = (w && (w == m_mainCanvas->m_integralDialog || m_mainCanvas->m_integralDialog->isAncestorOf(w)))
+                               || (me && m_mainCanvas->m_integralDialog->frameGeometry().contains(me->globalPos()));
+            if (isInside) {
+                return false;
+            }
+            m_mainCanvas->m_integralDialog->hide();
+        } else if (event->type() == QEvent::KeyPress) {
+            QWidget *fw = QApplication::focusWidget();
+            QWidget *w = qobject_cast<QWidget*>(watched);
+            const bool isInside = (w && (w == m_mainCanvas->m_integralDialog || m_mainCanvas->m_integralDialog->isAncestorOf(w)))
+                               || (fw && (fw == m_mainCanvas->m_integralDialog || m_mainCanvas->m_integralDialog->isAncestorOf(fw)));
+            if (isInside) {
+                return false;
+            }
+            m_mainCanvas->m_integralDialog->hide();
         }
     }
 
@@ -568,6 +593,13 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         updateZoomHUD(localPos.x(), localPos.y());
         return;
     }
+    
+    // Disable all prefix states if Esc is pressed
+    if (event->key() == Qt::Key_Escape) {
+        controlKeyIsPressed = aKeyWasPressed = cKeyWasPressed = zKeyWasPressed = false;
+        mKeyWasPressed = fKeyWasPressed = sKeyWasPressed = dKeyWasPressed = oKeyWasPressed = false;
+        return;
+    }
 
     // Handle key sequences following a CTRL press
     if (controlKeyIsPressed || (event->modifiers() & Qt::ControlModifier)) {
@@ -602,9 +634,59 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         hideZoomHUD();
         return;
     }
+    // Handle commands prefixed by 'O' (Output / Save)
+    else if (oKeyWasPressed) {
+        switch (event->key()) {
+            case Qt::Key_S:
+                // O + S: Export Spectrum
+                emit requestExportSpectrumDialog();
+                break;
+            case Qt::Key_Equal:
+                // O + =: Output Postscript (save plot)
+                emit requestPrintPlot();
+                break;
+            case Qt::Key_O:
+                // Redundant O press: cancel prefix
+                break;
+            default:
+                std::cout << "Waited for output command after O was pressed but no valid command arrived" << std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for output command after O was pressed but no valid command arrived\n");
+                break;
+        }
+        oKeyWasPressed = false;
+    }
+    // Handle commands prefixed by 'A' (Automatic routines)
+    else if (aKeyWasPressed) {
+        switch (event->key()) {
+            case Qt::Key_J:
+                // A + J: Automatic integration with background
+                emit requestAutoIntegration(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_G:
+                // A + G: Automatic Gaussian multi-peak fit
+                emit autoFitRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_T:
+                // A + T: Automatic TrackFit Setup
+                emit requestTrackFitDialog();
+                break;
+            case Qt::Key_A:
+                // Redundant A press: cancel prefix
+                break;
+            default:
+                std::cout << "Waited for automatic command after A was pressed but no valid command arrived" << std::endl;
+                CommandPrompt::getInstance()->appendPlainText("Waited for automatic command after A was pressed but no valid command arrived\n");
+                break;
+        }
+        aKeyWasPressed = false;
+    }
     // Handle commands prefixed by 'C' (Computation routines)
     else if (cKeyWasPressed) {
         switch (event->key()) {
+            case Qt::Key_B:
+                // C + B: Background fit calculation
+                emit requestFitBackground();
+                break;
             case Qt::Key_I:
                 // C + I: Integration without background subtraction
                 emit requestIntegrationNoBackground();
@@ -624,6 +706,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_W:
                 // C + W: Cut / slice gate from compressed matrix
                 emit requestGateCut();
+                break;
+            case Qt::Key_T:
+                // C + T: Calculate TrackFit
+                emit requestTrackFitDialog();
                 break;
             case Qt::Key_C:
                 // Redundant C press: cancel prefix
@@ -669,6 +755,11 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_Z:
                 // Redundant Z press: cancel prefix
                 break;
+            case Qt::Key_N:
+                // Z + N: Set load behavior to Autoscale
+                if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
+                CommandPrompt::getInstance()->appendPlainText("Display behavior: Auto Scale on new spectrum.\n");
+                break;
             default:
                 std::cout << "Waited for delete command after Z was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for delete command after Z was pressed but no valid command arrived after it\n");
@@ -695,6 +786,14 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // M + G: Redraw Gauss peak centroid markers
                 emit requestShowGaussMarkers();
                 break;
+            case Qt::Key_J:
+                // M + J: Redraw Background and Integral markers
+                emit requestMJMarkers();
+                break;
+            case Qt::Key_V:
+                // M + V: Redraw Background, Range, and Gauss markers
+                emit requestMVMarkers();
+                break;
             case Qt::Key_P:
                 // M + P: Redraw Peak Search markers
                 emit requestShowPeakMarkers();
@@ -709,6 +808,11 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_M:
                 // Redundant M press: cancel prefix
+                break;
+            case Qt::Key_N:
+                // M + N: Set load behavior to Preserve Scale
+                if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
+                CommandPrompt::getInstance()->appendPlainText("Display behavior: Preserve Scale on new spectrum.\n");
                 break;
             default:
                 std::cout << "Waited for show command after M was pressed but no valid command arrived after it" << std::endl;
@@ -729,6 +833,14 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_Y:
                 emit requestFullY();
+                break;
+            case Qt::Key_O:
+                // F + O: Force Y-Max to cursor Y
+                emit requestSetYMax(yMousePosition);
+                break;
+            case Qt::Key_U:
+                // F + U: Force Y-Min to cursor Y
+                emit requestSetYMin(yMousePosition);
                 break;
             default:
                 break;
@@ -761,6 +873,22 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_W:
                 emit requestGateCut();
                 break;
+            case Qt::Key_N: {
+                // D + N: Open dialog to set display behavior
+                if (m_mainCanvas) {
+                    QStringList items;
+                    items << "Auto Scale" << "Preserve Scale";
+                    bool ok;
+                    QString item = QInputDialog::getItem(this, "Set Display Behavior",
+                                                         "Select behavior on new spectrum:", items, 0, false, &ok);
+                    if (ok && !item.isEmpty()) {
+                        if (item == "Auto Scale") m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
+                        else m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
+                        CommandPrompt::getInstance()->appendPlainText("Display behavior set to: " + item + "\n");
+                    }
+                }
+                break;
+            }
             default:
                 break;
         }
@@ -777,11 +905,17 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_D:
                 dKeyWasPressed = true;
                 break;
+            case Qt::Key_A:
+                aKeyWasPressed = true;
+                break;
             case Qt::Key_C:
                 cKeyWasPressed = true;
                 break;
             case Qt::Key_Z:
                 zKeyWasPressed = true;
+                break;
+            case Qt::Key_O:
+                oKeyWasPressed = true;
                 break;
             case Qt::Key_M:
                 mKeyWasPressed = true;
@@ -793,9 +927,18 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // 'I': Place integral boundary marker at cursor
                 emit addIntegralMarkerRequested(xMousePosition, yMousePosition);
                 break;
+            case Qt::Key_K:
+                emit requestQuickCalibration();
+                break;
+            case Qt::Key_Q:
+                emit requestMatrixProjection();
+                break;
             case Qt::Key_Space:
                 // Spacebar: Place zoom boundary marker at cursor
                 emit addSpaceBarMarkerRequested(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_N:
+                emit requestOpenSpectrumDialog();
                 break;
             case Qt::Key_F:
                 fKeyWasPressed = true;
@@ -827,6 +970,14 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_G:
                 // 'G': Place Gaussian peak estimate marker at cursor
                 emit requestAddGaussMarker(xMousePosition, yMousePosition);
+                break;
+            case Qt::Key_P:
+                // 'P': Search/Go to a specific energy/channel
+                emit requestGoToEnergy();
+                break;
+            case Qt::Key_X:
+                // 'X': Zoom around current cursor position
+                emit requestZoomAroundCursor(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_Equal:
                 // '=': Clear drawn overlay lines and reset display
