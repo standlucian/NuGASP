@@ -558,11 +558,11 @@ void QMainCanvas::translateplusTheScreen()
         const Int_t newFirst = std::min(maxBin, first + step);
         const Int_t newLast  = std::min(maxBin, last + step);
         xAxis->SetRange(newFirst, newLast);
-        adjustYAxisToVisibleMax(hist);
     }
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
@@ -590,11 +590,11 @@ void QMainCanvas::translateminusTheScreen()
         const Int_t newFirst = std::max(1, first - step);
         const Int_t newLast  = std::max(1, last - step);
         xAxis->SetRange(newFirst, newLast);
-        adjustYAxisToVisibleMax(hist);
     }
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
@@ -621,7 +621,6 @@ void QMainCanvas::shiftDisplayLeft75()
         const Int_t newFirst = std::max(1, first - step);
         const Int_t newLast  = std::max(newFirst + 2, last - step);
         xAxis->SetRange(newFirst, newLast);
-        adjustYAxisToVisibleMax(hist);
     }
 
     ColorTheFrameOfTheHistogram();
@@ -655,7 +654,6 @@ void QMainCanvas::shiftDisplayRight75()
         const Int_t newLast  = std::min(maxBin, last + step);
         const Int_t newFirst = std::min(newLast - 2, first + step);
         xAxis->SetRange(std::max(1, newFirst), newLast);
-        adjustYAxisToVisibleMax(hist);
     }
 
     ColorTheFrameOfTheHistogram();
