@@ -589,6 +589,10 @@ protected:
     double          m_autoscaleHeadroomLinear{10.0};
     double          m_autoscaleHeadroomLog{30.0};
     int             m_defaultZoomWidth{200};
+    int             m_gridDivisionsX{10};
+    int             m_gridDivisionsY{10};
+    int             m_gridLineWidth{1};
+    int             m_gridLineStyle{2}; // 1 = Solid, 2 = Dashed, 3 = Dotted
     EfficiencyConfig m_efficiencyConfig;
 };
 

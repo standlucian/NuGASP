@@ -7,6 +7,7 @@ class QSpinBox;
 class QDoubleSpinBox;
 class QCheckBox;
 class QRadioButton;
+class QComboBox;
 class QMainCanvas;
 
 class DisplayParamsDialog : public QDialog {
@@ -29,7 +30,11 @@ private:
     QDoubleSpinBox *m_spinLinearHeadroom{nullptr};
     QDoubleSpinBox *m_spinLogHeadroom{nullptr};
     QCheckBox      *m_chkGridX{nullptr};
+    QSpinBox       *m_spinGridDivX{nullptr};
     QCheckBox      *m_chkGridY{nullptr};
+    QSpinBox       *m_spinGridDivY{nullptr};
+    QSpinBox       *m_spinGridWidth{nullptr};
+    QComboBox      *m_comboGridStyle{nullptr};
     QSpinBox       *m_spinZoomWidth{nullptr};
     QRadioButton   *m_radioLinearY{nullptr};
     QRadioButton   *m_radioLogY{nullptr};

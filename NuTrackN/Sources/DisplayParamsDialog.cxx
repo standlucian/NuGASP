@@ -13,6 +13,7 @@
 #include <QDoubleSpinBox>
 #include <QCheckBox>
 #include <QRadioButton>
+#include <QComboBox>
 #include <QPushButton>
 #include <QButtonGroup>
 
@@ -20,14 +21,15 @@ DisplayParamsDialog::DisplayParamsDialog(QMainCanvas *mainCanvas, QWidget *paren
     : QDialog(parent), m_mainCanvas(mainCanvas)
 {
     setWindowTitle(tr("Display Parameters (DD)"));
-    resize(480, 480);
+    resize(520, 520);
     setStyleSheet(
         "QDialog { background-color: #1e1e1e; color: #ffffff; }"
         "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-size: 13px; }"
         "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
         "QLabel { color: #cccccc; font-size: 12px; }"
         "QSpinBox, QDoubleSpinBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 6px; font-size: 12px; }"
-        "QSpinBox:focus, QDoubleSpinBox:focus { border: 1px solid #007acc; }"
+        "QComboBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 6px; font-size: 12px; }"
+        "QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid #007acc; }"
         "QCheckBox, QRadioButton { color: #ffffff; font-size: 12px; spacing: 6px; }"
         "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 6px 16px; font-weight: bold; font-size: 12px; }"
         "QPushButton:hover { background-color: #4e4e52; }"
@@ -74,8 +76,34 @@ void DisplayParamsDialog::setupUI()
     QGridLayout *gridDisplay = new QGridLayout(grpDisplay);
     gridDisplay->setSpacing(8);
 
-    m_chkGridX = new QCheckBox(tr("Show X-Axis Grid Lines"), grpDisplay);
-    m_chkGridY = new QCheckBox(tr("Show Y-Axis Grid Lines"), grpDisplay);
+    m_chkGridX = new QCheckBox(tr("Show X Grid"), grpDisplay);
+    QLabel *lblGridDivX = new QLabel(tr("X Grid Size (Divisions):"), grpDisplay);
+    m_spinGridDivX = new QSpinBox(grpDisplay);
+    m_spinGridDivX->setRange(2, 100);
+    m_spinGridDivX->setValue(10);
+    m_spinGridDivX->setToolTip(tr("Number of grid intervals along the X axis"));
+
+    m_chkGridY = new QCheckBox(tr("Show Y Grid"), grpDisplay);
+    QLabel *lblGridDivY = new QLabel(tr("Y Grid Size (Divisions):"), grpDisplay);
+    m_spinGridDivY = new QSpinBox(grpDisplay);
+    m_spinGridDivY->setRange(2, 100);
+    m_spinGridDivY->setValue(10);
+    m_spinGridDivY->setToolTip(tr("Number of grid intervals along the Y axis"));
+
+    connect(m_chkGridX, &QCheckBox::toggled, m_spinGridDivX, &QSpinBox::setEnabled);
+    connect(m_chkGridY, &QCheckBox::toggled, m_spinGridDivY, &QSpinBox::setEnabled);
+
+    QLabel *lblGridWidth = new QLabel(tr("Grid Line Width:"), grpDisplay);
+    m_spinGridWidth = new QSpinBox(grpDisplay);
+    m_spinGridWidth->setRange(1, 5);
+    m_spinGridWidth->setSuffix(" px");
+    m_spinGridWidth->setValue(1);
+
+    QLabel *lblGridStyle = new QLabel(tr("Grid Style:"), grpDisplay);
+    m_comboGridStyle = new QComboBox(grpDisplay);
+    m_comboGridStyle->addItem(tr("Dashed"), 2);
+    m_comboGridStyle->addItem(tr("Dotted"), 3);
+    m_comboGridStyle->addItem(tr("Solid"), 1);
 
     QLabel *lblZoom = new QLabel(tr("Default Zoom Width:"), grpDisplay);
     m_spinZoomWidth = new QSpinBox(grpDisplay);
@@ -84,9 +112,20 @@ void DisplayParamsDialog::setupUI()
     m_spinZoomWidth->setSuffix(" ch");
 
     gridDisplay->addWidget(m_chkGridX, 0, 0);
-    gridDisplay->addWidget(m_chkGridY, 0, 1);
-    gridDisplay->addWidget(lblZoom, 1, 0);
-    gridDisplay->addWidget(m_spinZoomWidth, 1, 1);
+    gridDisplay->addWidget(lblGridDivX, 0, 1);
+    gridDisplay->addWidget(m_spinGridDivX, 0, 2);
+
+    gridDisplay->addWidget(m_chkGridY, 1, 0);
+    gridDisplay->addWidget(lblGridDivY, 1, 1);
+    gridDisplay->addWidget(m_spinGridDivY, 1, 2);
+
+    gridDisplay->addWidget(lblGridWidth, 2, 0);
+    gridDisplay->addWidget(m_spinGridWidth, 2, 1);
+    gridDisplay->addWidget(lblGridStyle, 2, 2);
+    gridDisplay->addWidget(m_comboGridStyle, 2, 3);
+
+    gridDisplay->addWidget(lblZoom, 3, 0);
+    gridDisplay->addWidget(m_spinZoomWidth, 3, 1, 1, 3);
     mainLayout->addWidget(grpDisplay);
 
     // 3. Y-Axis Scale Mode (Linear vs Log)
@@ -173,11 +212,18 @@ void DisplayParamsDialog::loadCurrentValues()
     m_spinLinearHeadroom->setValue(m_mainCanvas->m_autoscaleHeadroomLinear);
     m_spinLogHeadroom->setValue(m_mainCanvas->m_autoscaleHeadroomLog);
     m_spinZoomWidth->setValue(m_mainCanvas->m_defaultZoomWidth);
+    m_spinGridDivX->setValue(m_mainCanvas->m_gridDivisionsX);
+    m_spinGridDivY->setValue(m_mainCanvas->m_gridDivisionsY);
+    m_spinGridWidth->setValue(m_mainCanvas->m_gridLineWidth);
+    int styleIdx = m_comboGridStyle->findData(m_mainCanvas->m_gridLineStyle);
+    if (styleIdx >= 0) m_comboGridStyle->setCurrentIndex(styleIdx);
 
     TVirtualPad *pad = nullptr;
     if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
-        const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
-        pad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
+        if (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1) {
+            const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
+            pad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
+        }
         if (!pad) pad = m_mainCanvas->getRootCanvas()->getCanvas();
     }
 
@@ -192,6 +238,8 @@ void DisplayParamsDialog::loadCurrentValues()
     } else {
         m_radioLinearY->setChecked(true);
     }
+    m_spinGridDivX->setEnabled(m_chkGridX->isChecked());
+    m_spinGridDivY->setEnabled(m_chkGridY->isChecked());
 
     TH1F *hist = m_mainCanvas->HijF[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j];
     if (hist && hist->GetXaxis()) {
@@ -219,6 +267,10 @@ void DisplayParamsDialog::applySettings()
     m_mainCanvas->m_autoscaleHeadroomLinear = m_spinLinearHeadroom->value();
     m_mainCanvas->m_autoscaleHeadroomLog    = m_spinLogHeadroom->value();
     m_mainCanvas->m_defaultZoomWidth        = m_spinZoomWidth->value();
+    m_mainCanvas->m_gridDivisionsX          = m_spinGridDivX->value();
+    m_mainCanvas->m_gridDivisionsY          = m_spinGridDivY->value();
+    m_mainCanvas->m_gridLineWidth           = m_spinGridWidth->value();
+    m_mainCanvas->m_gridLineStyle           = m_comboGridStyle->currentData().toInt();
 
     const bool wantLog = m_radioLogY->isChecked();
     double y0 = m_spinYMin->value();
@@ -260,17 +312,17 @@ void DisplayParamsDialog::applySettings()
     }
 
     gStyle->SetGridColor(kGray + 2);
-    gStyle->SetGridStyle(2); // Dashed lines
-    gStyle->SetGridWidth(1);
+    gStyle->SetGridStyle(m_mainCanvas->m_gridLineStyle);
+    gStyle->SetGridWidth(m_mainCanvas->m_gridLineWidth);
 
     for (int z = 1; z <= m_mainCanvas->maxElement_i; ++z) {
         for (int g = 1; g <= m_mainCanvas->maxElement_j; ++g) {
             TH1F *h = m_mainCanvas->HijF[z][g];
             if (h && h->GetXaxis()) {
-                h->GetXaxis()->SetNdivisions(510, kTRUE);
+                h->GetXaxis()->SetNdivisions(m_mainCanvas->m_gridDivisionsX, kTRUE);
                 h->GetXaxis()->SetLabelSize(0);
                 h->GetXaxis()->SetTickLength(0);
-                h->GetYaxis()->SetNdivisions(510, kTRUE);
+                h->GetYaxis()->SetNdivisions(m_mainCanvas->m_gridDivisionsY, kTRUE);
                 h->GetYaxis()->SetLabelSize(0);
                 h->GetYaxis()->SetTickLength(0);
             }
@@ -303,11 +355,14 @@ void DisplayParamsDialog::applySettings()
     m_mainCanvas->updateAxisStatusLabels();
 
     CommandPrompt::getInstance()->appendPlainText(
-        QString("Display Parameters updated (DD): Linear Headroom=%1%, Log Headroom=%2%, Grid=[%3,%4], ZoomWidth=%5 ch\n")
+        QString("Display Parameters updated (DD): Linear Headroom=%1%, Log Headroom=%2%, Grid=[%3,%4] (Divisions: X=%5, Y=%6, Width=%7px), ZoomWidth=%8 ch\n")
             .arg(m_mainCanvas->m_autoscaleHeadroomLinear, 0, 'f', 1)
             .arg(m_mainCanvas->m_autoscaleHeadroomLog, 0, 'f', 1)
             .arg(m_chkGridX->isChecked() ? "X" : "-")
             .arg(m_chkGridY->isChecked() ? "Y" : "-")
+            .arg(m_mainCanvas->m_gridDivisionsX)
+            .arg(m_mainCanvas->m_gridDivisionsY)
+            .arg(m_mainCanvas->m_gridLineWidth)
             .arg(m_mainCanvas->m_defaultZoomWidth));
 }
 
