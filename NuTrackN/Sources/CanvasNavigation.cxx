@@ -227,10 +227,6 @@ void QMainCanvas::sameY()
             } else {
                 pad = canvas->getCanvas();
             }
-            if (pad) {
-                pad->SetLogy(activeLogy);
-            }
-
             targetHist->SetMinimum(activeMin);
             targetHist->SetMaximum(activeMax);
             targetHist->GetYaxis()->SetRangeUser(activeMin, activeMax);
@@ -239,6 +235,10 @@ void QMainCanvas::sameY()
                 if (!overlay || overlay == targetHist) continue;
                 overlay->SetMinimum(activeMin);
                 overlay->SetMaximum(activeMax);
+            }
+
+            if (pad) {
+                pad->SetLogy(activeLogy);
             }
 
             renderPeakSearchLabels(z, g);
@@ -278,7 +278,6 @@ void QMainCanvas::toggleLogY()
     if (!pad) return;
 
     const int newLogy = pad->GetLogy() ? 0 : 1;
-    pad->SetLogy(newLogy);
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
@@ -311,13 +310,15 @@ void QMainCanvas::toggleLogY()
         if (localMax <= 0.0) localMax = 10.0;
 
         if (newLogy) {
+            const double yMax = localMax * (1.0 + m_autoscaleHeadroomLog / 100.0);
             hist->SetMinimum(0.5);
-            hist->GetYaxis()->SetRangeUser(0.5, localMax * 1.30);
-            hist->SetMaximum(localMax * 1.30);
+            hist->GetYaxis()->SetRangeUser(0.5, yMax);
+            hist->SetMaximum(yMax);
         } else {
+            const double yMax = localMax * (1.0 + m_autoscaleHeadroomLinear / 100.0);
             hist->SetMinimum(0.0);
-            hist->GetYaxis()->SetRangeUser(0.0, localMax * 1.10);
-            hist->SetMaximum(localMax * 1.10);
+            hist->GetYaxis()->SetRangeUser(0.0, yMax);
+            hist->SetMaximum(yMax);
         }
     }
 
@@ -330,6 +331,9 @@ void QMainCanvas::toggleLogY()
             overlay->SetMinimum(0.0);
         }
     }
+
+    // Set pad log scale only after histogram minimum has been safely established
+    pad->SetLogy(newLogy);
 
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
     renderPeakLabels(SelectedElement_i, SelectedElement_j);

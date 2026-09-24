@@ -152,6 +152,17 @@ void DisplayParamsDialog::setupUI()
     btnLayout->addWidget(btnApply);
     btnLayout->addWidget(btnOk);
     btnLayout->addWidget(btnCancel);
+    connect(m_radioLogY, &QRadioButton::toggled, this, [this](bool isLog) {
+        if (isLog) {
+            m_spinYMin->setRange(0.0001, 1e9);
+            if (m_spinYMin->value() < 0.1) {
+                m_spinYMin->setValue(0.5);
+            }
+        } else {
+            m_spinYMin->setRange(0.0, 1e9);
+        }
+    });
+
     mainLayout->addLayout(btnLayout);
 }
 
@@ -188,7 +199,15 @@ void DisplayParamsDialog::loadCurrentValues()
         const int last  = hist->GetXaxis()->GetLast();
         m_spinXMin->setValue(hist->GetXaxis()->GetBinLowEdge(first));
         m_spinXMax->setValue(hist->GetXaxis()->GetBinUpEdge(last));
-        m_spinYMin->setValue(hist->GetMinimum());
+        double curYMin = hist->GetMinimum();
+        if (m_radioLogY->isChecked()) {
+            m_spinYMin->setRange(0.0001, 1e9);
+            if (curYMin < 0.1) curYMin = 0.5;
+        } else {
+            m_spinYMin->setRange(0.0, 1e9);
+            if (curYMin < 0.0) curYMin = 0.0;
+        }
+        m_spinYMin->setValue(curYMin);
         m_spinYMax->setValue(hist->GetMaximum());
     }
 }
@@ -201,6 +220,36 @@ void DisplayParamsDialog::applySettings()
     m_mainCanvas->m_autoscaleHeadroomLog    = m_spinLogHeadroom->value();
     m_mainCanvas->m_defaultZoomWidth        = m_spinZoomWidth->value();
 
+    const bool wantLog = m_radioLogY->isChecked();
+    double y0 = m_spinYMin->value();
+    double y1 = m_spinYMax->value();
+
+    if (wantLog) {
+        if (y0 <= 0.0) y0 = 0.5;
+        if (y1 <= y0) y1 = y0 + 10.0;
+    }
+
+    TH1F *hist = m_mainCanvas->HijF[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j];
+    if (hist && hist->GetXaxis()) {
+        const double x0 = m_spinXMin->value();
+        const double x1 = m_spinXMax->value();
+
+        if (x1 > x0) {
+            hist->GetXaxis()->SetRangeUser(x0, x1);
+        }
+        if (y1 > y0) {
+            hist->SetMinimum(y0);
+            hist->SetMaximum(y1);
+            hist->GetYaxis()->SetRangeUser(y0, y1);
+        }
+
+        for (TH1F *overlay : m_mainCanvas->HijC[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->SetMinimum(y0);
+            overlay->SetMaximum(y1);
+        }
+    }
+
     TVirtualPad *pad = nullptr;
     if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
         const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
@@ -211,26 +260,8 @@ void DisplayParamsDialog::applySettings()
     if (pad) {
         pad->SetGridx(m_chkGridX->isChecked() ? 1 : 0);
         pad->SetGridy(m_chkGridY->isChecked() ? 1 : 0);
-        const bool wantLog = m_radioLogY->isChecked();
         if ((pad->GetLogy() != 0) != wantLog) {
             pad->SetLogy(wantLog ? 1 : 0);
-        }
-    }
-
-    TH1F *hist = m_mainCanvas->HijF[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j];
-    if (hist && hist->GetXaxis()) {
-        const double x0 = m_spinXMin->value();
-        const double x1 = m_spinXMax->value();
-        const double y0 = m_spinYMin->value();
-        const double y1 = m_spinYMax->value();
-
-        if (x1 > x0) {
-            hist->GetXaxis()->SetRangeUser(x0, x1);
-        }
-        if (y1 > y0) {
-            hist->GetYaxis()->SetRangeUser(y0, y1);
-            hist->SetMinimum(y0);
-            hist->SetMaximum(y1);
         }
     }
 
