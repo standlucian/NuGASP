@@ -9,7 +9,19 @@ TracknHistogram::TracknHistogram() : TH1F() {}
 
 TracknHistogram::TracknHistogram(const char *name, const char *title,
                                  Int_t nbins, Double_t xlow, Double_t xup)
-    : TH1F(name, title, nbins, xlow, xup) {}
+    : TH1F(name, title, nbins, xlow, xup) {
+  if (GetXaxis()) {
+    GetXaxis()->SetNdivisions(510, kTRUE);
+    GetXaxis()->SetLabelSize(0);
+    GetXaxis()->SetTickLength(0);
+  }
+  if (GetYaxis()) {
+    GetYaxis()->SetNdivisions(510, kTRUE);
+    GetYaxis()->SetLabelSize(0);
+    GetYaxis()->SetTickLength(0);
+  }
+  SetStats(0);
+}
 
 TracknHistogram::TracknHistogram(const TracknHistogram &other)
     : TH1F(other), fIsCalibrated(other.fIsCalibrated), fCalibA0(other.fCalibA0),

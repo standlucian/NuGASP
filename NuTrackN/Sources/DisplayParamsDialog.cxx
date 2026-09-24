@@ -250,18 +250,49 @@ void DisplayParamsDialog::applySettings()
         }
     }
 
-    TVirtualPad *pad = nullptr;
+    TVirtualPad *activePad = nullptr;
     if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
-        const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
-        pad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
-        if (!pad) pad = m_mainCanvas->getRootCanvas()->getCanvas();
+        if (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1) {
+            const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
+            activePad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
+        }
+        if (!activePad) activePad = m_mainCanvas->getRootCanvas()->getCanvas();
     }
 
-    if (pad) {
-        pad->SetGridx(m_chkGridX->isChecked() ? 1 : 0);
-        pad->SetGridy(m_chkGridY->isChecked() ? 1 : 0);
-        if ((pad->GetLogy() != 0) != wantLog) {
-            pad->SetLogy(wantLog ? 1 : 0);
+    gStyle->SetGridColor(kGray + 2);
+    gStyle->SetGridStyle(2); // Dashed lines
+    gStyle->SetGridWidth(1);
+
+    for (int z = 1; z <= m_mainCanvas->maxElement_i; ++z) {
+        for (int g = 1; g <= m_mainCanvas->maxElement_j; ++g) {
+            TH1F *h = m_mainCanvas->HijF[z][g];
+            if (h && h->GetXaxis()) {
+                h->GetXaxis()->SetNdivisions(510, kTRUE);
+                h->GetXaxis()->SetLabelSize(0);
+                h->GetXaxis()->SetTickLength(0);
+                h->GetYaxis()->SetNdivisions(510, kTRUE);
+                h->GetYaxis()->SetLabelSize(0);
+                h->GetYaxis()->SetTickLength(0);
+            }
+            TVirtualPad *p = nullptr;
+            if (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1) {
+                p = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad((z - 1) * m_mainCanvas->maxElement_j + g);
+            } else {
+                p = m_mainCanvas->getRootCanvas()->getCanvas();
+            }
+            if (p) {
+                p->cd();
+                p->SetGridx(m_chkGridX->isChecked() ? 1 : 0);
+                p->SetGridy(m_chkGridY->isChecked() ? 1 : 0);
+                if (p == activePad && (p->GetLogy() != 0) != wantLog) {
+                    p->SetLogy(wantLog ? 1 : 0);
+                }
+                if (m_chkGridX->isChecked() || m_chkGridY->isChecked()) {
+                    p->RedrawAxis("g");
+                }
+                p->Modified();
+                p->Update();
+            }
         }
     }
 

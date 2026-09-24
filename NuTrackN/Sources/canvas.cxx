@@ -515,11 +515,16 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     // 7. Initialize default 10240-channel TracknHistogram for the primary spectrum cell
     gStyle->SetOptTitle(0);
+    gStyle->SetGridColor(kGray + 2);
+    gStyle->SetGridStyle(2); // Dashed lines
+    gStyle->SetGridWidth(1);
     HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0, 10240);
-    HijF[1][1]->GetXaxis()->SetNdivisions(0, kTRUE);
+    HijF[1][1]->GetXaxis()->SetNdivisions(510, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);
-    HijF[1][1]->GetYaxis()->SetNdivisions(0, kTRUE);
+    HijF[1][1]->GetXaxis()->SetTickLength(0);
+    HijF[1][1]->GetYaxis()->SetNdivisions(510, kTRUE);
     HijF[1][1]->GetYaxis()->SetLabelSize(0);
+    HijF[1][1]->GetYaxis()->SetTickLength(0);
     HijF[1][1]->SetStats(0);
 }
 
