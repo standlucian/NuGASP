@@ -48,7 +48,10 @@ HEADERS += \
     Include/complib.h \
     Include/MatrixReader.h \
     Include/MatrixDialog.h \
-    Include/IntegralDialog.h
+    Include/IntegralDialog.h \
+    Include/DisplayParamsDialog.h \
+    Include/EfficiencyDialog.h \
+    Include/AutoCalibDialog.h
 
 # Project source files
 SOURCES += \
@@ -71,6 +74,9 @@ SOURCES += \
     Sources/complib.c \
     Sources/MatrixReader.cxx \
     Sources/MatrixDialog.cxx \
-    Sources/IntegralDialog.cxx
+    Sources/IntegralDialog.cxx \
+    Sources/DisplayParamsDialog.cxx \
+    Sources/EfficiencyDialog.cxx \
+    Sources/AutoCalibDialog.cxx
 
 

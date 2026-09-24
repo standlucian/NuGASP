@@ -403,8 +403,8 @@ void QMainCanvas::adjustYAxisToVisibleMax(TH1F *hist, int z, int g)
     }
     const bool isLog = (pad && pad->GetLogy() != 0);
     const double yMin = isLog ? 0.5 : 0.0;
-    const double yMax = isLog ? (localMax <= 0.0 ? 10.0 : localMax * 1.30)
-                              : (localMax <= 0.0 ? 10.0 : localMax * 1.10);
+    const double yMax = isLog ? (localMax <= 0.0 ? 10.0 : localMax * (1.0 + m_autoscaleHeadroomLog / 100.0))
+                              : (localMax <= 0.0 ? 10.0 : localMax * (1.0 + m_autoscaleHeadroomLinear / 100.0));
 
     hist->GetYaxis()->SetRangeUser(yMin, yMax);
     hist->SetMaximum(yMax);
@@ -859,7 +859,7 @@ void QMainCanvas::zoomAroundCursor(Int_t x, Int_t y)
     int width = currentMax - currentMin;
     
     if (width >= xAxis->GetNbins() - 2) {
-        width = 200; // Default zoom window width if fully unzoomed
+        width = m_defaultZoomWidth > 0 ? m_defaultZoomWidth : 200;
     }
     
     int newMin = std::max(1, binX - width / 2);
@@ -910,7 +910,7 @@ void QMainCanvas::goToEnergy()
     int width = currentMax - currentMin;
     
     if (width >= xAxis->GetNbins() - 2) {
-        width = 200; // Default zoom window width if fully unzoomed
+        width = m_defaultZoomWidth > 0 ? m_defaultZoomWidth : 200;
     }
     
     int newMin = std::max(1, targetBin - width / 2);

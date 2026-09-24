@@ -680,6 +680,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // A + T: Automatic TrackFit Setup
                 emit requestTrackFitDialog();
                 break;
+            case Qt::Key_K:
+                // A + K: Automatic Energy Calibration (autoECALIBRATION)
+                emit requestAutoCalibDialog();
+                break;
             case Qt::Key_A:
                 // Redundant A press: cancel prefix
                 break;
@@ -909,6 +913,22 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_W:
                 emit requestGateCut();
+                break;
+            case Qt::Key_D:
+                // D + D: Display Parameters Dialog
+                emit requestDisplayParamsDialog();
+                break;
+            case Qt::Key_E:
+                // D + E: Efficiency Correction Dialog
+                emit requestEfficiencyDialog();
+                break;
+            case Qt::Key_G:
+                // D + G: Define Peak Width Mode (Coupled vs Independent)
+                emit requestPeakWidthMode();
+                break;
+            case Qt::Key_Q:
+                // D + Q: Matrix Setup / Coincidence Background
+                emit requestMatrixSetup();
                 break;
             case Qt::Key_F:
             case Qt::Key_L: {

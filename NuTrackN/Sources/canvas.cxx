@@ -8,6 +8,10 @@
 #include "TrackFitDialog.h"
 #include "MatrixReader.h"
 #include "MatrixDialog.h"
+#include "DisplayParamsDialog.h"
+#include "EfficiencyDialog.h"
+#include "AutoCalibDialog.h"
+#include <QInputDialog>
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -476,6 +480,13 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestTrackFitDialog, this, &QMainCanvas::openTrackFitDialog);
     connect(canvas, &QRootCanvas::requestCTCalibration, this, &QMainCanvas::openTrackFitDialog);
     connect(canvas, &QRootCanvas::requestATCalibration, this, &QMainCanvas::executeATCalibration);
+    
+    // Block 3: Setup & Parameter Definition Dialogs
+    connect(canvas, &QRootCanvas::requestDisplayParamsDialog, this, &QMainCanvas::openDisplayParamsDialog);
+    connect(canvas, &QRootCanvas::requestEfficiencyDialog, this, &QMainCanvas::openEfficiencyDialog);
+    connect(canvas, &QRootCanvas::requestPeakWidthMode, this, &QMainCanvas::openPeakWidthModeDialog);
+    connect(canvas, &QRootCanvas::requestMatrixSetup, this, &QMainCanvas::onOpenCMClicked);
+    connect(canvas, &QRootCanvas::requestAutoCalibDialog, this, &QMainCanvas::openAutoCalibDialog);
     
     // File I/O
     connect(canvas, &QRootCanvas::requestOpenSpectrumDialog, this, &QMainCanvas::clicked1);
@@ -1736,4 +1747,73 @@ void QMainCanvas::writeAreaLogData(double centroid, double fwhm, double gross, d
         .arg(QString::number(error, 'f', 1),      -14, QChar(' '));
     m_areaLogStream << dataRow;
     m_areaLogStream.flush();
+}
+
+//==============================================================================
+// Block 3: Setup & Parameter Definition Slots (DD, DE, DG, AK)
+//==============================================================================
+void QMainCanvas::openDisplayParamsDialog() {
+    DisplayParamsDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openEfficiencyDialog() {
+    EfficiencyDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openPeakWidthModeDialog() {
+    QStringList items;
+    items << tr("Coupled / Common Width (GASP standard)")
+          << tr("Independent / Decoupled Width (individual widths)");
+    int currentIdx = m_uncoupleWidths ? 1 : 0;
+    bool ok = false;
+    QString selected = QInputDialog::getItem(
+        this, tr("Define Peak Width Mode (DG)"),
+        tr("Select Gaussian peak width model for multi-peak fitting:"),
+        items, currentIdx, false, &ok);
+    if (ok && !selected.isEmpty()) {
+        m_uncoupleWidths = (selected == items[1]);
+        if (chkUncoupleWidths) {
+            chkUncoupleWidths->setChecked(m_uncoupleWidths);
+        }
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Peak width mode set to: %1 (DG)\n")
+                .arg(m_uncoupleWidths ? "Independent / Decoupled" : "Coupled / Common"));
+    }
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openAutoCalibDialog() {
+    AutoCalibDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+double QMainCanvas::evaluateEfficiency(double energyKeV) const {
+    if (m_efficiencyConfig.type == EfficiencyType::None) {
+        return 1.0;
+    }
+    if (m_efficiencyConfig.type == EfficiencyType::Polynomial) {
+        if (energyKeV <= 0.01) return 1.0;
+        double lnE = std::log(energyKeV);
+        double sum = 0.0;
+        double term = 1.0;
+        for (double c : m_efficiencyConfig.coeffs) {
+            sum += c * term;
+            term *= lnE;
+        }
+        double eff = std::exp(sum) * m_efficiencyConfig.scalingFactor;
+        return (eff > 0.0) ? eff : 1.0;
+    }
+    if (m_efficiencyConfig.type == EfficiencyType::Spectrum) {
+        const auto &vec = m_efficiencyConfig.spectrumData;
+        int idx = static_cast<int>(std::round(energyKeV));
+        if (idx >= 0 && idx < static_cast<int>(vec.size()) && vec[idx] > 0.0) {
+            return vec[idx] * m_efficiencyConfig.scalingFactor;
+        }
+    }
+    return 1.0;
 }

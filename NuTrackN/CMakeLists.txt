@@ -38,6 +38,9 @@ set(SOURCES
     Sources/complib.c
     Sources/MatrixReader.cxx
     Sources/MatrixDialog.cxx
+    Sources/DisplayParamsDialog.cxx
+    Sources/EfficiencyDialog.cxx
+    Sources/AutoCalibDialog.cxx
 )
 
 set(HEADERS
@@ -53,6 +56,9 @@ set(HEADERS
     Include/complib.h
     Include/MatrixReader.h
     Include/MatrixDialog.h
+    Include/DisplayParamsDialog.h
+    Include/EfficiencyDialog.h
+    Include/AutoCalibDialog.h
 )
 
 add_executable(nutrackn ${SOURCES} ${HEADERS})

@@ -16,6 +16,7 @@
 #include "calib.h"
 #include "PeakFit.h"
 #include "SpectrumImportDialog.h"
+#include "EfficiencyDialog.h"
 #include <memory>
 
 class MatrixReader;
@@ -100,6 +101,8 @@ class MatrixReader;
 
 class TH1F;
 class QMainCanvas;
+class DisplayParamsDialog;
+class AutoCalibDialog;
 
 class QZoomHUD : public QWidget
 {
@@ -168,6 +171,11 @@ protected:
 signals:
    void requestEnCalDialog();
    void requestTrackFitDialog();
+   void requestDisplayParamsDialog();
+   void requestEfficiencyDialog();
+   void requestPeakWidthMode();
+   void requestMatrixSetup();
+   void requestAutoCalibDialog();
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void requestGoToEnergy();
@@ -278,6 +286,9 @@ class QMainCanvas : public QWidget
    friend void showPeakSearchParamsDialog(QMainCanvas *mainCanvas, double sigma, double threshold, const std::vector<DetectedPeak> &peaks, double xMin, double xMax);
    friend class QRootCanvas;
    friend class IntegralDialog;
+   friend class DisplayParamsDialog;
+   friend class EfficiencyDialog;
+   friend class AutoCalibDialog;
 
 public:
     enum class LoadBehavior {
@@ -304,6 +315,15 @@ public:
    QString getAreaLogFileName() const { return m_areaLogFile.fileName(); }
    void writeAreaLogHeader(bool isFitting);
    void writeAreaLogData(double centroid, double fwhm, double gross, double net, double background, double error);
+
+   // Block 3: Setup & Parameter Definition Dialogs
+   void openDisplayParamsDialog();
+   void openEfficiencyDialog();
+   void openPeakWidthModeDialog();
+   void openAutoCalibDialog();
+   const EfficiencyConfig& getEfficiencyConfig() const { return m_efficiencyConfig; }
+   void setEfficiencyConfig(const EfficiencyConfig &cfg) { m_efficiencyConfig = cfg; }
+   double evaluateEfficiency(double energyKeV) const;
          int numberoftimes=1;
    std::vector<int> colors_hist={4,2,3,7,6,1,5,28,38,30,8};
 
@@ -564,6 +584,12 @@ protected:
     AreaLogContext  m_lastAreaLogContext{AreaLogContext::None};
     QFile           m_areaLogFile;
     QTextStream     m_areaLogStream;
+
+    // Block 3: Display Parameters (DD) & Efficiency (DE)
+    double          m_autoscaleHeadroomLinear{10.0};
+    double          m_autoscaleHeadroomLog{30.0};
+    int             m_defaultZoomWidth{200};
+    EfficiencyConfig m_efficiencyConfig;
 };
 
 

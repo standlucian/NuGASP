@@ -33,3 +33,9 @@ cmake_install.cmake
 NuTrackN/nutrackn
 NuTrackN/canvas
 NuTrackN/Legacy/xtrack/xtrackn
+
+# Runtime output / logs
+NuTrackN/check
+NuTrackN/log.txt
+*.ps
+log.txt
