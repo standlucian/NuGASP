@@ -782,6 +782,13 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     showFitParametersDialog(mainCanvas, "AutoFit Parameters", autoHtml, peaks);
 
+    if (mainCanvas->m_isAreaLoggingEnabled) {
+        mainCanvas->writeAreaLogHeader(true);
+        double bkgVal = mainCanvas->backgroundFunction ? mainCanvas->backgroundFunction->Integral(fitMin, fitMax) : 0.0;
+        double grossVal = gaussianIntegral + bkgVal;
+        mainCanvas->writeAreaLogData(dispEnergy, dispFWHM, grossVal, gaussianIntegral, bkgVal, gaussianIntegralError);
+    }
+
     TList *funcList = hist->GetListOfFunctions();
     if (funcList) {
         TObject *fitFunc = funcList->FindObject(mainCanvas->gaussianWithBackgroundFunction->GetName());
@@ -1185,6 +1192,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     }
 
     std::vector<FittedPeakData> peaks(nPeaks);
+    std::vector<double> peakCenters(nPeaks);
 
     // Calculate individual peak integrals, uncertainties, and print data rows
     for (std::size_t i = 0; i < nPeaks; ++i) {
@@ -1226,6 +1234,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         const Double_t peakCenter = fullFunction->GetParameter(meanIdx);
         const Double_t centerErr  = fullFunction->GetParError(meanIdx);
         const Double_t peakArea   = tempGaussFunction.Integral(r0, r1);
+        peakCenters[i] = peakCenter;
 
         Double_t dispEnergy = peakCenter;
         Double_t dispEnergyErr = centerErr;
@@ -1308,6 +1317,28 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         peaks[i].isCalibrated = isCalib;
     }
     mainCanvas->m_lastMultiPeakCount = nPeaks;
+
+    if (mainCanvas->m_isAreaLoggingEnabled && nPeaks > 0) {
+        mainCanvas->writeAreaLogHeader(true);
+        TF1 bkgTF1_log("bkgTF1_log", "[0]*x + [1]", r0, r1);
+        bkgTF1_log.SetParameter(0, mainCanvas->backgroundA1);
+        bkgTF1_log.SetParameter(1, mainCanvas->backgroundA0);
+
+        for (std::size_t i = 0; i < nPeaks; ++i) {
+            double bkgForPeak = 0.0;
+            if (nPeaks == 1) {
+                bkgForPeak = mainCanvas->backgroundIntegral;
+            } else {
+                double pMin = (i == 0) ? r0 : 0.5 * (peakCenters[i - 1] + peakCenters[i]);
+                double pMax = (i + 1 == nPeaks) ? r1 : 0.5 * (peakCenters[i] + peakCenters[i + 1]);
+                if (pMax > pMin) {
+                    bkgForPeak = bkgTF1_log.Integral(pMin, pMax);
+                }
+            }
+            double grossArea = peaks[i].netArea + bkgForPeak;
+            mainCanvas->writeAreaLogData(peaks[i].centroid, peaks[i].width, grossArea, peaks[i].netArea, bkgForPeak, peaks[i].netAreaErr);
+        }
+    }
 
     CommandPrompt::getInstance()->appendPlainText("");
     mainCanvas->renderPeakLabels(mainCanvas->SelectedElement_i, mainCanvas->SelectedElement_j);

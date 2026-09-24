@@ -358,6 +358,8 @@ void integral_function(TH1F* histogram,
             p.fwhmError = fwhmError;
             p.energy = isCalib ? energy : centroid;
             p.energyError = isCalib ? energyError : centroidError;
+            p.energyFwhm = widthDisp;
+            p.energyFwhmError = widthDispError;
             p.isCalibrated = isCalib;
             outPeaks->push_back(p);
         }

@@ -541,6 +541,7 @@ void QMainCanvas::clearDrawnObjects()
 //==============================================================================
 QMainCanvas::~QMainCanvas()
 {
+    stopAreaLogging();
     clearDrawnObjects();
     delete backgroundCovarianceMatrix;
     backgroundCovarianceMatrix = nullptr;
@@ -1668,4 +1669,71 @@ void QMainCanvas::setYMin(double yVal)
 
         CommandPrompt::getInstance()->appendPlainText(QString("Y-Min forced to %1 (FU)\n").arg(yCursorVal));
     }
+}
+
+bool QMainCanvas::startAreaLogging(const QString& fileName) {
+    if (m_areaLogFile.isOpen()) {
+        m_areaLogStream.flush();
+        m_areaLogFile.close();
+    }
+    m_areaLogFile.setFileName(fileName);
+    if (m_areaLogFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        m_areaLogStream.setDevice(&m_areaLogFile);
+        m_isAreaLoggingEnabled = true;
+        m_lastAreaLogContext = AreaLogContext::None;
+        return true;
+    }
+    m_isAreaLoggingEnabled = false;
+    m_lastAreaLogContext = AreaLogContext::None;
+    return false;
+}
+
+bool QMainCanvas::stopAreaLogging() {
+    bool wasOpen = m_areaLogFile.isOpen();
+    if (wasOpen) {
+        m_areaLogStream.flush();
+        m_areaLogFile.close();
+    }
+    m_isAreaLoggingEnabled = false;
+    m_lastAreaLogContext = AreaLogContext::None;
+    return wasOpen;
+}
+
+void QMainCanvas::writeAreaLogHeader(bool isFitting) {
+    if (!m_isAreaLoggingEnabled || !m_areaLogFile.isOpen()) return;
+
+    AreaLogContext targetContext = isFitting ? AreaLogContext::Fitting : AreaLogContext::Integration;
+    if (m_lastAreaLogContext == targetContext) return;
+
+    m_lastAreaLogContext = targetContext;
+    const QString sepLine = QString(98, '-') + "\n";
+    m_areaLogStream << sepLine;
+    if (isFitting) {
+        m_areaLogStream << "Gauss Fit Results:\n";
+    } else {
+        m_areaLogStream << "Integration Results:\n";
+    }
+    const QString headerRow = QString("%1%2%3%4%5%6\n")
+        .arg("Centroid", -16, QChar(' '))
+        .arg("FWHM",     -14, QChar(' '))
+        .arg("Gross",    -18, QChar(' '))
+        .arg("Net",      -18, QChar(' '))
+        .arg("Bkg",      -18, QChar(' '))
+        .arg("Error",    -14, QChar(' '));
+    m_areaLogStream << headerRow;
+    m_areaLogStream << sepLine;
+    m_areaLogStream.flush();
+}
+
+void QMainCanvas::writeAreaLogData(double centroid, double fwhm, double gross, double net, double background, double error) {
+    if (!m_isAreaLoggingEnabled || !m_areaLogFile.isOpen()) return;
+    const QString dataRow = QString("%1%2%3%4%5%6\n")
+        .arg(QString::number(centroid, 'f', 2),   -16, QChar(' '))
+        .arg(QString::number(fwhm, 'f', 2),       -14, QChar(' '))
+        .arg(QString::number(gross, 'f', 1),      -18, QChar(' '))
+        .arg(QString::number(net, 'f', 1),        -18, QChar(' '))
+        .arg(QString::number(background, 'f', 1), -18, QChar(' '))
+        .arg(QString::number(error, 'f', 1),      -14, QChar(' '));
+    m_areaLogStream << dataRow;
+    m_areaLogStream.flush();
 }

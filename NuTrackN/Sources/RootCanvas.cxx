@@ -21,6 +21,8 @@
 #include <QAction>
 #include <QMessageBox>
 #include <QApplication>
+#include <QFileDialog>
+#include <QInputDialog>
 #include <QGuiApplication>
 #include <QCursor>
 
@@ -50,6 +52,7 @@ QRootCanvas::QRootCanvas(QWidget *parent)
       fKeyWasPressed(false),
       sKeyWasPressed(false),
       dKeyWasPressed(false),
+      oKeyWasPressed(false),
       m_zoomHUD(new QZoomHUD(nullptr)),
       m_mainCanvas(nullptr)
 {
@@ -771,6 +774,18 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_Z:
                 // Redundant Z press: cancel prefix
                 break;
+            case Qt::Key_F:
+            case Qt::Key_L:
+                // Z + F / Z + L: Close Area Output File
+                if (m_mainCanvas) {
+                    QString logName = m_mainCanvas->getAreaLogFileName();
+                    if (m_mainCanvas->stopAreaLogging()) {
+                        CommandPrompt::getInstance()->appendPlainText("Area output logging closed: " + logName + "\n");
+                    } else {
+                        CommandPrompt::getInstance()->appendPlainText("No area output file currently open.\n");
+                    }
+                }
+                break;
             case Qt::Key_N:
                 // Z + N: Set load behavior to Autoscale
                 if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
@@ -895,6 +910,21 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_W:
                 emit requestGateCut();
                 break;
+            case Qt::Key_F:
+            case Qt::Key_L: {
+                // D + F / D + L: Define Area Output File
+                if (m_mainCanvas) {
+                    QString fileName = QFileDialog::getSaveFileName(this, "Define Area Output File", "", "Area Log (*.area);;Text Files (*.txt);;All Files (*)");
+                    if (!fileName.isEmpty()) {
+                        if (m_mainCanvas->startAreaLogging(fileName)) {
+                            CommandPrompt::getInstance()->appendPlainText("Area output logging enabled -> " + fileName + "\n");
+                        } else {
+                            CommandPrompt::getInstance()->appendPlainText("Error: Failed to open area output file: " + fileName + "\n");
+                        }
+                    }
+                }
+                break;
+            }
             case Qt::Key_N: {
                 // D + N: Open dialog to set display behavior
                 if (m_mainCanvas) {

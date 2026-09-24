@@ -65,6 +65,8 @@ struct IntegratedPeak {
     Double_t fwhmError{0.0};
     Double_t energy{0.0};
     Double_t energyError{0.0};
+    Double_t energyFwhm{0.0};
+    Double_t energyFwhmError{0.0};
     bool isCalibrated{false};
 };
 

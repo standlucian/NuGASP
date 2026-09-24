@@ -24,6 +24,8 @@ class MatrixReader;
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
+#include <QFile>
+#include <QTextStream>
 #include <QGroupBox>
 #include <QLabel>
 #include <QGridLayout>
@@ -146,7 +148,7 @@ public:
 protected:
    TCanvas        *fCanvas;
    Double_t       xMousePosition, yMousePosition;
-   bool           controlKeyIsPressed, aKeyWasPressed, cKeyWasPressed, zKeyWasPressed, mKeyWasPressed, fKeyWasPressed, sKeyWasPressed, dKeyWasPressed, oKeyWasPressed;
+   bool           controlKeyIsPressed{false}, aKeyWasPressed{false}, cKeyWasPressed{false}, zKeyWasPressed{false}, mKeyWasPressed{false}, fKeyWasPressed{false}, sKeyWasPressed{false}, dKeyWasPressed{false}, oKeyWasPressed{false};
    QZoomHUD       *m_zoomHUD;
    QMainCanvas    *m_mainCanvas;
 
@@ -293,6 +295,15 @@ public:
    int getBinFromClick(int x, int y);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
+
+   enum class AreaLogContext { None, Integration, Fitting };
+
+   bool startAreaLogging(const QString& fileName);
+   bool stopAreaLogging();
+   bool isAreaLoggingEnabled() const { return m_isAreaLoggingEnabled; }
+   QString getAreaLogFileName() const { return m_areaLogFile.fileName(); }
+   void writeAreaLogHeader(bool isFitting);
+   void writeAreaLogData(double centroid, double fwhm, double gross, double net, double background, double error);
          int numberoftimes=1;
    std::vector<int> colors_hist={4,2,3,7,6,1,5,28,38,30,8};
 
@@ -547,6 +558,12 @@ protected:
     QPushButton                   *btnOpenCM{nullptr};
     QPushButton                   *btnGateCM{nullptr};
     std::shared_ptr<MatrixReader>  m_currentMatrix;
+
+    // Area Output Logging
+    bool            m_isAreaLoggingEnabled{false};
+    AreaLogContext  m_lastAreaLogContext{AreaLogContext::None};
+    QFile           m_areaLogFile;
+    QTextStream     m_areaLogStream;
 };
 
 

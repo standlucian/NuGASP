@@ -106,6 +106,15 @@ void QMainCanvas::areaFunction()
         listOfObjectsDrawnOnScreen.Add(lbl);
     }
 
+    if (m_isAreaLoggingEnabled && !peaks.empty()) {
+        writeAreaLogHeader(false);
+        for (const auto &peak : peaks) {
+            double dispCentroid = peak.isCalibrated ? peak.energy : peak.centroid;
+            double dispWidth = peak.isCalibrated ? peak.energyFwhm : peak.fwhm;
+            writeAreaLogData(dispCentroid, dispWidth, peak.grossArea, peak.area, peak.bgArea, peak.areaError);
+        }
+    }
+
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 }
@@ -174,6 +183,16 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog)
         lbl->Draw("same");
         listOfObjectsDrawnOnScreen.Add(lbl);
     }
+
+    if (m_isAreaLoggingEnabled && !peaks.empty()) {
+        writeAreaLogHeader(false);
+        for (const auto &peak : peaks) {
+            double dispCentroid = peak.isCalibrated ? peak.energy : peak.centroid;
+            double dispWidth = peak.isCalibrated ? peak.energyFwhm : peak.fwhm;
+            writeAreaLogData(dispCentroid, dispWidth, peak.grossArea, peak.area, peak.bgArea, peak.areaError);
+        }
+    }
+
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
