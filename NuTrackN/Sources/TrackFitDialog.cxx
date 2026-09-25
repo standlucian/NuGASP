@@ -536,8 +536,12 @@ TrackFitInspectionDialog::TrackFitInspectionDialog(const std::vector<TrackFitPea
 
     QHBoxLayout *eqRow = new QHBoxLayout();
     m_lblEquation = new QLabel(footerBox);
+    const QFont inspDlgFont = Design::getDialogFont();
+    const int inspPt = inspDlgFont.pointSize() > 0 ? inspDlgFont.pointSize() : 11;
     m_lblRms = new QLabel(footerBox);
-    m_lblRms->setStyleSheet("font-weight: bold; color: #4ec9b0; font-size: 13px;");
+    m_lblRms->setFont(inspDlgFont);
+    m_lblRms->setStyleSheet(QString("font-weight: bold; color: #4ec9b0; font-family: \"%1\"; font-size: %2pt;")
+        .arg(inspDlgFont.family()).arg(inspPt));
     eqRow->addWidget(m_lblEquation, 1);
     eqRow->addWidget(m_lblRms);
     footerLayout->addLayout(eqRow);
@@ -673,18 +677,20 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
 
     QString statusText;
     if (m_activeHist && m_activeHist->IsCalibrated()) {
-        statusText = "<span style='color:#4ec9b0;'>CALIBRATED</span>";
+        statusText = "<span style='color:#4ec9b0; font-weight:bold;'>CALIBRATED</span>";
     } else {
-        statusText = "<span style='color:#f48771;'>UNCALIBRATED</span>";
+        statusText = "<span style='color:#f48771; font-weight:bold;'>UNCALIBRATED</span>";
     }
 
     const QFont dlgFont = Design::getDialogFont();
     const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     QLabel *lblPadInfo = new QLabel(
-        QString("<span style='font-family:\"%1\"; font-size:%2pt;'><b>Pad:</b> (%3, %4) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%5 &nbsp;|&nbsp; <b>Current Status:</b> %6</span>")
-            .arg(dlgFont.family()).arg(pt).arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
+        QString("<span style='font-family:\"%1\"; font-size:%2pt; color:%3;'><b>Pad:</b> (%4, %5) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%6 &nbsp;|&nbsp; <b>Current Status:</b> %7</span>")
+            .arg(dlgFont.family()).arg(pt).arg(Design::getDialogTextColor().name()).arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
         headerBox);
     lblPadInfo->setFont(dlgFont);
+    lblPadInfo->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogTextColor().name(), dlgFont.family()).arg(pt));
     headerLayout->addWidget(lblPadInfo);
     headerLayout->addStretch(1);
     mainLayout->addWidget(headerBox);
@@ -807,8 +813,10 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
 
     m_lblInspectorDetails = new QLabel(inspectorBox);
     m_lblInspectorDetails->setFont(dlgFont);
-    m_lblInspectorDetails->setStyleSheet(QString("background: %1; border: 1px solid %2; padding: 6px; border-radius: 4px; font-family: \"%3\"; font-size: %4pt;")
-        .arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name(),
+    m_lblInspectorDetails->setStyleSheet(QString("background: %1; color: %2; border: 1px solid %3; padding: 6px; border-radius: 4px; font-family: \"%4\"; font-size: %5pt;")
+        .arg(Design::getDialogBackgroundColor().lighter(115).name(),
+             Design::getDialogTextColor().name(),
+             Design::getDialogBackgroundColor().lighter(135).name(),
              dlgFont.family()).arg(pt));
     m_lblInspectorDetails->setWordWrap(true);
     inspectorLayout->addWidget(m_lblInspectorDetails);
@@ -858,7 +866,9 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     m_comboPolyOrder->setCurrentIndex(1); // Default to quadratic
 
     m_lblRmsResidual = new QLabel("RMS Residual: - keV", summaryBox);
-    m_lblRmsResidual->setStyleSheet("color: #4ec9b0; font-weight: bold; font-size: 13px;");
+    m_lblRmsResidual->setFont(dlgFont);
+    m_lblRmsResidual->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+        .arg(dlgFont.family()).arg(pt));
 
     sumRow1->addWidget(lblOrder);
     sumRow1->addWidget(m_comboPolyOrder);
@@ -871,7 +881,9 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     summaryLayout->addWidget(m_lblEquation);
 
     m_lblFwhmEquation = new QLabel("<b>Energy Resolution (FWHM):</b> <i>FWHM(E) = -</i>", summaryBox);
-    m_lblFwhmEquation->setStyleSheet("color: #cccccc; font-size: 12px;");
+    m_lblFwhmEquation->setFont(dlgFont);
+    m_lblFwhmEquation->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogTextColor().name(), dlgFont.family()).arg(pt));
     summaryLayout->addWidget(m_lblFwhmEquation);
 
     mainLayout->addWidget(summaryBox);
@@ -1188,9 +1200,15 @@ void TrackFitDialog::onTableSelectionChanged()
 //==============================================================================
 void TrackFitDialog::updateInspectorView(int row)
 {
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
+    const QString textColor = Design::getDialogTextColor().name();
+
     if (row < 0 || row >= static_cast<int>(m_peakResults.size())) {
         m_inspectorTile->clearData();
-        m_lblInspectorDetails->setText("No peak selected.");
+        m_lblInspectorDetails->setFont(dlgFont);
+        m_lblInspectorDetails->setText(QString("<div style='font-family:\"%1\"; font-size:%2pt; color:%3;'>No peak selected.</div>")
+            .arg(dlgFont.family()).arg(pt).arg(textColor));
         return;
     }
 
@@ -1198,14 +1216,12 @@ void TrackFitDialog::updateInspectorView(int row)
     const auto &res = m_peakResults[row];
     m_inspectorTile->setPeakData(res, row);
 
-    const QFont dlgFont = Design::getDialogFont();
-    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     const QString statusColor = (res.status == "OK" || res.status == "Found" || res.status == "Fitted")
                                     ? "#51cf66"
                                     : (res.status == "Weak" || res.status == "Uncertain") ? "#ffd43b" : "#ff6b6b";
     QString details = QString(
-        "<div style='font-family:\"%11\"; font-size:%12pt;'>"
-        "<b>Peak:</b> %1 keV &nbsp;|&nbsp; <b>Status:</b> <span style='color:%2;'>%3</span><br>"
+        "<div style='font-family:\"%11\"; font-size:%12pt; color:%13;'>"
+        "<b>Peak:</b> %1 keV &nbsp;|&nbsp; <b>Status:</b> <span style='color:%2; font-weight:bold;'>%3</span><br>"
         "<b>Predicted Ch:</b> %4 &nbsp;|&nbsp; <b>Fitted Centroid:</b> %5<br>"
         "<b>FWHM:</b> %6 keV (%7 ch) &nbsp;|&nbsp; <b>Net Area:</b> %8 counts<br>"
         "<b>Recalibrated Energy:</b> %9 keV &nbsp;|&nbsp; <b>Residual ΔE:</b> %10 keV"
@@ -1221,7 +1237,8 @@ void TrackFitDialog::updateInspectorView(int row)
         .arg(res.calcEnergy > 0 ? QString::number(res.calcEnergy, 'f', 2) : "-")
         .arg(res.fittedCentroid > 0 ? QString("%1%2").arg(res.residualEnergy >= 0 ? "+" : "").arg(res.residualEnergy, 0, 'f', 3) : "-")
         .arg(dlgFont.family())
-        .arg(pt);
+        .arg(pt)
+        .arg(textColor);
 
     m_lblInspectorDetails->setFont(dlgFont);
     m_lblInspectorDetails->setText(details);

@@ -197,8 +197,12 @@ void AutoCalibDialog::setupUI()
     btnSearch->setStyleSheet("QPushButton { background-color: #264f78; border-color: #3880c0; }");
     connect(btnSearch, &QPushButton::clicked, this, &AutoCalibDialog::runSearchAndMatch);
 
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     m_lblResultStatus = new QLabel(tr("Ready to search peaks and match reference energies."), grpMatches);
-    m_lblResultStatus->setStyleSheet("color: #4ec9b0; font-weight: bold;");
+    m_lblResultStatus->setFont(dlgFont);
+    m_lblResultStatus->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+        .arg(dlgFont.family()).arg(pt));
 
     actionLayout->addWidget(btnSearch);
     actionLayout->addSpacing(10);
@@ -308,7 +312,10 @@ void AutoCalibDialog::runSearchAndMatch()
     std::vector<DetectedPeak> detected = findPeaksWithTSpectrum(hist, sigma, threshold, false);
     if (detected.size() < 2) {
         m_lblResultStatus->setText(tr("Insufficient peaks detected (< 2). Try lowering threshold or adjusting sigma."));
-        m_lblResultStatus->setStyleSheet("color: #f48771; font-weight: bold;");
+        const QFont df = Design::getDialogFont();
+        m_lblResultStatus->setFont(df);
+        m_lblResultStatus->setStyleSheet(QString("color: #f48771; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+            .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
         m_btnApply->setEnabled(false);
         return;
     }
@@ -382,7 +389,10 @@ void AutoCalibDialog::runSearchAndMatch()
 
     if (maxFound < 2) {
         m_lblResultStatus->setText(tr("No consistent calibration pattern found within gain limits."));
-        m_lblResultStatus->setStyleSheet("color: #f48771; font-weight: bold;");
+        const QFont df = Design::getDialogFont();
+        m_lblResultStatus->setFont(df);
+        m_lblResultStatus->setStyleSheet(QString("color: #f48771; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+            .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
         m_btnApply->setEnabled(false);
         return;
     }
@@ -442,7 +452,10 @@ void AutoCalibDialog::runSearchAndMatch()
         .arg(bestA1, 0, 'f', 4)
         .arg(maxFound)
         .arg(refEnergies.size()));
-    m_lblResultStatus->setStyleSheet("color: #4ec9b0; font-weight: bold;");
+    const QFont df = Design::getDialogFont();
+    m_lblResultStatus->setFont(df);
+    m_lblResultStatus->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+        .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
     m_btnApply->setEnabled(true);
 }
 

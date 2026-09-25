@@ -334,21 +334,22 @@ void runTwoPointCalibrationDialog(QWidget *parent,
     // Construct the Qt modal dialog
     QDialog dialog(parent);
     dialog.setWindowTitle("Energy Calibration (1st Order)");
-    dialog.setStyleSheet(
-        "QDialog { background-color: #2b2b2b; color: #ffffff; }"
-        "QLabel { color: #ffffff; font-size: 19px; }"
-        "QSpinBox { background-color: #ffffff; color: #000000; font-size: 19px; font-weight: bold; border-radius: 3px; padding: 4px 8px; }"
-        "QLineEdit { background-color: #ffffff; color: #000000; font-size: 19px; border: 1px solid #707070; border-radius: 3px; padding: 4px 8px; }"
-    );
+    dialog.setFont(Design::getDialogFont());
+    dialog.setStyleSheet(Design::getDialogStyleSheet());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
     mainLayout->setSpacing(16);
     mainLayout->setContentsMargins(20, 20, 20, 20);
 
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
+
     // Top control: How many points should be used? (limited to available markers)
     QHBoxLayout *topControlLayout = new QHBoxLayout();
     QLabel *lblHowMany = new QLabel("How many points should be used?", &dialog);
-    lblHowMany->setStyleSheet("font-weight: bold; font-size: 19px;");
+    lblHowMany->setFont(dlgFont);
+    lblHowMany->setStyleSheet(QString("font-weight: bold; font-family: \"%1\"; font-size: %2pt; color: %3;")
+        .arg(dlgFont.family()).arg(pt + 1).arg(Design::getDialogTextColor().name()));
 
     QSpinBox *pointsSpinBox = new QSpinBox(&dialog);
     pointsSpinBox->setRange(2, availableMarkers);
@@ -398,20 +399,23 @@ void runTwoPointCalibrationDialog(QWidget *parent,
 
             QLabel *idxLabel = new QLabel(QString("Point %1:").arg(idx + 1), rowWidget);
             idxLabel->setFixedWidth(85);
-            idxLabel->setStyleSheet("color: #00ffff; font-weight: bold;");
+            idxLabel->setFont(dlgFont);
+            idxLabel->setStyleSheet(QString("color: %1; font-weight: bold; font-family: \"%2\"; font-size: %3pt;")
+                .arg(Design::getDialogAccentColor().name(), dlgFont.family()).arg(pt));
 
             QLabel *chLabel = new QLabel("Channel:", rowWidget);
-            chLabel->setStyleSheet("color: #dddddd;");
+            chLabel->setFont(dlgFont);
             QLineEdit *chEdit = new QLineEdit(rowWidget);
             chEdit->setFixedWidth(140);
             chEdit->setReadOnly(true);
             chEdit->setFocusPolicy(Qt::NoFocus);
-            chEdit->setStyleSheet("background-color: #383838; color: #9cdcfe; font-weight: bold; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px;");
+            chEdit->setFont(dlgFont);
 
             QLabel *enLabel = new QLabel("Energy (keV):", rowWidget);
-            enLabel->setStyleSheet("color: #dddddd;");
+            enLabel->setFont(dlgFont);
             QLineEdit *enEdit = new QLineEdit(rowWidget);
             enEdit->setFixedWidth(170);
+            enEdit->setFont(dlgFont);
 
             rowHBox->addWidget(idxLabel);
             rowHBox->addWidget(chLabel);
@@ -557,22 +561,8 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     QDialog dialog(mainCanvas);
     dialog.setWindowTitle("Energy Calibration Manager (EnCal)");
     dialog.resize(820, 600);
-    dialog.setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QTabWidget::pane { border: 1px solid #3e3e42; background: #252526; border-radius: 4px; }"
-        "QTabBar::tab { background: #2d2d30; color: #cccccc; padding: 8px 18px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; font-weight: bold; font-size: 13px; }"
-        "QTabBar::tab:selected { background: #007acc; color: #ffffff; }"
-        "QLabel { color: #e0e0e0; font-size: 13px; }"
-        "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 5px 8px; font-size: 13px; }"
-        "QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid #007acc; }"
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 6px 16px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-        "QPushButton:pressed { background-color: #007acc; }"
-        "QTableWidget { background-color: #252526; color: #ffffff; gridline-color: #3e3e42; selection-background-color: #094771; font-size: 13px; }"
-        "QHeaderView::section { background-color: #2d2d30; color: #cccccc; padding: 6px; border: 1px solid #3e3e42; font-weight: bold; font-size: 12px; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 12px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-    );
+    dialog.setFont(Design::getDialogFont());
+    dialog.setStyleSheet(Design::getDialogStyleSheet());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(&dialog);
     mainLayout->setSpacing(12);
@@ -584,16 +574,22 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     headerLayout->setContentsMargins(12, 12, 12, 12);
     headerLayout->setSpacing(8);
 
+    const QFont calibDlgFont = Design::getDialogFont();
+    const int calibPt = calibDlgFont.pointSize() > 0 ? calibDlgFont.pointSize() : 11;
+
     QHBoxLayout *headerRow1 = new QHBoxLayout();
     QLabel *lblTarget = new QLabel(
         QString("<b>Pad Location:</b> Row %1, Col %2 &nbsp;|&nbsp; <b>Current Spectrum Index:</b> #%3")
             .arg(sel_i).arg(sel_j).arg(mainCanvas->getCurrentSpectrumIndex()),
         headerBox);
-    lblTarget->setStyleSheet("color: #9cdcfe; font-size: 13px;");
+    lblTarget->setFont(calibDlgFont);
+    lblTarget->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogAccentColor().name(), calibDlgFont.family()).arg(calibPt));
     headerRow1->addWidget(lblTarget);
     headerRow1->addStretch(1);
 
     QPushButton *btnDisableCalib = new QPushButton("Disable Calibration", headerBox);
+    btnDisableCalib->setFont(calibDlgFont);
     btnDisableCalib->setStyleSheet(
         "QPushButton { background-color: #3a2020; color: #f48771; border: 1px solid #803030; border-radius: 4px; padding: 5px 12px; font-weight: bold; }"
         "QPushButton:hover { background-color: #502525; border-color: #a04040; }"
@@ -603,6 +599,9 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     headerLayout->addLayout(headerRow1);
 
     QLabel *lblStatus = new QLabel(headerBox);
+    lblStatus->setFont(calibDlgFont);
+    lblStatus->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogTextColor().name(), calibDlgFont.family()).arg(calibPt));
     headerLayout->addWidget(lblStatus);
     mainLayout->addWidget(headerBox);
 
@@ -610,13 +609,13 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
         if (activeHist->IsCalibrated()) {
             const auto &segs = activeHist->GetCalibrationSegments();
             if (segs.size() > 1) {
-                lblStatus->setText(QString("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; Piecewise polynomial (%1 segments loaded).")
+                lblStatus->setText(QString("<b>Status:</b> <span style='color:#4ec9b0; font-weight:bold;'>CALIBRATED</span> &mdash; Piecewise polynomial (%1 segments loaded).")
                     .arg(segs.size()));
             } else {
-                lblStatus->setText("<b>Status:</b> <span style='color:#4ec9b0;'>CALIBRATED</span> &mdash; Single segment: Polynomial");
+                lblStatus->setText("<b>Status:</b> <span style='color:#4ec9b0; font-weight:bold;'>CALIBRATED</span> &mdash; Single segment: Polynomial");
             }
         } else {
-            lblStatus->setText("<b>Status:</b> <span style='color:#f48771;'>UNCALIBRATED</span> &mdash; Displaying raw spectrum channels.");
+            lblStatus->setText("<b>Status:</b> <span style='color:#f48771; font-weight:bold;'>UNCALIBRATED</span> &mdash; Displaying raw spectrum channels.");
         }
     };
     updateStatusLabel();

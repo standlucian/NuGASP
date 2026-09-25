@@ -218,8 +218,13 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     mainLayout->setContentsMargins(18, 18, 18, 18);
 
     // Title / Description
+    const QFont df = Design::getDialogFont();
     auto *titleLabel = new QLabel(tr("<b>Export Active Spectrum to Disk</b>"), this);
-    titleLabel->setStyleSheet("font-size: 14px; color: #60a5fa;");
+    titleLabel->setFont(df);
+    titleLabel->setStyleSheet(QString("font-size: %1pt; color: %2; font-family: \"%3\";")
+        .arg(df.pointSize() > 0 ? df.pointSize() + 2 : 13)
+        .arg(Design::getDialogAccentColor().name())
+        .arg(df.family()));
     mainLayout->addWidget(titleLabel);
 
     // Grid Form
@@ -326,17 +331,24 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
 
     // Preview / Summary Box
     auto *infoBox = new QFrame(this);
-    infoBox->setStyleSheet("background-color: #252526; border: 1px solid #3c3c3c; border-radius: 4px; padding: 10px;");
+    infoBox->setStyleSheet(QString("background-color: %1; border: 1px solid %2; border-radius: 4px; padding: 10px;")
+        .arg(Design::getDialogBackgroundColor().lighter(115).name())
+        .arg(Design::getDialogBackgroundColor().lighter(135).name()));
     auto *infoLayout = new QVBoxLayout(infoBox);
     infoLayout->setSpacing(4);
     infoLayout->setContentsMargins(8, 8, 8, 8);
 
+    const int pt = df.pointSize() > 0 ? df.pointSize() : 11;
     m_summaryLabel = new QLabel(this);
-    m_summaryLabel->setStyleSheet("color: #9cdcfe; font-weight: bold;");
+    m_summaryLabel->setFont(df);
+    m_summaryLabel->setStyleSheet(QString("color: %1; font-weight: bold; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogAccentColor().name(), df.family()).arg(pt));
     infoLayout->addWidget(m_summaryLabel);
 
     m_previewLabel = new QLabel(this);
-    m_previewLabel->setStyleSheet("color: #a0a0a0; font-size: 11px;");
+    m_previewLabel->setFont(df);
+    m_previewLabel->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogTextColor().name(), df.family()).arg(pt));
     infoLayout->addWidget(m_previewLabel);
 
     mainLayout->addWidget(infoBox);

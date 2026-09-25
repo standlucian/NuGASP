@@ -97,8 +97,12 @@ void EfficiencyDialog::setupUI()
     m_spinTestEnergy->setRange(1.0, 10000.0);
     m_spinTestEnergy->setValue(1332.5);
     m_spinTestEnergy->setDecimals(1);
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     m_lblTestResult = new QLabel(tr("Calculated Eff: -"), m_grpPoly);
-    m_lblTestResult->setStyleSheet("color: #4ec9b0; font-weight: bold; font-size: 13px;");
+    m_lblTestResult->setFont(dlgFont);
+    m_lblTestResult->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+        .arg(dlgFont.family()).arg(pt));
     connect(m_spinTestEnergy, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EfficiencyDialog::updateTestCalculation);
 
     testLayout->addWidget(lblTest);

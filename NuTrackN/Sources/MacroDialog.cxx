@@ -37,11 +37,15 @@ void MacroDialog::setupUI()
     mainLayout->setContentsMargins(12, 12, 12, 12);
 
     // 1. Top description banner
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     QLabel *lblDesc = new QLabel(
         tr("<b>Xtrackn Command Strings & Macros:</b> Configure sequence strings for slots 0–9.<br>"
            "Trigger via keyboard: <b>[0-9]</b> to run once, <b>D+[0-9]</b> to define, <b>C+[0-9]</b> to cycle, "
            "<b>M+[0-9]</b> to show, <b>Z+[0-9]</b> to erase."), this);
-    lblDesc->setStyleSheet("color: #9cdcfe; margin-bottom: 4px;");
+    lblDesc->setFont(dlgFont);
+    lblDesc->setStyleSheet(QString("color: %1; margin-bottom: 4px; font-family: \"%2\"; font-size: %3pt;")
+        .arg(Design::getDialogAccentColor().name(), dlgFont.family()).arg(pt));
     mainLayout->addWidget(lblDesc);
 
     // 2. Table of Macros (Slots 0 to 9)
@@ -114,8 +118,9 @@ void MacroDialog::setupUI()
 
     QTextBrowser *helpBrowser = new QTextBrowser(grpHelp);
     helpBrowser->setFixedHeight(120);
-    helpBrowser->setHtml(
-        "<table style='width:100%; font-family:monospace;'>"
+    helpBrowser->setFont(dlgFont);
+    helpBrowser->setHtml(QString(
+        "<table style='width:100%; font-family:\"%1\", sans-serif; font-size:%2pt; color:%3;'>"
         "<tr>"
         "<td><b>N / N+</b>: Next Spectrum</td>"
         "<td><b>N-</b>: Prev Spectrum</td>"
@@ -143,7 +148,7 @@ void MacroDialog::setupUI()
         "<td><b>ZA</b>: Delete All Markers</td>"
         "</tr>"
         "</table>"
-    );
+    ).arg(dlgFont.family()).arg(pt).arg(Design::getDialogTextColor().name()));
     helpLayout->addWidget(helpBrowser);
     mainLayout->addWidget(grpHelp);
 

@@ -381,23 +381,29 @@ void MatrixDialog::setupUI()
     QLabel *lblTitle = new QLabel(QString("<b>Matrix File:</b> %1").arg(titleText), headerFrame);
     headerLayout->addWidget(lblTitle);
 
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
+    const QString textColor = Design::getDialogTextColor().name();
+    const QString accentColor = Design::getDialogAccentColor().name();
+
     // Symmetry notice
     m_lblSymmetryBanner = new QLabel(headerFrame);
+    m_lblSymmetryBanner->setFont(dlgFont);
     if (m_reader && m_reader->isSymmetric()) {
-        m_lblSymmetryBanner->setStyleSheet(
+        m_lblSymmetryBanner->setStyleSheet(QString(
             "background-color: #133827; color: #44ffaa; border: 1px solid #287a53; "
-            "border-radius: 4px; padding: 6px 12px; font-size: 13px; font-weight: bold;"
-        );
+            "border-radius: 4px; padding: 6px 12px; font-family: \"%1\"; font-size: %2pt; font-weight: bold;"
+        ).arg(dlgFont.family()).arg(pt));
         m_lblSymmetryBanner->setText(
             QString("✓ Symmetrical Matrix (%1 x %2 channels) — Projection X and Projection Y are identical.")
                 .arg(m_reader->getResolutionX())
                 .arg(m_reader->getResolutionY())
         );
     } else if (m_reader) {
-        m_lblSymmetryBanner->setStyleSheet(
+        m_lblSymmetryBanner->setStyleSheet(QString(
             "background-color: #3b2810; color: #ffb84d; border: 1px solid #7d501a; "
-            "border-radius: 4px; padding: 6px 12px; font-size: 13px; font-weight: bold;"
-        );
+            "border-radius: 4px; padding: 6px 12px; font-family: \"%1\"; font-size: %2pt; font-weight: bold;"
+        ).arg(dlgFont.family()).arg(pt));
         m_lblSymmetryBanner->setText(
             QString("⇄ Non-Symmetrical Matrix (%1 x %2 channels) — Asymmetrical axes with independent projections.")
                 .arg(m_reader->getResolutionX())
@@ -417,7 +423,8 @@ void MatrixDialog::setupUI()
 
     if (m_reader && !m_reader->isSymmetric()) {
         QLabel *lblPrompt = new QLabel(tr("Select which projection spectrum to load into the active pad:"), grpSelection);
-        lblPrompt->setStyleSheet("color: #b0b8c6; font-size: 13px;");
+        lblPrompt->setFont(dlgFont);
+        lblPrompt->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;").arg(textColor, dlgFont.family()).arg(pt));
         selectionLayout->addWidget(lblPrompt);
 
         QHBoxLayout *radioLayout = new QHBoxLayout();
@@ -444,7 +451,8 @@ void MatrixDialog::setupUI()
             QString("Total 1D Projection (%1 channels, %2 total integral counts)")
                 .arg(m_reader->getResolutionX())
                 .arg(QLocale().toString(static_cast<qlonglong>(m_reader->getTotalCounts()))), grpSelection);
-        lblSym->setStyleSheet("color: #00e0ff; font-weight: bold; font-size: 14px;");
+        lblSym->setFont(dlgFont);
+        lblSym->setStyleSheet(QString("color: %1; font-weight: bold; font-family: \"%2\"; font-size: %3pt;").arg(accentColor, dlgFont.family()).arg(pt));
         selectionLayout->addWidget(lblSym);
     }
     mainLayout->addWidget(grpSelection);
@@ -466,7 +474,8 @@ void MatrixDialog::setupUI()
     previewBar->addStretch(1);
 
     m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-family: monospace;");
+    m_lblHoverReadout->setFont(dlgFont);
+    m_lblHoverReadout->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;").arg(textColor, dlgFont.family()).arg(pt));
     previewBar->addWidget(m_lblHoverReadout);
 
     previewLayout->addLayout(previewBar);
@@ -524,8 +533,10 @@ void MatrixDialog::setupUI()
     bgLayout->addLayout(bgTopRow);
 
     m_lblBgHelp = new QLabel(grpBg);
+    m_lblBgHelp->setFont(dlgFont);
     m_lblBgHelp->setWordWrap(true);
-    m_lblBgHelp->setStyleSheet("color: #9cb3c9; font-size: 12px; font-style: italic;");
+    m_lblBgHelp->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt; font-style: italic;")
+        .arg(textColor, dlgFont.family()).arg(pt));
     bgLayout->addWidget(m_lblBgHelp);
 
     connect(m_chkEnableBg, &QCheckBox::toggled, this, &MatrixDialog::onBackgroundConfigChanged);
@@ -551,7 +562,9 @@ void MatrixDialog::setupUI()
             .arg(m_reader->getNumDivY());
 
         m_lblDetails = new QLabel(details, this);
-        m_lblDetails->setStyleSheet("color: #8c93a1; font-size: 12px;");
+        m_lblDetails->setFont(dlgFont);
+        m_lblDetails->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+            .arg(textColor, dlgFont.family()).arg(pt));
         m_lblDetails->setAlignment(Qt::AlignCenter);
         mainLayout->addWidget(m_lblDetails);
     }
@@ -814,15 +827,21 @@ void MatrixGateDialog::setupUI()
     headerLayout->addWidget(lblTitle);
     headerLayout->addStretch(1);
 
+    const QFont gateDlgFont = Design::getDialogFont();
+    const int gatePt = gateDlgFont.pointSize() > 0 ? gateDlgFont.pointSize() : 11;
+    const QString gateTextColor = Design::getDialogTextColor().name();
+    const QString gateAccentColor = Design::getDialogAccentColor().name();
+
     if (m_reader) {
         QLabel *lblSym = new QLabel(
             m_reader->isSymmetric()
                 ? tr("Symmetric Matrix")
                 : tr("Non-Symmetrical Matrix"), headerFrame);
-        lblSym->setStyleSheet(
+        lblSym->setFont(gateDlgFont);
+        lblSym->setStyleSheet(QString(
             "background-color: #123d2e; color: #44ffaa; border: 1px solid #2e7752; "
-            "border-radius: 4px; padding: 3px 8px; font-size: 12px; font-weight: bold;"
-        );
+            "border-radius: 4px; padding: 3px 8px; font-family: \"%1\"; font-size: %2pt; font-weight: bold;"
+        ).arg(gateDlgFont.family()).arg(gatePt));
         headerLayout->addWidget(lblSym);
     }
     mainLayout->addWidget(headerFrame);
@@ -855,7 +874,9 @@ void MatrixGateDialog::setupUI()
         QHBoxLayout *peakSelectLayout = new QHBoxLayout();
         peakSelectLayout->setSpacing(10);
         m_lblPeakPrompt = new QLabel(tr("Peak Gate:"), grpGate);
-        m_lblPeakPrompt->setStyleSheet("font-weight: bold; color: #00e0ff; font-size: 13px;");
+        m_lblPeakPrompt->setFont(gateDlgFont);
+        m_lblPeakPrompt->setStyleSheet(QString("font-weight: bold; color: %1; font-family: \"%2\"; font-size: %3pt;")
+            .arg(gateAccentColor, gateDlgFont.family()).arg(gatePt));
         peakSelectLayout->addWidget(m_lblPeakPrompt);
 
         m_comboPeakGate = new QComboBox(grpGate);
@@ -876,8 +897,10 @@ void MatrixGateDialog::setupUI()
         gateLayout->addLayout(peakSelectLayout);
 
         m_lblGatesDetail = new QLabel(grpGate);
+        m_lblGatesDetail->setFont(gateDlgFont);
         m_lblGatesDetail->setWordWrap(true);
-        m_lblGatesDetail->setStyleSheet("color: #b0c4de; font-size: 12px; font-family: monospace;");
+        m_lblGatesDetail->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+            .arg(gateTextColor, gateDlgFont.family()).arg(gatePt));
         gateLayout->addWidget(m_lblGatesDetail);
     }
 
@@ -899,11 +922,15 @@ void MatrixGateDialog::setupUI()
     paramGrid->addWidget(m_spinGateMax, 0, 3);
 
     m_lblGateWidth = new QLabel(grpGate);
-    m_lblGateWidth->setStyleSheet("color: #b0b8c6; font-size: 12px;");
+    m_lblGateWidth->setFont(gateDlgFont);
+    m_lblGateWidth->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+        .arg(gateTextColor, gateDlgFont.family()).arg(gatePt));
     paramGrid->addWidget(m_lblGateWidth, 1, 0, 1, 2);
 
     m_lblGateEnergy = new QLabel(grpGate);
-    m_lblGateEnergy->setStyleSheet("color: #44ffaa; font-weight: bold; font-size: 13px;");
+    m_lblGateEnergy->setFont(gateDlgFont);
+    m_lblGateEnergy->setStyleSheet(QString("color: #44ffaa; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
+        .arg(gateDlgFont.family()).arg(gatePt));
     paramGrid->addWidget(m_lblGateEnergy, 1, 2, 1, 2);
 
     gateLayout->addLayout(paramGrid);
@@ -914,7 +941,8 @@ void MatrixGateDialog::setupUI()
 
     m_chkEnableBg = new QCheckBox(tr("Background Subtraction:"), grpGate);
     m_chkEnableBg->setChecked(m_reader ? m_reader->getBackgroundConfig().enabled : true);
-    m_chkEnableBg->setStyleSheet("font-weight: bold; color: #ffffff;");
+    m_chkEnableBg->setFont(gateDlgFont);
+    m_chkEnableBg->setStyleSheet(QString("font-weight: bold; color: %1;").arg(gateTextColor));
     bgRow->addWidget(m_chkEnableBg);
 
     m_lblBgModePrompt = new QLabel(tr("Mode:"), grpGate);
@@ -949,8 +977,10 @@ void MatrixGateDialog::setupUI()
     gateLayout->addLayout(bgRow);
 
     m_lblBgStats = new QLabel(grpGate);
+    m_lblBgStats->setFont(gateDlgFont);
     m_lblBgStats->setWordWrap(true);
-    m_lblBgStats->setStyleSheet("color: #44ffaa; font-size: 12px; font-family: monospace;");
+    m_lblBgStats->setStyleSheet(QString("color: #44ffaa; font-family: \"%1\"; font-size: %2pt;")
+        .arg(gateDlgFont.family()).arg(gatePt));
     gateLayout->addWidget(m_lblBgStats);
 
     connect(m_chkEnableBg, &QCheckBox::toggled, this, &MatrixGateDialog::onBackgroundSettingsChanged);
@@ -980,7 +1010,8 @@ void MatrixGateDialog::setupUI()
     previewBar->addStretch(1);
 
     m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-family: monospace;");
+    m_lblHoverReadout->setFont(gateDlgFont);
+    m_lblHoverReadout->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;").arg(gateTextColor, gateDlgFont.family()).arg(gatePt));
     previewBar->addWidget(m_lblHoverReadout);
 
     previewLayout->addLayout(previewBar);
