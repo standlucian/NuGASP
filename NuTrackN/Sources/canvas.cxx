@@ -12,7 +12,9 @@
 #include "EfficiencyDialog.h"
 #include "AutoCalibDialog.h"
 #include "MacroDialog.h"
+#include "IntegralDialog.h"
 #include <QInputDialog>
+#include <QShortcut>
 
 #include <TCanvas.h>
 #include <TH1F.h>
@@ -519,6 +521,13 @@ QMainCanvas::QMainCanvas(QWidget *parent)
             m_macros[i] = {i, "", "", 1, ""};
         }
     }
+
+    // Secret shortcut to open all dialogs simultaneously for visual inspection (Ctrl+Shift+D and F12)
+    QShortcut *shortcutSecret = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D), this, nullptr, nullptr, Qt::ApplicationShortcut);
+    connect(shortcutSecret, &QShortcut::activated, this, &QMainCanvas::openAllDialogsForInspection);
+
+    QShortcut *shortcutF12 = new QShortcut(QKeySequence(Qt::Key_F12), this, nullptr, nullptr, Qt::ApplicationShortcut);
+    connect(shortcutF12, &QShortcut::activated, this, &QMainCanvas::openAllDialogsForInspection);
 }
 
 //==============================================================================
@@ -1293,6 +1302,71 @@ void QMainCanvas::OpenColorSelectionDialog() {
 }
 
 //==============================================================================
+// QMainCanvas::openAllDialogsForInspection
+//==============================================================================
+// Secret shortcut action (Ctrl+Shift+D or F12) that instantiates and cascades
+// all dialogs non-modally for comprehensive visual theme and typography testing.
+//==============================================================================
+void QMainCanvas::openAllDialogsForInspection() {
+    QList<QDialog*> dialogList;
+
+    // 1. Appearance & Typography Settings Dialog
+    dialogList.append(Design::createAppearanceDialog(this, this));
+
+    // 2. Display Parameters & Grid Dialog
+    dialogList.append(new DisplayParamsDialog(this, this));
+
+    // 3. Spectrum Import / Read Dialog
+    dialogList.append(new SpectrumImportDialog(m_currentSpectrumFile.isEmpty() ? "sample.spe" : m_currentSpectrumFile, this));
+
+    // 4. Spectrum Export / Write Dialog
+    std::vector<double> exportSample(1024, 0.0);
+    if (selectedHisto) {
+        int n = selectedHisto->GetNbinsX();
+        exportSample.resize(n);
+        for (int i = 0; i < n; ++i) exportSample[i] = selectedHisto->GetBinContent(i + 1);
+    }
+    dialogList.append(new SpectrumExportDialog(exportSample, "sample_export.spe", SpectrumFormat::LongInt32, exportSample.size(), this));
+
+    // 5. Track Fit / Visual Inspection Dialog
+    dialogList.append(new TrackFitDialog(this, getActiveTracknHistogram(), m_currentSpectrumIndex, this));
+
+    // 6. Matrix 2D Inspection Dialog
+    dialogList.append(new MatrixDialog(m_currentMatrix, false, 0.0, 1.0, 0.0, this));
+
+    // 7. Area / Peak Integration Dialog
+    dialogList.append(new IntegralDialog(this, this));
+
+    // 8. Efficiency Calibration Dialog
+    dialogList.append(new EfficiencyDialog(this, this));
+
+    // 9. Automated Energy Calibration Dialog
+    dialogList.append(new AutoCalibDialog(this, this));
+
+    // 10. Macros & Command Strings Dialog
+    dialogList.append(new MacroDialog(this));
+
+    // Cascade all dialogs cleanly across the screen
+    const int startX = 30;
+    const int startY = 30;
+    const int stepX = 40;
+    const int stepY = 40;
+
+    for (int i = 0; i < dialogList.size(); ++i) {
+        QDialog *dlg = dialogList[i];
+        if (!dlg) continue;
+        dlg->setAttribute(Qt::WA_DeleteOnClose);
+        dlg->show();
+        dlg->raise();
+        dlg->move(startX + i * stepX, startY + i * stepY);
+    }
+
+    if (CommandPrompt::getInstance()) {
+        CommandPrompt::getInstance()->appendPlainText(">>> [SECRET KEY Ctrl+Shift+D / F12]: Opened all 10 dialogs for visual inspection.\n");
+    }
+}
+
+//==============================================================================
 // QMainCanvas::Cal2pMain
 //==============================================================================
 // Delegates two-point energy calibration dialog to calib module.
@@ -1450,6 +1524,12 @@ void QMainCanvas::offerHelp()
 
 void QMainCanvas::keyPressEvent(QKeyEvent *event)
 {
+    if (((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) ||
+        event->key() == Qt::Key_F12) {
+        openAllDialogsForInspection();
+        return;
+    }
+
     if (canvas && focusWidget() != canvas) {
         canvas->setFocus();
         QApplication::sendEvent(canvas, event);

@@ -598,6 +598,15 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
         emit mousePilgrimCoordRequest(xMousePosition, yMousePosition);
     }
 
+    // Secret shortcut to open all dialogs for inspection (Ctrl+Shift+D or F12)
+    if (((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) ||
+        event->key() == Qt::Key_F12) {
+        if (m_mainCanvas) {
+            m_mainCanvas->openAllDialogsForInspection();
+            return;
+        }
+    }
+
     if (event->key() == Qt::Key_Control) {
         controlKeyIsPressed = true;
         updateZoomHUD(xMousePosition, yMousePosition);

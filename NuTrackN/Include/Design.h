@@ -96,7 +96,10 @@ namespace Design {
 
     // Aliases for compatibility
     inline void saveTypographySettings() { saveSettings(); }
-    inline void loadTypographySettings() { loadSettings(); }
+    /**
+     * @brief Creates the interactive appearance & typography settings dialog (non-modal).
+     */
+    QDialog* createAppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget);
 
 } // namespace Design
 
@@ -146,6 +149,7 @@ void changeBackgroundColor(TCanvas* canvas);
  * @param parent Parent widget for the dialog.
  * @param canvasWidget Pointer to the main canvas widget.
  */
+QDialog* createAppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget);
 void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget);
 
 #endif // DESIGN_H

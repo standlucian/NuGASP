@@ -1232,6 +1232,16 @@ void AppearanceDialog::revertChanges() {
   refreshDialogTheme();
 }
 
+namespace Design {
+QDialog* createAppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget) {
+  return new AppearanceDialog(parent, canvasWidget);
+}
+}
+
+QDialog* createAppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget) {
+  return Design::createAppearanceDialog(parent, canvasWidget);
+}
+
 void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
   AppearanceDialog dialog(parent, canvasWidget);
   dialog.exec();

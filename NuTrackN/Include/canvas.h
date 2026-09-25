@@ -425,6 +425,7 @@ public slots:
    void IdentifyLastPilgrimHistogram(Double_t x, Double_t y);
    void ColorTheFrameOfTheHistogram();
    void OpenColorSelectionDialog();
+   void openAllDialogsForInspection();
    void showXYcoord(Double_t, Double_t);
    void DeleteCulomn();
    void DeleteLine();
