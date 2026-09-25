@@ -192,17 +192,14 @@ void AutoCalibDialog::setupUI()
     m_tableMatches->verticalHeader()->setVisible(false);
     matchesLayout->addWidget(m_tableMatches);
 
+    const QFont dlgFont = Design::getDialogFont();
     QHBoxLayout *actionLayout = new QHBoxLayout();
     QPushButton *btnSearch = new QPushButton(tr("Search & Match Peaks"), grpMatches);
-    btnSearch->setStyleSheet("QPushButton { background-color: #264f78; border-color: #3880c0; }");
+    btnSearch->setFont(dlgFont);
     connect(btnSearch, &QPushButton::clicked, this, &AutoCalibDialog::runSearchAndMatch);
 
-    const QFont dlgFont = Design::getDialogFont();
-    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     m_lblResultStatus = new QLabel(tr("Ready to search peaks and match reference energies."), grpMatches);
     m_lblResultStatus->setFont(dlgFont);
-    m_lblResultStatus->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-        .arg(dlgFont.family()).arg(pt));
 
     actionLayout->addWidget(btnSearch);
     actionLayout->addSpacing(10);
@@ -214,11 +211,12 @@ void AutoCalibDialog::setupUI()
     // Dialog bottom buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
     m_btnApply = new QPushButton(tr("Apply Calibration"), this);
+    m_btnApply->setFont(dlgFont);
     m_btnApply->setEnabled(false);
-    m_btnApply->setStyleSheet("QPushButton { background-color: #0e639c; } QPushButton:hover { background-color: #1177bb; }");
     connect(m_btnApply, &QPushButton::clicked, this, &AutoCalibDialog::applyCalibration);
 
     QPushButton *btnClose = new QPushButton(tr("Close"), this);
+    btnClose->setFont(dlgFont);
     connect(btnClose, &QPushButton::clicked, this, &QDialog::reject);
 
     btnLayout->addStretch(1);
@@ -312,10 +310,6 @@ void AutoCalibDialog::runSearchAndMatch()
     std::vector<DetectedPeak> detected = findPeaksWithTSpectrum(hist, sigma, threshold, false);
     if (detected.size() < 2) {
         m_lblResultStatus->setText(tr("Insufficient peaks detected (< 2). Try lowering threshold or adjusting sigma."));
-        const QFont df = Design::getDialogFont();
-        m_lblResultStatus->setFont(df);
-        m_lblResultStatus->setStyleSheet(QString("color: #f48771; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-            .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
         m_btnApply->setEnabled(false);
         return;
     }
@@ -389,10 +383,6 @@ void AutoCalibDialog::runSearchAndMatch()
 
     if (maxFound < 2) {
         m_lblResultStatus->setText(tr("No consistent calibration pattern found within gain limits."));
-        const QFont df = Design::getDialogFont();
-        m_lblResultStatus->setFont(df);
-        m_lblResultStatus->setStyleSheet(QString("color: #f48771; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-            .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
         m_btnApply->setEnabled(false);
         return;
     }
@@ -452,10 +442,6 @@ void AutoCalibDialog::runSearchAndMatch()
         .arg(bestA1, 0, 'f', 4)
         .arg(maxFound)
         .arg(refEnergies.size()));
-    const QFont df = Design::getDialogFont();
-    m_lblResultStatus->setFont(df);
-    m_lblResultStatus->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-        .arg(df.family()).arg(df.pointSize() > 0 ? df.pointSize() : 11));
     m_btnApply->setEnabled(true);
 }
 

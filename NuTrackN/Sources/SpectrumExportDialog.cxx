@@ -208,10 +208,7 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     setWindowTitle(tr("Export Spectrum (W)"));
     setMinimumWidth(560);
     setFont(Design::getDialogFont());
-    setStyleSheet(Design::getDialogStyleSheet() +
-        "\nQPushButton#btnExport { background-color: #15803d; border-color: #16a34a; }"
-        "\nQPushButton#btnExport:hover { background-color: #16a34a; border-color: #22c55e; }"
-    );
+    setStyleSheet(Design::getDialogStyleSheet());
 
     auto *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(14);

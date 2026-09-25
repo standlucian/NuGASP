@@ -98,11 +98,8 @@ void EfficiencyDialog::setupUI()
     m_spinTestEnergy->setValue(1332.5);
     m_spinTestEnergy->setDecimals(1);
     const QFont dlgFont = Design::getDialogFont();
-    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     m_lblTestResult = new QLabel(tr("Calculated Eff: -"), m_grpPoly);
     m_lblTestResult->setFont(dlgFont);
-    m_lblTestResult->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-        .arg(dlgFont.family()).arg(pt));
     connect(m_spinTestEnergy, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EfficiencyDialog::updateTestCalculation);
 
     testLayout->addWidget(lblTest);
@@ -140,9 +137,11 @@ void EfficiencyDialog::setupUI()
     // Dialog Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
     QPushButton *btnApply = new QPushButton(tr("Apply"), this);
+    btnApply->setFont(dlgFont);
     QPushButton *btnOk = new QPushButton(tr("OK"), this);
+    btnOk->setFont(dlgFont);
     QPushButton *btnCancel = new QPushButton(tr("Cancel"), this);
-    btnOk->setStyleSheet("QPushButton { background-color: #0e639c; } QPushButton:hover { background-color: #1177bb; }");
+    btnCancel->setFont(dlgFont);
 
     connect(btnApply, &QPushButton::clicked, this, &EfficiencyDialog::applySettings);
     connect(btnOk, &QPushButton::clicked, this, &EfficiencyDialog::onAccept);

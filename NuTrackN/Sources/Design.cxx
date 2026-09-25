@@ -1742,19 +1742,6 @@ void AppearanceDialog::refreshDialogTheme() {
         "QAbstractItemView::item:selected, QAbstractItemView::item:hover { background-color: %3; color: #ffffff; }\n"
     ).arg(inputBg, fg, accent, border, family).arg(pt));
   }
-
-  if (m_btnApply) {
-    m_btnApply->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: #ffffff; border: 1px solid %2; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
-        "QPushButton:hover { background-color: %5; }\n"
-    ).arg(accent, border, family).arg(pt).arg(m_curDlgAccent.lighter(120).name()));
-  }
-  if (m_btnOk) {
-    m_btnOk->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: #ffffff; border: 1px solid %2; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
-        "QPushButton:hover { background-color: %5; }\n"
-    ).arg(accent, border, family).arg(pt).arg(m_curDlgAccent.lighter(120).name()));
-  }
 }
 
 void AppearanceDialog::updateAllSwatches() {

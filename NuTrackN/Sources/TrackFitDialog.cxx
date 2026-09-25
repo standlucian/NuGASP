@@ -116,11 +116,8 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
 
     // 2. Header: Reference Energy & Badge
     const QFont baseFont = Design::getDialogFont();
-    QFont headerFont = baseFont;
-    headerFont.setPointSize(std::max(8, (baseFont.pointSize() > 0 ? baseFont.pointSize() : 11) - 1));
-    headerFont.setBold(true);
-    painter.setFont(headerFont);
-    painter.setPen(isIncluded ? QColor("#00ffff") : QColor("#888888"));
+    painter.setFont(baseFont);
+    painter.setPen(Design::getDialogTextColor());
 
     QString titleText = QString("Ref: %1 keV").arg(m_res.refEnergy, 0, 'f', 2);
     painter.drawText(QRectF(10, 6, w * 0.55, 20), Qt::AlignLeft | Qt::AlignVCenter, titleText);
@@ -675,22 +672,15 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     const int sel_j = m_mainCanvas ? m_mainCanvas->SelectedElement_j : 1;
     const int specIdx = m_mainCanvas ? m_mainCanvas->getCurrentSpectrumIndex() : 0;
 
-    QString statusText;
-    if (m_activeHist && m_activeHist->IsCalibrated()) {
-        statusText = "<span style='color:#4ec9b0; font-weight:bold;'>CALIBRATED</span>";
-    } else {
-        statusText = "<span style='color:#f48771; font-weight:bold;'>UNCALIBRATED</span>";
-    }
+    QString statusText = (m_activeHist && m_activeHist->IsCalibrated()) ? "CALIBRATED" : "UNCALIBRATED";
 
     const QFont dlgFont = Design::getDialogFont();
     const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     QLabel *lblPadInfo = new QLabel(
-        QString("<span style='font-family:\"%1\"; font-size:%2pt; color:%3;'><b>Pad:</b> (%4, %5) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%6 &nbsp;|&nbsp; <b>Current Status:</b> %7</span>")
-            .arg(dlgFont.family()).arg(pt).arg(Design::getDialogTextColor().name()).arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
+        QString("<b>Pad:</b> (%1, %2) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%3 &nbsp;|&nbsp; <b>Current Status:</b> %4")
+            .arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
         headerBox);
     lblPadInfo->setFont(dlgFont);
-    lblPadInfo->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
-        .arg(Design::getDialogTextColor().name(), dlgFont.family()).arg(pt));
     headerLayout->addWidget(lblPadInfo);
     headerLayout->addStretch(1);
     mainLayout->addWidget(headerBox);
@@ -867,8 +857,6 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
 
     m_lblRmsResidual = new QLabel("RMS Residual: - keV", summaryBox);
     m_lblRmsResidual->setFont(dlgFont);
-    m_lblRmsResidual->setStyleSheet(QString("color: #4ec9b0; font-weight: bold; font-family: \"%1\"; font-size: %2pt;")
-        .arg(dlgFont.family()).arg(pt));
 
     sumRow1->addWidget(lblOrder);
     sumRow1->addWidget(m_comboPolyOrder);
@@ -1216,18 +1204,14 @@ void TrackFitDialog::updateInspectorView(int row)
     const auto &res = m_peakResults[row];
     m_inspectorTile->setPeakData(res, row);
 
-    const QString statusColor = (res.status == "OK" || res.status == "Found" || res.status == "Fitted")
-                                    ? "#51cf66"
-                                    : (res.status == "Weak" || res.status == "Uncertain") ? "#ffd43b" : "#ff6b6b";
     QString details = QString(
-        "<div style='font-family:\"%11\"; font-size:%12pt; color:%13;'>"
-        "<b>Peak:</b> %1 keV &nbsp;|&nbsp; <b>Status:</b> <span style='color:%2; font-weight:bold;'>%3</span><br>"
-        "<b>Predicted Ch:</b> %4 &nbsp;|&nbsp; <b>Fitted Centroid:</b> %5<br>"
-        "<b>FWHM:</b> %6 keV (%7 ch) &nbsp;|&nbsp; <b>Net Area:</b> %8 counts<br>"
-        "<b>Recalibrated Energy:</b> %9 keV &nbsp;|&nbsp; <b>Residual ΔE:</b> %10 keV"
+        "<div>"
+        "<b>Peak:</b> %1 keV &nbsp;|&nbsp; <b>Status:</b> %2<br>"
+        "<b>Predicted Ch:</b> %3 &nbsp;|&nbsp; <b>Fitted Centroid:</b> %4<br>"
+        "<b>FWHM:</b> %5 keV (%6 ch) &nbsp;|&nbsp; <b>Net Area:</b> %7 counts<br>"
+        "<b>Recalibrated Energy:</b> %8 keV &nbsp;|&nbsp; <b>Residual ΔE:</b> %9 keV"
         "</div>")
         .arg(res.refEnergy, 0, 'f', 2)
-        .arg(statusColor)
         .arg(res.status)
         .arg(res.expectedChannel, 0, 'f', 1)
         .arg(res.fittedCentroid > 0 ? QString("%1 ± %2").arg(res.fittedCentroid, 0, 'f', 2).arg(res.centroidErr, 0, 'f', 3) : "None")
@@ -1235,23 +1219,16 @@ void TrackFitDialog::updateInspectorView(int row)
         .arg(res.fwhmChannel > 0 ? QString::number(res.fwhmChannel, 'f', 1) : "-")
         .arg(res.netArea > 0 ? QString::number(res.netArea, 'f', 0) : "-")
         .arg(res.calcEnergy > 0 ? QString::number(res.calcEnergy, 'f', 2) : "-")
-        .arg(res.fittedCentroid > 0 ? QString("%1%2").arg(res.residualEnergy >= 0 ? "+" : "").arg(res.residualEnergy, 0, 'f', 3) : "-")
-        .arg(dlgFont.family())
-        .arg(pt)
-        .arg(textColor);
+        .arg(res.fittedCentroid > 0 ? QString("%1%2").arg(res.residualEnergy >= 0 ? "+" : "").arg(res.residualEnergy, 0, 'f', 3) : "-");
 
     m_lblInspectorDetails->setFont(dlgFont);
     m_lblInspectorDetails->setText(details);
 
     m_btnToggleInclude->setFont(dlgFont);
     if (res.isIncluded) {
-        m_btnToggleInclude->setText("❌ Exclude This Peak From Fit");
-        m_btnToggleInclude->setStyleSheet(QString("color: #ff6b6b; font-weight: bold; padding: 6px; font-family: \"%1\"; font-size: %2pt;")
-            .arg(dlgFont.family()).arg(pt));
+        m_btnToggleInclude->setText(tr("Exclude This Peak From Fit"));
     } else {
-        m_btnToggleInclude->setText("✔ Include This Peak In Fit");
-        m_btnToggleInclude->setStyleSheet(QString("color: #51cf66; font-weight: bold; padding: 6px; font-family: \"%1\"; font-size: %2pt;")
-            .arg(dlgFont.family()).arg(pt));
+        m_btnToggleInclude->setText(tr("Include This Peak In Fit"));
     }
 }
 
