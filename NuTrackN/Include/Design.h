@@ -68,6 +68,7 @@ namespace Design {
     void setDialogAccentColor(const QColor &color);
 
     QString getDialogStyleSheet();
+    QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QColor &fgCol, const QColor &accentCol);
 
     // =========================================================================
     // Category 3: Graph and Overlays (ROOT Canvas, Axes, Labels, ZoomHUD)

@@ -30,6 +30,14 @@ int main(int argc, char **argv) {
   // Attach command prompt panel to the canvas layout
   addCommandPrompt(&mainWindow);
 
+  // Apply complete saved design theme (UI background, button styles, readouts, dialog styles, canvas bg & spectra)
+  Design::applyUITheme(&mainWindow);
+
+  // Ensure all color and typography settings are synced to disk upon application exit
+  QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
+    Design::saveSettings();
+  });
+
   // Ensure the application exits when the last window is closed
   QObject::connect(&app, &QGuiApplication::lastWindowClosed, &app,
                    &QCoreApplication::quit);

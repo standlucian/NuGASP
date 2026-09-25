@@ -65,6 +65,7 @@ void QMainCanvas::closeEvent(QCloseEvent *e)
         QMessageBox::Yes | QMessageBox::No);
 
     if (quiting == QMessageBox::Yes) {
+        Design::saveSettings();
         e->accept();
     } else {
         e->ignore();
@@ -108,6 +109,9 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     // Top container widget holding spectrum canvas, coordinate readout, and action buttons
     QWidget *topContainer = new QWidget(mainSplitter);
     topContainer->setObjectName("topContainer");
+    topContainer->setAttribute(Qt::WA_StyledBackground, true);
+    topContainer->setStyleSheet(QString("QWidget#topContainer { background-color: %1; }").arg(Design::getUIBackgroundColor().name()));
+    this->setStyleSheet(QString("QMainCanvas { background-color: %1; }").arg(Design::getUIBackgroundColor().name()));
     QVBoxLayout *topLayout = new QVBoxLayout(topContainer);
     topLayout->setContentsMargins(4, 4, 4, 4);
     topLayout->setSpacing(2);
@@ -504,6 +508,10 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     gStyle->SetGridColor(kGray + 2);
     gStyle->SetGridStyle(2); // Dashed lines
     gStyle->SetGridWidth(1);
+    const Color_t initialRootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    gStyle->SetCanvasColor(initialRootBg);
+    gStyle->SetPadColor(initialRootBg);
+    gStyle->SetFrameFillColor(initialRootBg);
     HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0, 10240);
     HijF[1][1]->GetXaxis()->SetNdivisions(510, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);

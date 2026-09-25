@@ -11,6 +11,7 @@
 #include <QFormLayout>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QAbstractItemView>
 #include <QTabWidget>
 #include <QGroupBox>
 #include <QLabel>
@@ -203,6 +204,7 @@ void saveSettings() {
   settings.setValue("Design/RangeMarkerColor", s_rangeMarkerColor.name());
   settings.setValue("Design/GaussMarkerColor", s_gaussMarkerColor.name());
   settings.setValue("Design/GateMarkerColor", s_gateMarkerColor.name());
+  settings.sync();
 }
 
 void loadSettings() {
@@ -241,7 +243,8 @@ void loadSettings() {
 
   if (settings.contains("Design/GraphBgColor")) s_graphBgColor = QColor(settings.value("Design/GraphBgColor").toString());
 
-  for (std::size_t i = 0; i < s_spectrumColors.size(); ++i) {
+  if (s_spectrumColors.size() < 9) s_spectrumColors.resize(9, QColor("#ffffff"));
+  for (std::size_t i = 0; i < 9; ++i) {
     const QString key = QString("Design/SpectrumColor_%1").arg(i);
     if (settings.contains(key)) {
       s_spectrumColors[i] = QColor(settings.value(key).toString());
@@ -383,24 +386,45 @@ void setDialogTextColor(const QColor &color) { s_dialogTextColor = color; saveSe
 QColor getDialogAccentColor() { if (!s_typographyInitialized) initializeTypography(); return s_dialogAccentColor; }
 void setDialogAccentColor(const QColor &color) { s_dialogAccentColor = color; saveSettings(); }
 
-QString getDialogStyleSheet() {
-  if (!s_typographyInitialized) initializeTypography();
-  const QString family = s_dialogFont.family();
-  const int pt = s_dialogFont.pointSize() > 0 ? s_dialogFont.pointSize() : 11;
-  const QString bg = s_dialogBgColor.name();
-  const QString fg = s_dialogTextColor.name();
-  const QString accent = s_dialogAccentColor.name();
-  const QString panelBg = s_dialogBgColor.lighter(118).name();
-  const QString border = s_dialogBgColor.lighter(140).name();
-  const QString inputBg = s_dialogBgColor.lighter(110).name();
+QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QColor &fgCol, const QColor &accentCol) {
+  const QString family = font.family();
+  const int pt = font.pointSize() > 0 ? font.pointSize() : 11;
+  const QString bg = bgCol.name();
+  const QString fg = fgCol.name();
+  const QString accent = accentCol.name();
+
+  const bool isDark = bgCol.lightness() < 128;
+  const QString panelBg = isDark ? bgCol.lighter(125).name() : bgCol.darker(110).name();
+  const QString border = isDark ? bgCol.lighter(160).name() : bgCol.darker(135).name();
+  const QString inputBg = isDark ? bgCol.lighter(118).name() : bgCol.lighter(112).name();
 
   return QString(
       "QDialog { background-color: %1; color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
       "QGroupBox { border: 1px solid %5; border-radius: 4px; margin-top: 10px; font-weight: bold; color: %6; font-family: \"%3\"; font-size: %4pt; }\n"
       "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }\n"
       "QLabel { color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 4px 6px; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid %6; }\n"
+      "QLineEdit { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 4px 6px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QLineEdit:focus { border: 1px solid %6; }\n"
+      "QComboBox { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 4px 6px; font-family: \"%3\"; font-size: %4pt; min-height: 22px; }\n"
+      "QComboBox:hover, QComboBox:focus { border: 1px solid %6; }\n"
+      "QComboBox:editable { background-color: %7; color: %2; }\n"
+      "QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 22px; border-left: 1px solid %5; background-color: %8; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }\n"
+      "QComboBox::drop-down:hover { background-color: %5; }\n"
+      "QComboBox::down-arrow { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid %2; margin: auto; }\n"
+      "QComboBox QAbstractItemView { background-color: %7; color: %2; selection-background-color: %6; selection-color: #ffffff; border: 1px solid %5; outline: none; padding: 2px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QComboBox QAbstractItemView::item { min-height: 24px; padding: 4px 8px; color: %2; background-color: %7; }\n"
+      "QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover { background-color: %6; color: #ffffff; }\n"
+      "QSpinBox, QDoubleSpinBox { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 3px 22px 3px 6px; font-family: \"%3\"; font-size: %4pt; min-height: 22px; }\n"
+      "QSpinBox:focus, QDoubleSpinBox:focus, QSpinBox:hover, QDoubleSpinBox:hover { border: 1px solid %6; }\n"
+      "QSpinBox QLineEdit, QDoubleSpinBox QLineEdit { background-color: transparent; color: %2; border: none; padding: 0; }\n"
+      "QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 18px; background-color: %8; border-left: 1px solid %5; border-bottom: 1px solid %5; border-top-right-radius: 3px; }\n"
+      "QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover { background-color: %5; }\n"
+      "QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed { background-color: %6; }\n"
+      "QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid %2; margin: auto; }\n"
+      "QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 18px; background-color: %8; border-left: 1px solid %5; border-bottom-right-radius: 3px; }\n"
+      "QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background-color: %5; }\n"
+      "QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed { background-color: %6; }\n"
+      "QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid %2; margin: auto; }\n"
       "QCheckBox, QRadioButton { color: %2; font-family: \"%3\"; font-size: %4pt; spacing: 6px; }\n"
       "QTableWidget { background-color: %8; color: %2; gridline-color: %5; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
       "QHeaderView::section { background-color: %8; color: %6; font-weight: bold; border: 1px solid %5; padding: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
@@ -417,6 +441,11 @@ QString getDialogStyleSheet() {
       "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
       "QWidget#tabCanvas { background-color: %1; }\n"
   ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg);
+}
+
+QString getDialogStyleSheet() {
+  if (!s_typographyInitialized) initializeTypography();
+  return buildDialogStyleSheet(s_dialogFont, s_dialogBgColor, s_dialogTextColor, s_dialogAccentColor);
 }
 
 QFont getGraphFont() {
@@ -562,6 +591,7 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     // Set matching background color on toolbar container and mainCanvas
     QWidget *topContainer = mainCanvas->findChild<QWidget*>("topContainer");
     if (topContainer) {
+      topContainer->setAttribute(Qt::WA_StyledBackground, true);
       topContainer->setStyleSheet(QString("QWidget#topContainer { background-color: %1; }").arg(s_uiBgColor.name()));
     }
     mainCanvas->setStyleSheet(QString("QMainCanvas { background-color: %1; }").arg(s_uiBgColor.name()));
@@ -572,15 +602,33 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     CommandPrompt::getInstance()->setStyleSheet(getPromptStyleSheet());
   }
 
-  // 2. Global application font and stylesheets for dialogs (including any already open)
+  // 2. Global application font, palette and stylesheets for dialogs and popups
   if (qApp) {
     const QFont dlgFont = getDialogFont();
     const QString dlgSheet = getDialogStyleSheet();
     qApp->setFont(dlgFont);
+    qApp->setStyleSheet(dlgSheet);
+
+    const bool isDark = s_dialogBgColor.lightness() < 128;
+    const QString panelBg = isDark ? s_dialogBgColor.lighter(125).name() : s_dialogBgColor.darker(110).name();
+    const QString inputBg = isDark ? s_dialogBgColor.lighter(118).name() : s_dialogBgColor.lighter(112).name();
+
+    QPalette pal = qApp->palette();
+    pal.setColor(QPalette::Window, s_dialogBgColor);
+    pal.setColor(QPalette::WindowText, s_dialogTextColor);
+    pal.setColor(QPalette::Base, QColor(inputBg));
+    pal.setColor(QPalette::Text, s_dialogTextColor);
+    pal.setColor(QPalette::Button, QColor(panelBg));
+    pal.setColor(QPalette::ButtonText, s_dialogTextColor);
+    pal.setColor(QPalette::Highlight, s_dialogAccentColor);
+    pal.setColor(QPalette::HighlightedText, Qt::white);
+    qApp->setPalette(pal);
+
     for (QWidget *widget : QApplication::topLevelWidgets()) {
       if (QDialog *dlg = qobject_cast<QDialog*>(widget)) {
         dlg->setFont(dlgFont);
         dlg->setStyleSheet(dlgSheet);
+        dlg->setPalette(pal);
         dlg->update();
       }
     }
@@ -1107,6 +1155,13 @@ void AppearanceDialog::setupUI() {
   m_presetCombo->addItem("(Custom / Keep Current)");
   m_presetCombo->addItem("Classic (Legacy Xtrackn)");
   m_presetCombo->addItem("Modern (Deep Space Cyan)");
+  if (m_curUIBg == QColor("#708090") && m_curDlgBg == QColor("#708090")) {
+    m_presetCombo->setCurrentIndex(1);
+  } else if (m_curUIBg == QColor("#0f172a") && m_curDlgBg == QColor("#151b26")) {
+    m_presetCombo->setCurrentIndex(2);
+  } else {
+    m_presetCombo->setCurrentIndex(0);
+  }
   presetLayout->addWidget(lblPreset);
   presetLayout->addWidget(m_presetCombo, 1);
   dialogLayout->addLayout(presetLayout);
@@ -1652,34 +1707,41 @@ void AppearanceDialog::refreshDialogTheme() {
 
   const QString family = m_curDialogFont.family();
   const int pt = m_curDialogFont.pointSize() > 0 ? m_curDialogFont.pointSize() : 11;
-  const QString bg = m_curDlgBg.name();
   const QString fg = m_curDlgFg.name();
   const QString accent = m_curDlgAccent.name();
-  const QString panelBg = m_curDlgBg.lighter(118).name();
-  const QString border = m_curDlgBg.lighter(140).name();
-  const QString inputBg = m_curDlgBg.lighter(110).name();
 
-  setStyleSheet(QString(
-      "QDialog { background-color: %1; color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QGroupBox { border: 1px solid %5; border-radius: 4px; margin-top: 10px; font-weight: bold; color: %6; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }\n"
-      "QLabel { color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 4px 6px; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid %6; }\n"
-      "QCheckBox, QRadioButton { color: %2; font-family: \"%3\"; font-size: %4pt; spacing: 6px; }\n"
-      "QTableWidget { background-color: %8; color: %2; gridline-color: %5; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QHeaderView::section { background-color: %8; color: %6; font-weight: bold; border: 1px solid %5; padding: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QPushButton { background-color: %7; color: %2; border: 1px solid %5; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QPushButton:hover { background-color: %5; }\n"
-      "QPushButton:pressed { background-color: %6; color: #ffffff; }\n"
-      "QPushButton:disabled { color: #888888; background-color: %8; border: 1px solid %5; }\n"
-      "QTextBrowser, QTextEdit, QPlainTextEdit { background-color: %8; color: %2; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QTabWidget::pane { border: 1px solid %5; background-color: %1; }\n"
-      "QTabBar::tab { background-color: %8; color: %2; padding: 6px 14px; border: 1px solid %5; font-family: \"%3\"; font-size: %4pt; }\n"
-      "QTabBar::tab:selected { background-color: %1; color: %6; border-bottom: 2px solid %6; }\n"
-      "QScrollArea { background-color: %1; border: none; }\n"
-      "QScrollArea > QWidget { background-color: %1; border: none; }\n"
-  ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg));
+  const bool isDark = m_curDlgBg.lightness() < 128;
+  const QString panelBg = isDark ? m_curDlgBg.lighter(125).name() : m_curDlgBg.darker(110).name();
+  const QString border = isDark ? m_curDlgBg.lighter(160).name() : m_curDlgBg.darker(135).name();
+  const QString inputBg = isDark ? m_curDlgBg.lighter(118).name() : m_curDlgBg.lighter(112).name();
+
+  setStyleSheet(Design::buildDialogStyleSheet(m_curDialogFont, m_curDlgBg, m_curDlgFg, m_curDlgAccent));
+
+  QPalette pal = palette();
+  pal.setColor(QPalette::Window, m_curDlgBg);
+  pal.setColor(QPalette::WindowText, m_curDlgFg);
+  pal.setColor(QPalette::Base, QColor(inputBg));
+  pal.setColor(QPalette::Text, m_curDlgFg);
+  pal.setColor(QPalette::Button, QColor(panelBg));
+  pal.setColor(QPalette::ButtonText, m_curDlgFg);
+  pal.setColor(QPalette::Highlight, m_curDlgAccent);
+  pal.setColor(QPalette::HighlightedText, Qt::white);
+  setPalette(pal);
+
+  if (m_presetCombo && m_presetCombo->view()) {
+    m_presetCombo->view()->setStyleSheet(QString(
+        "QAbstractItemView { background-color: %1; color: %2; selection-background-color: %3; selection-color: #ffffff; border: 1px solid %4; outline: none; padding: 2px; font-family: \"%5\"; font-size: %6pt; }\n"
+        "QAbstractItemView::item { min-height: 24px; padding: 4px 8px; color: %2; background-color: %1; }\n"
+        "QAbstractItemView::item:selected, QAbstractItemView::item:hover { background-color: %3; color: #ffffff; }\n"
+    ).arg(inputBg, fg, accent, border, family).arg(pt));
+  }
+  if (m_comboRootFont && m_comboRootFont->view()) {
+    m_comboRootFont->view()->setStyleSheet(QString(
+        "QAbstractItemView { background-color: %1; color: %2; selection-background-color: %3; selection-color: #ffffff; border: 1px solid %4; outline: none; padding: 2px; font-family: \"%5\"; font-size: %6pt; }\n"
+        "QAbstractItemView::item { min-height: 24px; padding: 4px 8px; color: %2; background-color: %1; }\n"
+        "QAbstractItemView::item:selected, QAbstractItemView::item:hover { background-color: %3; color: #ffffff; }\n"
+    ).arg(inputBg, fg, accent, border, family).arg(pt));
+  }
 
   if (m_btnApply) {
     m_btnApply->setStyleSheet(QString(
