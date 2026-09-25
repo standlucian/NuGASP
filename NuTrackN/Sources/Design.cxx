@@ -368,10 +368,21 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     const QFont btnFont = getButtonFont();
     const QList<QPushButton*> buttons = mainCanvas->findChildren<QPushButton*>();
     for (QPushButton *btn : buttons) {
-      if (btn && btn->icon().isNull() && btn->text() != "MAC") {
-        btn->setFont(btnFont);
-        btn->setStyleSheet(btnStyle);
+      if (!btn || !btn->icon().isNull() || btn->text() == "MAC") continue;
+
+      // Do NOT style buttons inside dialogs: dialog buttons must respond to Dialog options
+      if (btn->window() != mainCanvas) continue;
+      bool insideDialog = false;
+      for (QWidget *w = btn->parentWidget(); w && w != mainCanvas; w = w->parentWidget()) {
+        if (qobject_cast<QDialog*>(w)) {
+          insideDialog = true;
+          break;
+        }
       }
+      if (insideDialog) continue;
+
+      btn->setFont(btnFont);
+      btn->setStyleSheet(btnStyle);
     }
   }
 
@@ -510,6 +521,7 @@ private:
   void updateDlgPreview();
   void updateGraphPreview();
   void updateAllSwatches();
+  void refreshDialogTheme();
   void commitChanges();
   void revertChanges();
 
@@ -572,6 +584,11 @@ private:
   QFrame *m_mockCanvasBox{nullptr};
   QLabel *m_mockPeakLabel{nullptr};
 
+  QPushButton *m_btnReset{nullptr};
+  QPushButton *m_btnApply{nullptr};
+  QPushButton *m_btnOk{nullptr};
+  QPushButton *m_btnCancel{nullptr};
+
   QList<std::function<void()>> m_swatchUpdaters;
 };
 
@@ -619,40 +636,45 @@ AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
   m_curSpec = m_origSpec;
   m_curPeak = m_origPeak;
 
-  setFont(m_curDialogFont);
-  setStyleSheet(Design::getDialogStyleSheet());
-
   setupUI();
+  refreshDialogTheme();
 }
 
 void AppearanceDialog::addColorRow(QGridLayout *grid, int row, const QString &label, QColor *colorVar, std::function<void()> onChange) {
-  grid->addWidget(new QLabel(label, this), row, 0);
+  QLabel *lbl = new QLabel(label, this);
+  grid->addWidget(lbl, row, 0);
 
+  // Direct clickable colored button (swatch) displaying its hex value
   QPushButton *swatch = new QPushButton(this);
-  swatch->setFixedSize(54, 26);
+  swatch->setFixedSize(86, 28);
+  swatch->setCursor(Qt::PointingHandCursor);
+  swatch->setToolTip(QString("Click to choose %1").arg(label));
+
   auto updateSwatch = [swatch, colorVar]() {
-    swatch->setStyleSheet(QString("background-color: %1; border: 2px solid #888888; border-radius: 4px;").arg(colorVar->name()));
+    const QString hex = colorVar->name().toUpper();
+    // High-contrast font color based on background luminance
+    double lum = 0.299 * colorVar->red() + 0.587 * colorVar->green() + 0.114 * colorVar->blue();
+    const QString textCol = lum > 140 ? "#000000" : "#ffffff";
+    swatch->setText(hex);
+    swatch->setStyleSheet(QString(
+        "QPushButton { background-color: %1; color: %2; border: 2px solid #888888; border-radius: 4px; font-weight: bold; font-family: monospace; font-size: 10pt; }\n"
+        "QPushButton:hover { border: 2px solid #ffffff; }\n"
+    ).arg(colorVar->name(), textCol));
   };
   updateSwatch();
   m_swatchUpdaters.append(updateSwatch);
 
-  QPushButton *pickBtn = new QPushButton("Pick...", this);
-  pickBtn->setFixedWidth(75);
-
   const QString dialogTitle = QString("Select %1").arg(label);
-  auto pickAction = [this, colorVar, dialogTitle, updateSwatch, onChange]() {
+  connect(swatch, &QPushButton::clicked, this, [this, colorVar, dialogTitle, updateSwatch, onChange]() {
     QColor c = QColorDialog::getColor(*colorVar, this, dialogTitle);
     if (c.isValid()) {
       *colorVar = c;
       updateSwatch();
       if (onChange) onChange();
     }
-  };
-  connect(swatch, &QPushButton::clicked, this, pickAction);
-  connect(pickBtn, &QPushButton::clicked, this, pickAction);
+  });
 
-  grid->addWidget(swatch, row, 1);
-  grid->addWidget(pickBtn, row, 2);
+  grid->addWidget(swatch, row, 1, Qt::AlignRight);
 }
 
 void AppearanceDialog::setupUI() {
@@ -700,13 +722,15 @@ void AppearanceDialog::setupUI() {
 
   QGroupBox *grpBtnColors = new QGroupBox("Colors", tabBtn);
   QGridLayout *gridBtnColors = new QGridLayout(grpBtnColors);
+  gridBtnColors->setColumnStretch(0, 1);
+  gridBtnColors->setColumnStretch(1, 0);
   addColorRow(gridBtnColors, 0, "Button Background:", &m_curBtnBg, [this]() { updateBtnPreview(); });
   addColorRow(gridBtnColors, 1, "Button Text Color:", &m_curBtnFg, [this]() { updateBtnPreview(); });
   addColorRow(gridBtnColors, 2, "Console Prompt Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
   addColorRow(gridBtnColors, 3, "Console Prompt Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
   tabBtnLayout->addWidget(grpBtnColors);
 
-  QGroupBox *grpBtnPreview = new QGroupBox("Live Preview", tabBtn);
+  QGroupBox *grpBtnPreview = new QGroupBox("Live Preview (Main UI Toolbar)", tabBtn);
   QVBoxLayout *vboxBtnPreview = new QVBoxLayout(grpBtnPreview);
   m_sampleBtn = new QPushButton("EnCal", grpBtnPreview);
   m_sampleBtn->setFixedHeight(36);
@@ -744,12 +768,23 @@ void AppearanceDialog::setupUI() {
 
   QGroupBox *grpDlgColors = new QGroupBox("Colors", tabDlg);
   QGridLayout *gridDlgColors = new QGridLayout(grpDlgColors);
-  addColorRow(gridDlgColors, 0, "Dialog Background:", &m_curDlgBg, [this]() { updateDlgPreview(); });
-  addColorRow(gridDlgColors, 1, "Dialog Text & Labels:", &m_curDlgFg, [this]() { updateDlgPreview(); });
-  addColorRow(gridDlgColors, 2, "Highlight / Accent:", &m_curDlgAccent, [this]() { updateDlgPreview(); });
+  gridDlgColors->setColumnStretch(0, 1);
+  gridDlgColors->setColumnStretch(1, 0);
+  addColorRow(gridDlgColors, 0, "Dialog Background:", &m_curDlgBg, [this]() {
+    updateDlgPreview();
+    refreshDialogTheme();
+  });
+  addColorRow(gridDlgColors, 1, "Dialog Text & Labels:", &m_curDlgFg, [this]() {
+    updateDlgPreview();
+    refreshDialogTheme();
+  });
+  addColorRow(gridDlgColors, 2, "Highlight / Accent:", &m_curDlgAccent, [this]() {
+    updateDlgPreview();
+    refreshDialogTheme();
+  });
   tabDlgLayout->addWidget(grpDlgColors);
 
-  QGroupBox *grpDlgPreview = new QGroupBox("Live Preview", tabDlg);
+  QGroupBox *grpDlgPreview = new QGroupBox("Live Preview (Dialog Controls)", tabDlg);
   QVBoxLayout *vboxDlgPreview = new QVBoxLayout(grpDlgPreview);
   m_mockDialogBox = new QFrame(grpDlgPreview);
   QVBoxLayout *mockLayout = new QVBoxLayout(m_mockDialogBox);
@@ -797,12 +832,14 @@ void AppearanceDialog::setupUI() {
 
   QGroupBox *grpGraphColors = new QGroupBox("Colors", tabGraph);
   QGridLayout *gridGraphColors = new QGridLayout(grpGraphColors);
+  gridGraphColors->setColumnStretch(0, 1);
+  gridGraphColors->setColumnStretch(1, 0);
   addColorRow(gridGraphColors, 0, "Canvas Background:", &m_curGraphBg, [this]() { updateGraphPreview(); });
   addColorRow(gridGraphColors, 1, "Spectrum Trace & Fill:", &m_curSpec, [this]() { updateGraphPreview(); });
   addColorRow(gridGraphColors, 2, "Peak Markers & Labels:", &m_curPeak, [this]() { updateGraphPreview(); });
   tabGraphLayout->addWidget(grpGraphColors);
 
-  QGroupBox *grpGraphPreview = new QGroupBox("Live Preview", tabGraph);
+  QGroupBox *grpGraphPreview = new QGroupBox("Live Preview (Graph & Canvas)", tabGraph);
   QVBoxLayout *vboxGraphPreview = new QVBoxLayout(grpGraphPreview);
   m_mockCanvasBox = new QFrame(grpGraphPreview);
   m_mockCanvasBox->setMinimumHeight(80);
@@ -841,12 +878,14 @@ void AppearanceDialog::setupUI() {
       m_curDialogFont = f;
       m_spinDlgSize->setValue(f.pointSize());
       updateDlgPreview();
+      refreshDialogTheme();
     }
   });
 
   connect(m_spinDlgSize, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
     m_curDialogFont.setPointSize(val);
     updateDlgPreview();
+    refreshDialogTheme();
   });
 
   connect(btnChooseGraphFont, &QPushButton::clicked, this, [this]() {
@@ -896,27 +935,26 @@ void AppearanceDialog::setupUI() {
       m_curGraphBg = QColor("#0a0a14"); m_curSpec = QColor("#00f0ff"); m_curPeak = QColor("#ff007f");
     }
     updateAllSwatches();
+    refreshDialogTheme();
   });
 
   // Action Buttons Bar
   QHBoxLayout *btnBar = new QHBoxLayout();
-  QPushButton *btnReset = new QPushButton("↺ Reset to Defaults", this);
-  QPushButton *btnApply = new QPushButton("Apply", this);
-  QPushButton *btnOk = new QPushButton("OK", this);
-  QPushButton *btnCancel = new QPushButton("Cancel", this);
+  m_btnReset = new QPushButton("↺ Reset to Defaults", this);
+  m_btnApply = new QPushButton("Apply", this);
+  m_btnOk = new QPushButton("OK", this);
+  m_btnCancel = new QPushButton("Cancel", this);
 
-  btnOk->setDefault(true);
-  btnApply->setStyleSheet("QPushButton { background-color: #0e639c; color: #ffffff; font-weight: bold; }");
-  btnOk->setStyleSheet("QPushButton { background-color: #107c41; color: #ffffff; font-weight: bold; }");
+  m_btnOk->setDefault(true);
 
-  btnBar->addWidget(btnReset);
+  btnBar->addWidget(m_btnReset);
   btnBar->addStretch();
-  btnBar->addWidget(btnApply);
-  btnBar->addWidget(btnOk);
-  btnBar->addWidget(btnCancel);
+  btnBar->addWidget(m_btnApply);
+  btnBar->addWidget(m_btnOk);
+  btnBar->addWidget(m_btnCancel);
   dialogLayout->addLayout(btnBar);
 
-  connect(btnReset, &QPushButton::clicked, this, [this]() {
+  connect(m_btnReset, &QPushButton::clicked, this, [this]() {
     Design::resetToDefaults();
     m_curBtnFont = Design::getButtonPromptFont();
     m_curDialogFont = Design::getDialogFont();
@@ -944,16 +982,17 @@ void AppearanceDialog::setupUI() {
     m_presetCombo->setCurrentIndex(0);
 
     updateAllSwatches();
+    refreshDialogTheme();
   });
 
-  connect(btnApply, &QPushButton::clicked, this, &AppearanceDialog::commitChanges);
+  connect(m_btnApply, &QPushButton::clicked, this, &AppearanceDialog::commitChanges);
 
-  connect(btnOk, &QPushButton::clicked, this, [this]() {
+  connect(m_btnOk, &QPushButton::clicked, this, [this]() {
     commitChanges();
     accept();
   });
 
-  connect(btnCancel, &QPushButton::clicked, this, [this]() {
+  connect(m_btnCancel, &QPushButton::clicked, this, [this]() {
     revertChanges();
     reject();
   });
@@ -1018,6 +1057,52 @@ void AppearanceDialog::updateGraphPreview() {
   m_mockPeakLabel->setStyleSheet(QString("color: %1; border: none; font-weight: bold;").arg(m_curPeak.name()));
 }
 
+void AppearanceDialog::refreshDialogTheme() {
+  setFont(m_curDialogFont);
+
+  const QString family = m_curDialogFont.family();
+  const int pt = m_curDialogFont.pointSize() > 0 ? m_curDialogFont.pointSize() : 11;
+  const QString bg = m_curDlgBg.name();
+  const QString fg = m_curDlgFg.name();
+  const QString accent = m_curDlgAccent.name();
+  const QString panelBg = m_curDlgBg.lighter(118).name();
+  const QString border = m_curDlgBg.lighter(140).name();
+  const QString inputBg = m_curDlgBg.lighter(110).name();
+
+  setStyleSheet(QString(
+      "QDialog { background-color: %1; color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QGroupBox { border: 1px solid %5; border-radius: 4px; margin-top: 10px; font-weight: bold; color: %6; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }\n"
+      "QLabel { color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: %7; color: %2; border: 1px solid %5; border-radius: 3px; padding: 4px 6px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid %6; }\n"
+      "QCheckBox, QRadioButton { color: %2; font-family: \"%3\"; font-size: %4pt; spacing: 6px; }\n"
+      "QTableWidget { background-color: %8; color: %2; gridline-color: %5; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QHeaderView::section { background-color: %8; color: %6; font-weight: bold; border: 1px solid %5; padding: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QPushButton { background-color: %7; color: %2; border: 1px solid %5; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QPushButton:hover { background-color: %5; }\n"
+      "QPushButton:pressed { background-color: %6; color: #ffffff; }\n"
+      "QPushButton:disabled { color: #888888; background-color: %8; border: 1px solid %5; }\n"
+      "QTextBrowser, QTextEdit, QPlainTextEdit { background-color: %8; color: %2; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QTabWidget::pane { border: 1px solid %5; background-color: %1; }\n"
+      "QTabBar::tab { background-color: %8; color: %2; padding: 6px 14px; border: 1px solid %5; font-family: \"%3\"; font-size: %4pt; }\n"
+      "QTabBar::tab:selected { background-color: %1; color: %6; border-bottom: 2px solid %6; }\n"
+  ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg));
+
+  if (m_btnApply) {
+    m_btnApply->setStyleSheet(QString(
+        "QPushButton { background-color: %1; color: #ffffff; border: 1px solid %2; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
+        "QPushButton:hover { background-color: %5; }\n"
+    ).arg(accent, border, family).arg(pt).arg(m_curDlgAccent.lighter(120).name()));
+  }
+  if (m_btnOk) {
+    m_btnOk->setStyleSheet(QString(
+        "QPushButton { background-color: %1; color: #ffffff; border: 1px solid %2; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
+        "QPushButton:hover { background-color: %5; }\n"
+    ).arg(accent, border, family).arg(pt).arg(m_curDlgAccent.lighter(120).name()));
+  }
+}
+
 void AppearanceDialog::updateAllSwatches() {
   for (const auto &fn : m_swatchUpdaters) {
     fn();
@@ -1047,8 +1132,7 @@ void AppearanceDialog::commitChanges() {
   Design::saveSettings();
   Design::applyUITheme(m_canvasWidget);
 
-  setFont(m_curDialogFont);
-  setStyleSheet(Design::getDialogStyleSheet());
+  refreshDialogTheme();
 }
 
 void AppearanceDialog::revertChanges() {
@@ -1070,6 +1154,12 @@ void AppearanceDialog::revertChanges() {
 
   Design::saveSettings();
   Design::applyUITheme(m_canvasWidget);
+
+  m_curDialogFont = m_origDialogFont;
+  m_curDlgBg = m_origDlgBg;
+  m_curDlgFg = m_origDlgFg;
+  m_curDlgAccent = m_origDlgAccent;
+  refreshDialogTheme();
 }
 
 void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
