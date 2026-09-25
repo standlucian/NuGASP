@@ -393,11 +393,13 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     if (tc) {
       Color_t rootBg = TColor::GetColor(s_graphBgColor.name().toUtf8().constData());
       tc->SetFillColor(rootBg);
-      TIter next(tc->GetListOfPrimitives());
-      TObject *obj = nullptr;
-      while ((obj = next())) {
-        if (obj && obj->InheritsFrom(TPad::Class())) {
-          static_cast<TPad*>(obj)->SetFillColor(rootBg);
+      if (tc->GetListOfPrimitives()) {
+        TIter next(tc->GetListOfPrimitives());
+        TObject *obj = nullptr;
+        while ((obj = next())) {
+          if (obj && obj->InheritsFrom(TPad::Class())) {
+            static_cast<TPad*>(obj)->SetFillColor(rootBg);
+          }
         }
       }
       tc->Modified();
@@ -495,148 +497,224 @@ void changeBackgroundColor(TCanvas *canvas) {
 }
 
 //==============================================================================
-// openColorSelectionDialog (Settings Dialog for Fonts, Sizes, and Colors)
+// AppearanceDialog (Full Settings Dialog for Fonts, Sizes, and Colors)
 //==============================================================================
-void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
-  // Snapshot initial settings to allow clean Cancel / revert
-  QFont origBtnFont = Design::getButtonPromptFont();
-  QFont origDialogFont = Design::getDialogFont();
-  QFont origGraphFont = Design::getGraphFont();
-  int origRootFontIdx = Design::getRootFontFamilyIndex();
+class AppearanceDialog : public QDialog {
+public:
+  AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget);
 
-  QColor origBtnBg = Design::getButtonBackgroundColor();
-  QColor origBtnFg = Design::getButtonTextColor();
-  QColor origPromptBg = Design::getPromptBackgroundColor();
-  QColor origPromptFg = Design::getPromptTextColor();
+private:
+  void setupUI();
+  void addColorRow(QGridLayout *grid, int row, const QString &label, QColor *colorVar, std::function<void()> onChange);
+  void updateBtnPreview();
+  void updateDlgPreview();
+  void updateGraphPreview();
+  void updateAllSwatches();
+  void commitChanges();
+  void revertChanges();
 
-  QColor origDlgBg = Design::getDialogBackgroundColor();
-  QColor origDlgFg = Design::getDialogTextColor();
-  QColor origDlgAccent = Design::getDialogAccentColor();
+  QMainCanvas *m_canvasWidget;
 
-  QColor origGraphBg = Design::getGraphBackgroundColor();
-  QColor origSpec = Design::getSpectrumColor();
-  QColor origPeak = Design::getPeakMarkerColor();
+  // Snapshot of original values
+  QFont m_origBtnFont;
+  QFont m_origDialogFont;
+  QFont m_origGraphFont;
+  int m_origRootFontIdx;
 
-  // Working copies for the interactive modal
-  QFont curBtnFont = origBtnFont;
-  QFont curDialogFont = origDialogFont;
-  QFont curGraphFont = origGraphFont;
-  int curRootFontIdx = origRootFontIdx;
+  QColor m_origBtnBg;
+  QColor m_origBtnFg;
+  QColor m_origPromptBg;
+  QColor m_origPromptFg;
 
-  QColor curBtnBg = origBtnBg;
-  QColor curBtnFg = origBtnFg;
-  QColor curPromptBg = origPromptBg;
-  QColor curPromptFg = origPromptFg;
+  QColor m_origDlgBg;
+  QColor m_origDlgFg;
+  QColor m_origDlgAccent;
 
-  QColor curDlgBg = origDlgBg;
-  QColor curDlgFg = origDlgFg;
-  QColor curDlgAccent = origDlgAccent;
+  QColor m_origGraphBg;
+  QColor m_origSpec;
+  QColor m_origPeak;
 
-  QColor curGraphBg = origGraphBg;
-  QColor curSpec = origSpec;
-  QColor curPeak = origPeak;
+  // Working values
+  QFont m_curBtnFont;
+  QFont m_curDialogFont;
+  QFont m_curGraphFont;
+  int m_curRootFontIdx;
 
-  // Build the settings dialog
-  QDialog dialog(parent);
-  dialog.setWindowTitle("Appearance & Typography Settings (3 Fonts & Colors)");
-  dialog.resize(680, 640);
-  dialog.setFont(curDialogFont);
-  dialog.setStyleSheet(Design::getDialogStyleSheet());
+  QColor m_curBtnBg;
+  QColor m_curBtnFg;
+  QColor m_curPromptBg;
+  QColor m_curPromptFg;
 
-  QVBoxLayout *dialogLayout = new QVBoxLayout(&dialog);
+  QColor m_curDlgBg;
+  QColor m_curDlgFg;
+  QColor m_curDlgAccent;
+
+  QColor m_curGraphBg;
+  QColor m_curSpec;
+  QColor m_curPeak;
+
+  // UI elements for live updates
+  QComboBox *m_presetCombo{nullptr};
+  QLabel *m_lblBtnFontDesc{nullptr};
+  QSpinBox *m_spinBtnSize{nullptr};
+  QPushButton *m_sampleBtn{nullptr};
+  QLineEdit *m_samplePrompt{nullptr};
+
+  QLabel *m_lblDlgFontDesc{nullptr};
+  QSpinBox *m_spinDlgSize{nullptr};
+  QFrame *m_mockDialogBox{nullptr};
+  QLabel *m_mockLabel{nullptr};
+  QPushButton *m_mockButton{nullptr};
+
+  QLabel *m_lblGraphFontDesc{nullptr};
+  QSpinBox *m_spinGraphSize{nullptr};
+  QComboBox *m_comboRootFont{nullptr};
+  QFrame *m_mockCanvasBox{nullptr};
+  QLabel *m_mockPeakLabel{nullptr};
+
+  QList<std::function<void()>> m_swatchUpdaters;
+};
+
+AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
+    : QDialog(parent), m_canvasWidget(canvasWidget)
+{
+  setWindowTitle("Appearance & Typography Settings (3 Fonts & Colors)");
+  resize(680, 640);
+
+  // Snapshot original settings to allow clean Cancel / revert
+  m_origBtnFont = Design::getButtonPromptFont();
+  m_origDialogFont = Design::getDialogFont();
+  m_origGraphFont = Design::getGraphFont();
+  m_origRootFontIdx = Design::getRootFontFamilyIndex();
+
+  m_origBtnBg = Design::getButtonBackgroundColor();
+  m_origBtnFg = Design::getButtonTextColor();
+  m_origPromptBg = Design::getPromptBackgroundColor();
+  m_origPromptFg = Design::getPromptTextColor();
+
+  m_origDlgBg = Design::getDialogBackgroundColor();
+  m_origDlgFg = Design::getDialogTextColor();
+  m_origDlgAccent = Design::getDialogAccentColor();
+
+  m_origGraphBg = Design::getGraphBackgroundColor();
+  m_origSpec = Design::getSpectrumColor();
+  m_origPeak = Design::getPeakMarkerColor();
+
+  // Working copies
+  m_curBtnFont = m_origBtnFont;
+  m_curDialogFont = m_origDialogFont;
+  m_curGraphFont = m_origGraphFont;
+  m_curRootFontIdx = m_origRootFontIdx;
+
+  m_curBtnBg = m_origBtnBg;
+  m_curBtnFg = m_origBtnFg;
+  m_curPromptBg = m_origPromptBg;
+  m_curPromptFg = m_origPromptFg;
+
+  m_curDlgBg = m_origDlgBg;
+  m_curDlgFg = m_origDlgFg;
+  m_curDlgAccent = m_origDlgAccent;
+
+  m_curGraphBg = m_origGraphBg;
+  m_curSpec = m_origSpec;
+  m_curPeak = m_origPeak;
+
+  setFont(m_curDialogFont);
+  setStyleSheet(Design::getDialogStyleSheet());
+
+  setupUI();
+}
+
+void AppearanceDialog::addColorRow(QGridLayout *grid, int row, const QString &label, QColor *colorVar, std::function<void()> onChange) {
+  grid->addWidget(new QLabel(label, this), row, 0);
+
+  QPushButton *swatch = new QPushButton(this);
+  swatch->setFixedSize(54, 26);
+  auto updateSwatch = [swatch, colorVar]() {
+    swatch->setStyleSheet(QString("background-color: %1; border: 2px solid #888888; border-radius: 4px;").arg(colorVar->name()));
+  };
+  updateSwatch();
+  m_swatchUpdaters.append(updateSwatch);
+
+  QPushButton *pickBtn = new QPushButton("Pick...", this);
+  pickBtn->setFixedWidth(75);
+
+  const QString dialogTitle = QString("Select %1").arg(label);
+  auto pickAction = [this, colorVar, dialogTitle, updateSwatch, onChange]() {
+    QColor c = QColorDialog::getColor(*colorVar, this, dialogTitle);
+    if (c.isValid()) {
+      *colorVar = c;
+      updateSwatch();
+      if (onChange) onChange();
+    }
+  };
+  connect(swatch, &QPushButton::clicked, this, pickAction);
+  connect(pickBtn, &QPushButton::clicked, this, pickAction);
+
+  grid->addWidget(swatch, row, 1);
+  grid->addWidget(pickBtn, row, 2);
+}
+
+void AppearanceDialog::setupUI() {
+  QVBoxLayout *dialogLayout = new QVBoxLayout(this);
   dialogLayout->setSpacing(10);
   dialogLayout->setContentsMargins(14, 14, 14, 14);
 
   // Top header with quick theme presets dropdown
   QHBoxLayout *presetLayout = new QHBoxLayout();
-  QLabel *lblPreset = new QLabel("<b>Quick Theme Preset:</b>", &dialog);
-  QComboBox *presetCombo = new QComboBox(&dialog);
-  presetCombo->addItem("(Custom / Keep Current)");
-  presetCombo->addItem("Default Dark (Balanced)");
-  presetCombo->addItem("Classic Light (Paper White)");
-  presetCombo->addItem("Vampire (Crimson / Deep Black)");
-  presetCombo->addItem("Cyberpunk (Neon Cyan & Pink)");
+  QLabel *lblPreset = new QLabel("<b>Quick Theme Preset:</b>", this);
+  m_presetCombo = new QComboBox(this);
+  m_presetCombo->addItem("(Custom / Keep Current)");
+  m_presetCombo->addItem("Default Dark (Balanced)");
+  m_presetCombo->addItem("Classic Light (Paper White)");
+  m_presetCombo->addItem("Vampire (Crimson / Deep Black)");
+  m_presetCombo->addItem("Cyberpunk (Neon Cyan & Pink)");
   presetLayout->addWidget(lblPreset);
-  presetLayout->addWidget(presetCombo, 1);
+  presetLayout->addWidget(m_presetCombo, 1);
   dialogLayout->addLayout(presetLayout);
 
   // 3-Category Tabs
-  QTabWidget *tabs = new QTabWidget(&dialog);
-
-  // Helper lambda for color pickers with real-time swatch preview
-  auto addColorRow = [&](QGridLayout *grid, int row, const QString &label, QColor &colorVar, std::function<void()> onChange) {
-    grid->addWidget(new QLabel(label, &dialog), row, 0);
-
-    QPushButton *swatch = new QPushButton(&dialog);
-    swatch->setFixedSize(54, 26);
-    auto updateSwatch = [swatch](const QColor &c) {
-      swatch->setStyleSheet(QString("background-color: %1; border: 2px solid #888888; border-radius: 4px;").arg(c.name()));
-    };
-    updateSwatch(colorVar);
-
-    QPushButton *pickBtn = new QPushButton("Pick...", &dialog);
-    pickBtn->setFixedWidth(75);
-
-    auto pickAction = [&, swatch, updateSwatch, onChange]() {
-      QColor c = QColorDialog::getColor(colorVar, &dialog, QString("Select %1").arg(label));
-      if (c.isValid()) {
-        colorVar = c;
-        updateSwatch(c);
-        if (onChange) onChange();
-      }
-    };
-    QObject::connect(swatch, &QPushButton::clicked, pickAction);
-    QObject::connect(pickBtn, &QPushButton::clicked, pickAction);
-
-    grid->addWidget(swatch, row, 1);
-    grid->addWidget(pickBtn, row, 2);
-    return swatch;
-  };
-
-  // Forward declare preview update routines
-  std::function<void()> updateBtnPreview;
-  std::function<void()> updateDlgPreview;
-  std::function<void()> updateGraphPreview;
+  QTabWidget *tabs = new QTabWidget(this);
 
   // =========================================================================
-  // TAB 1: Buttons and Prompt
+  // TAB 1: Buttons & Prompt
   // =========================================================================
   QWidget *tabBtn = new QWidget();
   QVBoxLayout *tabBtnLayout = new QVBoxLayout(tabBtn);
 
   QGroupBox *grpBtnFont = new QGroupBox("Category 1 Typography (Buttons & Console)", tabBtn);
   QGridLayout *gridBtnFont = new QGridLayout(grpBtnFont);
-  QLabel *lblBtnFontDesc = new QLabel(tabBtn);
+  m_lblBtnFontDesc = new QLabel(tabBtn);
   QPushButton *btnChooseBtnFont = new QPushButton("Choose Font...", tabBtn);
-  QSpinBox *spinBtnSize = new QSpinBox(tabBtn);
-  spinBtnSize->setRange(7, 32);
-  spinBtnSize->setValue(curBtnFont.pointSize() > 0 ? curBtnFont.pointSize() : 11);
-  spinBtnSize->setSuffix(" pt");
+  m_spinBtnSize = new QSpinBox(tabBtn);
+  m_spinBtnSize->setRange(7, 32);
+  m_spinBtnSize->setValue(m_curBtnFont.pointSize() > 0 ? m_curBtnFont.pointSize() : 11);
+  m_spinBtnSize->setSuffix(" pt");
 
   gridBtnFont->addWidget(new QLabel("Font Family:"), 0, 0);
-  gridBtnFont->addWidget(lblBtnFontDesc, 0, 1);
+  gridBtnFont->addWidget(m_lblBtnFontDesc, 0, 1);
   gridBtnFont->addWidget(btnChooseBtnFont, 0, 2);
   gridBtnFont->addWidget(new QLabel("Point Size:"), 1, 0);
-  gridBtnFont->addWidget(spinBtnSize, 1, 1);
+  gridBtnFont->addWidget(m_spinBtnSize, 1, 1);
   tabBtnLayout->addWidget(grpBtnFont);
 
   QGroupBox *grpBtnColors = new QGroupBox("Colors", tabBtn);
   QGridLayout *gridBtnColors = new QGridLayout(grpBtnColors);
-  QPushButton *swatchBtnBg = addColorRow(gridBtnColors, 0, "Button Background:", curBtnBg, [&]() { if (updateBtnPreview) updateBtnPreview(); });
-  QPushButton *swatchBtnFg = addColorRow(gridBtnColors, 1, "Button Text Color:", curBtnFg, [&]() { if (updateBtnPreview) updateBtnPreview(); });
-  QPushButton *swatchPromptBg = addColorRow(gridBtnColors, 2, "Console Prompt Background:", curPromptBg, [&]() { if (updateBtnPreview) updateBtnPreview(); });
-  QPushButton *swatchPromptFg = addColorRow(gridBtnColors, 3, "Console Prompt Text:", curPromptFg, [&]() { if (updateBtnPreview) updateBtnPreview(); });
+  addColorRow(gridBtnColors, 0, "Button Background:", &m_curBtnBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 1, "Button Text Color:", &m_curBtnFg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 2, "Console Prompt Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 3, "Console Prompt Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
   tabBtnLayout->addWidget(grpBtnColors);
 
   QGroupBox *grpBtnPreview = new QGroupBox("Live Preview", tabBtn);
   QVBoxLayout *vboxBtnPreview = new QVBoxLayout(grpBtnPreview);
-  QPushButton *sampleBtn = new QPushButton("EnCal", grpBtnPreview);
-  sampleBtn->setFixedHeight(36);
-  QLineEdit *samplePrompt = new QLineEdit("NuTrackN Output Console: Peak 1 at 1332.5 keV (FWHM 2.1)", grpBtnPreview);
-  samplePrompt->setReadOnly(true);
-  samplePrompt->setFixedHeight(36);
-  vboxBtnPreview->addWidget(sampleBtn);
-  vboxBtnPreview->addWidget(samplePrompt);
+  m_sampleBtn = new QPushButton("EnCal", grpBtnPreview);
+  m_sampleBtn->setFixedHeight(36);
+  m_samplePrompt = new QLineEdit("NuTrackN Output Console: Peak 1 at 1332.5 keV (FWHM 2.1)", grpBtnPreview);
+  m_samplePrompt->setReadOnly(true);
+  m_samplePrompt->setFixedHeight(36);
+  vboxBtnPreview->addWidget(m_sampleBtn);
+  vboxBtnPreview->addWidget(m_samplePrompt);
   tabBtnLayout->addWidget(grpBtnPreview);
   tabBtnLayout->addStretch();
 
@@ -650,36 +728,36 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
 
   QGroupBox *grpDlgFont = new QGroupBox("Category 2 Typography (All Parameter & Analysis Dialogs)", tabDlg);
   QGridLayout *gridDlgFont = new QGridLayout(grpDlgFont);
-  QLabel *lblDlgFontDesc = new QLabel(tabDlg);
+  m_lblDlgFontDesc = new QLabel(tabDlg);
   QPushButton *btnChooseDlgFont = new QPushButton("Choose Font...", tabDlg);
-  QSpinBox *spinDlgSize = new QSpinBox(tabDlg);
-  spinDlgSize->setRange(7, 32);
-  spinDlgSize->setValue(curDialogFont.pointSize() > 0 ? curDialogFont.pointSize() : 11);
-  spinDlgSize->setSuffix(" pt");
+  m_spinDlgSize = new QSpinBox(tabDlg);
+  m_spinDlgSize->setRange(7, 32);
+  m_spinDlgSize->setValue(m_curDialogFont.pointSize() > 0 ? m_curDialogFont.pointSize() : 11);
+  m_spinDlgSize->setSuffix(" pt");
 
   gridDlgFont->addWidget(new QLabel("Font Family:"), 0, 0);
-  gridDlgFont->addWidget(lblDlgFontDesc, 0, 1);
+  gridDlgFont->addWidget(m_lblDlgFontDesc, 0, 1);
   gridDlgFont->addWidget(btnChooseDlgFont, 0, 2);
   gridDlgFont->addWidget(new QLabel("Point Size:"), 1, 0);
-  gridDlgFont->addWidget(spinDlgSize, 1, 1);
+  gridDlgFont->addWidget(m_spinDlgSize, 1, 1);
   tabDlgLayout->addWidget(grpDlgFont);
 
   QGroupBox *grpDlgColors = new QGroupBox("Colors", tabDlg);
   QGridLayout *gridDlgColors = new QGridLayout(grpDlgColors);
-  QPushButton *swatchDlgBg = addColorRow(gridDlgColors, 0, "Dialog Background:", curDlgBg, [&]() { if (updateDlgPreview) updateDlgPreview(); });
-  QPushButton *swatchDlgFg = addColorRow(gridDlgColors, 1, "Dialog Text & Labels:", curDlgFg, [&]() { if (updateDlgPreview) updateDlgPreview(); });
-  QPushButton *swatchDlgAccent = addColorRow(gridDlgColors, 2, "Highlight / Accent:", curDlgAccent, [&]() { if (updateDlgPreview) updateDlgPreview(); });
+  addColorRow(gridDlgColors, 0, "Dialog Background:", &m_curDlgBg, [this]() { updateDlgPreview(); });
+  addColorRow(gridDlgColors, 1, "Dialog Text & Labels:", &m_curDlgFg, [this]() { updateDlgPreview(); });
+  addColorRow(gridDlgColors, 2, "Highlight / Accent:", &m_curDlgAccent, [this]() { updateDlgPreview(); });
   tabDlgLayout->addWidget(grpDlgColors);
 
   QGroupBox *grpDlgPreview = new QGroupBox("Live Preview", tabDlg);
   QVBoxLayout *vboxDlgPreview = new QVBoxLayout(grpDlgPreview);
-  QFrame *mockDialogBox = new QFrame(grpDlgPreview);
-  QVBoxLayout *mockLayout = new QVBoxLayout(mockDialogBox);
-  QLabel *mockLabel = new QLabel("Integration Range: [ 1120 .. 1450 ]", mockDialogBox);
-  QPushButton *mockButton = new QPushButton("Apply Parameters", mockDialogBox);
-  mockLayout->addWidget(mockLabel);
-  mockLayout->addWidget(mockButton);
-  vboxDlgPreview->addWidget(mockDialogBox);
+  m_mockDialogBox = new QFrame(grpDlgPreview);
+  QVBoxLayout *mockLayout = new QVBoxLayout(m_mockDialogBox);
+  m_mockLabel = new QLabel("Integration Range: [ 1120 .. 1450 ]", m_mockDialogBox);
+  m_mockButton = new QPushButton("Apply Parameters", m_mockDialogBox);
+  mockLayout->addWidget(m_mockLabel);
+  mockLayout->addWidget(m_mockButton);
+  vboxDlgPreview->addWidget(m_mockDialogBox);
   tabDlgLayout->addWidget(grpDlgPreview);
   tabDlgLayout->addStretch();
 
@@ -693,46 +771,46 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
 
   QGroupBox *grpGraphFont = new QGroupBox("Category 3 Typography (ROOT Graph, Labels, ZoomHUD)", tabGraph);
   QGridLayout *gridGraphFont = new QGridLayout(grpGraphFont);
-  QLabel *lblGraphFontDesc = new QLabel(tabGraph);
+  m_lblGraphFontDesc = new QLabel(tabGraph);
   QPushButton *btnChooseGraphFont = new QPushButton("Choose Font...", tabGraph);
-  QSpinBox *spinGraphSize = new QSpinBox(tabGraph);
-  spinGraphSize->setRange(7, 32);
-  spinGraphSize->setValue(curGraphFont.pointSize() > 0 ? curGraphFont.pointSize() : 10);
-  spinGraphSize->setSuffix(" pt");
+  m_spinGraphSize = new QSpinBox(tabGraph);
+  m_spinGraphSize->setRange(7, 32);
+  m_spinGraphSize->setValue(m_curGraphFont.pointSize() > 0 ? m_curGraphFont.pointSize() : 10);
+  m_spinGraphSize->setSuffix(" pt");
 
-  QComboBox *comboRootFont = new QComboBox(tabGraph);
-  comboRootFont->addItem("Helvetica (Sans-Serif - Standard ROOT Font 4)", 4);
-  comboRootFont->addItem("Times (Serif - ROOT Font 13)", 13);
-  comboRootFont->addItem("Courier (Monospace - ROOT Font 6)", 6);
-  comboRootFont->addItem("Greek / Symbol (ROOT Font 12)", 12);
-  int foundIdx = comboRootFont->findData(curRootFontIdx);
-  if (foundIdx >= 0) comboRootFont->setCurrentIndex(foundIdx);
+  m_comboRootFont = new QComboBox(tabGraph);
+  m_comboRootFont->addItem("Helvetica (Sans-Serif - Standard ROOT Font 4)", 4);
+  m_comboRootFont->addItem("Times (Serif - ROOT Font 13)", 13);
+  m_comboRootFont->addItem("Courier (Monospace - ROOT Font 6)", 6);
+  m_comboRootFont->addItem("Greek / Symbol (ROOT Font 12)", 12);
+  int foundIdx = m_comboRootFont->findData(m_curRootFontIdx);
+  if (foundIdx >= 0) m_comboRootFont->setCurrentIndex(foundIdx);
 
   gridGraphFont->addWidget(new QLabel("Qt Overlay Font:"), 0, 0);
-  gridGraphFont->addWidget(lblGraphFontDesc, 0, 1);
+  gridGraphFont->addWidget(m_lblGraphFontDesc, 0, 1);
   gridGraphFont->addWidget(btnChooseGraphFont, 0, 2);
   gridGraphFont->addWidget(new QLabel("Qt Overlay Size:"), 1, 0);
-  gridGraphFont->addWidget(spinGraphSize, 1, 1);
+  gridGraphFont->addWidget(m_spinGraphSize, 1, 1);
   gridGraphFont->addWidget(new QLabel("ROOT Font Family:"), 2, 0);
-  gridGraphFont->addWidget(comboRootFont, 2, 1, 1, 2);
+  gridGraphFont->addWidget(m_comboRootFont, 2, 1, 1, 2);
   tabGraphLayout->addWidget(grpGraphFont);
 
   QGroupBox *grpGraphColors = new QGroupBox("Colors", tabGraph);
   QGridLayout *gridGraphColors = new QGridLayout(grpGraphColors);
-  QPushButton *swatchGraphBg = addColorRow(gridGraphColors, 0, "Canvas Background:", curGraphBg, [&]() { if (updateGraphPreview) updateGraphPreview(); });
-  QPushButton *swatchSpec = addColorRow(gridGraphColors, 1, "Spectrum Trace & Fill:", curSpec, [&]() { if (updateGraphPreview) updateGraphPreview(); });
-  QPushButton *swatchPeak = addColorRow(gridGraphColors, 2, "Peak Markers & Labels:", curPeak, [&]() { if (updateGraphPreview) updateGraphPreview(); });
+  addColorRow(gridGraphColors, 0, "Canvas Background:", &m_curGraphBg, [this]() { updateGraphPreview(); });
+  addColorRow(gridGraphColors, 1, "Spectrum Trace & Fill:", &m_curSpec, [this]() { updateGraphPreview(); });
+  addColorRow(gridGraphColors, 2, "Peak Markers & Labels:", &m_curPeak, [this]() { updateGraphPreview(); });
   tabGraphLayout->addWidget(grpGraphColors);
 
   QGroupBox *grpGraphPreview = new QGroupBox("Live Preview", tabGraph);
   QVBoxLayout *vboxGraphPreview = new QVBoxLayout(grpGraphPreview);
-  QFrame *mockCanvasBox = new QFrame(grpGraphPreview);
-  mockCanvasBox->setMinimumHeight(80);
-  QHBoxLayout *mockCanvasLayout = new QHBoxLayout(mockCanvasBox);
-  QLabel *mockPeakLabel = new QLabel("[1] 1332.5 keV", mockCanvasBox);
-  mockPeakLabel->setAlignment(Qt::AlignCenter);
-  mockCanvasLayout->addWidget(mockPeakLabel);
-  vboxGraphPreview->addWidget(mockCanvasBox);
+  m_mockCanvasBox = new QFrame(grpGraphPreview);
+  m_mockCanvasBox->setMinimumHeight(80);
+  QHBoxLayout *mockCanvasLayout = new QHBoxLayout(m_mockCanvasBox);
+  m_mockPeakLabel = new QLabel("[1] 1332.5 keV", m_mockCanvasBox);
+  m_mockPeakLabel->setAlignment(Qt::AlignCenter);
+  mockCanvasLayout->addWidget(m_mockPeakLabel);
+  vboxGraphPreview->addWidget(m_mockCanvasBox);
   tabGraphLayout->addWidget(grpGraphPreview);
   tabGraphLayout->addStretch();
 
@@ -740,160 +818,92 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
 
   dialogLayout->addWidget(tabs, 1);
 
-  // Update Preview Implementations
-  updateBtnPreview = [&]() {
-    lblBtnFontDesc->setText(QString("%1, %2pt, %3")
-                                .arg(curBtnFont.family())
-                                .arg(curBtnFont.pointSize() > 0 ? curBtnFont.pointSize() : 11)
-                                .arg(curBtnFont.bold() ? "Bold" : "Normal"));
-    QFont f = curBtnFont;
-    f.setBold(true);
-    sampleBtn->setFont(f);
-    sampleBtn->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: %2; font-weight: bold; padding: 4px; "
-        "border-top: 2px solid #ffffff; border-left: 2px solid #ffffff; "
-        "border-right: 2px solid #606060; border-bottom: 2px solid #606060; }"
-    ).arg(curBtnBg.name(), curBtnFg.name()));
-
-    QFont pf = curBtnFont;
-    pf.setBold(false);
-    samplePrompt->setFont(pf);
-    samplePrompt->setStyleSheet(QString(
-        "QLineEdit { background-color: %1; color: %2; border: 1px solid #888888; padding: 4px; }"
-    ).arg(curPromptBg.name(), curPromptFg.name()));
-  };
-
-  updateDlgPreview = [&]() {
-    lblDlgFontDesc->setText(QString("%1, %2pt")
-                                .arg(curDialogFont.family())
-                                .arg(curDialogFont.pointSize() > 0 ? curDialogFont.pointSize() : 11));
-    mockDialogBox->setStyleSheet(QString(
-        "QFrame { background-color: %1; border: 1px solid #555555; border-radius: 4px; }"
-    ).arg(curDlgBg.name()));
-    mockLabel->setFont(curDialogFont);
-    mockLabel->setStyleSheet(QString("color: %1; border: none;").arg(curDlgFg.name()));
-    mockButton->setFont(curDialogFont);
-    mockButton->setStyleSheet(QString(
-        "QPushButton { background-color: %1; color: #ffffff; border: 1px solid #777777; "
-        "border-radius: 4px; padding: 4px 12px; font-weight: bold; }"
-    ).arg(curDlgAccent.name()));
-  };
-
-  updateGraphPreview = [&]() {
-    lblGraphFontDesc->setText(QString("%1, %2pt")
-                                  .arg(curGraphFont.family())
-                                  .arg(curGraphFont.pointSize() > 0 ? curGraphFont.pointSize() : 10));
-    mockCanvasBox->setStyleSheet(QString(
-        "QFrame { background-color: %1; border: 1px solid %2; border-radius: 4px; }"
-    ).arg(curGraphBg.name(), curSpec.name()));
-    QFont gf = curGraphFont;
-    gf.setBold(true);
-    mockPeakLabel->setFont(gf);
-    mockPeakLabel->setStyleSheet(QString("color: %1; border: none; font-weight: bold;").arg(curPeak.name()));
-  };
-
   // Wire Font Choosers
-  QObject::connect(btnChooseBtnFont, &QPushButton::clicked, [&]() {
+  connect(btnChooseBtnFont, &QPushButton::clicked, this, [this]() {
     bool ok = false;
-    QFont f = QFontDialog::getFont(&ok, curBtnFont, &dialog, "Choose Button & Prompt Font");
+    QFont f = QFontDialog::getFont(&ok, m_curBtnFont, this, "Choose Button & Prompt Font");
     if (ok) {
-      curBtnFont = f;
-      spinBtnSize->setValue(f.pointSize());
+      m_curBtnFont = f;
+      m_spinBtnSize->setValue(f.pointSize());
       updateBtnPreview();
     }
   });
 
-  QObject::connect(spinBtnSize, QOverload<int>::of(&QSpinBox::valueChanged), [&](int val) {
-    curBtnFont.setPointSize(val);
+  connect(m_spinBtnSize, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
+    m_curBtnFont.setPointSize(val);
     updateBtnPreview();
   });
 
-  QObject::connect(btnChooseDlgFont, &QPushButton::clicked, [&]() {
+  connect(btnChooseDlgFont, &QPushButton::clicked, this, [this]() {
     bool ok = false;
-    QFont f = QFontDialog::getFont(&ok, curDialogFont, &dialog, "Choose Dialog Typography");
+    QFont f = QFontDialog::getFont(&ok, m_curDialogFont, this, "Choose Dialog Typography");
     if (ok) {
-      curDialogFont = f;
-      spinDlgSize->setValue(f.pointSize());
+      m_curDialogFont = f;
+      m_spinDlgSize->setValue(f.pointSize());
       updateDlgPreview();
     }
   });
 
-  QObject::connect(spinDlgSize, QOverload<int>::of(&QSpinBox::valueChanged), [&](int val) {
-    curDialogFont.setPointSize(val);
+  connect(m_spinDlgSize, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
+    m_curDialogFont.setPointSize(val);
     updateDlgPreview();
   });
 
-  QObject::connect(btnChooseGraphFont, &QPushButton::clicked, [&]() {
+  connect(btnChooseGraphFont, &QPushButton::clicked, this, [this]() {
     bool ok = false;
-    QFont f = QFontDialog::getFont(&ok, curGraphFont, &dialog, "Choose Graph Overlay Typography");
+    QFont f = QFontDialog::getFont(&ok, m_curGraphFont, this, "Choose Graph Overlay Typography");
     if (ok) {
-      curGraphFont = f;
-      spinGraphSize->setValue(f.pointSize());
+      m_curGraphFont = f;
+      m_spinGraphSize->setValue(f.pointSize());
       updateGraphPreview();
     }
   });
 
-  QObject::connect(spinGraphSize, QOverload<int>::of(&QSpinBox::valueChanged), [&](int val) {
-    curGraphFont.setPointSize(val);
+  connect(m_spinGraphSize, QOverload<int>::of(&QSpinBox::valueChanged), this, [this](int val) {
+    m_curGraphFont.setPointSize(val);
     updateGraphPreview();
   });
 
-  QObject::connect(comboRootFont, QOverload<int>::of(&QComboBox::currentIndexChanged), [&](int idx) {
-    curRootFontIdx = comboRootFont->itemData(idx).toInt();
+  connect(m_comboRootFont, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
+    m_curRootFontIdx = m_comboRootFont->itemData(idx).toInt();
   });
 
   // Wire Presets
-  auto updateAllSwatches = [&]() {
-    swatchBtnBg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curBtnBg.name()));
-    swatchBtnFg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curBtnFg.name()));
-    swatchPromptBg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curPromptBg.name()));
-    swatchPromptFg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curPromptFg.name()));
-    swatchDlgBg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curDlgBg.name()));
-    swatchDlgFg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curDlgFg.name()));
-    swatchDlgAccent->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curDlgAccent.name()));
-    swatchGraphBg->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curGraphBg.name()));
-    swatchSpec->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curSpec.name()));
-    swatchPeak->setStyleSheet(QString("background-color: %1; border: 2px solid #888; border-radius: 4px;").arg(curPeak.name()));
-    updateBtnPreview();
-    updateDlgPreview();
-    updateGraphPreview();
-  };
-
-  QObject::connect(presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), [&](int idx) {
+  connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
     if (idx == 1) {
       // Default Dark
-      curBtnBg = QColor("#e0e0e0"); curBtnFg = QColor("#000000");
-      curPromptBg = QColor("#ffffff"); curPromptFg = QColor("#000000");
-      curDlgBg = QColor("#1e1e1e"); curDlgFg = QColor("#dcdcdc"); curDlgAccent = QColor("#007acc");
-      curGraphBg = QColor("#1e1e1e"); curSpec = QColor("#3399ff"); curPeak = QColor("#00ffff");
+      m_curBtnBg = QColor("#e0e0e0"); m_curBtnFg = QColor("#000000");
+      m_curPromptBg = QColor("#ffffff"); m_curPromptFg = QColor("#000000");
+      m_curDlgBg = QColor("#1e1e1e"); m_curDlgFg = QColor("#dcdcdc"); m_curDlgAccent = QColor("#007acc");
+      m_curGraphBg = QColor("#1e1e1e"); m_curSpec = QColor("#3399ff"); m_curPeak = QColor("#00ffff");
     } else if (idx == 2) {
       // Classic Light
-      curBtnBg = QColor("#e8e8e8"); curBtnFg = QColor("#111111");
-      curPromptBg = QColor("#ffffff"); curPromptFg = QColor("#000000");
-      curDlgBg = QColor("#f4f4f4"); curDlgFg = QColor("#222222"); curDlgAccent = QColor("#0066cc");
-      curGraphBg = QColor("#ffffff"); curSpec = QColor("#0033aa"); curPeak = QColor("#cc0000");
+      m_curBtnBg = QColor("#e8e8e8"); m_curBtnFg = QColor("#111111");
+      m_curPromptBg = QColor("#ffffff"); m_curPromptFg = QColor("#000000");
+      m_curDlgBg = QColor("#f4f4f4"); m_curDlgFg = QColor("#222222"); m_curDlgAccent = QColor("#0066cc");
+      m_curGraphBg = QColor("#ffffff"); m_curSpec = QColor("#0033aa"); m_curPeak = QColor("#cc0000");
     } else if (idx == 3) {
       // Vampire
-      curBtnBg = QColor("#2b1b1b"); curBtnFg = QColor("#ffcccc");
-      curPromptBg = QColor("#1a0f0f"); curPromptFg = QColor("#ff7777");
-      curDlgBg = QColor("#160808"); curDlgFg = QColor("#f0d0d0"); curDlgAccent = QColor("#870202");
-      curGraphBg = QColor("#100505"); curSpec = QColor("#870202"); curPeak = QColor("#ff3333");
+      m_curBtnBg = QColor("#2b1b1b"); m_curBtnFg = QColor("#ffcccc");
+      m_curPromptBg = QColor("#1a0f0f"); m_curPromptFg = QColor("#ff7777");
+      m_curDlgBg = QColor("#160808"); m_curDlgFg = QColor("#f0d0d0"); m_curDlgAccent = QColor("#870202");
+      m_curGraphBg = QColor("#100505"); m_curSpec = QColor("#870202"); m_curPeak = QColor("#ff3333");
     } else if (idx == 4) {
       // Cyberpunk
-      curBtnBg = QColor("#181828"); curBtnFg = QColor("#00ffff");
-      curPromptBg = QColor("#0c0c16"); curPromptFg = QColor("#00ff99");
-      curDlgBg = QColor("#12131f"); curDlgFg = QColor("#e6e6ff"); curDlgAccent = QColor("#ff007f");
-      curGraphBg = QColor("#0a0a14"); curSpec = QColor("#00f0ff"); curPeak = QColor("#ff007f");
+      m_curBtnBg = QColor("#181828"); m_curBtnFg = QColor("#00ffff");
+      m_curPromptBg = QColor("#0c0c16"); m_curPromptFg = QColor("#00ff99");
+      m_curDlgBg = QColor("#12131f"); m_curDlgFg = QColor("#e6e6ff"); m_curDlgAccent = QColor("#ff007f");
+      m_curGraphBg = QColor("#0a0a14"); m_curSpec = QColor("#00f0ff"); m_curPeak = QColor("#ff007f");
     }
     updateAllSwatches();
   });
 
   // Action Buttons Bar
   QHBoxLayout *btnBar = new QHBoxLayout();
-  QPushButton *btnReset = new QPushButton("↺ Reset to Defaults", &dialog);
-  QPushButton *btnApply = new QPushButton("Apply", &dialog);
-  QPushButton *btnOk = new QPushButton("OK", &dialog);
-  QPushButton *btnCancel = new QPushButton("Cancel", &dialog);
+  QPushButton *btnReset = new QPushButton("↺ Reset to Defaults", this);
+  QPushButton *btnApply = new QPushButton("Apply", this);
+  QPushButton *btnOk = new QPushButton("OK", this);
+  QPushButton *btnCancel = new QPushButton("Cancel", this);
 
   btnOk->setDefault(true);
   btnApply->setStyleSheet("QPushButton { background-color: #0e639c; color: #ffffff; font-weight: bold; }");
@@ -906,95 +916,163 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
   btnBar->addWidget(btnCancel);
   dialogLayout->addLayout(btnBar);
 
-  auto commitChanges = [&]() {
-    Design::setButtonPromptFont(curBtnFont);
-    Design::setButtonBackgroundColor(curBtnBg);
-    Design::setButtonTextColor(curBtnFg);
-    Design::setPromptBackgroundColor(curPromptBg);
-    Design::setPromptTextColor(curPromptFg);
-
-    Design::setDialogFont(curDialogFont);
-    Design::setDialogBackgroundColor(curDlgBg);
-    Design::setDialogTextColor(curDlgFg);
-    Design::setDialogAccentColor(curDlgAccent);
-
-    Design::setGraphFont(curGraphFont, curRootFontIdx);
-    Design::setGraphBackgroundColor(curGraphBg);
-    Design::setSpectrumColor(curSpec);
-    Design::setPeakMarkerColor(curPeak);
-
-    Design::saveSettings();
-    Design::applyUITheme(canvasWidget);
-
-    // Refresh dialog's own styling
-    dialog.setFont(curDialogFont);
-    dialog.setStyleSheet(Design::getDialogStyleSheet());
-  };
-
-  QObject::connect(btnReset, &QPushButton::clicked, [&]() {
+  connect(btnReset, &QPushButton::clicked, this, [this]() {
     Design::resetToDefaults();
-    curBtnFont = Design::getButtonPromptFont();
-    curDialogFont = Design::getDialogFont();
-    curGraphFont = Design::getGraphFont();
-    curRootFontIdx = Design::getRootFontFamilyIndex();
+    m_curBtnFont = Design::getButtonPromptFont();
+    m_curDialogFont = Design::getDialogFont();
+    m_curGraphFont = Design::getGraphFont();
+    m_curRootFontIdx = Design::getRootFontFamilyIndex();
 
-    curBtnBg = Design::getButtonBackgroundColor();
-    curBtnFg = Design::getButtonTextColor();
-    curPromptBg = Design::getPromptBackgroundColor();
-    curPromptFg = Design::getPromptTextColor();
+    m_curBtnBg = Design::getButtonBackgroundColor();
+    m_curBtnFg = Design::getButtonTextColor();
+    m_curPromptBg = Design::getPromptBackgroundColor();
+    m_curPromptFg = Design::getPromptTextColor();
 
-    curDlgBg = Design::getDialogBackgroundColor();
-    curDlgFg = Design::getDialogTextColor();
-    curDlgAccent = Design::getDialogAccentColor();
+    m_curDlgBg = Design::getDialogBackgroundColor();
+    m_curDlgFg = Design::getDialogTextColor();
+    m_curDlgAccent = Design::getDialogAccentColor();
 
-    curGraphBg = Design::getGraphBackgroundColor();
-    curSpec = Design::getSpectrumColor();
-    curPeak = Design::getPeakMarkerColor();
+    m_curGraphBg = Design::getGraphBackgroundColor();
+    m_curSpec = Design::getSpectrumColor();
+    m_curPeak = Design::getPeakMarkerColor();
 
-    spinBtnSize->setValue(curBtnFont.pointSize());
-    spinDlgSize->setValue(curDialogFont.pointSize());
-    spinGraphSize->setValue(curGraphFont.pointSize());
-    int rootIdx = comboRootFont->findData(curRootFontIdx);
-    if (rootIdx >= 0) comboRootFont->setCurrentIndex(rootIdx);
-    presetCombo->setCurrentIndex(0);
+    m_spinBtnSize->setValue(m_curBtnFont.pointSize());
+    m_spinDlgSize->setValue(m_curDialogFont.pointSize());
+    m_spinGraphSize->setValue(m_curGraphFont.pointSize());
+    int rootIdx = m_comboRootFont->findData(m_curRootFontIdx);
+    if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
+    m_presetCombo->setCurrentIndex(0);
 
     updateAllSwatches();
   });
 
-  QObject::connect(btnApply, &QPushButton::clicked, commitChanges);
+  connect(btnApply, &QPushButton::clicked, this, &AppearanceDialog::commitChanges);
 
-  QObject::connect(btnOk, &QPushButton::clicked, [&]() {
+  connect(btnOk, &QPushButton::clicked, this, [this]() {
     commitChanges();
-    dialog.accept();
+    accept();
   });
 
-  QObject::connect(btnCancel, &QPushButton::clicked, [&]() {
-    // Revert to original settings in case Apply was previously pressed
-    Design::setButtonPromptFont(origBtnFont);
-    Design::setButtonBackgroundColor(origBtnBg);
-    Design::setButtonTextColor(origBtnFg);
-    Design::setPromptBackgroundColor(origPromptBg);
-    Design::setPromptTextColor(origPromptFg);
-
-    Design::setDialogFont(origDialogFont);
-    Design::setDialogBackgroundColor(origDlgBg);
-    Design::setDialogTextColor(origDlgFg);
-    Design::setDialogAccentColor(origDlgAccent);
-
-    Design::setGraphFont(origGraphFont, origRootFontIdx);
-    Design::setGraphBackgroundColor(origGraphBg);
-    Design::setSpectrumColor(origSpec);
-    Design::setPeakMarkerColor(origPeak);
-
-    Design::saveSettings();
-    Design::applyUITheme(canvasWidget);
-    dialog.reject();
+  connect(btnCancel, &QPushButton::clicked, this, [this]() {
+    revertChanges();
+    reject();
   });
 
-  // Initial trigger to render previews
+  // Initial render
   updateBtnPreview();
   updateDlgPreview();
   updateGraphPreview();
+}
 
+void AppearanceDialog::updateBtnPreview() {
+  if (!m_lblBtnFontDesc || !m_sampleBtn || !m_samplePrompt) return;
+  m_lblBtnFontDesc->setText(QString("%1, %2pt, %3")
+                               .arg(m_curBtnFont.family())
+                               .arg(m_curBtnFont.pointSize() > 0 ? m_curBtnFont.pointSize() : 11)
+                               .arg(m_curBtnFont.bold() ? "Bold" : "Normal"));
+  QFont f = m_curBtnFont;
+  f.setBold(true);
+  m_sampleBtn->setFont(f);
+  m_sampleBtn->setStyleSheet(QString(
+      "QPushButton { background-color: %1; color: %2; font-weight: bold; padding: 4px; "
+      "border-top: 2px solid #ffffff; border-left: 2px solid #ffffff; "
+      "border-right: 2px solid #606060; border-bottom: 2px solid #606060; }"
+  ).arg(m_curBtnBg.name(), m_curBtnFg.name()));
+
+  QFont pf = m_curBtnFont;
+  pf.setBold(false);
+  m_samplePrompt->setFont(pf);
+  m_samplePrompt->setStyleSheet(QString(
+      "QLineEdit { background-color: %1; color: %2; border: 1px solid #888888; padding: 4px; }"
+  ).arg(m_curPromptBg.name(), m_curPromptFg.name()));
+}
+
+void AppearanceDialog::updateDlgPreview() {
+  if (!m_lblDlgFontDesc || !m_mockDialogBox || !m_mockLabel || !m_mockButton) return;
+  m_lblDlgFontDesc->setText(QString("%1, %2pt")
+                               .arg(m_curDialogFont.family())
+                               .arg(m_curDialogFont.pointSize() > 0 ? m_curDialogFont.pointSize() : 11));
+  m_mockDialogBox->setStyleSheet(QString(
+      "QFrame { background-color: %1; border: 1px solid #555555; border-radius: 4px; }"
+  ).arg(m_curDlgBg.name()));
+  m_mockLabel->setFont(m_curDialogFont);
+  m_mockLabel->setStyleSheet(QString("color: %1; border: none;").arg(m_curDlgFg.name()));
+  m_mockButton->setFont(m_curDialogFont);
+  m_mockButton->setStyleSheet(QString(
+      "QPushButton { background-color: %1; color: #ffffff; border: 1px solid #777777; "
+      "border-radius: 4px; padding: 4px 12px; font-weight: bold; }"
+  ).arg(m_curDlgAccent.name()));
+}
+
+void AppearanceDialog::updateGraphPreview() {
+  if (!m_lblGraphFontDesc || !m_mockCanvasBox || !m_mockPeakLabel) return;
+  m_lblGraphFontDesc->setText(QString("%1, %2pt")
+                                .arg(m_curGraphFont.family())
+                                .arg(m_curGraphFont.pointSize() > 0 ? m_curGraphFont.pointSize() : 10));
+  m_mockCanvasBox->setStyleSheet(QString(
+      "QFrame { background-color: %1; border: 1px solid %2; border-radius: 4px; }"
+  ).arg(m_curGraphBg.name(), m_curSpec.name()));
+  QFont gf = m_curGraphFont;
+  gf.setBold(true);
+  m_mockPeakLabel->setFont(gf);
+  m_mockPeakLabel->setStyleSheet(QString("color: %1; border: none; font-weight: bold;").arg(m_curPeak.name()));
+}
+
+void AppearanceDialog::updateAllSwatches() {
+  for (const auto &fn : m_swatchUpdaters) {
+    fn();
+  }
+  updateBtnPreview();
+  updateDlgPreview();
+  updateGraphPreview();
+}
+
+void AppearanceDialog::commitChanges() {
+  Design::setButtonPromptFont(m_curBtnFont);
+  Design::setButtonBackgroundColor(m_curBtnBg);
+  Design::setButtonTextColor(m_curBtnFg);
+  Design::setPromptBackgroundColor(m_curPromptBg);
+  Design::setPromptTextColor(m_curPromptFg);
+
+  Design::setDialogFont(m_curDialogFont);
+  Design::setDialogBackgroundColor(m_curDlgBg);
+  Design::setDialogTextColor(m_curDlgFg);
+  Design::setDialogAccentColor(m_curDlgAccent);
+
+  Design::setGraphFont(m_curGraphFont, m_curRootFontIdx);
+  Design::setGraphBackgroundColor(m_curGraphBg);
+  Design::setSpectrumColor(m_curSpec);
+  Design::setPeakMarkerColor(m_curPeak);
+
+  Design::saveSettings();
+  Design::applyUITheme(m_canvasWidget);
+
+  setFont(m_curDialogFont);
+  setStyleSheet(Design::getDialogStyleSheet());
+}
+
+void AppearanceDialog::revertChanges() {
+  Design::setButtonPromptFont(m_origBtnFont);
+  Design::setButtonBackgroundColor(m_origBtnBg);
+  Design::setButtonTextColor(m_origBtnFg);
+  Design::setPromptBackgroundColor(m_origPromptBg);
+  Design::setPromptTextColor(m_origPromptFg);
+
+  Design::setDialogFont(m_origDialogFont);
+  Design::setDialogBackgroundColor(m_origDlgBg);
+  Design::setDialogTextColor(m_origDlgFg);
+  Design::setDialogAccentColor(m_origDlgAccent);
+
+  Design::setGraphFont(m_origGraphFont, m_origRootFontIdx);
+  Design::setGraphBackgroundColor(m_origGraphBg);
+  Design::setSpectrumColor(m_origSpec);
+  Design::setPeakMarkerColor(m_origPeak);
+
+  Design::saveSettings();
+  Design::applyUITheme(m_canvasWidget);
+}
+
+void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
+  AppearanceDialog dialog(parent, canvasWidget);
   dialog.exec();
 }
