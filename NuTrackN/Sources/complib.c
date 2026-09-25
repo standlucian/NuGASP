@@ -79,7 +79,6 @@ comp_compress_(int *lwdata, const int *nch, unsigned char *packed, int *dnbytes,
   int nbytes, nbytes0, nbytes1, nbytes2, nbytes3, nbycomp;
   int ii, ll;
   int *ptr;
-  int  *ptr1;
 
   nbytes2z = ccomp__2_check(lwdata, *nch);
 
@@ -150,6 +149,7 @@ comp_compress_(int *lwdata, const int *nch, unsigned char *packed, int *dnbytes,
     case -1:
       nbits   = NBITSINT;
       nbytes0 = SIZEINT * *nch;
+      /* fallthrough */
     case 0:
       *mode = nbits;
       nbycomp = ccomp__0_compress(lwdata, *nch, packed, *mode);
@@ -461,7 +461,7 @@ ccomp__1_compressLW(const int *data, int nch,int *pack, int nonzero) {
 int
 ccomp__1_decompressW(int *data, int nch, short int *wpack) {
 
-  short int ii, nonzero, indpack, inddata, nexdata;
+  short int ii, nonzero, inddata, nexdata;
   int *dptr;
   short int *wptr;
 #if defined( _GW_BIG_ENDIAN )
@@ -515,7 +515,7 @@ ccomp__1_decompressW(int *data, int nch, short int *wpack) {
 int
 ccomp__1_decompressLW(int *data, int nch, int *pack) {
 
-  int ii, nonzero, indpack, inddata, nexdata;
+  int ii, nonzero, inddata, nexdata;
   int *dptr, *pptr;
 #if defined( _GW_BIG_ENDIAN )
   char *swp_ptr;
@@ -634,8 +634,7 @@ ccomp__2_compress(const int *dati, int isize, unsigned char *bdat) {
 
   int compress;
   int idpnt, nbits, minval, itag, icount, ii;
-  int nbitsn, minvaln, nch, nbused, iminval, nextra;
-  unsigned int dd;
+  int nbitsn, minvaln, nch, nbused;
   unsigned char * cptr;
 
   idpnt = 0;
@@ -680,8 +679,7 @@ ccomp__2_compress(const int *dati, int isize, unsigned char *bdat) {
 int
 ccomp__2_decompress(int *dati, int isize, unsigned char *bdat) {
 
-  unsigned int dd;
-  int idpnt, nbits, minval, itag, icount, ii;
+  int idpnt, nbits, minval, itag, icount;
   int nhead, nch, nbused;
   int lbin;
   unsigned char * cptr;
@@ -725,8 +723,8 @@ ccomp__2_findvals(const int *dati, int *nbits, int *minval) {
 int
 ccomp__2_puthead(unsigned char *bdat, int nbits, int itag, int icount, int minval) {
 
-  int ii, iminval, nextra, nhead;
-  unsigned int dd;
+  int ii, iminval, nextra;
+  unsigned int dd = 0;
 
   switch (itag) {
     case 0: dd =   icount * 4; break;
@@ -774,7 +772,6 @@ ccomp__2_puthead(unsigned char *bdat, int nbits, int itag, int icount, int minva
 int
 ccomp__2_gethead(unsigned char *bdat, int *nbits, int *itag, int *icount,int *minval) {
 
-  int nhead;
   unsigned int dd;
   int nextra, isign, ii;
 
@@ -963,7 +960,7 @@ ccomp__3_compress(const int *data, int nch, unsigned char *pack) {
         }
       }
       else {
-        dd = (dd << TBITS-nbits) | nmask[TBITS-nbits];
+        dd = (dd << (TBITS - nbits)) | nmask[TBITS - nbits];
         *chptr++ = dd;
         ll -= (TBITS-nbits);
         nbits = 0;
@@ -998,14 +995,13 @@ ccomp__3_decompress(int *data, int nch, unsigned char *pack) {
   int  * ptr;
   unsigned char * chptr;
   unsigned int dd;
-  int ii, nn, ll, nbits;
+  int ii, nn, ll;
 
   ptr = data; chptr = pack;
-  nbits = 0; ii = 0; ll = 0;
+  ii = 0; ll = 0;
 
   while (1) {
     dd = (*chptr++);
-    nbits  = TBITS;
     for(nn = 0; nn < TBITS; nn++) {
       if(dd & TVAL) ll++;
       else {
