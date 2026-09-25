@@ -381,22 +381,13 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     iconButton->setIconSize(QSize(22, 22));
     iconButton->setToolTip(tr("Color & Theme Settings"));
     iconButton->setFixedSize(33, 33);
-    iconButton->setStyleSheet(
-        "QPushButton { border: 1px solid #999999; background: #ffffff; }"
-        "QPushButton:pressed { background: #e0e0e0; }"
-    );
+    iconButton->setStyleSheet(Design::getButtonStyleSheet());
     connect(iconButton, &QPushButton::clicked, this, &QMainCanvas::OpenColorSelectionDialog);
     outBox->addWidget(iconButton);
 
-    QPushButton *btnMacro = new QPushButton(tr("MAC"), topContainer);
-    btnMacro->setFont(Design::getButtonFont());
+    QPushButton *btnMacro = makeButton(tr("MAC"), topContainer, true);
     btnMacro->setToolTip(tr("Macros & Command Strings (Block 4) [Shortcut: D+M]"));
     btnMacro->setFixedSize(38, 33);
-    btnMacro->setStyleSheet(
-        "QPushButton { border: 1px solid #007acc; background: #252526; color: #00ffff; border-radius: 3px; }"
-        "QPushButton:hover { background: #007acc; color: #ffffff; }"
-        "QPushButton:pressed { background: #0e639c; }"
-    );
     connect(btnMacro, &QPushButton::clicked, this, &QMainCanvas::openMacroDialog);
     outBox->addWidget(btnMacro);
 

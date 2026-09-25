@@ -368,7 +368,7 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     const QFont btnFont = getButtonFont();
     const QList<QPushButton*> buttons = mainCanvas->findChildren<QPushButton*>();
     for (QPushButton *btn : buttons) {
-      if (!btn || !btn->icon().isNull() || btn->text() == "MAC") continue;
+      if (!btn) continue;
 
       // Do NOT style buttons inside dialogs: dialog buttons must respond to Dialog options
       if (btn->window() != mainCanvas) continue;
