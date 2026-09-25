@@ -983,8 +983,6 @@ private:
   QLabel *m_mockGraphSampleLabel{nullptr};
 
   // Tab 4 UI
-  QScrollArea *m_scrollTabCanvas{nullptr};
-  QWidget *m_tabCanvas{nullptr};
   CanvasPreviewWidget *m_canvasPreview{nullptr};
 
   // Bottom action buttons
@@ -1164,7 +1162,7 @@ void AppearanceDialog::setupUI() {
   tabBtnLayout->addWidget(grpBtnPreview);
   tabBtnLayout->addStretch();
 
-  tabs->addTab(tabBtn, "🔘 1. Buttons & UI");
+  tabs->addTab(tabBtn, "1. Buttons && UI");
 
   // =========================================================================
   // TAB 2: Dialogs
@@ -1218,7 +1216,7 @@ void AppearanceDialog::setupUI() {
   tabDlgLayout->addWidget(grpDlgPreview);
   tabDlgLayout->addStretch();
 
-  tabs->addTab(tabDlg, "💬 2. Dialogs");
+  tabs->addTab(tabDlg, "2. Dialogs");
 
   // =========================================================================
   // TAB 3: Graph Typography
@@ -1264,40 +1262,38 @@ void AppearanceDialog::setupUI() {
   tabGraphLayout->addWidget(grpGraphPreview);
   tabGraphLayout->addStretch();
 
-  tabs->addTab(tabGraph, "🔤 3. Graph Typography");
+  tabs->addTab(tabGraph, "3. Graph Typography");
 
   // =========================================================================
   // TAB 4: Canvas, Spectra & Markers
   // =========================================================================
-  m_scrollTabCanvas = new QScrollArea(this);
-  m_scrollTabCanvas->setWidgetResizable(true);
-  m_scrollTabCanvas->setFrameShape(QFrame::NoFrame);
-  m_scrollTabCanvas->setObjectName("scrollTabCanvas");
-
-  m_tabCanvas = new QWidget();
-  m_tabCanvas->setObjectName("tabCanvas");
-  QVBoxLayout *tabCanvasLayout = new QVBoxLayout(m_tabCanvas);
-  tabCanvasLayout->setSpacing(10);
+  QWidget *tabCanvas = new QWidget();
+  QVBoxLayout *tabCanvasLayout = new QVBoxLayout(tabCanvas);
+  tabCanvasLayout->setSpacing(8);
   tabCanvasLayout->setContentsMargins(10, 10, 10, 10);
 
   // Group 1: Canvas Background
-  QGroupBox *grpCanvasBg = new QGroupBox("Canvas Background", m_tabCanvas);
+  QGroupBox *grpCanvasBg = new QGroupBox("Canvas Background", tabCanvas);
   QGridLayout *gridCanvasBg = new QGridLayout(grpCanvasBg);
+  gridCanvasBg->setContentsMargins(10, 6, 10, 6);
   gridCanvasBg->setColumnStretch(0, 1);
   gridCanvasBg->setColumnStretch(1, 0);
   addColorRow(gridCanvasBg, 0, 0, "Canvas Background Color:", &m_curGraphBg, [this]() { updateCanvasPreview(); });
   tabCanvasLayout->addWidget(grpCanvasBg);
 
-  // Group 2: Spectrum Colors (All 9 Options)
-  QGroupBox *grpSpectra = new QGroupBox("Spectrum Colors (Channels 1 - 9 / Overlays)", m_tabCanvas);
+  // Group 2: Spectrum Colors (All 9 Options) - 3 Columns
+  QGroupBox *grpSpectra = new QGroupBox("Spectrum Colors (Channels 1 - 9 / Overlays)", tabCanvas);
   QGridLayout *gridSpectra = new QGridLayout(grpSpectra);
-  gridSpectra->setColumnStretch(0, 1);
-  gridSpectra->setColumnStretch(1, 0);
-  gridSpectra->setColumnStretch(2, 1);
-  gridSpectra->setColumnStretch(3, 0);
+  gridSpectra->setContentsMargins(10, 6, 10, 6);
+  gridSpectra->setHorizontalSpacing(14);
+  gridSpectra->setVerticalSpacing(4);
+  for (int c = 0; c < 6; c += 2) {
+    gridSpectra->setColumnStretch(c, 1);
+    gridSpectra->setColumnStretch(c + 1, 0);
+  }
 
   const QString specNames[9] = {
-      "Spectrum 1 (Primary / Active):",
+      "Spectrum 1 (Primary):",
       "Spectrum 2 (Overlay 1):",
       "Spectrum 3 (Overlay 2):",
       "Spectrum 4 (Overlay 3):",
@@ -1309,39 +1305,45 @@ void AppearanceDialog::setupUI() {
   };
 
   for (int i = 0; i < 9; ++i) {
-    int row = i % 5;
-    int col = (i < 5) ? 0 : 2;
+    int row = i % 3;
+    int col = (i / 3) * 2;
     addColorRow(gridSpectra, row, col, specNames[i], &m_curSpectrumColors[i], [this]() { updateCanvasPreview(); });
   }
   tabCanvasLayout->addWidget(grpSpectra);
 
-  // Group 3: Marker Colors
-  QGroupBox *grpMarkers = new QGroupBox("Marker Colors", m_tabCanvas);
+  // Group 3: Marker Colors - 3 Columns
+  QGroupBox *grpMarkers = new QGroupBox("Marker Colors", tabCanvas);
   QGridLayout *gridMarkers = new QGridLayout(grpMarkers);
-  gridMarkers->setColumnStretch(0, 1);
-  gridMarkers->setColumnStretch(1, 0);
-  gridMarkers->setColumnStretch(2, 1);
-  gridMarkers->setColumnStretch(3, 0);
+  gridMarkers->setContentsMargins(10, 6, 10, 6);
+  gridMarkers->setHorizontalSpacing(14);
+  gridMarkers->setVerticalSpacing(4);
+  for (int c = 0; c < 6; c += 2) {
+    gridMarkers->setColumnStretch(c, 1);
+    gridMarkers->setColumnStretch(c + 1, 0);
+  }
 
-  addColorRow(gridMarkers, 0, 0, "Peak Search Markers:", &m_curPeak, [this]() { updateCanvasPreview(); });
-  addColorRow(gridMarkers, 1, 0, "Zoom / Spacebar ROI Markers:", &m_curZoom, [this]() { updateCanvasPreview(); });
-  addColorRow(gridMarkers, 2, 0, "Background Markers:", &m_curBgMarker, [this]() { updateCanvasPreview(); });
-  addColorRow(gridMarkers, 3, 0, "Integral ROI Markers:", &m_curIntegral, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 0, 0, "Peak Search:", &m_curPeak, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 1, 0, "Zoom / ROI:", &m_curZoom, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 2, 0, "Background:", &m_curBgMarker, [this]() { updateCanvasPreview(); });
 
-  addColorRow(gridMarkers, 0, 2, "Range Markers:", &m_curRange, [this]() { updateCanvasPreview(); });
-  addColorRow(gridMarkers, 1, 2, "Gauss Centroid Markers:", &m_curGauss, [this]() { updateCanvasPreview(); });
-  addColorRow(gridMarkers, 2, 2, "Gate Markers:", &m_curGate, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 0, 2, "Integral ROI:", &m_curIntegral, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 1, 2, "Range Marker:", &m_curRange, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 2, 2, "Gauss Centroid:", &m_curGauss, [this]() { updateCanvasPreview(); });
+
+  addColorRow(gridMarkers, 0, 4, "Gate Marker:", &m_curGate, [this]() { updateCanvasPreview(); });
   tabCanvasLayout->addWidget(grpMarkers);
 
   // Group 4: Live Canvas Preview
-  QGroupBox *grpLiveCanvas = new QGroupBox("Live Canvas Preview (Canvas, Spectra & Markers)", m_tabCanvas);
+  QGroupBox *grpLiveCanvas = new QGroupBox("Live Canvas Preview", tabCanvas);
   QVBoxLayout *vboxLiveCanvas = new QVBoxLayout(grpLiveCanvas);
+  vboxLiveCanvas->setContentsMargins(10, 6, 10, 6);
   m_canvasPreview = new CanvasPreviewWidget(grpLiveCanvas);
   vboxLiveCanvas->addWidget(m_canvasPreview);
   tabCanvasLayout->addWidget(grpLiveCanvas);
 
-  m_scrollTabCanvas->setWidget(m_tabCanvas);
-  tabs->addTab(m_scrollTabCanvas, "🎨 4. Canvas, Spectra & Markers");
+  tabCanvasLayout->addStretch();
+
+  tabs->addTab(tabCanvas, "4. Canvas, Spectra && Markers");
 
   dialogLayout->addWidget(tabs, 1);
 
@@ -1677,25 +1679,7 @@ void AppearanceDialog::refreshDialogTheme() {
       "QTabBar::tab:selected { background-color: %1; color: %6; border-bottom: 2px solid %6; }\n"
       "QScrollArea { background-color: %1; border: none; }\n"
       "QScrollArea > QWidget { background-color: %1; border: none; }\n"
-      "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
-      "QWidget#tabCanvas { background-color: %1; }\n"
   ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg));
-
-  if (m_scrollTabCanvas) {
-    m_scrollTabCanvas->setStyleSheet(QString(
-        "QScrollArea { background-color: %1; border: none; }\n"
-        "QScrollArea > QWidget { background-color: %1; border: none; }\n"
-        "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
-        "QWidget#tabCanvas { background-color: %1; }\n"
-    ).arg(bg));
-
-    if (m_scrollTabCanvas->viewport()) {
-      QPalette vp = m_scrollTabCanvas->viewport()->palette();
-      vp.setColor(QPalette::Window, m_curDlgBg);
-      m_scrollTabCanvas->viewport()->setPalette(vp);
-      m_scrollTabCanvas->viewport()->setAutoFillBackground(true);
-    }
-  }
 
   if (m_btnApply) {
     m_btnApply->setStyleSheet(QString(

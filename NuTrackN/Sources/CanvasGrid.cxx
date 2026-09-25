@@ -699,6 +699,31 @@ void QMainCanvas::RefreshScreen()
         }
     }
 
+    bool anyHist = false;
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            if (HijF[z][g]) { anyHist = true; break; }
+        }
+        if (anyHist) break;
+    }
+
+    if (!anyHist) {
+        rootCanvas->SetFillColor(rootBg);
+        if (gPad) {
+            gPad->SetFillColor(rootBg);
+            gPad->SetFrameFillColor(rootBg);
+        }
+        TLatex *l = new TLatex();
+        l->SetTextSize(0.15);
+        l->SetTextAlign(22);
+        l->SetTextColor(axisCol);
+        l->DrawLatex(0.5, 0.5, "NuTrackN");
+        rootCanvas->Modified();
+        rootCanvas->Update();
+        canvas->update();
+        return;
+    }
+
     for (int z = 1; z <= maxElement_i; ++z) {
         for (int g = 1; g <= maxElement_j; ++g) {
             if (!HijF[z][g]) continue;
