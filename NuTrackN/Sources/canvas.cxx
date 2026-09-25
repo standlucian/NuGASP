@@ -113,32 +113,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
         btn->setFocusPolicy(Qt::NoFocus);
         btn->setEnabled(enabled);
         btn->setFont(Design::getButtonFont());
-        btn->setStyleSheet(
-            "QPushButton {"
-            "  border-top: 2px solid #ffffff;"
-            "  border-left: 2px solid #ffffff;"
-            "  border-right: 2px solid #606060;"
-            "  border-bottom: 2px solid #606060;"
-            "  background-color: #e0e0e0;"
-            "  color: #000000;"
-            "  padding: 3px 6px;"
-            "}"
-            "QPushButton:pressed {"
-            "  border-top: 2px solid #606060;"
-            "  border-left: 2px solid #606060;"
-            "  border-right: 2px solid #ffffff;"
-            "  border-bottom: 2px solid #ffffff;"
-            "  background-color: #d0d0d0;"
-            "}"
-            "QPushButton:disabled {"
-            "  color: #888888;"
-            "  background-color: #e8e8e8;"
-            "  border-top: 2px solid #f0f0f0;"
-            "  border-left: 2px solid #f0f0f0;"
-            "  border-right: 2px solid #a0a0a0;"
-            "  border-bottom: 2px solid #a0a0a0;"
-            "}"
-        );
+        btn->setStyleSheet(Design::getButtonStyleSheet());
         return btn;
     };
 

@@ -2,6 +2,7 @@
 #define DESIGN_H
 
 #include <QFont>
+#include <QColor>
 #include <QPlainTextEdit>
 #include <QString>
 
@@ -12,19 +13,24 @@ class TCanvas;
 namespace Design {
 
     /**
-     * @brief Initializes typography settings from saved configuration or defaults.
+     * @brief Initializes typography and color settings from saved configuration or defaults.
      */
     void initializeTypography();
 
     /**
-     * @brief Persists typography preferences to QSettings.
+     * @brief Persists typography and color preferences to QSettings.
      */
-    void saveTypographySettings();
+    void saveSettings();
 
     /**
-     * @brief Loads typography preferences from QSettings.
+     * @brief Loads typography and color preferences from QSettings.
      */
-    void loadTypographySettings();
+    void loadSettings();
+
+    /**
+     * @brief Resets all fonts, sizes, and colors to factory defaults.
+     */
+    void resetToDefaults();
 
     // =========================================================================
     // Category 1: Buttons and Prompt Console
@@ -34,11 +40,32 @@ namespace Design {
     QFont getButtonPromptFont();
     void setButtonPromptFont(const QFont &font);
 
+    QColor getButtonBackgroundColor();
+    void setButtonBackgroundColor(const QColor &color);
+    QColor getButtonTextColor();
+    void setButtonTextColor(const QColor &color);
+
+    QColor getPromptBackgroundColor();
+    void setPromptBackgroundColor(const QColor &color);
+    QColor getPromptTextColor();
+    void setPromptTextColor(const QColor &color);
+
+    QString getButtonStyleSheet();
+    QString getPromptStyleSheet();
+
     // =========================================================================
     // Category 2: Dialogs
     // =========================================================================
     QFont getDialogFont();
     void setDialogFont(const QFont &font);
+
+    QColor getDialogBackgroundColor();
+    void setDialogBackgroundColor(const QColor &color);
+    QColor getDialogTextColor();
+    void setDialogTextColor(const QColor &color);
+    QColor getDialogAccentColor();
+    void setDialogAccentColor(const QColor &color);
+
     QString getDialogStyleSheet();
 
     // =========================================================================
@@ -49,10 +76,26 @@ namespace Design {
     int getRootFontFamilyIndex();
     void setGraphFont(const QFont &qtFont, int rootFontFamilyIndex = 4);
 
+    QColor getGraphBackgroundColor();
+    void setGraphBackgroundColor(const QColor &color);
+    QColor getSpectrumColor();
+    void setSpectrumColor(const QColor &color);
+    QColor getPeakMarkerColor();
+    void setPeakMarkerColor(const QColor &color);
+
     /**
      * @brief Applies graph typography to CERN ROOT gStyle.
      */
     void applyGraphTypography();
+
+    /**
+     * @brief Applies the full theme (fonts, sizes, colors) to the active main window and canvas.
+     */
+    void applyUITheme(QMainCanvas *mainCanvas);
+
+    // Aliases for compatibility
+    inline void saveTypographySettings() { saveSettings(); }
+    inline void loadTypographySettings() { loadSettings(); }
 
 } // namespace Design
 
