@@ -90,31 +90,31 @@ void initializeTypography() {
 }
 
 void resetToDefaults() {
-  QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  mono.setPointSize(11);
-  s_buttonPromptFont = mono;
+  // Authentic Classic Xtrackn baseline (glwlib.c & screenshot)
+  QFont timesFont("Times New Roman", 11);
+  timesFont.setStyleHint(QFont::Times);
+  s_buttonPromptFont = timesFont;
+  s_buttonPromptFont.setBold(true);
+  s_dialogFont = timesFont;
+  s_graphFont = timesFont;
+  s_rootFontFamilyIndex = 13; // ROOT Font 13: Times
 
-  QFont dialogFont("DejaVu Sans", 11, QFont::Normal);
-  dialogFont.setStyleHint(QFont::SansSerif);
-  s_dialogFont = dialogFont;
-
-  QFont graphFont("DejaVu Sans", 10, QFont::Normal);
-  graphFont.setStyleHint(QFont::SansSerif);
-  s_graphFont = graphFont;
-  s_rootFontFamilyIndex = 4;
-
-  s_buttonBgColor = QColor("#e0e0e0");
-  s_buttonTextColor = QColor("#000000");
-  s_promptBgColor = QColor("#ffffff");
+  // GLW_LABELCOLOR_1 = rgb(119, 144, 173) -> #7790ad
+  // Button text = CYAN -> #00ffff
+  // GLW_FRAMECOLOR = rgb(112, 128, 144) -> #708090
+  // GLW_FRAMECOLOR_DARK = rgb(47, 79, 79) -> #2f4f4f
+  s_buttonBgColor = QColor("#7790ad");
+  s_buttonTextColor = QColor("#00ffff");
+  s_promptBgColor = QColor("#7790ad");
   s_promptTextColor = QColor("#000000");
 
-  s_dialogBgColor = QColor("#1e1e1e");
-  s_dialogTextColor = QColor("#dcdcdc");
-  s_dialogAccentColor = QColor("#007acc");
+  s_dialogBgColor = QColor("#708090");
+  s_dialogTextColor = QColor("#000000");
+  s_dialogAccentColor = QColor("#2f4f4f");
 
-  s_graphBgColor = QColor("#1e1e1e");
-  s_spectrumColor = QColor("#3399ff");
-  s_peakMarkerColor = QColor("#00ffff");
+  s_graphBgColor = QColor("#000000");
+  s_spectrumColor = QColor("#ffffff");
+  s_peakMarkerColor = QColor("#ffff00");
 
   saveSettings();
 }
@@ -417,6 +417,12 @@ void applyUITheme(QMainCanvas *mainCanvas) {
 
       lbl->setFont(btnFont);
       lbl->setStyleSheet(labelStyle);
+    }
+
+    // Set matching frame color on toolbar container
+    QWidget *topContainer = mainCanvas->findChild<QWidget*>("topContainer");
+    if (topContainer) {
+      topContainer->setStyleSheet(QString("QWidget#topContainer { background-color: %1; }").arg(s_buttonBgColor.darker(106).name()));
     }
   }
 
@@ -951,12 +957,24 @@ void AppearanceDialog::setupUI() {
       m_curGraphFont = timesFont;
       m_curRootFontIdx = 13; // ROOT Font 13: Times
 
-      m_curBtnBg = QColor("#b0b8c0"); m_curBtnFg = QColor("#000000");
-      m_curPromptBg = QColor("#ffffff"); m_curPromptFg = QColor("#000000");
+      // Exact legacy Xtrackn colors from glwlib.c and screenshot:
+      // GLW_LABELCOLOR_1 = rgb(119, 144, 173) -> #7790ad
+      // Button text = CYAN -> #00ffff
+      // Readouts = GLW_LABELCOLOR_1 -> #7790ad with BLACK text -> #000000
+      // Frame = GLW_FRAMECOLOR = rgb(112, 128, 144) -> #708090
+      // Dark Frame = GLW_FRAMECOLOR_DARK = rgb(47, 79, 79) -> #2f4f4f
+      m_curBtnBg = QColor("#7790ad");
+      m_curBtnFg = QColor("#00ffff");
+      m_curPromptBg = QColor("#7790ad");
+      m_curPromptFg = QColor("#000000");
 
-      m_curDlgBg = QColor("#c8c8c8"); m_curDlgFg = QColor("#000000"); m_curDlgAccent = QColor("#000080");
+      m_curDlgBg = QColor("#708090");
+      m_curDlgFg = QColor("#000000");
+      m_curDlgAccent = QColor("#2f4f4f");
 
-      m_curGraphBg = QColor("#000000"); m_curSpec = QColor("#ffffff"); m_curPeak = QColor("#ffff00");
+      m_curGraphBg = QColor("#000000");
+      m_curSpec = QColor("#ffffff");
+      m_curPeak = QColor("#ffff00");
 
       m_spinBtnSize->setValue(11);
       m_spinDlgSize->setValue(11);
@@ -1031,7 +1049,7 @@ void AppearanceDialog::setupUI() {
     m_spinGraphSize->setValue(m_curGraphFont.pointSize());
     int rootIdx = m_comboRootFont->findData(m_curRootFontIdx);
     if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
-    m_presetCombo->setCurrentIndex(0);
+    m_presetCombo->setCurrentIndex(1);
 
     updateAllSwatches();
     refreshDialogTheme();

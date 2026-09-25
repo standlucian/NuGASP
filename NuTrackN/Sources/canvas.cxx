@@ -103,6 +103,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     // Top container widget holding spectrum canvas, coordinate readout, and action buttons
     QWidget *topContainer = new QWidget(mainSplitter);
+    topContainer->setObjectName("topContainer");
     QVBoxLayout *topLayout = new QVBoxLayout(topContainer);
     topLayout->setContentsMargins(4, 4, 4, 4);
     topLayout->setSpacing(2);
