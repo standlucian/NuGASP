@@ -431,9 +431,18 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     CommandPrompt::getInstance()->setStyleSheet(getPromptStyleSheet());
   }
 
-  // 2. Global application font for dialogs
+  // 2. Global application font and stylesheets for dialogs (including any already open)
   if (qApp) {
-    qApp->setFont(getDialogFont());
+    const QFont dlgFont = getDialogFont();
+    const QString dlgSheet = getDialogStyleSheet();
+    qApp->setFont(dlgFont);
+    for (QWidget *widget : QApplication::topLevelWidgets()) {
+      if (QDialog *dlg = qobject_cast<QDialog*>(widget)) {
+        dlg->setFont(dlgFont);
+        dlg->setStyleSheet(dlgSheet);
+        dlg->update();
+      }
+    }
   }
 
   // 3. Graph canvas

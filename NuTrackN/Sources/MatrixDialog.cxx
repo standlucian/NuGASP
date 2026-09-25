@@ -151,18 +151,18 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
     p.setRenderHint(QPainter::Antialiasing, true);
 
     // Background
-    p.fillRect(rect(), QColor("#14161a"));
-    p.setPen(QPen(QColor("#2b303c"), 1));
+    p.fillRect(rect(), Design::getGraphBackgroundColor());
+    p.setPen(QPen(Design::getDialogBackgroundColor().lighter(130), 1));
     p.drawRect(rect().adjusted(0, 0, -1, -1));
 
     const QRect plotArea = getPlotArea();
 
     // Plot Border
-    p.setPen(QPen(QColor("#3d4452"), 1));
+    p.setPen(QPen(Design::getDialogBackgroundColor().lighter(140), 1));
     p.drawRect(plotArea);
 
     if (m_data.empty() || m_maxVal <= 0.0) {
-        p.setPen(QColor("#777e8c"));
+        p.setPen(Design::getDialogTextColor());
         p.drawText(plotArea, Qt::AlignCenter, tr("No spectrum data available for preview."));
         return;
     }
@@ -219,16 +219,17 @@ void Matrix1DPreviewWidget::paintEvent(QPaintEvent *)
     fillPoly << QPointF(plotArea.right(), plotArea.bottom());
 
     // Shaded fill under curve
+    QColor specColor = Design::getSpectrumColor();
     QLinearGradient grad(0, plotArea.top(), 0, plotArea.bottom());
-    grad.setColorAt(0.0, QColor(0, 224, 255, 110));
-    grad.setColorAt(1.0, QColor(0, 136, 204, 15));
+    grad.setColorAt(0.0, QColor(specColor.red(), specColor.green(), specColor.blue(), 110));
+    grad.setColorAt(1.0, QColor(specColor.red(), specColor.green(), specColor.blue(), 15));
     p.setBrush(grad);
     p.setPen(Qt::NoPen);
     p.drawPolygon(fillPoly);
 
     // Spectrum curve line
     p.setBrush(Qt::NoBrush);
-    p.setPen(QPen(QColor("#00e0ff"), 1.2));
+    p.setPen(QPen(specColor, 1.2));
     p.drawPolyline(linePoly);
 
     // Background curve line (if present)
@@ -356,23 +357,8 @@ MatrixDialog::MatrixDialog(std::shared_ptr<MatrixReader> reader,
     resize(880, 680);
     setMinimumSize(780, 580);
 
-    setStyleSheet(
-        "QDialog { background-color: #24262b; color: #ffffff; }"
-        "QLabel { color: #e6e6e6; font-size: 14px; }"
-        "QLabel:disabled { color: #585f6d; }"
-        "QGroupBox { font-size: 14px; font-weight: bold; color: #00e0ff; border: 1px solid #444955; border-radius: 6px; margin-top: 10px; padding-top: 14px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
-        "QRadioButton { font-size: 14px; color: #ffffff; spacing: 8px; }"
-        "QRadioButton::indicator { width: 18px; height: 18px; }"
-        "QCheckBox { font-size: 13px; color: #ffffff; spacing: 8px; }"
-        "QComboBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QComboBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
-        "QComboBox::drop-down:disabled { border: none; background-color: transparent; }"
-        "QComboBox QAbstractItemView { background-color: #24262b; color: #ffffff; selection-background-color: #0077b6; }"
-        "QDoubleSpinBox, QSpinBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QDoubleSpinBox:disabled, QSpinBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
-        "QPushButton { font-size: 14px; font-weight: bold; border-radius: 4px; padding: 7px 18px; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     setupUI();
     updatePreview();
@@ -386,14 +372,13 @@ void MatrixDialog::setupUI()
 
     // 1. Header Banner with File Name & Symmetry Status
     QFrame *headerFrame = new QFrame(this);
-    headerFrame->setStyleSheet("background-color: #1a2332; border: 1px solid #23486a; border-radius: 6px; padding: 10px 14px;");
+    headerFrame->setStyleSheet(QString("background-color: %1; border: 1px solid %2; border-radius: 6px; padding: 10px 14px;").arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name()));
     QVBoxLayout *headerLayout = new QVBoxLayout(headerFrame);
     headerLayout->setSpacing(6);
     headerLayout->setContentsMargins(0, 0, 0, 0);
 
     QString titleText = m_reader ? m_reader->getFileName() : tr("Unknown Matrix");
     QLabel *lblTitle = new QLabel(QString("<b>Matrix File:</b> %1").arg(titleText), headerFrame);
-    lblTitle->setStyleSheet("font-size: 16px; color: #ffffff;");
     headerLayout->addWidget(lblTitle);
 
     // Symmetry notice
@@ -477,16 +462,11 @@ void MatrixDialog::setupUI()
     m_btnLogScale = new QPushButton(tr("Log Y"), grpPreview);
     m_btnLogScale->setCheckable(true);
     m_btnLogScale->setChecked(false);
-    m_btnLogScale->setStyleSheet(
-        "QPushButton { background-color: #2b303c; color: #00e0ff; border: 1px solid #414856; border-radius: 3px; padding: 4px 12px; font-size: 12px; font-weight: bold; } "
-        "QPushButton:checked { background-color: #0077b6; color: #ffffff; border: 1px solid #0096c7; } "
-        "QPushButton:hover { background-color: #3d4452; }"
-    );
     previewBar->addWidget(m_btnLogScale);
     previewBar->addStretch(1);
 
     m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
+    m_lblHoverReadout->setStyleSheet("font-family: monospace;");
     previewBar->addWidget(m_lblHoverReadout);
 
     previewLayout->addLayout(previewBar);
@@ -511,7 +491,6 @@ void MatrixDialog::setupUI()
 
     m_chkEnableBg = new QCheckBox(tr("Enable Background Subtraction"), grpBg);
     m_chkEnableBg->setChecked(m_reader ? m_reader->getBackgroundConfig().enabled : true);
-    m_chkEnableBg->setStyleSheet("font-weight: bold; color: #ffffff;");
     bgTopRow->addWidget(m_chkEnableBg);
 
     m_lblBgModePrompt = new QLabel(tr("Mode:"), grpBg);
@@ -584,18 +563,10 @@ void MatrixDialog::setupUI()
     bottomLayout->addStretch(1);
 
     m_btnLoadProjection = new QPushButton(tr("Load Projection into Active Pad"), this);
-    m_btnLoadProjection->setStyleSheet(
-        "QPushButton { background-color: #0077b6; color: #ffffff; border: 1px solid #0096c7; font-size: 15px; padding: 8px 24px; } "
-        "QPushButton:hover { background-color: #0096c7; }"
-    );
     connect(m_btnLoadProjection, &QPushButton::clicked, this, &MatrixDialog::onLoadProjectionClicked);
     bottomLayout->addWidget(m_btnLoadProjection);
 
     m_btnClose = new QPushButton(tr("Close"), this);
-    m_btnClose->setStyleSheet(
-        "QPushButton { background-color: #3e4452; color: #ffffff; border: 1px solid #5a6275; padding: 8px 20px; } "
-        "QPushButton:hover { background-color: #4f5769; }"
-    );
     connect(m_btnClose, &QPushButton::clicked, this, &QDialog::accept);
     bottomLayout->addWidget(m_btnClose);
 
@@ -758,23 +729,8 @@ MatrixGateDialog::MatrixGateDialog(std::shared_ptr<MatrixReader> reader,
     resize(880, 680);
     setMinimumSize(780, 580);
 
-    setStyleSheet(
-        "QDialog { background-color: #24262b; color: #ffffff; }"
-        "QLabel { color: #e6e6e6; font-size: 14px; }"
-        "QLabel:disabled { color: #585f6d; }"
-        "QGroupBox { font-size: 14px; font-weight: bold; color: #00e0ff; border: 1px solid #444955; border-radius: 6px; margin-top: 10px; padding-top: 14px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
-        "QSpinBox { background-color: #323640; color: #ffffff; font-size: 14px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QRadioButton { font-size: 14px; color: #ffffff; spacing: 8px; }"
-        "QCheckBox { font-size: 13px; color: #ffffff; spacing: 8px; }"
-        "QComboBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QComboBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
-        "QComboBox::drop-down:disabled { border: none; background-color: transparent; }"
-        "QComboBox QAbstractItemView { background-color: #24262b; color: #ffffff; selection-background-color: #0077b6; }"
-        "QDoubleSpinBox { background-color: #323640; color: #ffffff; font-size: 13px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QDoubleSpinBox:disabled, QSpinBox:disabled { background-color: #1a1c22; color: #585f6d; border: 1px solid #2d313b; }"
-        "QPushButton { font-size: 14px; font-weight: bold; border-radius: 4px; padding: 7px 18px; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     int maxCh = (m_reader && m_reader->isOpen()) ? (m_reader->getResolutionY() - 1) : 10239;
     if (m_gates.empty()) {
@@ -849,13 +805,12 @@ void MatrixGateDialog::setupUI()
 
     // 1. Header Frame
     QFrame *headerFrame = new QFrame(this);
-    headerFrame->setStyleSheet("background-color: #1a2332; border: 1px solid #23486a; border-radius: 6px; padding: 8px 12px;");
+    headerFrame->setStyleSheet(QString("background-color: %1; border: 1px solid %2; border-radius: 6px; padding: 8px 12px;").arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name()));
     QHBoxLayout *headerLayout = new QHBoxLayout(headerFrame);
     headerLayout->setContentsMargins(0, 0, 0, 0);
 
     QString titleText = m_reader ? m_reader->getFileName() : tr("Unknown Matrix");
     QLabel *lblTitle = new QLabel(QString("<b>Coincidence Gating:</b> %1").arg(titleText), headerFrame);
-    lblTitle->setStyleSheet("font-size: 16px; color: #00e0ff;");
     headerLayout->addWidget(lblTitle);
     headerLayout->addStretch(1);
 
@@ -1021,16 +976,11 @@ void MatrixGateDialog::setupUI()
     m_btnLogScale = new QPushButton(tr("Log Y"), grpPreview);
     m_btnLogScale->setCheckable(true);
     m_btnLogScale->setChecked(false);
-    m_btnLogScale->setStyleSheet(
-        "QPushButton { background-color: #2b303c; color: #00e0ff; border: 1px solid #414856; border-radius: 3px; padding: 4px 12px; font-size: 12px; font-weight: bold; } "
-        "QPushButton:checked { background-color: #0077b6; color: #ffffff; border: 1px solid #0096c7; } "
-        "QPushButton:hover { background-color: #3d4452; }"
-    );
     previewBar->addWidget(m_btnLogScale);
     previewBar->addStretch(1);
 
     m_lblHoverReadout = new QLabel(tr("Hover over spectrum to inspect channel counts"), grpPreview);
-    m_lblHoverReadout->setStyleSheet("font-size: 12px; color: #88909e; font-family: monospace;");
+    m_lblHoverReadout->setStyleSheet("font-family: monospace;");
     previewBar->addWidget(m_lblHoverReadout);
 
     previewLayout->addLayout(previewBar);
@@ -1051,26 +1001,14 @@ void MatrixGateDialog::setupUI()
     bottomLayout->addStretch(1);
 
     m_btnSliceGate = new QPushButton(tr("Slice && Load into Pad"), this);
-    m_btnSliceGate->setStyleSheet(
-        "QPushButton { background-color: #1e7040; color: #ffffff; border: 1px solid #2e9e5d; font-size: 14px; padding: 7px 20px; } "
-        "QPushButton:hover { background-color: #278d52; }"
-    );
     connect(m_btnSliceGate, &QPushButton::clicked, this, &MatrixGateDialog::onSliceGateClicked);
     bottomLayout->addWidget(m_btnSliceGate);
 
     m_btnOverlayGate = new QPushButton(tr("Overlay on Pad"), this);
-    m_btnOverlayGate->setStyleSheet(
-        "QPushButton { background-color: #7b4f12; color: #ffffff; border: 1px solid #b8751b; font-size: 14px; padding: 7px 20px; } "
-        "QPushButton:hover { background-color: #946016; }"
-    );
     connect(m_btnOverlayGate, &QPushButton::clicked, this, &MatrixGateDialog::onOverlayGateClicked);
     bottomLayout->addWidget(m_btnOverlayGate);
 
     m_btnClose = new QPushButton(tr("Close"), this);
-    m_btnClose->setStyleSheet(
-        "QPushButton { background-color: #3e4452; color: #ffffff; border: 1px solid #5a6275; padding: 7px 18px; } "
-        "QPushButton:hover { background-color: #4f5769; }"
-    );
     connect(m_btnClose, &QPushButton::clicked, this, &QDialog::accept);
     bottomLayout->addWidget(m_btnClose);
 

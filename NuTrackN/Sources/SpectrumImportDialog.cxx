@@ -1,4 +1,5 @@
 #include "SpectrumImportDialog.h"
+#include "Design.h"
 
 #include <QComboBox>
 #include <QLabel>
@@ -468,31 +469,35 @@ void QSpectrumPlotPreview::paintEvent(QPaintEvent *)
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing, false);
 
-    painter.fillRect(rect(), QColor("#14161a"));
-    painter.setPen(QPen(QColor("#2b303c"), 1));
+    painter.fillRect(rect(), Design::getGraphBackgroundColor());
+    painter.setPen(QPen(Design::getDialogBackgroundColor().lighter(130), 1));
     painter.drawRect(rect().adjusted(0, 0, -1, -1));
 
     if (m_primaryData.empty()) {
-        painter.setPen(QColor("#777e8c"));
+        painter.setPen(Design::getDialogTextColor());
         painter.drawText(rect(), Qt::AlignCenter, tr("No spectrum data loaded for preview."));
         return;
     }
 
+    QColor specCol = Design::getSpectrumColor();
+    QColor specFill = specCol;
+    specFill.setAlpha(45);
+
     if (m_secondaryData.empty()) {
         drawSinglePlot(painter, rect(), m_primaryData, m_primaryIndex,
-                       QColor("#00f0ff"), QColor(0, 240, 255, 45));
+                       specCol, specFill);
     } else {
         const int midY = rect().height() / 2;
         QRect topRect(rect().left(), rect().top(), rect().width(), midY - 1);
         QRect botRect(rect().left(), rect().top() + midY + 1, rect().width(), rect().height() - midY - 1);
 
         drawSinglePlot(painter, topRect, m_primaryData, m_primaryIndex,
-                       QColor("#00f0ff"), QColor(0, 240, 255, 45));
+                       specCol, specFill);
         drawSinglePlot(painter, botRect, m_secondaryData, m_secondaryIndex,
-                       QColor("#ffb830"), QColor(255, 184, 48, 45));
+                       Design::getDialogAccentColor(), QColor(Design::getDialogAccentColor().red(), Design::getDialogAccentColor().green(), Design::getDialogAccentColor().blue(), 45));
 
         // Draw separator
-        painter.setPen(QPen(QColor("#2d323e"), 1));
+        painter.setPen(QPen(Design::getDialogBackgroundColor().lighter(140), 1));
         painter.drawLine(rect().left() + 8, rect().top() + midY, rect().right() - 8, rect().top() + midY);
     }
 }
@@ -508,18 +513,8 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     setWindowTitle(tr("Open Spectrum - Format & Length"));
     setMinimumWidth(680);
     resize(720, 620);
-
-    setStyleSheet(
-        "QDialog { background-color: #24262b; color: #ffffff; }"
-        "QLabel { color: #e6e6e6; font-size: 15px; }"
-        "QGroupBox { font-size: 15px; font-weight: bold; color: #00e0ff; border: 1px solid #444955; border-radius: 6px; margin-top: 10px; padding-top: 14px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 4px; }"
-        "QComboBox { background-color: #323640; color: #ffffff; font-size: 15px; border: 1px solid #555b68; border-radius: 4px; padding: 5px 10px; }"
-        "QComboBox::drop-down { border: none; }"
-        "QComboBox QAbstractItemView { background-color: #2b2f38; color: #ffffff; selection-background-color: #0088cc; }"
-        "QSpinBox { background-color: #323640; color: #ffffff; font-size: 15px; border: 1px solid #555b68; border-radius: 4px; padding: 4px 8px; }"
-        "QPushButton { font-size: 15px; font-weight: bold; border-radius: 4px; padding: 6px 18px; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(14);
@@ -530,7 +525,6 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_lblFile = new QLabel(QString("<b>File:</b> %1 (%2 bytes)")
                                .arg(fi.fileName())
                                .arg(QLocale().toString(static_cast<qulonglong>(fi.size()))), this);
-    m_lblFile->setStyleSheet("font-size: 16px; color: #ffffff;");
     mainLayout->addWidget(m_lblFile);
 
     // 2. Auto-Detection Banner
@@ -538,8 +532,8 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
 
     m_lblDetectedBanner = new QLabel(this);
     m_lblDetectedBanner->setStyleSheet(
-        "background-color: #1a3328; color: #44ffaa; border: 1px solid #2e7752; "
-        "border-radius: 5px; padding: 8px 12px; font-size: 14px; font-weight: bold;"
+        QString("border: 1px solid %1; border-radius: 5px; padding: 8px 12px; font-weight: bold; color: %1;")
+            .arg(Design::getDialogAccentColor().name())
     );
     m_lblDetectedBanner->setText(QString("🎯 Auto-Detected: %1").arg(m_detected.confidenceReason));
     mainLayout->addWidget(m_lblDetectedBanner);
@@ -614,7 +608,6 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_btnPrevSpec = new QPushButton(tr("◀"), m_specIndexContainer);
     m_btnPrevSpec->setFixedWidth(32);
     m_btnPrevSpec->setFixedHeight(28);
-    m_btnPrevSpec->setStyleSheet("background-color: #383c45; color: #00f0ff; font-weight: bold; border-radius: 3px;");
 
     m_spinSpectrumIndex = new QSpinBox(m_specIndexContainer);
     m_spinSpectrumIndex->setRange(0, 0);
@@ -625,10 +618,9 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_btnNextSpec = new QPushButton(tr("▶"), m_specIndexContainer);
     m_btnNextSpec->setFixedWidth(32);
     m_btnNextSpec->setFixedHeight(28);
-    m_btnNextSpec->setStyleSheet("background-color: #383c45; color: #00f0ff; font-weight: bold; border-radius: 3px;");
 
     m_lblSpectrumCount = new QLabel(m_specIndexContainer);
-    m_lblSpectrumCount->setStyleSheet("color: #a0a0a0; font-size: 13px; font-style: italic;");
+    m_lblSpectrumCount->setStyleSheet("font-style: italic;");
 
     specIndexLayout->addWidget(m_btnPrevSpec);
     specIndexLayout->addWidget(m_spinSpectrumIndex);
@@ -648,7 +640,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     prevLayout->setContentsMargins(14, 16, 14, 14);
 
     m_lblPreviewSummary = new QLabel(previewGroup);
-    m_lblPreviewSummary->setStyleSheet("font-weight: bold; color: #00f0ff; font-size: 14px;");
+    m_lblPreviewSummary->setStyleSheet(QString("font-weight: bold; color: %1;").arg(Design::getDialogAccentColor().name()));
 
     m_plotPreview = new QSpectrumPlotPreview(previewGroup);
 
@@ -661,11 +653,9 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     btnLayout->addStretch(1);
 
     m_btnCancel = new QPushButton(tr("Cancel"), this);
-    m_btnCancel->setStyleSheet("background-color: #4a4e58; color: #ffffff; border: 1px solid #666c7a;");
     connect(m_btnCancel, &QPushButton::clicked, this, &QDialog::reject);
 
     m_btnLoad = new QPushButton(tr("Load Spectrum"), this);
-    m_btnLoad->setStyleSheet("background-color: #007acc; color: #ffffff; border: 1px solid #0099ff;");
     m_btnLoad->setDefault(true);
     connect(m_btnLoad, &QPushButton::clicked, this, &QDialog::accept);
 

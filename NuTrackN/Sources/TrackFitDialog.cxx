@@ -455,17 +455,8 @@ TrackFitInspectionDialog::TrackFitInspectionDialog(const std::vector<TrackFitPea
 {
     setWindowTitle("AutoTrace - Visual Fit Inspection (Xtrackn)");
     resize(1180, 800);
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 8px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-        "QLabel { color: #e0e0e0; font-size: 13px; }"
-        "QComboBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px; font-size: 13px; }"
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 6px 16px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-        "QPushButton:pressed { background-color: #007acc; }"
-        "QScrollArea { background-color: #16181d; border: 1px solid #333333; border-radius: 4px; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(10);
@@ -493,7 +484,7 @@ TrackFitInspectionDialog::TrackFitInspectionDialog(const std::vector<TrackFitPea
     headerLayout->addSpacing(15);
 
     QLabel *lblTip = new QLabel("💡 <i>Click any tile to toggle Include/Exclude</i>", headerBox);
-    lblTip->setStyleSheet("color: #88d49e;");
+    lblTip->setStyleSheet(QString("color: %1;").arg(Design::getDialogAccentColor().name()));
     headerLayout->addWidget(lblTip);
 
     mainLayout->addWidget(headerBox);
@@ -505,7 +496,7 @@ TrackFitInspectionDialog::TrackFitInspectionDialog(const std::vector<TrackFitPea
     scrollArea->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
 
     QWidget *gridContainer = new QWidget(scrollArea);
-    gridContainer->setStyleSheet("background-color: #16181d;");
+    gridContainer->setStyleSheet(QString("background-color: %1;").arg(Design::getDialogBackgroundColor().name()));
     QGridLayout *gridLayout = new QGridLayout(gridContainer);
     gridLayout->setSpacing(10);
     gridLayout->setContentsMargins(10, 10, 10, 10);
@@ -550,11 +541,7 @@ TrackFitInspectionDialog::TrackFitInspectionDialog(const std::vector<TrackFitPea
     btnRow->addStretch(1);
 
     QPushButton *btnAccept = new QPushButton("✓ Accept Calibration", footerBox);
-    btnAccept->setStyleSheet(
-        "QPushButton { background-color: #007acc; color: #ffffff; border: 1px solid #0098ff; "
-        "border-radius: 4px; padding: 7px 22px; font-weight: bold; font-size: 13px; } "
-        "QPushButton:hover { background-color: #118ad4; }"
-    );
+    btnAccept->setDefault(true);
     connect(btnAccept, &QPushButton::clicked, this, &TrackFitInspectionDialog::onAcceptCalibration);
 
     QPushButton *btnClose = new QPushButton("Close / Return", footerBox);
@@ -658,23 +645,8 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
 {
     setWindowTitle("AutoTrace / TrackFit Calibration Manager (DT)");
     resize(1080, 720);
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QTabWidget::pane { border: 1px solid #3e3e42; background: #252526; border-radius: 4px; }"
-        "QTabBar::tab { background: #2d2d30; color: #cccccc; padding: 8px 20px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; font-weight: bold; font-size: 13px; }"
-        "QTabBar::tab:selected { background: #007acc; color: #ffffff; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-        "QLabel { color: #e0e0e0; font-size: 13px; }"
-        "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px; font-size: 13px; }"
-        "QLineEdit:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid #007acc; }"
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 13px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-        "QPushButton:pressed { background-color: #007acc; }"
-        "QTableWidget { background-color: #252526; color: #ffffff; gridline-color: #3e3e42; selection-background-color: #094771; font-size: 13px; }"
-        "QHeaderView::section { background-color: #2d2d30; color: #cccccc; padding: 6px; border: 1px solid #3e3e42; font-weight: bold; font-size: 12px; }"
-        "QScrollArea { background-color: #1e1e1e; border: none; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(8);
@@ -775,19 +747,8 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     m_spinFitWidth->setFixedWidth(65);
 
     QPushButton *btnRunAutoTrace = new QPushButton("▶ Auto-Trace & Fit", controlsBox);
-    btnRunAutoTrace->setStyleSheet(
-        "QPushButton { background-color: #007acc; color: #ffffff; border: 1px solid #0098ff; "
-        "border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 13px; } "
-        "QPushButton:hover { background-color: #118ad4; }"
-    );
-
     QPushButton *btnViewAllFits = new QPushButton("🔍 All Fits...", controlsBox);
     btnViewAllFits->setToolTip("Open dedicated visual inspection window showing all fitted peaks");
-    btnViewAllFits->setStyleSheet(
-        "QPushButton { background-color: #2e7d32; color: #ffffff; border: 1px solid #43a047; "
-        "border-radius: 4px; padding: 6px 12px; font-weight: bold; font-size: 13px; } "
-        "QPushButton:hover { background-color: #388e3c; }"
-    );
 
     row2->addWidget(lblGain);
     row2->addWidget(m_spinInitGain);
@@ -832,12 +793,11 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     inspectorLayout->addWidget(m_inspectorTile, 1);
 
     m_lblInspectorDetails = new QLabel(inspectorBox);
-    m_lblInspectorDetails->setStyleSheet("color: #cccccc; font-size: 12px; background: #16181d; padding: 6px; border-radius: 4px;");
+    m_lblInspectorDetails->setStyleSheet(QString("background: %1; border: 1px solid %2; padding: 6px; border-radius: 4px;").arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name()));
     m_lblInspectorDetails->setWordWrap(true);
     inspectorLayout->addWidget(m_lblInspectorDetails);
 
     m_btnToggleInclude = new QPushButton("Toggle Exclude / Include Peak", inspectorBox);
-    m_btnToggleInclude->setStyleSheet("background-color: #3e3e42; font-size: 12px; padding: 6px 12px;");
     inspectorLayout->addWidget(m_btnToggleInclude);
 
     tabTableLayout->addWidget(inspectorBox, 4);
@@ -853,7 +813,6 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     tabGridLayout->setContentsMargins(8, 8, 8, 8);
 
     m_lblGridSummary = new QLabel("All Fitted Peaks Grid (Xtrackn View) &mdash; Click any tile to toggle its inclusion in the calibration polynomial:", tabGrid);
-    m_lblGridSummary->setStyleSheet("color: #9cdcfe; font-size: 13px; font-weight: bold;");
     tabGridLayout->addWidget(m_lblGridSummary);
 
     m_gridScrollArea = new QScrollArea(tabGrid);
@@ -905,19 +864,7 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     actionLayout->setSpacing(10);
 
     QPushButton *btnApplyActive = new QPushButton("✓ Apply to Active Spectrum", this);
-    btnApplyActive->setStyleSheet(
-        "QPushButton { background-color: #007acc; color: #ffffff; border: 1px solid #0098ff; "
-        "border-radius: 4px; padding: 7px 18px; font-weight: bold; font-size: 13px; min-height: 28px; }"
-        "QPushButton:hover { background-color: #118ad4; }"
-    );
-
     QPushButton *btnApplyAll = new QPushButton("Apply to All Open Spectra", this);
-    btnApplyAll->setStyleSheet(
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; "
-        "border-radius: 4px; padding: 7px 16px; font-weight: bold; font-size: 13px; min-height: 28px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-    );
-
     QPushButton *btnSave = new QPushButton("Save...", this);
     btnSave->setToolTip("Save calibrated parameters to a .cal or .mcal file.");
 
@@ -1255,10 +1202,10 @@ void TrackFitDialog::updateInspectorView(int row)
 
     if (res.isIncluded) {
         m_btnToggleInclude->setText("❌ Exclude This Peak From Fit");
-        m_btnToggleInclude->setStyleSheet("background-color: #4a2222; color: #f48771; font-weight: bold; border: 1px solid #803030; padding: 6px;");
+        m_btnToggleInclude->setStyleSheet("color: #ff6b6b; font-weight: bold; padding: 6px;");
     } else {
         m_btnToggleInclude->setText("✔ Include This Peak In Fit");
-        m_btnToggleInclude->setStyleSheet("background-color: #224a33; color: #4ec9b0; font-weight: bold; border: 1px solid #308040; padding: 6px;");
+        m_btnToggleInclude->setStyleSheet("color: #51cf66; font-weight: bold; padding: 6px;");
     }
 }
 
