@@ -52,6 +52,7 @@ namespace Design {
 
     QString getButtonStyleSheet();
     QString getPromptStyleSheet();
+    QString getStatusLabelStyleSheet();
 
     // =========================================================================
     // Category 2: Dialogs

@@ -265,6 +265,21 @@ QString getPromptStyleSheet() {
   ).arg(s_promptBgColor.name(), s_promptTextColor.name(), s_dialogAccentColor.name());
 }
 
+QString getStatusLabelStyleSheet() {
+  if (!s_typographyInitialized) initializeTypography();
+  const QString bg = s_promptBgColor.name();
+  const QString fg = s_promptTextColor.name();
+  const QString border = s_buttonBgColor.darker(135).name();
+  return QString(
+      "QLabel {"
+      "  background-color: %1;"
+      "  color: %2;"
+      "  border: 1px solid %3;"
+      "  padding: 2px 6px;"
+      "}"
+  ).arg(bg, fg, border);
+}
+
 QFont getDialogFont() {
   if (!s_typographyInitialized) initializeTypography();
   return s_dialogFont;
@@ -362,7 +377,7 @@ void applyGraphTypography() {
 }
 
 void applyUITheme(QMainCanvas *mainCanvas) {
-  // 1. Buttons & Prompt
+  // 1. Buttons, Status Readouts & Console Prompt
   if (mainCanvas) {
     const QString btnStyle = getButtonStyleSheet();
     const QFont btnFont = getButtonFont();
@@ -383,6 +398,25 @@ void applyUITheme(QMainCanvas *mainCanvas) {
 
       btn->setFont(btnFont);
       btn->setStyleSheet(btnStyle);
+    }
+
+    // Update status readout fields (Xmin, Xmax, Ymin, Ymax, Ch, En, Cts, etc.)
+    const QString labelStyle = getStatusLabelStyleSheet();
+    const QList<QLabel*> labels = mainCanvas->findChildren<QLabel*>();
+    for (QLabel *lbl : labels) {
+      if (!lbl) continue;
+      if (lbl->window() != mainCanvas) continue;
+      bool insideDialog = false;
+      for (QWidget *w = lbl->parentWidget(); w && w != mainCanvas; w = w->parentWidget()) {
+        if (qobject_cast<QDialog*>(w)) {
+          insideDialog = true;
+          break;
+        }
+      }
+      if (insideDialog) continue;
+
+      lbl->setFont(btnFont);
+      lbl->setStyleSheet(labelStyle);
     }
   }
 
@@ -682,15 +716,13 @@ void AppearanceDialog::setupUI() {
   dialogLayout->setSpacing(10);
   dialogLayout->setContentsMargins(14, 14, 14, 14);
 
-  // Top header with quick theme presets dropdown
+  // Top header with quick theme presets dropdown (Classic Xtrackn & Modern)
   QHBoxLayout *presetLayout = new QHBoxLayout();
-  QLabel *lblPreset = new QLabel("<b>Quick Theme Preset:</b>", this);
+  QLabel *lblPreset = new QLabel("<b>Theme Preset:</b>", this);
   m_presetCombo = new QComboBox(this);
   m_presetCombo->addItem("(Custom / Keep Current)");
-  m_presetCombo->addItem("Default Dark (Balanced)");
-  m_presetCombo->addItem("Classic Light (Paper White)");
-  m_presetCombo->addItem("Vampire (Crimson / Deep Black)");
-  m_presetCombo->addItem("Cyberpunk (Neon Cyan & Pink)");
+  m_presetCombo->addItem("Classic (Legacy Xtrackn)");
+  m_presetCombo->addItem("Modern (Deep Space Cyan)");
   presetLayout->addWidget(lblPreset);
   presetLayout->addWidget(m_presetCombo, 1);
   dialogLayout->addLayout(presetLayout);
@@ -726,15 +758,15 @@ void AppearanceDialog::setupUI() {
   gridBtnColors->setColumnStretch(1, 0);
   addColorRow(gridBtnColors, 0, "Button Background:", &m_curBtnBg, [this]() { updateBtnPreview(); });
   addColorRow(gridBtnColors, 1, "Button Text Color:", &m_curBtnFg, [this]() { updateBtnPreview(); });
-  addColorRow(gridBtnColors, 2, "Console Prompt Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
-  addColorRow(gridBtnColors, 3, "Console Prompt Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 2, "Readouts & Console Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 3, "Readouts & Console Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
   tabBtnLayout->addWidget(grpBtnColors);
 
   QGroupBox *grpBtnPreview = new QGroupBox("Live Preview (Main UI Toolbar)", tabBtn);
   QVBoxLayout *vboxBtnPreview = new QVBoxLayout(grpBtnPreview);
   m_sampleBtn = new QPushButton("EnCal", grpBtnPreview);
   m_sampleBtn->setFixedHeight(36);
-  m_samplePrompt = new QLineEdit("NuTrackN Output Console: Peak 1 at 1332.5 keV (FWHM 2.1)", grpBtnPreview);
+  m_samplePrompt = new QLineEdit("X Min: 0.0   |   NuTrackN Output: Ready", grpBtnPreview);
   m_samplePrompt->setReadOnly(true);
   m_samplePrompt->setFixedHeight(36);
   vboxBtnPreview->addWidget(m_sampleBtn);
@@ -910,29 +942,49 @@ void AppearanceDialog::setupUI() {
   // Wire Presets
   connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
     if (idx == 1) {
-      // Default Dark
-      m_curBtnBg = QColor("#e0e0e0"); m_curBtnFg = QColor("#000000");
+      // 1. Classic (Copying classic Xtrackn as much as possible)
+      QFont timesFont("Times New Roman", 11);
+      timesFont.setStyleHint(QFont::Times);
+      m_curBtnFont = timesFont;
+      m_curBtnFont.setBold(true);
+      m_curDialogFont = timesFont;
+      m_curGraphFont = timesFont;
+      m_curRootFontIdx = 13; // ROOT Font 13: Times
+
+      m_curBtnBg = QColor("#b0b8c0"); m_curBtnFg = QColor("#000000");
       m_curPromptBg = QColor("#ffffff"); m_curPromptFg = QColor("#000000");
-      m_curDlgBg = QColor("#1e1e1e"); m_curDlgFg = QColor("#dcdcdc"); m_curDlgAccent = QColor("#007acc");
-      m_curGraphBg = QColor("#1e1e1e"); m_curSpec = QColor("#3399ff"); m_curPeak = QColor("#00ffff");
+
+      m_curDlgBg = QColor("#c8c8c8"); m_curDlgFg = QColor("#000000"); m_curDlgAccent = QColor("#000080");
+
+      m_curGraphBg = QColor("#000000"); m_curSpec = QColor("#ffffff"); m_curPeak = QColor("#ffff00");
+
+      m_spinBtnSize->setValue(11);
+      m_spinDlgSize->setValue(11);
+      m_spinGraphSize->setValue(11);
+      int rootIdx = m_comboRootFont->findData(13);
+      if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
     } else if (idx == 2) {
-      // Classic Light
-      m_curBtnBg = QColor("#e8e8e8"); m_curBtnFg = QColor("#111111");
-      m_curPromptBg = QColor("#ffffff"); m_curPromptFg = QColor("#000000");
-      m_curDlgBg = QColor("#f4f4f4"); m_curDlgFg = QColor("#222222"); m_curDlgAccent = QColor("#0066cc");
-      m_curGraphBg = QColor("#ffffff"); m_curSpec = QColor("#0033aa"); m_curPeak = QColor("#cc0000");
-    } else if (idx == 3) {
-      // Vampire
-      m_curBtnBg = QColor("#2b1b1b"); m_curBtnFg = QColor("#ffcccc");
-      m_curPromptBg = QColor("#1a0f0f"); m_curPromptFg = QColor("#ff7777");
-      m_curDlgBg = QColor("#160808"); m_curDlgFg = QColor("#f0d0d0"); m_curDlgAccent = QColor("#870202");
-      m_curGraphBg = QColor("#100505"); m_curSpec = QColor("#870202"); m_curPeak = QColor("#ff3333");
-    } else if (idx == 4) {
-      // Cyberpunk
-      m_curBtnBg = QColor("#181828"); m_curBtnFg = QColor("#00ffff");
-      m_curPromptBg = QColor("#0c0c16"); m_curPromptFg = QColor("#00ff99");
-      m_curDlgBg = QColor("#12131f"); m_curDlgFg = QColor("#e6e6ff"); m_curDlgAccent = QColor("#ff007f");
-      m_curGraphBg = QColor("#0a0a14"); m_curSpec = QColor("#00f0ff"); m_curPeak = QColor("#ff007f");
+      // 2. Modern (Deep Space Cyan)
+      QFont modernFont("DejaVu Sans", 10);
+      modernFont.setStyleHint(QFont::SansSerif);
+      m_curBtnFont = modernFont;
+      m_curBtnFont.setBold(true);
+      m_curDialogFont = modernFont;
+      m_curGraphFont = modernFont;
+      m_curRootFontIdx = 4; // ROOT Font 4: Helvetica / Sans-Serif
+
+      m_curBtnBg = QColor("#1e2638"); m_curBtnFg = QColor("#e2e8f0");
+      m_curPromptBg = QColor("#121824"); m_curPromptFg = QColor("#38bdf8");
+
+      m_curDlgBg = QColor("#151b26"); m_curDlgFg = QColor("#e2e8f0"); m_curDlgAccent = QColor("#00d2ff");
+
+      m_curGraphBg = QColor("#0c1017"); m_curSpec = QColor("#00f0ff"); m_curPeak = QColor("#ff2d75");
+
+      m_spinBtnSize->setValue(10);
+      m_spinDlgSize->setValue(10);
+      m_spinGraphSize->setValue(10);
+      int rootIdx = m_comboRootFont->findData(4);
+      if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
     }
     updateAllSwatches();
     refreshDialogTheme();

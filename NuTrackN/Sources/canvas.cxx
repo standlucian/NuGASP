@@ -122,12 +122,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
         lbl->setAlignment(align | Qt::AlignVCenter);
         lbl->setFixedHeight(33);
         lbl->setFont(Design::getButtonFont());
-        lbl->setStyleSheet(
-            "background-color: #ffffff;"
-            "color: #000000;"
-            "border: 1px solid #999999;"
-            "padding: 2px 6px;"
-        );
+        lbl->setStyleSheet(Design::getStatusLabelStyleSheet());
         return lbl;
     };
 
