@@ -96,7 +96,10 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
         painter.setBrush(QColor("#15161a"));
         painter.drawRoundedRect(bgRect, 6.0, 6.0);
         painter.setPen(QColor("#666666"));
-        painter.setFont(QFont("sans-serif", 10, QFont::Normal));
+        const QFont baseFont = Design::getDialogFont();
+        QFont emptyFont = baseFont;
+        emptyFont.setPointSize(baseFont.pointSize() > 0 ? baseFont.pointSize() : 10);
+        painter.setFont(emptyFont);
         painter.drawText(bgRect, Qt::AlignCenter, "No peak selected / No fit data");
         return;
     }
@@ -112,7 +115,10 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
     painter.drawRoundedRect(bgRect, 6.0, 6.0);
 
     // 2. Header: Reference Energy & Badge
-    QFont headerFont("sans-serif", 9, QFont::Bold);
+    const QFont baseFont = Design::getDialogFont();
+    QFont headerFont = baseFont;
+    headerFont.setPointSize(std::max(8, (baseFont.pointSize() > 0 ? baseFont.pointSize() : 11) - 1));
+    headerFont.setBold(true);
     painter.setFont(headerFont);
     painter.setPen(isIncluded ? QColor("#00ffff") : QColor("#888888"));
 
@@ -152,7 +158,9 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
         badgeTextCol = QColor("#f48771");
     }
 
-    QFont badgeFont("sans-serif", 8, QFont::Bold);
+    QFont badgeFont = baseFont;
+    badgeFont.setPointSize(std::max(7, (baseFont.pointSize() > 0 ? baseFont.pointSize() : 11) - 2));
+    badgeFont.setBold(true);
     painter.setFont(badgeFont);
     QFontMetrics fm(badgeFont);
     int badgeW = fm.horizontalAdvance(badgeText) + 12;
@@ -267,7 +275,9 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
 
     // 6. Footer Readout
     if (m_showFooter) {
-        QFont footerFont("sans-serif", 8, QFont::Normal);
+        QFont footerFont = baseFont;
+        footerFont.setPointSize(std::max(7, (baseFont.pointSize() > 0 ? baseFont.pointSize() : 11) - 2));
+        footerFont.setBold(false);
         painter.setFont(footerFont);
         painter.setPen(QColor("#cccccc"));
 
@@ -668,10 +678,13 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
         statusText = "<span style='color:#f48771;'>UNCALIBRATED</span>";
     }
 
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
     QLabel *lblPadInfo = new QLabel(
-        QString("<b>Pad:</b> (%1, %2) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%3 &nbsp;|&nbsp; <b>Current Status:</b> %4")
-            .arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
+        QString("<span style='font-family:\"%1\"; font-size:%2pt;'><b>Pad:</b> (%3, %4) &nbsp;|&nbsp; <b>Spectrum Index:</b> #%5 &nbsp;|&nbsp; <b>Current Status:</b> %6</span>")
+            .arg(dlgFont.family()).arg(pt).arg(sel_i).arg(sel_j).arg(specIdx).arg(statusText),
         headerBox);
+    lblPadInfo->setFont(dlgFont);
     headerLayout->addWidget(lblPadInfo);
     headerLayout->addStretch(1);
     mainLayout->addWidget(headerBox);
@@ -793,11 +806,15 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     inspectorLayout->addWidget(m_inspectorTile, 1);
 
     m_lblInspectorDetails = new QLabel(inspectorBox);
-    m_lblInspectorDetails->setStyleSheet(QString("background: %1; border: 1px solid %2; padding: 6px; border-radius: 4px;").arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name()));
+    m_lblInspectorDetails->setFont(dlgFont);
+    m_lblInspectorDetails->setStyleSheet(QString("background: %1; border: 1px solid %2; padding: 6px; border-radius: 4px; font-family: \"%3\"; font-size: %4pt;")
+        .arg(Design::getDialogBackgroundColor().lighter(115).name(), Design::getDialogBackgroundColor().lighter(135).name(),
+             dlgFont.family()).arg(pt));
     m_lblInspectorDetails->setWordWrap(true);
     inspectorLayout->addWidget(m_lblInspectorDetails);
 
     m_btnToggleInclude = new QPushButton("Toggle Exclude / Include Peak", inspectorBox);
+    m_btnToggleInclude->setFont(dlgFont);
     inspectorLayout->addWidget(m_btnToggleInclude);
 
     tabTableLayout->addWidget(inspectorBox, 4);
@@ -1181,12 +1198,18 @@ void TrackFitDialog::updateInspectorView(int row)
     const auto &res = m_peakResults[row];
     m_inspectorTile->setPeakData(res, row);
 
-    QString statusColor = res.isIncluded ? (res.fittedCentroid > 0 ? "#4ec9b0" : "#f48771") : "#888888";
+    const QFont dlgFont = Design::getDialogFont();
+    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
+    const QString statusColor = (res.status == "OK" || res.status == "Found" || res.status == "Fitted")
+                                    ? "#51cf66"
+                                    : (res.status == "Weak" || res.status == "Uncertain") ? "#ffd43b" : "#ff6b6b";
     QString details = QString(
+        "<div style='font-family:\"%11\"; font-size:%12pt;'>"
         "<b>Peak:</b> %1 keV &nbsp;|&nbsp; <b>Status:</b> <span style='color:%2;'>%3</span><br>"
         "<b>Predicted Ch:</b> %4 &nbsp;|&nbsp; <b>Fitted Centroid:</b> %5<br>"
         "<b>FWHM:</b> %6 keV (%7 ch) &nbsp;|&nbsp; <b>Net Area:</b> %8 counts<br>"
-        "<b>Recalibrated Energy:</b> %9 keV &nbsp;|&nbsp; <b>Residual ΔE:</b> %10 keV")
+        "<b>Recalibrated Energy:</b> %9 keV &nbsp;|&nbsp; <b>Residual ΔE:</b> %10 keV"
+        "</div>")
         .arg(res.refEnergy, 0, 'f', 2)
         .arg(statusColor)
         .arg(res.status)
@@ -1196,16 +1219,22 @@ void TrackFitDialog::updateInspectorView(int row)
         .arg(res.fwhmChannel > 0 ? QString::number(res.fwhmChannel, 'f', 1) : "-")
         .arg(res.netArea > 0 ? QString::number(res.netArea, 'f', 0) : "-")
         .arg(res.calcEnergy > 0 ? QString::number(res.calcEnergy, 'f', 2) : "-")
-        .arg(res.fittedCentroid > 0 ? QString("%1%2").arg(res.residualEnergy >= 0 ? "+" : "").arg(res.residualEnergy, 0, 'f', 3) : "-");
+        .arg(res.fittedCentroid > 0 ? QString("%1%2").arg(res.residualEnergy >= 0 ? "+" : "").arg(res.residualEnergy, 0, 'f', 3) : "-")
+        .arg(dlgFont.family())
+        .arg(pt);
 
+    m_lblInspectorDetails->setFont(dlgFont);
     m_lblInspectorDetails->setText(details);
 
+    m_btnToggleInclude->setFont(dlgFont);
     if (res.isIncluded) {
         m_btnToggleInclude->setText("❌ Exclude This Peak From Fit");
-        m_btnToggleInclude->setStyleSheet("color: #ff6b6b; font-weight: bold; padding: 6px;");
+        m_btnToggleInclude->setStyleSheet(QString("color: #ff6b6b; font-weight: bold; padding: 6px; font-family: \"%1\"; font-size: %2pt;")
+            .arg(dlgFont.family()).arg(pt));
     } else {
         m_btnToggleInclude->setText("✔ Include This Peak In Fit");
-        m_btnToggleInclude->setStyleSheet("color: #51cf66; font-weight: bold; padding: 6px;");
+        m_btnToggleInclude->setStyleSheet(QString("color: #51cf66; font-weight: bold; padding: 6px; font-family: \"%1\"; font-size: %2pt;")
+            .arg(dlgFont.family()).arg(pt));
     }
 }
 
