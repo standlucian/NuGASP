@@ -41,6 +41,7 @@ set(SOURCES
     Sources/DisplayParamsDialog.cxx
     Sources/EfficiencyDialog.cxx
     Sources/AutoCalibDialog.cxx
+    Sources/MacroDialog.cxx
 )
 
 set(HEADERS
@@ -59,6 +60,7 @@ set(HEADERS
     Include/DisplayParamsDialog.h
     Include/EfficiencyDialog.h
     Include/AutoCalibDialog.h
+    Include/MacroDialog.h
 )
 
 add_executable(nutrackn ${SOURCES} ${HEADERS})

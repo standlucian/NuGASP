@@ -11,6 +11,7 @@
 #include "DisplayParamsDialog.h"
 #include "EfficiencyDialog.h"
 #include "AutoCalibDialog.h"
+#include "MacroDialog.h"
 #include <QInputDialog>
 
 #include <TCanvas.h>
@@ -414,6 +415,17 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(iconButton, &QPushButton::clicked, this, &QMainCanvas::OpenColorSelectionDialog);
     outBox->addWidget(iconButton);
 
+    QPushButton *btnMacro = new QPushButton(tr("MAC"), topContainer);
+    btnMacro->setToolTip(tr("Macros & Command Strings (Block 4) [Shortcut: D+M]"));
+    btnMacro->setFixedSize(38, 33);
+    btnMacro->setStyleSheet(
+        "QPushButton { border: 1px solid #007acc; background: #252526; color: #00ffff; font-weight: bold; border-radius: 3px; font-size: 11px; }"
+        "QPushButton:hover { background: #007acc; color: #ffffff; }"
+        "QPushButton:pressed { background: #0e639c; }"
+    );
+    connect(btnMacro, &QPushButton::clicked, this, &QMainCanvas::openMacroDialog);
+    outBox->addWidget(btnMacro);
+
     bottomStatusGrid->addLayout(outBox, 1, 2);
 
     bottomLayout->addLayout(bottomStatusGrid, 1);
@@ -487,6 +499,14 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestPeakWidthMode, this, &QMainCanvas::openPeakWidthModeDialog);
     connect(canvas, &QRootCanvas::requestMatrixSetup, this, &QMainCanvas::onOpenCMClicked);
     connect(canvas, &QRootCanvas::requestAutoCalibDialog, this, &QMainCanvas::openAutoCalibDialog);
+
+    // Block 4: Command Strings / Macros (Dn, Cn, Mn, Zn, n)
+    connect(canvas, &QRootCanvas::requestDefineMacro, this, &QMainCanvas::defineMacro);
+    connect(canvas, &QRootCanvas::requestExecuteMacro, this, &QMainCanvas::executeMacro);
+    connect(canvas, &QRootCanvas::requestCycleMacro, this, [this](int id) { cycleMacro(id); });
+    connect(canvas, &QRootCanvas::requestShowMacro, this, &QMainCanvas::showMacro);
+    connect(canvas, &QRootCanvas::requestClearMacro, this, &QMainCanvas::clearMacro);
+    connect(canvas, &QRootCanvas::requestMacroDialog, this, &QMainCanvas::openMacroDialog);
     
     // File I/O
     connect(canvas, &QRootCanvas::requestOpenSpectrumDialog, this, &QMainCanvas::clicked1);
@@ -526,6 +546,17 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     HijF[1][1]->GetYaxis()->SetLabelSize(0);
     HijF[1][1]->GetYaxis()->SetTickLength(0);
     HijF[1][1]->SetStats(0);
+
+    // Block 4: Initialize default macro presets
+    m_macros[1] = {1, "*1", "", 1, "Next Spectrum (Autoscale)"};
+    m_macros[2] = {2, "*2", "", 1, "Previous Spectrum (Autoscale)"};
+    m_macros[3] = {3, "*3", "", 1, "Next Spectrum (Preserve Scale)"};
+    m_macros[4] = {4, "*4", "", 1, "Previous Spectrum (Preserve Scale)"};
+    for (int i = 0; i <= 9; ++i) {
+        if (m_macros.find(i) == m_macros.end()) {
+            m_macros[i] = {i, "", "", 1, ""};
+        }
+    }
 }
 
 //==============================================================================
@@ -880,19 +911,250 @@ void QMainCanvas::onSpectrumDecrementSameScale()
     stepSpectrumIndex(-1, true);
 }
 
+//==============================================================================
+// Block 4: Command Strings / Macros Implementation (Dn, Cn, Mn, Zn, n)
+//==============================================================================
 void QMainCanvas::executeMacro(int macroId)
 {
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Executing Macro %1 (*%1 / %1 hook)\n").arg(macroId));
-    if (macroId == 1) {
-        onSpectrumIncrement();
-    } else if (macroId == 2) {
-        onSpectrumDecrement();
-    } else if (macroId == 3) {
-        onSpectrumIncrementSameScale();
-    } else if (macroId == 4) {
-        onSpectrumDecrementSameScale();
+    if (macroId < 0 || macroId > 9) return;
+    auto it = m_macros.find(macroId);
+    if (it == m_macros.end() || it->second.commandString.trimmed().isEmpty()) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Macro #%1 is empty. Use D%1 to define it.\n").arg(macroId));
+        return;
     }
+
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Executing Macro %1: \"%2\"\n").arg(macroId).arg(it->second.commandString));
+
+    executeCommandString(it->second.commandString);
+}
+
+void QMainCanvas::cycleMacro(int macroId, int cycles)
+{
+    if (macroId < 0 || macroId > 9) return;
+    auto it = m_macros.find(macroId);
+    if (it == m_macros.end() || it->second.commandString.trimmed().isEmpty()) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Cannot cycle empty Macro #%1. Use D%1 to define it first.\n").arg(macroId));
+        return;
+    }
+
+    if (cycles <= 0) {
+        bool ok = false;
+        int defaultC = it->second.cycles > 0 ? it->second.cycles : 5;
+        cycles = QInputDialog::getInt(this, tr("Cycle Macro %1 (C%1)").arg(macroId),
+                                      tr("Number of cycles (#Cicli):"),
+                                      defaultC, 1, 10000, 1, &ok);
+        if (!ok || cycles <= 0) return;
+    }
+
+    m_macros[macroId].cycles = cycles;
+
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Starting Cycle on Macro %1: \"%2\" for %3 iterations...\n")
+            .arg(macroId).arg(it->second.commandString).arg(cycles));
+
+    for (int c = 1; c <= cycles; ++c) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("[Macro %1 | Cycle %2/%3]\n").arg(macroId).arg(c).arg(cycles));
+        executeCommandString(it->second.commandString);
+        qApp->processEvents();
+    }
+
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Completed %1 cycles of Macro %2.\n").arg(cycles).arg(macroId));
+}
+
+void QMainCanvas::defineMacro(int macroId)
+{
+    if (macroId < 0 || macroId > 9) return;
+    bool ok = false;
+    QString current = m_macros[macroId].commandString;
+    QString input = QInputDialog::getText(
+        this, tr("Define Macro %1 (D%1)").arg(macroId),
+        tr("Enter Automatic command string #%1# (e.g. NFF, NCP, AG, CJ):").arg(macroId),
+        QLineEdit::Normal, current, &ok);
+
+    if (ok) {
+        m_macros[macroId].id = macroId;
+        m_macros[macroId].commandString = input.trimmed().toUpper();
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Automatic command string #%1# defined: \"%2\"\n")
+                .arg(macroId).arg(m_macros[macroId].commandString));
+    }
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::showMacro(int macroId)
+{
+    if (macroId < 0 || macroId > 9) return;
+    auto it = m_macros.find(macroId);
+    QString str = (it != m_macros.end() && !it->second.commandString.isEmpty())
+        ? it->second.commandString
+        : "<empty>";
+    int cycles = (it != m_macros.end()) ? it->second.cycles : 1;
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Command string #%1#: \"%2\" (Default cycles: %3)\n")
+            .arg(macroId).arg(str).arg(cycles));
+}
+
+void QMainCanvas::clearMacro(int macroId)
+{
+    if (macroId < 0 || macroId > 9) return;
+    m_macros[macroId].commandString.clear();
+    CommandPrompt::getInstance()->appendPlainText(
+        QString("Command string #%1# erased (Z%1)\n").arg(macroId));
+}
+
+void QMainCanvas::openMacroDialog()
+{
+    MacroDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+bool QMainCanvas::executeMacroCommand(const QString &token)
+{
+    QString t = token.trimmed().toUpper();
+    if (t.isEmpty()) return true;
+
+    if (t == "N" || t == "N+" || t == "*1") {
+        onSpectrumIncrement();
+    } else if (t == "N-" || t == "*2") {
+        onSpectrumDecrement();
+    } else if (t == "*3") {
+        onSpectrumIncrementSameScale();
+    } else if (t == "*4") {
+        onSpectrumDecrementSameScale();
+    } else if (t == "FF") {
+        zoomOut();
+    } else if (t == "FX") {
+        fullX();
+    } else if (t == "FY") {
+        fullY();
+    } else if (t == "SX") {
+        sameX();
+    } else if (t == "SY") {
+        sameY();
+    } else if (t == "L") {
+        toggleLogY();
+    } else if (t == "CP") {
+        searchPeaks();
+    } else if (t == "MP") {
+        showPeakMarkers();
+    } else if (t == "ZP") {
+        deletePeakMarkers();
+    } else if (t == "CB") {
+        fitBackgroundHelper(this);
+    } else if (t == "CI") {
+        areaFunction();
+    } else if (t == "CJ") {
+        areaFunctionWithBackground(true);
+    } else if (t == "CG" || t == "CV") {
+        fitGauss();
+    } else if (t == "AG") {
+        autoFit(0, 0);
+    } else if (t == "AJ") {
+        autoIntegrationAtCursor(0, 0);
+    } else if (t == "Q") {
+        showMatrixProjection();
+    } else if (t == "=") {
+        RefreshScreen();
+    } else if (t == "<") {
+        shiftDisplayLeft75();
+    } else if (t == ">") {
+        shiftDisplayRight75();
+    } else if (t == "ZA") {
+        deleteAllMarkers();
+    } else if (t == "ZB") {
+        deleteBackgroundMarkers();
+    } else if (t == "ZI") {
+        deleteIntegralMarkers();
+    } else if (t == "ZR") {
+        deleteRangeMarkers();
+    } else if (t == "ZG") {
+        deleteGaussMarkers();
+    } else if (t == "ZW") {
+        deleteGateMarkers();
+    } else if (t == "ZJ") {
+        deleteZJMarkers();
+    } else if (t == "ZV") {
+        deleteZVMarkers();
+    } else if (t == "CW") {
+        onGateCMClicked();
+    } else if (t == "OS") {
+        clickedW();
+    } else if (t == "O=") {
+        printPlot();
+    } else if (t == "MZ") {
+        drawZeroLine();
+    } else {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Warning: Unrecognized macro command token '%1'\n").arg(t));
+        return false;
+    }
+    return true;
+}
+
+void QMainCanvas::executeCommandString(const QString &cmdStr)
+{
+    QString s = cmdStr.trimmed();
+    if (s.isEmpty()) return;
+
+    // Tokenizer
+    std::vector<QString> tokens;
+    int i = 0;
+    while (i < s.length()) {
+        if (s[i].isSpace() || s[i] == ',' || s[i] == ';') {
+            i++;
+            continue;
+        }
+        if (i + 1 < s.length()) {
+            QString two = s.mid(i, 2).toUpper();
+            if (two == "FF" || two == "FX" || two == "FY" ||
+                two == "SX" || two == "SY" ||
+                two == "CP" || two == "MP" || two == "ZP" ||
+                two == "CB" || two == "CI" || two == "CJ" ||
+                two == "CG" || two == "CV" || two == "AG" ||
+                two == "AJ" || two == "ZA" || two == "ZB" ||
+                two == "ZI" || two == "ZR" || two == "ZG" ||
+                two == "ZW" || two == "ZJ" || two == "ZV" ||
+                two == "CW" || two == "DW" || two == "OS" ||
+                two == "O=" || two == "MZ" ||
+                two == "N+" || two == "N-" ||
+                (s[i] == '*' && s[i+1].isDigit())) {
+                tokens.push_back(two);
+                i += 2;
+                continue;
+            }
+        }
+        QString one = s.mid(i, 1).toUpper();
+        tokens.push_back(one);
+        i += 1;
+    }
+
+    static int recursionDepth = 0;
+    if (recursionDepth > 10) {
+        CommandPrompt::getInstance()->appendPlainText("Error: Maximum macro recursion depth exceeded.\n");
+        return;
+    }
+    recursionDepth++;
+
+    for (const QString &tok : tokens) {
+        if (tok.length() == 1 && tok[0].isDigit()) {
+            int subId = tok.toInt();
+            auto it = m_macros.find(subId);
+            if (it != m_macros.end() && !it->second.commandString.isEmpty()) {
+                executeCommandString(it->second.commandString);
+            }
+        } else {
+            executeMacroCommand(tok);
+        }
+        qApp->processEvents();
+    }
+
+    recursionDepth--;
 }
 
 void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
@@ -1181,7 +1443,8 @@ void QMainCanvas::offerHelp()
     prompt->appendPlainText(" CB CI CJ MI MJ         Background, Integration(CI without background, CJ with), CB+CI\n");
     prompt->appendPlainText(" CG CV MG MV            Gaussfit, CB+CG. Show markers\n");
     prompt->appendPlainText(" CP MP                  Automatic peak search. Show peaks\n");
-    prompt->appendPlainText(" Dn Cn Mn Zn n          Define, Execute, Show, Erase command string n=1...9\n");
+    prompt->appendPlainText(" Dn Cn Mn Zn n          Define, Execute, Show, Erase command string n=0...9\n");
+    prompt->appendPlainText(" DM                     Open Macro & Command String Manager Dialog\n");
     prompt->appendPlainText(" DD                     Change the display parameters\n");
     prompt->appendPlainText(" DE                     Define how to do efficiency correction\n");
     prompt->appendPlainText(" DG                     Define peak width (individual/common) for fit\n");

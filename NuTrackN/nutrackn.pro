@@ -51,7 +51,8 @@ HEADERS += \
     Include/IntegralDialog.h \
     Include/DisplayParamsDialog.h \
     Include/EfficiencyDialog.h \
-    Include/AutoCalibDialog.h
+    Include/AutoCalibDialog.h \
+    Include/MacroDialog.h
 
 # Project source files
 SOURCES += \
@@ -77,6 +78,7 @@ SOURCES += \
     Sources/IntegralDialog.cxx \
     Sources/DisplayParamsDialog.cxx \
     Sources/EfficiencyDialog.cxx \
-    Sources/AutoCalibDialog.cxx
+    Sources/AutoCalibDialog.cxx \
+    Sources/MacroDialog.cxx
 
 

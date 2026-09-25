@@ -250,6 +250,12 @@ signals:
    void requestShiftDisplayLeft75();
    void requestShiftDisplayRight75();
    void requestDeleteNearestGaussMarker(Int_t, Int_t);
+   void requestDefineMacro(int macroId);
+   void requestExecuteMacro(int macroId);
+   void requestCycleMacro(int macroId);
+   void requestShowMacro(int macroId);
+   void requestClearMacro(int macroId);
+   void requestMacroDialog();
 };
 
 struct PeakParamState {
@@ -289,8 +295,22 @@ class QMainCanvas : public QWidget
    friend class DisplayParamsDialog;
    friend class EfficiencyDialog;
    friend class AutoCalibDialog;
+   friend class MacroDialog;
 
 public:
+    // Block 4: Command Strings / Macros (Dn, Cn, Mn, Zn, n)
+    struct MacroDefinition {
+        int id{0};
+        QString commandString;
+        QString spectrumListFile;
+        int cycles{1};
+        QString description;
+    };
+    void openMacroDialog();
+    bool executeMacroCommand(const QString &commandToken);
+    void executeCommandString(const QString &cmdStr);
+    const std::map<int, MacroDefinition>& getMacros() const { return m_macros; }
+    void setMacro(int macroId, const MacroDefinition &def) { m_macros[macroId] = def; }
     enum class LoadBehavior {
         Autoscale,
         PreserveScale
@@ -425,7 +445,13 @@ public slots:
     void onSpectrumIncrementSameScale();
     void onSpectrumDecrementSameScale();
     void stepSpectrumIndex(int delta, bool preserveScale = false);
+
+    // Block 4: Command Strings / Macros Slots (Dn, Cn, Mn, Zn, n)
+    void defineMacro(int macroId);
     void executeMacro(int macroId);
+    void cycleMacro(int macroId, int cycles = -1);
+    void showMacro(int macroId);
+    void clearMacro(int macroId);
 
     // Energy calibration dialogs
     void openEnCalDialog();
@@ -594,6 +620,9 @@ protected:
     int             m_gridLineWidth{1};
     int             m_gridLineStyle{2}; // 1 = Solid, 2 = Dashed, 3 = Dotted
     EfficiencyConfig m_efficiencyConfig;
+
+    // Block 4: Macros
+    std::map<int, MacroDefinition> m_macros;
 };
 
 

@@ -729,6 +729,21 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_C:
                 // Redundant C press: cancel prefix
                 break;
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9: {
+                // C + n: Cycle / loop command string n
+                int id = event->key() - Qt::Key_0;
+                emit requestCycleMacro(id);
+                break;
+            }
             default:
                 std::cout << "Waited for execute command after C was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for execute command after C was pressed but no valid command arrived after it\n");
@@ -795,6 +810,21 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
                 CommandPrompt::getInstance()->appendPlainText("Display behavior: Auto Scale on new spectrum.\n");
                 break;
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9: {
+                // Z + n: Zero / clear command string n
+                int id = event->key() - Qt::Key_0;
+                emit requestClearMacro(id);
+                break;
+            }
             default:
                 std::cout << "Waited for delete command after Z was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for delete command after Z was pressed but no valid command arrived after it\n");
@@ -853,6 +883,21 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // M + Z: Draw a line at zero counts
                 emit requestDrawZeroLine();
                 break;
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9: {
+                // M + n: Monitor / show command string n
+                int id = event->key() - Qt::Key_0;
+                emit requestShowMacro(id);
+                break;
+            }
             default:
                 std::cout << "Waited for show command after M was pressed but no valid command arrived after it" << std::endl;
                 CommandPrompt::getInstance()->appendPlainText("Waited for show command after M was pressed but no valid command arrived after it\n");
@@ -959,6 +1004,25 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                         CommandPrompt::getInstance()->appendPlainText("Display behavior set to: " + item + "\n");
                     }
                 }
+                break;
+            }
+            case Qt::Key_M:
+                // D + M: Open Macro Dialog
+                emit requestMacroDialog();
+                break;
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9: {
+                // D + n: Define command string n
+                int id = event->key() - Qt::Key_0;
+                emit requestDefineMacro(id);
                 break;
             }
             default:
@@ -1085,6 +1149,21 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // '-': Delete nearest peak marker to cursor
                 emit requestDeleteNearestGaussMarker(xMousePosition, yMousePosition);
                 break;
+            case Qt::Key_0:
+            case Qt::Key_1:
+            case Qt::Key_2:
+            case Qt::Key_3:
+            case Qt::Key_4:
+            case Qt::Key_5:
+            case Qt::Key_6:
+            case Qt::Key_7:
+            case Qt::Key_8:
+            case Qt::Key_9: {
+                // n: Execute command string n once
+                int id = event->key() - Qt::Key_0;
+                emit requestExecuteMacro(id);
+                break;
+            }
             default:
                 QWidget::keyPressEvent(event);
                 break;
