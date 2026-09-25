@@ -83,6 +83,7 @@ void AutoCalibDialog::initIsotopes()
 
 void AutoCalibDialog::setupUI()
 {
+    const QFont dlgFont = Design::getDialogFont();
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(8);
     mainLayout->setContentsMargins(12, 12, 12, 12);
@@ -116,6 +117,7 @@ void AutoCalibDialog::setupUI()
     m_editFilePath = new QLineEdit(grpRef);
     m_editFilePath->setPlaceholderText(tr("Select energy list file..."));
     QPushButton *btnBrowse = new QPushButton(tr("Browse..."), grpRef);
+    btnBrowse->setFont(dlgFont);
     connect(btnBrowse, &QPushButton::clicked, this, &AutoCalibDialog::onBrowseFile);
     rowFile->addWidget(m_radioFile);
     rowFile->addWidget(m_editFilePath, 1);
@@ -192,7 +194,6 @@ void AutoCalibDialog::setupUI()
     m_tableMatches->verticalHeader()->setVisible(false);
     matchesLayout->addWidget(m_tableMatches);
 
-    const QFont dlgFont = Design::getDialogFont();
     QHBoxLayout *actionLayout = new QHBoxLayout();
     QPushButton *btnSearch = new QPushButton(tr("Search & Match Peaks"), grpMatches);
     btnSearch->setFont(dlgFont);

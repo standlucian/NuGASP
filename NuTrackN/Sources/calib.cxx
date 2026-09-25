@@ -463,11 +463,7 @@ void runTwoPointCalibrationDialog(QWidget *parent,
 
     // Standard OK / Cancel buttons
     QDialogButtonBox buttonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, Qt::Horizontal, &dialog);
-    buttonBox.setStyleSheet(
-        "QPushButton { background-color: #4a4a4a; color: #ffffff; border: 1px solid #707070; "
-        "border-radius: 4px; padding: 6px 24px; font-weight: bold; font-size: 19px; min-height: 28px; } "
-        "QPushButton:hover { background-color: #5a5a5a; }"
-    );
+    buttonBox.setFont(dlgFont);
     mainLayout->addWidget(&buttonBox);
 
     QObject::connect(&buttonBox, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1050,23 +1046,17 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     actionLayout->setSpacing(10);
 
     QPushButton *btnApplyActive = new QPushButton("✓ Apply to Active Spectrum", &dialog);
-    btnApplyActive->setStyleSheet(
-        "QPushButton { background-color: #007acc; color: #ffffff; border: 1px solid #0098ff; "
-        "border-radius: 4px; padding: 7px 18px; font-weight: bold; font-size: 14px; min-height: 28px; }"
-        "QPushButton:hover { background-color: #118ad4; }"
-    );
+    btnApplyActive->setFont(Design::getDialogFont());
 
     QPushButton *btnApplyAll = new QPushButton("Apply to All Open Spectra", &dialog);
-    btnApplyAll->setStyleSheet(
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; "
-        "border-radius: 4px; padding: 7px 16px; font-weight: bold; font-size: 13px; min-height: 28px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-    );
+    btnApplyAll->setFont(Design::getDialogFont());
 
     QPushButton *btnSave = new QPushButton("Save...", &dialog);
+    btnSave->setFont(Design::getDialogFont());
     btnSave->setToolTip("Save calibration parameters to an .mcal or .cal file.");
 
     QPushButton *btnClose = new QPushButton("Close", &dialog);
+    btnClose->setFont(Design::getDialogFont());
 
     actionLayout->addWidget(btnApplyActive);
     actionLayout->addWidget(btnApplyAll);

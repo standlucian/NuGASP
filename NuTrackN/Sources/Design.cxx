@@ -432,6 +432,7 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
       "QPushButton:hover { background-color: %5; }\n"
       "QPushButton:pressed { background-color: %6; color: #ffffff; }\n"
       "QPushButton:disabled { color: #888888; background-color: %8; border: 1px solid %5; }\n"
+      "QPushButton:default { background-color: %7; color: %2; border: 1px solid %6; }\n"
       "QTextBrowser, QTextEdit, QPlainTextEdit { background-color: %8; color: %2; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
       "QTabWidget::pane { border: 1px solid %5; background-color: %1; }\n"
       "QTabBar::tab { background-color: %8; color: %2; padding: 6px 14px; border: 1px solid %5; font-family: \"%3\"; font-size: %4pt; }\n"

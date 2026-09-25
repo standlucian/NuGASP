@@ -91,11 +91,12 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
 
     // 1. Container background & border
     QRectF bgRect(1.0, 1.0, w - 2.0, h - 2.0);
+    const QColor dialogBg = Design::getDialogBackgroundColor();
     if (!m_hasData) {
-        painter.setPen(QPen(QColor("#3e3e42"), 1.0));
-        painter.setBrush(QColor("#15161a"));
+        painter.setPen(QPen(dialogBg.lighter(135), 1.0));
+        painter.setBrush(dialogBg);
         painter.drawRoundedRect(bgRect, 6.0, 6.0);
-        painter.setPen(QColor("#666666"));
+        painter.setPen(Design::getDialogTextColor());
         const QFont baseFont = Design::getDialogFont();
         QFont emptyFont = baseFont;
         emptyFont.setPointSize(baseFont.pointSize() > 0 ? baseFont.pointSize() : 10);
@@ -108,7 +109,7 @@ void PeakFitTileWidget::paintEvent(QPaintEvent *)
     const bool isFitted = (m_res.fittedCentroid > 0.0);
 
     QColor borderColor = !isIncluded ? QColor("#444444") : (isFitted ? QColor("#007acc") : QColor("#555555"));
-    QColor bgColor = !isIncluded ? QColor("#14161a") : QColor("#181b22");
+    QColor bgColor = dialogBg;
 
     painter.setPen(QPen(borderColor, 1.2));
     painter.setBrush(bgColor);
@@ -804,7 +805,7 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     m_lblInspectorDetails = new QLabel(inspectorBox);
     m_lblInspectorDetails->setFont(dlgFont);
     m_lblInspectorDetails->setStyleSheet(QString("background: %1; color: %2; border: 1px solid %3; padding: 6px; border-radius: 4px; font-family: \"%4\"; font-size: %5pt;")
-        .arg(Design::getDialogBackgroundColor().lighter(115).name(),
+        .arg(Design::getDialogBackgroundColor().name(),
              Design::getDialogTextColor().name(),
              Design::getDialogBackgroundColor().lighter(135).name(),
              dlgFont.family()).arg(pt));
@@ -881,11 +882,15 @@ TrackFitDialog::TrackFitDialog(QMainCanvas *mainCanvas,
     actionLayout->setSpacing(10);
 
     QPushButton *btnApplyActive = new QPushButton("✓ Apply to Active Spectrum", this);
+    btnApplyActive->setFont(dlgFont);
     QPushButton *btnApplyAll = new QPushButton("Apply to All Open Spectra", this);
+    btnApplyAll->setFont(dlgFont);
     QPushButton *btnSave = new QPushButton("Save...", this);
+    btnSave->setFont(dlgFont);
     btnSave->setToolTip("Save calibrated parameters to a .cal or .mcal file.");
 
     QPushButton *btnClose = new QPushButton("Close", this);
+    btnClose->setFont(dlgFont);
 
     actionLayout->addWidget(btnApplyActive);
     actionLayout->addWidget(btnApplyAll);

@@ -92,16 +92,19 @@ void MacroDialog::setupUI()
         actionLayout->setSpacing(4);
 
         QPushButton *btnRun = new QPushButton(tr("Run (1x)"), actionWidget);
+        btnRun->setFont(dlgFont);
         btnRun->setToolTip(tr("Execute this macro once"));
         connect(btnRun, &QPushButton::clicked, this, [this, i]() { onExecuteClicked(i); });
         actionLayout->addWidget(btnRun);
 
         QPushButton *btnCycle = new QPushButton(tr("Cycle"), actionWidget);
+        btnCycle->setFont(dlgFont);
         btnCycle->setToolTip(tr("Run this macro in a loop"));
         connect(btnCycle, &QPushButton::clicked, this, [this, i]() { onCycleClicked(i); });
         actionLayout->addWidget(btnCycle);
 
         QPushButton *btnClear = new QPushButton(tr("Clear"), actionWidget);
+        btnClear->setFont(dlgFont);
         btnClear->setToolTip(tr("Erase this macro string"));
         connect(btnClear, &QPushButton::clicked, this, [this, i]() { onClearClicked(i); });
         actionLayout->addWidget(btnClear);
@@ -155,7 +158,9 @@ void MacroDialog::setupUI()
     // 4. Bottom Button Controls
     QHBoxLayout *bottomLayout = new QHBoxLayout();
     QPushButton *btnLoad = new QPushButton(tr("Load from File..."), this);
+    btnLoad->setFont(dlgFont);
     QPushButton *btnSave = new QPushButton(tr("Save to File..."), this);
+    btnSave->setFont(dlgFont);
     connect(btnLoad, &QPushButton::clicked, this, &MacroDialog::onLoadFromFile);
     connect(btnSave, &QPushButton::clicked, this, &MacroDialog::onSaveToFile);
 
@@ -164,9 +169,11 @@ void MacroDialog::setupUI()
     bottomLayout->addStretch(1);
 
     QPushButton *btnApply = new QPushButton(tr("Apply"), this);
+    btnApply->setFont(dlgFont);
     QPushButton *btnOk = new QPushButton(tr("OK"), this);
+    btnOk->setFont(dlgFont);
     QPushButton *btnCancel = new QPushButton(tr("Close"), this);
-    btnOk->setStyleSheet("QPushButton { background-color: #0e639c; } QPushButton:hover { background-color: #1177bb; }");
+    btnCancel->setFont(dlgFont);
 
     connect(btnApply, &QPushButton::clicked, this, &MacroDialog::applySettings);
     connect(btnOk, &QPushButton::clicked, this, &MacroDialog::onAccept);

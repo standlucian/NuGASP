@@ -168,10 +168,13 @@ void DisplayParamsDialog::setupUI()
 
     // Buttons
     QHBoxLayout *btnLayout = new QHBoxLayout();
+    const QFont dlgFont = Design::getDialogFont();
     QPushButton *btnApply = new QPushButton(tr("Apply"), this);
+    btnApply->setFont(dlgFont);
     QPushButton *btnOk = new QPushButton(tr("OK"), this);
+    btnOk->setFont(dlgFont);
     QPushButton *btnCancel = new QPushButton(tr("Cancel"), this);
-    btnOk->setStyleSheet("QPushButton { background-color: #0e639c; } QPushButton:hover { background-color: #1177bb; }");
+    btnCancel->setFont(dlgFont);
 
     connect(btnApply, &QPushButton::clicked, this, &DisplayParamsDialog::applySettings);
     connect(btnOk, &QPushButton::clicked, this, &DisplayParamsDialog::onAccept);

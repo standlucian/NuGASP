@@ -33,6 +33,7 @@ EfficiencyDialog::EfficiencyDialog(QMainCanvas *mainCanvas, QWidget *parent)
 
 void EfficiencyDialog::setupUI()
 {
+    const QFont dlgFont = Design::getDialogFont();
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(10);
     mainLayout->setContentsMargins(14, 14, 14, 14);
@@ -82,7 +83,9 @@ void EfficiencyDialog::setupUI()
     // File buttons for Polynomial
     QHBoxLayout *polyBtnLayout = new QHBoxLayout();
     QPushButton *btnLoadEff = new QPushButton(tr("Load from .eff..."), m_grpPoly);
+    btnLoadEff->setFont(dlgFont);
     QPushButton *btnSaveEff = new QPushButton(tr("Save to .eff..."), m_grpPoly);
+    btnSaveEff->setFont(dlgFont);
     connect(btnLoadEff, &QPushButton::clicked, this, &EfficiencyDialog::onLoadFile);
     connect(btnSaveEff, &QPushButton::clicked, this, &EfficiencyDialog::onSaveFile);
     polyBtnLayout->addWidget(btnLoadEff);
@@ -97,7 +100,6 @@ void EfficiencyDialog::setupUI()
     m_spinTestEnergy->setRange(1.0, 10000.0);
     m_spinTestEnergy->setValue(1332.5);
     m_spinTestEnergy->setDecimals(1);
-    const QFont dlgFont = Design::getDialogFont();
     m_lblTestResult = new QLabel(tr("Calculated Eff: -"), m_grpPoly);
     m_lblTestResult->setFont(dlgFont);
     connect(m_spinTestEnergy, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &EfficiencyDialog::updateTestCalculation);
@@ -117,6 +119,7 @@ void EfficiencyDialog::setupUI()
     m_editSpecPath = new QLineEdit(m_grpSpec);
     m_editSpecPath->setPlaceholderText(tr("Path to efficiency spectrum (.spe, .txt)..."));
     QPushButton *btnBrowse = new QPushButton(tr("Browse..."), m_grpSpec);
+    btnBrowse->setFont(dlgFont);
     connect(btnBrowse, &QPushButton::clicked, this, &EfficiencyDialog::onBrowseSpectrum);
     specLayout->addWidget(m_editSpecPath);
     specLayout->addWidget(btnBrowse);

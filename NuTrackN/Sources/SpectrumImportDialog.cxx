@@ -606,6 +606,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_lblSpectrumIndex = new QLabel(tr("Spectrum Index:"), settingsGroup);
 
     m_btnPrevSpec = new QPushButton(tr("◀"), m_specIndexContainer);
+    m_btnPrevSpec->setFont(Design::getDialogFont());
     m_btnPrevSpec->setFixedWidth(32);
     m_btnPrevSpec->setFixedHeight(28);
 
@@ -616,6 +617,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_spinSpectrumIndex->setFixedWidth(90);
 
     m_btnNextSpec = new QPushButton(tr("▶"), m_specIndexContainer);
+    m_btnNextSpec->setFont(Design::getDialogFont());
     m_btnNextSpec->setFixedWidth(32);
     m_btnNextSpec->setFixedHeight(28);
 
@@ -652,11 +654,15 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     QHBoxLayout *btnLayout = new QHBoxLayout();
     btnLayout->addStretch(1);
 
+    const QFont dlgFont = Design::getDialogFont();
     m_btnCancel = new QPushButton(tr("Cancel"), this);
+    m_btnCancel->setFont(dlgFont);
     connect(m_btnCancel, &QPushButton::clicked, this, &QDialog::reject);
 
     m_btnLoad = new QPushButton(tr("Load Spectrum"), this);
-    m_btnLoad->setDefault(true);
+    m_btnLoad->setFont(dlgFont);
+    m_btnLoad->setAutoDefault(false);
+    m_btnLoad->setDefault(false);
     connect(m_btnLoad, &QPushButton::clicked, this, &QDialog::accept);
 
     btnLayout->addWidget(m_btnCancel);
