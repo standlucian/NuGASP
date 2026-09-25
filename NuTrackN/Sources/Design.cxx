@@ -30,6 +30,7 @@
 #include <TPad.h>
 #include <TColor.h>
 #include <TStyle.h>
+#include <TFrame.h>
 #include <TList.h>
 #include <TIterator.h>
 
@@ -41,58 +42,56 @@ namespace Design {
 static QFont s_buttonPromptFont;
 static QFont s_dialogFont;
 static QFont s_graphFont;
-static int s_rootFontFamilyIndex = 4; // 4 = Helvetica scalable
+static int s_rootFontFamilyIndex = 13; // 13 = Times (Classic Xtrackn baseline)
 static bool s_typographyInitialized = false;
 
-static QColor s_buttonBgColor("#7790ad");
-static QColor s_buttonTextColor("#00ffff");
-static QColor s_uiBgColor("#708090");
-static QColor s_promptBgColor("#7790ad");
-static QColor s_promptTextColor("#000000");
+// Authentic Classic Xtrackn baseline (glwlib.c, trackn.F, and legacy screenshot)
+static QColor s_buttonBgColor("#7790ad"); // GLW_LABELCOLOR_1
+static QColor s_buttonTextColor("#00ffff"); // CYAN
+static QColor s_uiBgColor("#708090");     // GLW_FRAMECOLOR
+static QColor s_promptBgColor("#7790ad"); // GLW_LABELCOLOR_1
+static QColor s_promptTextColor("#000000"); // BLACK
 
-static QColor s_dialogBgColor("#708090");
-static QColor s_dialogTextColor("#000000");
-static QColor s_dialogAccentColor("#2f4f4f");
+static QColor s_dialogBgColor("#708090"); // GLW_FRAMECOLOR
+static QColor s_dialogTextColor("#000000"); // BLACK
+static QColor s_dialogAccentColor("#2f4f4f"); // GLW_FRAMECOLOR_DARK
 
-static QColor s_graphBgColor("#000000");
+static QColor s_graphBgColor("#000000"); // GLW_DRAWBG = BLACK
 static std::vector<QColor> s_spectrumColors = {
-    QColor("#ffffff"), // Spectrum 1 (Active / Primary)
-    QColor("#ff0000"), // Spectrum 2 (Overlay 1)
-    QColor("#00ff00"), // Spectrum 3 (Overlay 2)
-    QColor("#00ffff"), // Spectrum 4 (Overlay 3)
-    QColor("#ff00ff"), // Spectrum 5 (Overlay 4)
-    QColor("#ffff00"), // Spectrum 6 (Overlay 5)
-    QColor("#3399ff"), // Spectrum 7 (Overlay 6)
-    QColor("#ff9900"), // Spectrum 8 (Overlay 7)
-    QColor("#cc66ff")  // Spectrum 9 (Overlay 8)
+    QColor("#ffffff"), // 1: WHITE   (glwlib.c:2577)
+    QColor("#ff0000"), // 2: RED     (glwlib.c:2578)
+    QColor("#00ff00"), // 3: GREEN   (glwlib.c:2579)
+    QColor("#ffff00"), // 4: YELLOW  (glwlib.c:2580)
+    QColor("#0000ff"), // 5: BLUE    (glwlib.c:2581)
+    QColor("#00ffff"), // 6: CYAN    (glwlib.c:2582)
+    QColor("#ff00ff"), // 7: MAGENTA (glwlib.c:2583)
+    QColor("#ff9900"), // 8: ORANGE
+    QColor("#800080")  // 9: PURPLE
 };
 
-static QColor s_peakMarkerColor("#ffff00");
-static QColor s_zoomMarkerColor("#00ffff");
-static QColor s_bgMarkerColor("#3366ff");
-static QColor s_integralMarkerColor("#ffff00");
-static QColor s_rangeMarkerColor("#ffff00");
-static QColor s_gaussMarkerColor("#ff69b4");
-static QColor s_gateMarkerColor("#ff00ff");
+static QColor s_peakMarkerColor("#ffff00");     // YELLOW (trackn.F:2166, glwlib.c:2137)
+static QColor s_zoomMarkerColor("#00ffff");     // CYAN   (ROI marker standard)
+static QColor s_bgMarkerColor("#0000ff");       // BLUE   (trackn.F:628 CALL SHOWMARKERS(XMBGD,NMBGD,2,4))
+static QColor s_integralMarkerColor("#ffff00"); // YELLOW (trackn.F:644 CALL SHOWMARKERS(XMINT,NMINT,2,3))
+static QColor s_rangeMarkerColor("#ff00ff");    // MAGENTA(trackn.F:640 CALL SHOWMARKERS(XMREG,NMREG,2,6))
+static QColor s_gaussMarkerColor("#ffff00");    // YELLOW (trackn.F:631 CALL SHOWMARKERS(XMGAU,NMGAU,1,3))
+static QColor s_gateMarkerColor("#ff0000");     // RED    (trackn.F:665 CALL SHOWMARKERS(CGATE,NGATES*2+mod(NGNEXT,2),2,1))
 
 void initializeTypography() {
   if (s_typographyInitialized) return;
 
-  // Category 1: Buttons and Prompt (Monospace / tabular clean font)
-  QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  mono.setPointSize(11);
-  s_buttonPromptFont = mono;
+  // Category 1: Buttons and Prompt (Times New Roman Bold matching legacy Xtrackn)
+  QFont timesFont("Times New Roman", 11);
+  timesFont.setStyleHint(QFont::Times);
+  s_buttonPromptFont = timesFont;
+  s_buttonPromptFont.setBold(true);
 
-  // Category 2: Dialogs (Clean modern sans-serif UI font)
-  QFont dialogFont("DejaVu Sans", 11, QFont::Normal);
-  dialogFont.setStyleHint(QFont::SansSerif);
-  s_dialogFont = dialogFont;
+  // Category 2: Dialogs
+  s_dialogFont = timesFont;
 
-  // Category 3: Graph itself (ROOT scalable font 42/43 + matching Qt font)
-  QFont graphFont("DejaVu Sans", 10, QFont::Normal);
-  graphFont.setStyleHint(QFont::SansSerif);
-  s_graphFont = graphFont;
-  s_rootFontFamilyIndex = 4; // Helvetica
+  // Category 3: Graph overlay & ROOT Times
+  s_graphFont = timesFont;
+  s_rootFontFamilyIndex = 13; // ROOT Font 13: Times
 
   s_buttonBgColor = QColor("#7790ad");
   s_buttonTextColor = QColor("#00ffff");
@@ -109,27 +108,27 @@ void initializeTypography() {
       QColor("#ffffff"),
       QColor("#ff0000"),
       QColor("#00ff00"),
+      QColor("#ffff00"),
+      QColor("#0000ff"),
       QColor("#00ffff"),
       QColor("#ff00ff"),
-      QColor("#ffff00"),
-      QColor("#3399ff"),
       QColor("#ff9900"),
-      QColor("#cc66ff")
+      QColor("#800080")
   };
   s_peakMarkerColor = QColor("#ffff00");
   s_zoomMarkerColor = QColor("#00ffff");
-  s_bgMarkerColor = QColor("#3366ff");
+  s_bgMarkerColor = QColor("#0000ff");
   s_integralMarkerColor = QColor("#ffff00");
-  s_rangeMarkerColor = QColor("#ffff00");
-  s_gaussMarkerColor = QColor("#ff69b4");
-  s_gateMarkerColor = QColor("#ff00ff");
+  s_rangeMarkerColor = QColor("#ff00ff");
+  s_gaussMarkerColor = QColor("#ffff00");
+  s_gateMarkerColor = QColor("#ff0000");
 
   loadSettings();
   s_typographyInitialized = true;
 }
 
 void resetToDefaults() {
-  // Authentic Classic Xtrackn baseline (glwlib.c & screenshot)
+  // Authentic Classic Xtrackn baseline (glwlib.c, trackn.F & screenshot)
   QFont timesFont("Times New Roman", 11);
   timesFont.setStyleHint(QFont::Times);
   s_buttonPromptFont = timesFont;
@@ -153,20 +152,20 @@ void resetToDefaults() {
       QColor("#ffffff"),
       QColor("#ff0000"),
       QColor("#00ff00"),
+      QColor("#ffff00"),
+      QColor("#0000ff"),
       QColor("#00ffff"),
       QColor("#ff00ff"),
-      QColor("#ffff00"),
-      QColor("#3399ff"),
       QColor("#ff9900"),
-      QColor("#cc66ff")
+      QColor("#800080")
   };
   s_peakMarkerColor = QColor("#ffff00");
   s_zoomMarkerColor = QColor("#00ffff");
-  s_bgMarkerColor = QColor("#3366ff");
+  s_bgMarkerColor = QColor("#0000ff");
   s_integralMarkerColor = QColor("#ffff00");
-  s_rangeMarkerColor = QColor("#ffff00");
-  s_gaussMarkerColor = QColor("#ff69b4");
-  s_gateMarkerColor = QColor("#ff00ff");
+  s_rangeMarkerColor = QColor("#ff00ff");
+  s_gaussMarkerColor = QColor("#ffff00");
+  s_gateMarkerColor = QColor("#ff0000");
 
   saveSettings();
 }
@@ -227,7 +226,7 @@ void loadSettings() {
   }
 
   if (settings.contains("Design/RootFontFamilyIndex")) {
-    s_rootFontFamilyIndex = settings.value("Design/RootFontFamilyIndex", 4).toInt();
+    s_rootFontFamilyIndex = settings.value("Design/RootFontFamilyIndex", 13).toInt();
   }
 
   if (settings.contains("Design/ButtonBgColor")) s_buttonBgColor = QColor(settings.value("Design/ButtonBgColor").toString());
@@ -413,6 +412,10 @@ QString getDialogStyleSheet() {
       "QTabWidget::pane { border: 1px solid %5; background-color: %1; }\n"
       "QTabBar::tab { background-color: %8; color: %2; padding: 6px 14px; border: 1px solid %5; font-family: \"%3\"; font-size: %4pt; }\n"
       "QTabBar::tab:selected { background-color: %1; color: %6; border-bottom: 2px solid %6; }\n"
+      "QScrollArea { background-color: %1; border: none; }\n"
+      "QScrollArea > QWidget { background-color: %1; border: none; }\n"
+      "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
+      "QWidget#tabCanvas { background-color: %1; }\n"
   ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg);
 }
 
@@ -587,23 +590,47 @@ void applyUITheme(QMainCanvas *mainCanvas) {
   applyGraphTypography();
 
   if (mainCanvas) {
+    const Color_t rootBg = TColor::GetColor(s_graphBgColor.name().toUtf8().constData());
+    const Color_t axisCol = (s_graphBgColor.lightness() > 130) ? kBlack : kWhite;
+
+    gStyle->SetCanvasColor(rootBg);
+    gStyle->SetPadColor(rootBg);
+    gStyle->SetFrameFillColor(rootBg);
+    gStyle->SetFrameLineColor(axisCol);
+    gStyle->SetAxisColor(axisCol, "X");
+    gStyle->SetAxisColor(axisCol, "Y");
+    gStyle->SetAxisColor(axisCol, "Z");
+    gStyle->SetLabelColor(axisCol, "X");
+    gStyle->SetLabelColor(axisCol, "Y");
+    gStyle->SetLabelColor(axisCol, "Z");
+
     if (mainCanvas->getRootCanvas()) {
       TCanvas *tc = mainCanvas->getRootCanvas()->getCanvas();
       if (tc) {
-        Color_t rootBg = TColor::GetColor(s_graphBgColor.name().toUtf8().constData());
         tc->SetFillColor(rootBg);
+        if (tc->GetFrame()) {
+          tc->GetFrame()->SetFillColor(rootBg);
+          tc->GetFrame()->SetLineColor(axisCol);
+        }
         if (tc->GetListOfPrimitives()) {
           TIter next(tc->GetListOfPrimitives());
           TObject *obj = nullptr;
           while ((obj = next())) {
             if (obj && obj->InheritsFrom(TPad::Class())) {
-              static_cast<TPad*>(obj)->SetFillColor(rootBg);
+              TPad *pad = static_cast<TPad*>(obj);
+              pad->SetFillColor(rootBg);
+              pad->SetFrameFillColor(rootBg);
+              if (pad->GetFrame()) {
+                pad->GetFrame()->SetFillColor(rootBg);
+                pad->GetFrame()->SetLineColor(axisCol);
+              }
             }
           }
         }
         tc->Modified();
         tc->Update();
       }
+      mainCanvas->getRootCanvas()->update();
     }
 
     // Synchronize all 9 spectrum colors with mainCanvas->colors_hist
@@ -708,7 +735,12 @@ void addCommandPrompt(QMainCanvas *m) {
 //==============================================================================
 void changeBackgroundColor(TCanvas *canvas) {
   if (canvas) {
-    canvas->SetFillColor(TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData()));
+    Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    canvas->SetFillColor(rootBg);
+    if (gPad) {
+      gPad->SetFillColor(rootBg);
+      gPad->SetFrameFillColor(rootBg);
+    }
     canvas->Modified();
     canvas->Update();
   }
@@ -849,8 +881,8 @@ private:
   QColor m_peak{"#ffff00"};
   QColor m_zoom{"#00ffff"};
   QColor m_integral{"#ffff00"};
-  QColor m_gauss{"#ff69b4"};
-  QColor m_gate{"#ff00ff"};
+  QColor m_gauss{"#ffff00"};
+  QColor m_gate{"#ff0000"};
 };
 
 //==============================================================================
@@ -951,6 +983,8 @@ private:
   QLabel *m_mockGraphSampleLabel{nullptr};
 
   // Tab 4 UI
+  QScrollArea *m_scrollTabCanvas{nullptr};
+  QWidget *m_tabCanvas{nullptr};
   CanvasPreviewWidget *m_canvasPreview{nullptr};
 
   // Bottom action buttons
@@ -1202,8 +1236,8 @@ void AppearanceDialog::setupUI() {
   m_spinGraphSize->setSuffix(" pt");
 
   m_comboRootFont = new QComboBox(tabGraph);
+  m_comboRootFont->addItem("Times (Serif - ROOT Font 13, Legacy Xtrackn)", 13);
   m_comboRootFont->addItem("Helvetica (Sans-Serif - Standard ROOT Font 4)", 4);
-  m_comboRootFont->addItem("Times (Serif - ROOT Font 13)", 13);
   m_comboRootFont->addItem("Courier (Monospace - ROOT Font 6)", 6);
   m_comboRootFont->addItem("Greek / Symbol (ROOT Font 12)", 12);
   int foundIdx = m_comboRootFont->findData(m_curRootFontIdx);
@@ -1235,15 +1269,19 @@ void AppearanceDialog::setupUI() {
   // =========================================================================
   // TAB 4: Canvas, Spectra & Markers
   // =========================================================================
-  QScrollArea *scrollTabCanvas = new QScrollArea(this);
-  scrollTabCanvas->setWidgetResizable(true);
-  QWidget *tabCanvas = new QWidget();
-  QVBoxLayout *tabCanvasLayout = new QVBoxLayout(tabCanvas);
+  m_scrollTabCanvas = new QScrollArea(this);
+  m_scrollTabCanvas->setWidgetResizable(true);
+  m_scrollTabCanvas->setFrameShape(QFrame::NoFrame);
+  m_scrollTabCanvas->setObjectName("scrollTabCanvas");
+
+  m_tabCanvas = new QWidget();
+  m_tabCanvas->setObjectName("tabCanvas");
+  QVBoxLayout *tabCanvasLayout = new QVBoxLayout(m_tabCanvas);
   tabCanvasLayout->setSpacing(10);
   tabCanvasLayout->setContentsMargins(10, 10, 10, 10);
 
   // Group 1: Canvas Background
-  QGroupBox *grpCanvasBg = new QGroupBox("Canvas Background", tabCanvas);
+  QGroupBox *grpCanvasBg = new QGroupBox("Canvas Background", m_tabCanvas);
   QGridLayout *gridCanvasBg = new QGridLayout(grpCanvasBg);
   gridCanvasBg->setColumnStretch(0, 1);
   gridCanvasBg->setColumnStretch(1, 0);
@@ -1251,7 +1289,7 @@ void AppearanceDialog::setupUI() {
   tabCanvasLayout->addWidget(grpCanvasBg);
 
   // Group 2: Spectrum Colors (All 9 Options)
-  QGroupBox *grpSpectra = new QGroupBox("Spectrum Colors (Channels 1 - 9 / Overlays)", tabCanvas);
+  QGroupBox *grpSpectra = new QGroupBox("Spectrum Colors (Channels 1 - 9 / Overlays)", m_tabCanvas);
   QGridLayout *gridSpectra = new QGridLayout(grpSpectra);
   gridSpectra->setColumnStretch(0, 1);
   gridSpectra->setColumnStretch(1, 0);
@@ -1278,7 +1316,7 @@ void AppearanceDialog::setupUI() {
   tabCanvasLayout->addWidget(grpSpectra);
 
   // Group 3: Marker Colors
-  QGroupBox *grpMarkers = new QGroupBox("Marker Colors", tabCanvas);
+  QGroupBox *grpMarkers = new QGroupBox("Marker Colors", m_tabCanvas);
   QGridLayout *gridMarkers = new QGridLayout(grpMarkers);
   gridMarkers->setColumnStretch(0, 1);
   gridMarkers->setColumnStretch(1, 0);
@@ -1296,14 +1334,14 @@ void AppearanceDialog::setupUI() {
   tabCanvasLayout->addWidget(grpMarkers);
 
   // Group 4: Live Canvas Preview
-  QGroupBox *grpLiveCanvas = new QGroupBox("Live Canvas Preview (Canvas, Spectra & Markers)", tabCanvas);
+  QGroupBox *grpLiveCanvas = new QGroupBox("Live Canvas Preview (Canvas, Spectra & Markers)", m_tabCanvas);
   QVBoxLayout *vboxLiveCanvas = new QVBoxLayout(grpLiveCanvas);
   m_canvasPreview = new CanvasPreviewWidget(grpLiveCanvas);
   vboxLiveCanvas->addWidget(m_canvasPreview);
   tabCanvasLayout->addWidget(grpLiveCanvas);
 
-  scrollTabCanvas->setWidget(tabCanvas);
-  tabs->addTab(scrollTabCanvas, "🎨 4. Canvas, Spectra & Markers");
+  m_scrollTabCanvas->setWidget(m_tabCanvas);
+  tabs->addTab(m_scrollTabCanvas, "🎨 4. Canvas, Spectra & Markers");
 
   dialogLayout->addWidget(tabs, 1);
 
@@ -1383,24 +1421,24 @@ void AppearanceDialog::setupUI() {
 
       m_curGraphBg = QColor("#000000");
       m_curSpectrumColors = {
-          QColor("#ffffff"),
-          QColor("#ff0000"),
-          QColor("#00ff00"),
-          QColor("#00ffff"),
-          QColor("#ff00ff"),
-          QColor("#ffff00"),
-          QColor("#3399ff"),
-          QColor("#ff9900"),
-          QColor("#cc66ff")
+          QColor("#ffffff"), // WHITE   (glwlib.c:2577)
+          QColor("#ff0000"), // RED     (glwlib.c:2578)
+          QColor("#00ff00"), // GREEN   (glwlib.c:2579)
+          QColor("#ffff00"), // YELLOW  (glwlib.c:2580)
+          QColor("#0000ff"), // BLUE    (glwlib.c:2581)
+          QColor("#00ffff"), // CYAN    (glwlib.c:2582)
+          QColor("#ff00ff"), // MAGENTA (glwlib.c:2583)
+          QColor("#ff9900"), // ORANGE
+          QColor("#800080")  // PURPLE
       };
 
-      m_curPeak = QColor("#ffff00");
-      m_curZoom = QColor("#00ffff");
-      m_curBgMarker = QColor("#3366ff");
-      m_curIntegral = QColor("#ffff00");
-      m_curRange = QColor("#ffff00");
-      m_curGauss = QColor("#ff69b4");
-      m_curGate = QColor("#ff00ff");
+      m_curPeak = QColor("#ffff00");     // YELLOW (trackn.F:2166, glwlib.c:2137)
+      m_curZoom = QColor("#00ffff");     // CYAN   (ROI standard)
+      m_curBgMarker = QColor("#0000ff"); // BLUE   (trackn.F:628)
+      m_curIntegral = QColor("#ffff00"); // YELLOW (trackn.F:644)
+      m_curRange = QColor("#ff00ff");    // MAGENTA(trackn.F:640)
+      m_curGauss = QColor("#ffff00");    // YELLOW (trackn.F:631)
+      m_curGate = QColor("#ff0000");     // RED    (trackn.F:665)
 
       m_spinBtnSize->setValue(11);
       m_spinDlgSize->setValue(11);
@@ -1429,15 +1467,15 @@ void AppearanceDialog::setupUI() {
 
       m_curGraphBg = QColor("#0c1017");
       m_curSpectrumColors = {
-          QColor("#00f0ff"),
-          QColor("#ff3366"),
-          QColor("#10b981"),
-          QColor("#fbbf24"),
-          QColor("#a855f7"),
-          QColor("#38bdf8"),
-          QColor("#f97316"),
-          QColor("#4ade80"),
-          QColor("#e879f9")
+          QColor("#00f0ff"), // Cyan
+          QColor("#ff3366"), // Coral
+          QColor("#10b981"), // Emerald
+          QColor("#fbbf24"), // Amber
+          QColor("#a855f7"), // Purple
+          QColor("#38bdf8"), // Sky Blue
+          QColor("#f97316"), // Orange
+          QColor("#4ade80"), // Mint
+          QColor("#e879f9")  // Fuchsia
       };
 
       m_curPeak = QColor("#ff2d75");
@@ -1446,7 +1484,7 @@ void AppearanceDialog::setupUI() {
       m_curIntegral = QColor("#f59e0b");
       m_curRange = QColor("#fb923c");
       m_curGauss = QColor("#f472b6");
-      m_curGate = QColor("#c084fc");
+      m_curGate = QColor("#a855f7");
 
       m_spinBtnSize->setValue(10);
       m_spinDlgSize->setValue(10);
@@ -1637,7 +1675,27 @@ void AppearanceDialog::refreshDialogTheme() {
       "QTabWidget::pane { border: 1px solid %5; background-color: %1; }\n"
       "QTabBar::tab { background-color: %8; color: %2; padding: 6px 14px; border: 1px solid %5; font-family: \"%3\"; font-size: %4pt; }\n"
       "QTabBar::tab:selected { background-color: %1; color: %6; border-bottom: 2px solid %6; }\n"
+      "QScrollArea { background-color: %1; border: none; }\n"
+      "QScrollArea > QWidget { background-color: %1; border: none; }\n"
+      "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
+      "QWidget#tabCanvas { background-color: %1; }\n"
   ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg));
+
+  if (m_scrollTabCanvas) {
+    m_scrollTabCanvas->setStyleSheet(QString(
+        "QScrollArea { background-color: %1; border: none; }\n"
+        "QScrollArea > QWidget { background-color: %1; border: none; }\n"
+        "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
+        "QWidget#tabCanvas { background-color: %1; }\n"
+    ).arg(bg));
+
+    if (m_scrollTabCanvas->viewport()) {
+      QPalette vp = m_scrollTabCanvas->viewport()->palette();
+      vp.setColor(QPalette::Window, m_curDlgBg);
+      m_scrollTabCanvas->viewport()->setPalette(vp);
+      m_scrollTabCanvas->viewport()->setAutoFillBackground(true);
+    }
+  }
 
   if (m_btnApply) {
     m_btnApply->setStyleSheet(QString(

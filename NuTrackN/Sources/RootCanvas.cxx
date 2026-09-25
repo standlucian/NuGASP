@@ -13,6 +13,8 @@
 #include <TLatex.h>
 #include <TF1.h>
 #include <TQObject.h>
+#include <TColor.h>
+#include <TStyle.h>
 
 #include <QMouseEvent>
 #include <QWheelEvent>
@@ -75,6 +77,12 @@ QRootCanvas::QRootCanvas(QWidget *parent)
     // Register widget with TVirtualX using native window id
     int wid = gVirtualX->AddWindow((ULong_t)winId(), width(), height());
     fCanvas = new TCanvas("Root Canvas", width(), height(), wid);
+    const Color_t initBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    fCanvas->SetFillColor(initBg);
+    if (gPad) {
+        gPad->SetFillColor(initBg);
+        gPad->SetFrameFillColor(initBg);
+    }
     TQObject::Connect("TGPopupMenu", "PoppedDown()", "TCanvas", fCanvas, "Update()");
 
     // Set canvas borders and margins as small as possible for maximal spectrum viewing area
@@ -87,7 +95,8 @@ QRootCanvas::QRootCanvas(QWidget *parent)
     TLatex l;
     l.SetTextSize(0.15);
     l.SetTextAlign(22);
-    l.SetTextColor(kBlack);
+    const Color_t splashCol = (Design::getGraphBackgroundColor().lightness() > 130) ? kBlack : kWhite;
+    l.SetTextColor(splashCol);
     l.DrawLatex(0.5, 0.5, "NuTrackN");
 }
 

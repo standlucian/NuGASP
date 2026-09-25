@@ -25,6 +25,8 @@
 #include <TLatex.h>
 #include <TLine.h>
 #include <TStyle.h>
+#include <TColor.h>
+#include <TFrame.h>
 
 #include <QApplication>
 #include <QFileDialog>
@@ -684,7 +686,8 @@ void QMainCanvas::clicked1()
 
     // Configure canvas background only after a file has been successfully loaded
     canvas->getCanvas()->SetBorderMode(0);
-    canvas->getCanvas()->SetFillColor(0);
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    canvas->getCanvas()->SetFillColor(rootBg);
 
     // Update axes and leave 10% empty space on top of the spectrum
     HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
@@ -1751,7 +1754,8 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
         }
 
         canvas->getCanvas()->SetBorderMode(0);
-        canvas->getCanvas()->SetFillColor(0);
+        const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+        canvas->getCanvas()->SetFillColor(rootBg);
 
         HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->UnZoom();
         adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);

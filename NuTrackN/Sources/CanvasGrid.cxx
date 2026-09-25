@@ -1,11 +1,15 @@
 #include "canvas.h"
 #include "tracknhistogram.h"
+#include "Design.h"
 
 #include <TCanvas.h>
 #include <TH1F.h>
 #include <TLine.h>
 #include <TVirtualPad.h>
 #include <TAxis.h>
+#include <TColor.h>
+#include <TStyle.h>
+#include <TFrame.h>
 #include <QWindowStateChangeEvent>
 #include <QString>
 #include <QLabel>
@@ -62,7 +66,8 @@ void QMainCanvas::AddCulomn()
     TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
-    rootCanvas->SetFillColor(0);
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    rootCanvas->SetFillColor(rootBg);
     rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
 
     for (int z = 1; z <= maxElement_i; ++z) {
@@ -157,7 +162,8 @@ void QMainCanvas::AddLine()
     TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
-    rootCanvas->SetFillColor(0);
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    rootCanvas->SetFillColor(rootBg);
     rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
 
     for (int z = 1; z <= maxElement_i; ++z) {
@@ -487,7 +493,8 @@ void QMainCanvas::DeleteCulomn()
     TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
-    rootCanvas->SetFillColor(0);
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    rootCanvas->SetFillColor(rootBg);
     rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
 
     for (int z = 1; z <= maxElement_i; ++z) {
@@ -572,7 +579,8 @@ void QMainCanvas::DeleteLine()
     TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
-    rootCanvas->SetFillColor(0);
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    rootCanvas->SetFillColor(rootBg);
 
     if (maxElement_i == 1 && maxElement_j == 1) {
         if (HijF[1][1]) {
@@ -670,10 +678,25 @@ void QMainCanvas::RefreshScreen()
     TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
-    rootCanvas->SetFillColor(0);
+
+    const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
+    const Color_t axisCol = (Design::getGraphBackgroundColor().lightness() > 130) ? kBlack : kWhite;
+
+    gStyle->SetCanvasColor(rootBg);
+    gStyle->SetPadColor(rootBg);
+    gStyle->SetFrameFillColor(rootBg);
+    gStyle->SetFrameLineColor(axisCol);
+
+    rootCanvas->SetFillColor(rootBg);
 
     if (maxElement_i > 1 || maxElement_j > 1) {
         rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
+    } else {
+        rootCanvas->cd();
+        if (gPad) {
+            gPad->SetFillColor(rootBg);
+            gPad->SetFrameFillColor(rootBg);
+        }
     }
 
     for (int z = 1; z <= maxElement_i; ++z) {
@@ -683,10 +706,27 @@ void QMainCanvas::RefreshScreen()
             const int padIndex = (z - 1) * maxElement_j + g;
             if (maxElement_i > 1 || maxElement_j > 1) {
                 rootCanvas->cd(padIndex);
+            } else {
+                rootCanvas->cd();
+            }
+
+            if (gPad) {
+                gPad->SetFillColor(rootBg);
+                gPad->SetFrameFillColor(rootBg);
             }
 
             adjustYAxisToVisibleMax(HijF[z][g], z, g);
+
+            HijF[z][g]->GetXaxis()->SetAxisColor(axisCol);
+            HijF[z][g]->GetXaxis()->SetLabelColor(axisCol);
+            HijF[z][g]->GetYaxis()->SetAxisColor(axisCol);
+            HijF[z][g]->GetYaxis()->SetLabelColor(axisCol);
             HijF[z][g]->Draw();
+
+            if (gPad && gPad->GetFrame()) {
+                gPad->GetFrame()->SetFillColor(rootBg);
+                gPad->GetFrame()->SetLineColor(axisCol);
+            }
 
             // Re-render Gaussian center annotations
             renderPeakLabels(z, g);
@@ -722,4 +762,5 @@ void QMainCanvas::RefreshScreen()
 
     rootCanvas->Modified();
     rootCanvas->Update();
+    canvas->update();
 }
