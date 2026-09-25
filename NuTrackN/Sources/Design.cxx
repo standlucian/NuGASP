@@ -20,7 +20,11 @@
 #include <QFontDialog>
 #include <QColorDialog>
 #include <QApplication>
+#include <QScrollArea>
+#include <QPainter>
+#include <QPainterPath>
 #include <iostream>
+#include <cmath>
 
 #include <TCanvas.h>
 #include <TPad.h>
@@ -40,18 +44,36 @@ static QFont s_graphFont;
 static int s_rootFontFamilyIndex = 4; // 4 = Helvetica scalable
 static bool s_typographyInitialized = false;
 
-static QColor s_buttonBgColor("#e0e0e0");
-static QColor s_buttonTextColor("#000000");
-static QColor s_promptBgColor("#ffffff");
+static QColor s_buttonBgColor("#7790ad");
+static QColor s_buttonTextColor("#00ffff");
+static QColor s_uiBgColor("#708090");
+static QColor s_promptBgColor("#7790ad");
 static QColor s_promptTextColor("#000000");
 
-static QColor s_dialogBgColor("#1e1e1e");
-static QColor s_dialogTextColor("#dcdcdc");
-static QColor s_dialogAccentColor("#007acc");
+static QColor s_dialogBgColor("#708090");
+static QColor s_dialogTextColor("#000000");
+static QColor s_dialogAccentColor("#2f4f4f");
 
-static QColor s_graphBgColor("#1e1e1e");
-static QColor s_spectrumColor("#3399ff");
-static QColor s_peakMarkerColor("#00ffff");
+static QColor s_graphBgColor("#000000");
+static std::vector<QColor> s_spectrumColors = {
+    QColor("#ffffff"), // Spectrum 1 (Active / Primary)
+    QColor("#ff0000"), // Spectrum 2 (Overlay 1)
+    QColor("#00ff00"), // Spectrum 3 (Overlay 2)
+    QColor("#00ffff"), // Spectrum 4 (Overlay 3)
+    QColor("#ff00ff"), // Spectrum 5 (Overlay 4)
+    QColor("#ffff00"), // Spectrum 6 (Overlay 5)
+    QColor("#3399ff"), // Spectrum 7 (Overlay 6)
+    QColor("#ff9900"), // Spectrum 8 (Overlay 7)
+    QColor("#cc66ff")  // Spectrum 9 (Overlay 8)
+};
+
+static QColor s_peakMarkerColor("#ffff00");
+static QColor s_zoomMarkerColor("#00ffff");
+static QColor s_bgMarkerColor("#3366ff");
+static QColor s_integralMarkerColor("#ffff00");
+static QColor s_rangeMarkerColor("#ffff00");
+static QColor s_gaussMarkerColor("#ff69b4");
+static QColor s_gateMarkerColor("#ff00ff");
 
 void initializeTypography() {
   if (s_typographyInitialized) return;
@@ -72,18 +94,35 @@ void initializeTypography() {
   s_graphFont = graphFont;
   s_rootFontFamilyIndex = 4; // Helvetica
 
-  s_buttonBgColor = QColor("#e0e0e0");
-  s_buttonTextColor = QColor("#000000");
-  s_promptBgColor = QColor("#ffffff");
+  s_buttonBgColor = QColor("#7790ad");
+  s_buttonTextColor = QColor("#00ffff");
+  s_uiBgColor = QColor("#708090");
+  s_promptBgColor = QColor("#7790ad");
   s_promptTextColor = QColor("#000000");
 
-  s_dialogBgColor = QColor("#1e1e1e");
-  s_dialogTextColor = QColor("#dcdcdc");
-  s_dialogAccentColor = QColor("#007acc");
+  s_dialogBgColor = QColor("#708090");
+  s_dialogTextColor = QColor("#000000");
+  s_dialogAccentColor = QColor("#2f4f4f");
 
-  s_graphBgColor = QColor("#1e1e1e");
-  s_spectrumColor = QColor("#3399ff");
-  s_peakMarkerColor = QColor("#00ffff");
+  s_graphBgColor = QColor("#000000");
+  s_spectrumColors = {
+      QColor("#ffffff"),
+      QColor("#ff0000"),
+      QColor("#00ff00"),
+      QColor("#00ffff"),
+      QColor("#ff00ff"),
+      QColor("#ffff00"),
+      QColor("#3399ff"),
+      QColor("#ff9900"),
+      QColor("#cc66ff")
+  };
+  s_peakMarkerColor = QColor("#ffff00");
+  s_zoomMarkerColor = QColor("#00ffff");
+  s_bgMarkerColor = QColor("#3366ff");
+  s_integralMarkerColor = QColor("#ffff00");
+  s_rangeMarkerColor = QColor("#ffff00");
+  s_gaussMarkerColor = QColor("#ff69b4");
+  s_gateMarkerColor = QColor("#ff00ff");
 
   loadSettings();
   s_typographyInitialized = true;
@@ -99,12 +138,9 @@ void resetToDefaults() {
   s_graphFont = timesFont;
   s_rootFontFamilyIndex = 13; // ROOT Font 13: Times
 
-  // GLW_LABELCOLOR_1 = rgb(119, 144, 173) -> #7790ad
-  // Button text = CYAN -> #00ffff
-  // GLW_FRAMECOLOR = rgb(112, 128, 144) -> #708090
-  // GLW_FRAMECOLOR_DARK = rgb(47, 79, 79) -> #2f4f4f
   s_buttonBgColor = QColor("#7790ad");
   s_buttonTextColor = QColor("#00ffff");
+  s_uiBgColor = QColor("#708090");
   s_promptBgColor = QColor("#7790ad");
   s_promptTextColor = QColor("#000000");
 
@@ -113,8 +149,24 @@ void resetToDefaults() {
   s_dialogAccentColor = QColor("#2f4f4f");
 
   s_graphBgColor = QColor("#000000");
-  s_spectrumColor = QColor("#ffffff");
+  s_spectrumColors = {
+      QColor("#ffffff"),
+      QColor("#ff0000"),
+      QColor("#00ff00"),
+      QColor("#00ffff"),
+      QColor("#ff00ff"),
+      QColor("#ffff00"),
+      QColor("#3399ff"),
+      QColor("#ff9900"),
+      QColor("#cc66ff")
+  };
   s_peakMarkerColor = QColor("#ffff00");
+  s_zoomMarkerColor = QColor("#00ffff");
+  s_bgMarkerColor = QColor("#3366ff");
+  s_integralMarkerColor = QColor("#ffff00");
+  s_rangeMarkerColor = QColor("#ffff00");
+  s_gaussMarkerColor = QColor("#ff69b4");
+  s_gateMarkerColor = QColor("#ff00ff");
 
   saveSettings();
 }
@@ -128,6 +180,7 @@ void saveSettings() {
 
   settings.setValue("Design/ButtonBgColor", s_buttonBgColor.name());
   settings.setValue("Design/ButtonTextColor", s_buttonTextColor.name());
+  settings.setValue("Design/UIBgColor", s_uiBgColor.name());
   settings.setValue("Design/PromptBgColor", s_promptBgColor.name());
   settings.setValue("Design/PromptTextColor", s_promptTextColor.name());
 
@@ -136,8 +189,21 @@ void saveSettings() {
   settings.setValue("Design/DialogAccentColor", s_dialogAccentColor.name());
 
   settings.setValue("Design/GraphBgColor", s_graphBgColor.name());
-  settings.setValue("Design/SpectrumColor", s_spectrumColor.name());
+
+  for (std::size_t i = 0; i < s_spectrumColors.size(); ++i) {
+    settings.setValue(QString("Design/SpectrumColor_%1").arg(i), s_spectrumColors[i].name());
+  }
+  if (!s_spectrumColors.empty()) {
+    settings.setValue("Design/SpectrumColor", s_spectrumColors[0].name());
+  }
+
   settings.setValue("Design/PeakMarkerColor", s_peakMarkerColor.name());
+  settings.setValue("Design/ZoomMarkerColor", s_zoomMarkerColor.name());
+  settings.setValue("Design/BgMarkerColor", s_bgMarkerColor.name());
+  settings.setValue("Design/IntegralMarkerColor", s_integralMarkerColor.name());
+  settings.setValue("Design/RangeMarkerColor", s_rangeMarkerColor.name());
+  settings.setValue("Design/GaussMarkerColor", s_gaussMarkerColor.name());
+  settings.setValue("Design/GateMarkerColor", s_gateMarkerColor.name());
 }
 
 void loadSettings() {
@@ -166,6 +232,7 @@ void loadSettings() {
 
   if (settings.contains("Design/ButtonBgColor")) s_buttonBgColor = QColor(settings.value("Design/ButtonBgColor").toString());
   if (settings.contains("Design/ButtonTextColor")) s_buttonTextColor = QColor(settings.value("Design/ButtonTextColor").toString());
+  if (settings.contains("Design/UIBgColor")) s_uiBgColor = QColor(settings.value("Design/UIBgColor").toString());
   if (settings.contains("Design/PromptBgColor")) s_promptBgColor = QColor(settings.value("Design/PromptBgColor").toString());
   if (settings.contains("Design/PromptTextColor")) s_promptTextColor = QColor(settings.value("Design/PromptTextColor").toString());
 
@@ -174,8 +241,23 @@ void loadSettings() {
   if (settings.contains("Design/DialogAccentColor")) s_dialogAccentColor = QColor(settings.value("Design/DialogAccentColor").toString());
 
   if (settings.contains("Design/GraphBgColor")) s_graphBgColor = QColor(settings.value("Design/GraphBgColor").toString());
-  if (settings.contains("Design/SpectrumColor")) s_spectrumColor = QColor(settings.value("Design/SpectrumColor").toString());
+
+  for (std::size_t i = 0; i < s_spectrumColors.size(); ++i) {
+    const QString key = QString("Design/SpectrumColor_%1").arg(i);
+    if (settings.contains(key)) {
+      s_spectrumColors[i] = QColor(settings.value(key).toString());
+    } else if (i == 0 && settings.contains("Design/SpectrumColor")) {
+      s_spectrumColors[0] = QColor(settings.value("Design/SpectrumColor").toString());
+    }
+  }
+
   if (settings.contains("Design/PeakMarkerColor")) s_peakMarkerColor = QColor(settings.value("Design/PeakMarkerColor").toString());
+  if (settings.contains("Design/ZoomMarkerColor")) s_zoomMarkerColor = QColor(settings.value("Design/ZoomMarkerColor").toString());
+  if (settings.contains("Design/BgMarkerColor")) s_bgMarkerColor = QColor(settings.value("Design/BgMarkerColor").toString());
+  if (settings.contains("Design/IntegralMarkerColor")) s_integralMarkerColor = QColor(settings.value("Design/IntegralMarkerColor").toString());
+  if (settings.contains("Design/RangeMarkerColor")) s_rangeMarkerColor = QColor(settings.value("Design/RangeMarkerColor").toString());
+  if (settings.contains("Design/GaussMarkerColor")) s_gaussMarkerColor = QColor(settings.value("Design/GaussMarkerColor").toString());
+  if (settings.contains("Design/GateMarkerColor")) s_gateMarkerColor = QColor(settings.value("Design/GateMarkerColor").toString());
 }
 
 QFont getButtonFont() {
@@ -212,6 +294,9 @@ void setButtonBackgroundColor(const QColor &color) { s_buttonBgColor = color; sa
 
 QColor getButtonTextColor() { if (!s_typographyInitialized) initializeTypography(); return s_buttonTextColor; }
 void setButtonTextColor(const QColor &color) { s_buttonTextColor = color; saveSettings(); }
+
+QColor getUIBackgroundColor() { if (!s_typographyInitialized) initializeTypography(); return s_uiBgColor; }
+void setUIBackgroundColor(const QColor &color) { s_uiBgColor = color; saveSettings(); }
 
 QColor getPromptBackgroundColor() { if (!s_typographyInitialized) initializeTypography(); return s_promptBgColor; }
 void setPromptBackgroundColor(const QColor &color) { s_promptBgColor = color; saveSettings(); }
@@ -356,11 +441,63 @@ void setGraphFont(const QFont &qtFont, int rootFontFamilyIndex) {
 QColor getGraphBackgroundColor() { if (!s_typographyInitialized) initializeTypography(); return s_graphBgColor; }
 void setGraphBackgroundColor(const QColor &color) { s_graphBgColor = color; saveSettings(); }
 
-QColor getSpectrumColor() { if (!s_typographyInitialized) initializeTypography(); return s_spectrumColor; }
-void setSpectrumColor(const QColor &color) { s_spectrumColor = color; saveSettings(); }
+std::vector<QColor> getSpectrumColors() {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_spectrumColors;
+}
+
+QColor getSpectrumColor() {
+  return getSpectrumColor(0);
+}
+
+QColor getSpectrumColor(int index) {
+  if (!s_typographyInitialized) initializeTypography();
+  if (index >= 0 && index < static_cast<int>(s_spectrumColors.size())) {
+    return s_spectrumColors[index];
+  }
+  return s_spectrumColors.empty() ? QColor("#ffffff") : s_spectrumColors[0];
+}
+
+void setSpectrumColor(const QColor &color) {
+  setSpectrumColor(0, color);
+}
+
+void setSpectrumColor(int index, const QColor &color) {
+  if (!s_typographyInitialized) initializeTypography();
+  if (index >= 0 && index < static_cast<int>(s_spectrumColors.size())) {
+    s_spectrumColors[index] = color;
+    saveSettings();
+  }
+}
+
+void setSpectrumColors(const std::vector<QColor> &colors) {
+  if (!s_typographyInitialized) initializeTypography();
+  for (std::size_t i = 0; i < colors.size() && i < s_spectrumColors.size(); ++i) {
+    s_spectrumColors[i] = colors[i];
+  }
+  saveSettings();
+}
 
 QColor getPeakMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_peakMarkerColor; }
 void setPeakMarkerColor(const QColor &color) { s_peakMarkerColor = color; saveSettings(); }
+
+QColor getZoomMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_zoomMarkerColor; }
+void setZoomMarkerColor(const QColor &color) { s_zoomMarkerColor = color; saveSettings(); }
+
+QColor getBackgroundMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_bgMarkerColor; }
+void setBackgroundMarkerColor(const QColor &color) { s_bgMarkerColor = color; saveSettings(); }
+
+QColor getIntegralMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_integralMarkerColor; }
+void setIntegralMarkerColor(const QColor &color) { s_integralMarkerColor = color; saveSettings(); }
+
+QColor getRangeMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_rangeMarkerColor; }
+void setRangeMarkerColor(const QColor &color) { s_rangeMarkerColor = color; saveSettings(); }
+
+QColor getGaussMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_gaussMarkerColor; }
+void setGaussMarkerColor(const QColor &color) { s_gaussMarkerColor = color; saveSettings(); }
+
+QColor getGateMarkerColor() { if (!s_typographyInitialized) initializeTypography(); return s_gateMarkerColor; }
+void setGateMarkerColor(const QColor &color) { s_gateMarkerColor = color; saveSettings(); }
 
 void applyGraphTypography() {
   if (gStyle) {
@@ -419,11 +556,12 @@ void applyUITheme(QMainCanvas *mainCanvas) {
       lbl->setStyleSheet(labelStyle);
     }
 
-    // Set matching frame color on toolbar container
+    // Set matching background color on toolbar container and mainCanvas
     QWidget *topContainer = mainCanvas->findChild<QWidget*>("topContainer");
     if (topContainer) {
-      topContainer->setStyleSheet(QString("QWidget#topContainer { background-color: %1; }").arg(s_buttonBgColor.darker(106).name()));
+      topContainer->setStyleSheet(QString("QWidget#topContainer { background-color: %1; }").arg(s_uiBgColor.name()));
     }
+    mainCanvas->setStyleSheet(QString("QMainCanvas { background-color: %1; }").arg(s_uiBgColor.name()));
   }
 
   if (CommandPrompt::getInstance()) {
@@ -445,34 +583,54 @@ void applyUITheme(QMainCanvas *mainCanvas) {
     }
   }
 
-  // 3. Graph canvas
+  // 3. Graph canvas & spectrum colors
   applyGraphTypography();
 
-  if (mainCanvas && mainCanvas->getRootCanvas()) {
-    TCanvas *tc = mainCanvas->getRootCanvas()->getCanvas();
-    if (tc) {
-      Color_t rootBg = TColor::GetColor(s_graphBgColor.name().toUtf8().constData());
-      tc->SetFillColor(rootBg);
-      if (tc->GetListOfPrimitives()) {
-        TIter next(tc->GetListOfPrimitives());
-        TObject *obj = nullptr;
-        while ((obj = next())) {
-          if (obj && obj->InheritsFrom(TPad::Class())) {
-            static_cast<TPad*>(obj)->SetFillColor(rootBg);
+  if (mainCanvas) {
+    if (mainCanvas->getRootCanvas()) {
+      TCanvas *tc = mainCanvas->getRootCanvas()->getCanvas();
+      if (tc) {
+        Color_t rootBg = TColor::GetColor(s_graphBgColor.name().toUtf8().constData());
+        tc->SetFillColor(rootBg);
+        if (tc->GetListOfPrimitives()) {
+          TIter next(tc->GetListOfPrimitives());
+          TObject *obj = nullptr;
+          while ((obj = next())) {
+            if (obj && obj->InheritsFrom(TPad::Class())) {
+              static_cast<TPad*>(obj)->SetFillColor(rootBg);
+            }
+          }
+        }
+        tc->Modified();
+        tc->Update();
+      }
+    }
+
+    // Synchronize all 9 spectrum colors with mainCanvas->colors_hist
+    if (mainCanvas->colors_hist.size() < s_spectrumColors.size()) {
+      mainCanvas->colors_hist.resize(s_spectrumColors.size());
+    }
+    for (std::size_t i = 0; i < s_spectrumColors.size(); ++i) {
+      mainCanvas->colors_hist[i] = TColor::GetColor(s_spectrumColors[i].name().toUtf8().constData());
+    }
+
+    if (mainCanvas->selectedHisto && !mainCanvas->colors_hist.empty()) {
+      mainCanvas->selectedHisto->SetLineColor(mainCanvas->colors_hist[0]);
+    }
+
+    for (int z = 0; z < 12; ++z) {
+      for (int g = 0; g < 12; ++g) {
+        if (mainCanvas->HijF[z][g] && !mainCanvas->colors_hist.empty()) {
+          mainCanvas->HijF[z][g]->SetLineColor(mainCanvas->colors_hist[0]);
+        }
+        for (std::size_t k = 0; k < mainCanvas->HijC[z][g].size(); ++k) {
+          if (mainCanvas->HijC[z][g][k]) {
+            mainCanvas->HijC[z][g][k]->SetLineColor(mainCanvas->colors_hist[k % mainCanvas->colors_hist.size()]);
           }
         }
       }
-      tc->Modified();
-      tc->Update();
     }
 
-    Color_t rootSpecColor = TColor::GetColor(s_spectrumColor.name().toUtf8().constData());
-    if (!mainCanvas->colors_hist.empty()) {
-      mainCanvas->colors_hist[0] = rootSpecColor;
-    }
-    if (mainCanvas->selectedHisto) {
-      mainCanvas->selectedHisto->SetLineColor(rootSpecColor);
-    }
     mainCanvas->RefreshScreen();
   }
 }
@@ -557,6 +715,145 @@ void changeBackgroundColor(TCanvas *canvas) {
 }
 
 //==============================================================================
+// CanvasPreviewWidget (Live Simulation of ROOT Canvas, Spectra & Markers)
+//==============================================================================
+class CanvasPreviewWidget : public QWidget {
+public:
+  explicit CanvasPreviewWidget(QWidget *parent = nullptr) : QWidget(parent) {
+    setMinimumHeight(140);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  }
+
+  void setPreviewData(const QColor &bg,
+                      const std::vector<QColor> &spectra,
+                      const QColor &peak,
+                      const QColor &zoom,
+                      const QColor &integral,
+                      const QColor &gauss,
+                      const QColor &gate) {
+    m_bg = bg;
+    m_spectra = spectra;
+    m_peak = peak;
+    m_zoom = zoom;
+    m_integral = integral;
+    m_gauss = gauss;
+    m_gate = gate;
+    update();
+  }
+
+protected:
+  void paintEvent(QPaintEvent *) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    const QRect r = rect();
+    p.fillRect(r, m_bg);
+
+    // Subtle border around canvas
+    p.setPen(QPen(m_bg.lighter(130), 1));
+    p.drawRect(r.adjusted(0, 0, -1, -1));
+
+    const int w = r.width();
+    const int h = r.height();
+    const int baseline = h - 24;
+    const int top = 22;
+
+    // Coordinate axes
+    p.setPen(QPen(QColor(128, 128, 128, 120), 1));
+    p.drawLine(35, baseline, w - 15, baseline);
+    p.drawLine(35, top, 35, baseline);
+
+    // Shaded ROI / Integral region
+    const int xRoi1 = static_cast<int>(w * 0.38);
+    const int xRoi2 = static_cast<int>(w * 0.60);
+    QColor shadeCol = m_integral;
+    shadeCol.setAlpha(45);
+    p.fillRect(QRect(xRoi1, top, xRoi2 - xRoi1, baseline - top), shadeCol);
+
+    // Vertical ROI marker lines
+    p.setPen(QPen(m_zoom, 1, Qt::DashLine));
+    p.drawLine(xRoi1, top, xRoi1, baseline);
+    p.drawLine(xRoi2, top, xRoi2, baseline);
+
+    // Gate marker line
+    const int xGate = static_cast<int>(w * 0.78);
+    p.setPen(QPen(m_gate, 2, Qt::SolidLine));
+    p.drawLine(xGate, top, xGate, baseline);
+
+    // Gauss centroid marker line
+    const int xPeak = static_cast<int>(w * 0.50);
+    p.setPen(QPen(m_gauss, 1, Qt::DotLine));
+    p.drawLine(xPeak, top, xPeak, baseline);
+
+    // Primary Spectrum (Spectrum 1)
+    if (!m_spectra.empty()) {
+      QPainterPath path1;
+      path1.moveTo(35, baseline - 4);
+      for (int x = 35; x <= w - 15; ++x) {
+        double normX = (x - 35.0) / (w - 50.0);
+        double bgLevel = 6.0 + 4.0 * (1.0 - normX);
+        double peak1 = 70.0 * std::exp(-0.5 * std::pow((x - xPeak) / 16.0, 2));
+        double peak2 = 28.0 * std::exp(-0.5 * std::pow((x - (w * 0.24)) / 11.0, 2));
+        double yVal = baseline - (bgLevel + peak1 + peak2);
+        path1.lineTo(x, yVal);
+      }
+      p.setPen(QPen(m_spectra[0], 2));
+      p.drawPath(path1);
+    }
+
+    // Secondary Spectrum Overlay (Spectrum 2)
+    if (m_spectra.size() > 1) {
+      QPainterPath path2;
+      path2.moveTo(35, baseline - 3);
+      for (int x = 35; x <= w - 15; ++x) {
+        double normX = (x - 35.0) / (w - 50.0);
+        double bgLevel = 4.0 + 3.0 * (1.0 - normX);
+        double peak = 45.0 * std::exp(-0.5 * std::pow((x - (xPeak + 26)) / 14.0, 2));
+        double yVal = baseline - (bgLevel + peak);
+        path2.lineTo(x, yVal);
+      }
+      p.setPen(QPen(m_spectra[1], 1, Qt::DashLine));
+      p.drawPath(path2);
+    }
+
+    // Peak Marker (Arrow / indicator on top of main peak)
+    p.setPen(QPen(m_peak, 2));
+    p.setBrush(m_peak);
+    QPolygon triangle;
+    triangle << QPoint(xPeak, top + 6) << QPoint(xPeak - 5, top - 2) << QPoint(xPeak + 5, top - 2);
+    p.drawPolygon(triangle);
+    p.drawLine(xPeak, top + 6, xPeak, top + 18);
+
+    // Legend
+    QFont legFont("sans-serif", 8);
+    p.setFont(legFont);
+    p.setPen(m_bg.lightness() > 130 ? Qt::black : Qt::white);
+    p.drawText(40, 15, "■ Spec 1");
+    if (m_spectra.size() > 1) {
+      p.setPen(m_spectra[1]);
+      p.drawText(100, 15, "- - Spec 2");
+    }
+    p.setPen(m_peak);
+    p.drawText(168, 15, "▼ Peak");
+    p.setPen(m_zoom);
+    p.drawText(220, 15, "| ROI");
+    p.setPen(m_gauss);
+    p.drawText(265, 15, ": Gauss");
+    p.setPen(m_gate);
+    p.drawText(320, 15, "| Gate");
+  }
+
+private:
+  QColor m_bg{"#000000"};
+  std::vector<QColor> m_spectra;
+  QColor m_peak{"#ffff00"};
+  QColor m_zoom{"#00ffff"};
+  QColor m_integral{"#ffff00"};
+  QColor m_gauss{"#ff69b4"};
+  QColor m_gate{"#ff00ff"};
+};
+
+//==============================================================================
 // AppearanceDialog (Full Settings Dialog for Fonts, Sizes, and Colors)
 //==============================================================================
 class AppearanceDialog : public QDialog {
@@ -565,10 +862,11 @@ public:
 
 private:
   void setupUI();
-  void addColorRow(QGridLayout *grid, int row, const QString &label, QColor *colorVar, std::function<void()> onChange);
+  void addColorRow(QGridLayout *grid, int row, int colOffset, const QString &label, QColor *colorVar, std::function<void()> onChange);
   void updateBtnPreview();
   void updateDlgPreview();
   void updateGraphPreview();
+  void updateCanvasPreview();
   void updateAllSwatches();
   void refreshDialogTheme();
   void commitChanges();
@@ -584,6 +882,7 @@ private:
 
   QColor m_origBtnBg;
   QColor m_origBtnFg;
+  QColor m_origUIBg;
   QColor m_origPromptBg;
   QColor m_origPromptFg;
 
@@ -592,8 +891,14 @@ private:
   QColor m_origDlgAccent;
 
   QColor m_origGraphBg;
-  QColor m_origSpec;
+  std::vector<QColor> m_origSpectrumColors;
   QColor m_origPeak;
+  QColor m_origZoom;
+  QColor m_origBgMarker;
+  QColor m_origIntegral;
+  QColor m_origRange;
+  QColor m_origGauss;
+  QColor m_origGate;
 
   // Working values
   QFont m_curBtnFont;
@@ -603,6 +908,7 @@ private:
 
   QColor m_curBtnBg;
   QColor m_curBtnFg;
+  QColor m_curUIBg;
   QColor m_curPromptBg;
   QColor m_curPromptFg;
 
@@ -611,28 +917,43 @@ private:
   QColor m_curDlgAccent;
 
   QColor m_curGraphBg;
-  QColor m_curSpec;
+  std::vector<QColor> m_curSpectrumColors;
   QColor m_curPeak;
+  QColor m_curZoom;
+  QColor m_curBgMarker;
+  QColor m_curIntegral;
+  QColor m_curRange;
+  QColor m_curGauss;
+  QColor m_curGate;
 
   // UI elements for live updates
   QComboBox *m_presetCombo{nullptr};
+
+  // Tab 1 UI
   QLabel *m_lblBtnFontDesc{nullptr};
   QSpinBox *m_spinBtnSize{nullptr};
+  QFrame *m_mockToolbarBox{nullptr};
   QPushButton *m_sampleBtn{nullptr};
   QLineEdit *m_samplePrompt{nullptr};
 
+  // Tab 2 UI
   QLabel *m_lblDlgFontDesc{nullptr};
   QSpinBox *m_spinDlgSize{nullptr};
   QFrame *m_mockDialogBox{nullptr};
   QLabel *m_mockLabel{nullptr};
   QPushButton *m_mockButton{nullptr};
 
+  // Tab 3 UI
   QLabel *m_lblGraphFontDesc{nullptr};
   QSpinBox *m_spinGraphSize{nullptr};
   QComboBox *m_comboRootFont{nullptr};
-  QFrame *m_mockCanvasBox{nullptr};
-  QLabel *m_mockPeakLabel{nullptr};
+  QFrame *m_mockGraphBox{nullptr};
+  QLabel *m_mockGraphSampleLabel{nullptr};
 
+  // Tab 4 UI
+  CanvasPreviewWidget *m_canvasPreview{nullptr};
+
+  // Bottom action buttons
   QPushButton *m_btnReset{nullptr};
   QPushButton *m_btnApply{nullptr};
   QPushButton *m_btnOk{nullptr};
@@ -644,8 +965,8 @@ private:
 AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
     : QDialog(parent), m_canvasWidget(canvasWidget)
 {
-  setWindowTitle("Appearance & Typography Settings (3 Fonts & Colors)");
-  resize(680, 640);
+  setWindowTitle("Appearance & Typography Settings (Fonts & Colors)");
+  resize(720, 660);
 
   // Snapshot original settings to allow clean Cancel / revert
   m_origBtnFont = Design::getButtonPromptFont();
@@ -655,6 +976,7 @@ AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
 
   m_origBtnBg = Design::getButtonBackgroundColor();
   m_origBtnFg = Design::getButtonTextColor();
+  m_origUIBg = Design::getUIBackgroundColor();
   m_origPromptBg = Design::getPromptBackgroundColor();
   m_origPromptFg = Design::getPromptTextColor();
 
@@ -663,8 +985,14 @@ AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
   m_origDlgAccent = Design::getDialogAccentColor();
 
   m_origGraphBg = Design::getGraphBackgroundColor();
-  m_origSpec = Design::getSpectrumColor();
+  m_origSpectrumColors = Design::getSpectrumColors();
   m_origPeak = Design::getPeakMarkerColor();
+  m_origZoom = Design::getZoomMarkerColor();
+  m_origBgMarker = Design::getBackgroundMarkerColor();
+  m_origIntegral = Design::getIntegralMarkerColor();
+  m_origRange = Design::getRangeMarkerColor();
+  m_origGauss = Design::getGaussMarkerColor();
+  m_origGate = Design::getGateMarkerColor();
 
   // Working copies
   m_curBtnFont = m_origBtnFont;
@@ -674,6 +1002,7 @@ AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
 
   m_curBtnBg = m_origBtnBg;
   m_curBtnFg = m_origBtnFg;
+  m_curUIBg = m_origUIBg;
   m_curPromptBg = m_origPromptBg;
   m_curPromptFg = m_origPromptFg;
 
@@ -682,18 +1011,27 @@ AppearanceDialog::AppearanceDialog(QWidget *parent, QMainCanvas *canvasWidget)
   m_curDlgAccent = m_origDlgAccent;
 
   m_curGraphBg = m_origGraphBg;
-  m_curSpec = m_origSpec;
+  m_curSpectrumColors = m_origSpectrumColors;
+  while (m_curSpectrumColors.size() < 9) {
+    m_curSpectrumColors.push_back(QColor("#ffffff"));
+  }
+
   m_curPeak = m_origPeak;
+  m_curZoom = m_origZoom;
+  m_curBgMarker = m_origBgMarker;
+  m_curIntegral = m_origIntegral;
+  m_curRange = m_origRange;
+  m_curGauss = m_origGauss;
+  m_curGate = m_origGate;
 
   setupUI();
   refreshDialogTheme();
 }
 
-void AppearanceDialog::addColorRow(QGridLayout *grid, int row, const QString &label, QColor *colorVar, std::function<void()> onChange) {
+void AppearanceDialog::addColorRow(QGridLayout *grid, int row, int colOffset, const QString &label, QColor *colorVar, std::function<void()> onChange) {
   QLabel *lbl = new QLabel(label, this);
-  grid->addWidget(lbl, row, 0);
+  grid->addWidget(lbl, row, colOffset);
 
-  // Direct clickable colored button (swatch) displaying its hex value
   QPushButton *swatch = new QPushButton(this);
   swatch->setFixedSize(86, 28);
   swatch->setCursor(Qt::PointingHandCursor);
@@ -701,7 +1039,6 @@ void AppearanceDialog::addColorRow(QGridLayout *grid, int row, const QString &la
 
   auto updateSwatch = [swatch, colorVar]() {
     const QString hex = colorVar->name().toUpper();
-    // High-contrast font color based on background luminance
     double lum = 0.299 * colorVar->red() + 0.587 * colorVar->green() + 0.114 * colorVar->blue();
     const QString textCol = lum > 140 ? "#000000" : "#ffffff";
     swatch->setText(hex);
@@ -723,7 +1060,7 @@ void AppearanceDialog::addColorRow(QGridLayout *grid, int row, const QString &la
     }
   });
 
-  grid->addWidget(swatch, row, 1, Qt::AlignRight);
+  grid->addWidget(swatch, row, colOffset + 1, Qt::AlignRight);
 }
 
 void AppearanceDialog::setupUI() {
@@ -742,11 +1079,11 @@ void AppearanceDialog::setupUI() {
   presetLayout->addWidget(m_presetCombo, 1);
   dialogLayout->addLayout(presetLayout);
 
-  // 3-Category Tabs
+  // 4-Category Tabs
   QTabWidget *tabs = new QTabWidget(this);
 
   // =========================================================================
-  // TAB 1: Buttons & Prompt
+  // TAB 1: Buttons & UI
   // =========================================================================
   QWidget *tabBtn = new QWidget();
   QVBoxLayout *tabBtnLayout = new QVBoxLayout(tabBtn);
@@ -771,25 +1108,29 @@ void AppearanceDialog::setupUI() {
   QGridLayout *gridBtnColors = new QGridLayout(grpBtnColors);
   gridBtnColors->setColumnStretch(0, 1);
   gridBtnColors->setColumnStretch(1, 0);
-  addColorRow(gridBtnColors, 0, "Button Background:", &m_curBtnBg, [this]() { updateBtnPreview(); });
-  addColorRow(gridBtnColors, 1, "Button Text Color:", &m_curBtnFg, [this]() { updateBtnPreview(); });
-  addColorRow(gridBtnColors, 2, "Readouts & Console Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
-  addColorRow(gridBtnColors, 3, "Readouts & Console Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 0, 0, "Main UI Background (Button Panel):", &m_curUIBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 1, 0, "Button Background:", &m_curBtnBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 2, 0, "Button Text Color:", &m_curBtnFg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 3, 0, "Readouts & Console Background:", &m_curPromptBg, [this]() { updateBtnPreview(); });
+  addColorRow(gridBtnColors, 4, 0, "Readouts & Console Text:", &m_curPromptFg, [this]() { updateBtnPreview(); });
   tabBtnLayout->addWidget(grpBtnColors);
 
   QGroupBox *grpBtnPreview = new QGroupBox("Live Preview (Main UI Toolbar)", tabBtn);
   QVBoxLayout *vboxBtnPreview = new QVBoxLayout(grpBtnPreview);
-  m_sampleBtn = new QPushButton("EnCal", grpBtnPreview);
-  m_sampleBtn->setFixedHeight(36);
-  m_samplePrompt = new QLineEdit("X Min: 0.0   |   NuTrackN Output: Ready", grpBtnPreview);
+  m_mockToolbarBox = new QFrame(grpBtnPreview);
+  QVBoxLayout *mockToolbarLayout = new QVBoxLayout(m_mockToolbarBox);
+  m_sampleBtn = new QPushButton("EnCal", m_mockToolbarBox);
+  m_sampleBtn->setFixedHeight(34);
+  m_samplePrompt = new QLineEdit("X Min: 0.0   |   NuTrackN Output: Ready", m_mockToolbarBox);
   m_samplePrompt->setReadOnly(true);
-  m_samplePrompt->setFixedHeight(36);
-  vboxBtnPreview->addWidget(m_sampleBtn);
-  vboxBtnPreview->addWidget(m_samplePrompt);
+  m_samplePrompt->setFixedHeight(34);
+  mockToolbarLayout->addWidget(m_sampleBtn);
+  mockToolbarLayout->addWidget(m_samplePrompt);
+  vboxBtnPreview->addWidget(m_mockToolbarBox);
   tabBtnLayout->addWidget(grpBtnPreview);
   tabBtnLayout->addStretch();
 
-  tabs->addTab(tabBtn, "🔘 1. Buttons & Prompt");
+  tabs->addTab(tabBtn, "🔘 1. Buttons & UI");
 
   // =========================================================================
   // TAB 2: Dialogs
@@ -817,15 +1158,15 @@ void AppearanceDialog::setupUI() {
   QGridLayout *gridDlgColors = new QGridLayout(grpDlgColors);
   gridDlgColors->setColumnStretch(0, 1);
   gridDlgColors->setColumnStretch(1, 0);
-  addColorRow(gridDlgColors, 0, "Dialog Background:", &m_curDlgBg, [this]() {
+  addColorRow(gridDlgColors, 0, 0, "Dialog Background:", &m_curDlgBg, [this]() {
     updateDlgPreview();
     refreshDialogTheme();
   });
-  addColorRow(gridDlgColors, 1, "Dialog Text & Labels:", &m_curDlgFg, [this]() {
+  addColorRow(gridDlgColors, 1, 0, "Dialog Text & Labels:", &m_curDlgFg, [this]() {
     updateDlgPreview();
     refreshDialogTheme();
   });
-  addColorRow(gridDlgColors, 2, "Highlight / Accent:", &m_curDlgAccent, [this]() {
+  addColorRow(gridDlgColors, 2, 0, "Highlight / Accent:", &m_curDlgAccent, [this]() {
     updateDlgPreview();
     refreshDialogTheme();
   });
@@ -846,7 +1187,7 @@ void AppearanceDialog::setupUI() {
   tabs->addTab(tabDlg, "💬 2. Dialogs");
 
   // =========================================================================
-  // TAB 3: Graph & Spectrum
+  // TAB 3: Graph Typography
   // =========================================================================
   QWidget *tabGraph = new QWidget();
   QVBoxLayout *tabGraphLayout = new QVBoxLayout(tabGraph);
@@ -877,28 +1218,92 @@ void AppearanceDialog::setupUI() {
   gridGraphFont->addWidget(m_comboRootFont, 2, 1, 1, 2);
   tabGraphLayout->addWidget(grpGraphFont);
 
-  QGroupBox *grpGraphColors = new QGroupBox("Colors", tabGraph);
-  QGridLayout *gridGraphColors = new QGridLayout(grpGraphColors);
-  gridGraphColors->setColumnStretch(0, 1);
-  gridGraphColors->setColumnStretch(1, 0);
-  addColorRow(gridGraphColors, 0, "Canvas Background:", &m_curGraphBg, [this]() { updateGraphPreview(); });
-  addColorRow(gridGraphColors, 1, "Spectrum Trace & Fill:", &m_curSpec, [this]() { updateGraphPreview(); });
-  addColorRow(gridGraphColors, 2, "Peak Markers & Labels:", &m_curPeak, [this]() { updateGraphPreview(); });
-  tabGraphLayout->addWidget(grpGraphColors);
-
-  QGroupBox *grpGraphPreview = new QGroupBox("Live Preview (Graph & Canvas)", tabGraph);
+  QGroupBox *grpGraphPreview = new QGroupBox("Live Preview (Graph Overlay Typography)", tabGraph);
   QVBoxLayout *vboxGraphPreview = new QVBoxLayout(grpGraphPreview);
-  m_mockCanvasBox = new QFrame(grpGraphPreview);
-  m_mockCanvasBox->setMinimumHeight(80);
-  QHBoxLayout *mockCanvasLayout = new QHBoxLayout(m_mockCanvasBox);
-  m_mockPeakLabel = new QLabel("[1] 1332.5 keV", m_mockCanvasBox);
-  m_mockPeakLabel->setAlignment(Qt::AlignCenter);
-  mockCanvasLayout->addWidget(m_mockPeakLabel);
-  vboxGraphPreview->addWidget(m_mockCanvasBox);
+  m_mockGraphBox = new QFrame(grpGraphPreview);
+  m_mockGraphBox->setMinimumHeight(80);
+  QHBoxLayout *mockGraphLayout = new QHBoxLayout(m_mockGraphBox);
+  m_mockGraphSampleLabel = new QLabel("Channel: 1332.5 keV | Peak Counts: 24,510", m_mockGraphBox);
+  m_mockGraphSampleLabel->setAlignment(Qt::AlignCenter);
+  mockGraphLayout->addWidget(m_mockGraphSampleLabel);
+  vboxGraphPreview->addWidget(m_mockGraphBox);
   tabGraphLayout->addWidget(grpGraphPreview);
   tabGraphLayout->addStretch();
 
-  tabs->addTab(tabGraph, "📈 3. Graph & Spectrum");
+  tabs->addTab(tabGraph, "🔤 3. Graph Typography");
+
+  // =========================================================================
+  // TAB 4: Canvas, Spectra & Markers
+  // =========================================================================
+  QScrollArea *scrollTabCanvas = new QScrollArea(this);
+  scrollTabCanvas->setWidgetResizable(true);
+  QWidget *tabCanvas = new QWidget();
+  QVBoxLayout *tabCanvasLayout = new QVBoxLayout(tabCanvas);
+  tabCanvasLayout->setSpacing(10);
+  tabCanvasLayout->setContentsMargins(10, 10, 10, 10);
+
+  // Group 1: Canvas Background
+  QGroupBox *grpCanvasBg = new QGroupBox("Canvas Background", tabCanvas);
+  QGridLayout *gridCanvasBg = new QGridLayout(grpCanvasBg);
+  gridCanvasBg->setColumnStretch(0, 1);
+  gridCanvasBg->setColumnStretch(1, 0);
+  addColorRow(gridCanvasBg, 0, 0, "Canvas Background Color:", &m_curGraphBg, [this]() { updateCanvasPreview(); });
+  tabCanvasLayout->addWidget(grpCanvasBg);
+
+  // Group 2: Spectrum Colors (All 9 Options)
+  QGroupBox *grpSpectra = new QGroupBox("Spectrum Colors (Channels 1 - 9 / Overlays)", tabCanvas);
+  QGridLayout *gridSpectra = new QGridLayout(grpSpectra);
+  gridSpectra->setColumnStretch(0, 1);
+  gridSpectra->setColumnStretch(1, 0);
+  gridSpectra->setColumnStretch(2, 1);
+  gridSpectra->setColumnStretch(3, 0);
+
+  const QString specNames[9] = {
+      "Spectrum 1 (Primary / Active):",
+      "Spectrum 2 (Overlay 1):",
+      "Spectrum 3 (Overlay 2):",
+      "Spectrum 4 (Overlay 3):",
+      "Spectrum 5 (Overlay 4):",
+      "Spectrum 6 (Overlay 5):",
+      "Spectrum 7 (Overlay 6):",
+      "Spectrum 8 (Overlay 7):",
+      "Spectrum 9 (Overlay 8):"
+  };
+
+  for (int i = 0; i < 9; ++i) {
+    int row = i % 5;
+    int col = (i < 5) ? 0 : 2;
+    addColorRow(gridSpectra, row, col, specNames[i], &m_curSpectrumColors[i], [this]() { updateCanvasPreview(); });
+  }
+  tabCanvasLayout->addWidget(grpSpectra);
+
+  // Group 3: Marker Colors
+  QGroupBox *grpMarkers = new QGroupBox("Marker Colors", tabCanvas);
+  QGridLayout *gridMarkers = new QGridLayout(grpMarkers);
+  gridMarkers->setColumnStretch(0, 1);
+  gridMarkers->setColumnStretch(1, 0);
+  gridMarkers->setColumnStretch(2, 1);
+  gridMarkers->setColumnStretch(3, 0);
+
+  addColorRow(gridMarkers, 0, 0, "Peak Search Markers:", &m_curPeak, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 1, 0, "Zoom / Spacebar ROI Markers:", &m_curZoom, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 2, 0, "Background Markers:", &m_curBgMarker, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 3, 0, "Integral ROI Markers:", &m_curIntegral, [this]() { updateCanvasPreview(); });
+
+  addColorRow(gridMarkers, 0, 2, "Range Markers:", &m_curRange, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 1, 2, "Gauss Centroid Markers:", &m_curGauss, [this]() { updateCanvasPreview(); });
+  addColorRow(gridMarkers, 2, 2, "Gate Markers:", &m_curGate, [this]() { updateCanvasPreview(); });
+  tabCanvasLayout->addWidget(grpMarkers);
+
+  // Group 4: Live Canvas Preview
+  QGroupBox *grpLiveCanvas = new QGroupBox("Live Canvas Preview (Canvas, Spectra & Markers)", tabCanvas);
+  QVBoxLayout *vboxLiveCanvas = new QVBoxLayout(grpLiveCanvas);
+  m_canvasPreview = new CanvasPreviewWidget(grpLiveCanvas);
+  vboxLiveCanvas->addWidget(m_canvasPreview);
+  tabCanvasLayout->addWidget(grpLiveCanvas);
+
+  scrollTabCanvas->setWidget(tabCanvas);
+  tabs->addTab(scrollTabCanvas, "🎨 4. Canvas, Spectra & Markers");
 
   dialogLayout->addWidget(tabs, 1);
 
@@ -957,7 +1362,7 @@ void AppearanceDialog::setupUI() {
   // Wire Presets
   connect(m_presetCombo, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int idx) {
     if (idx == 1) {
-      // 1. Classic (Copying classic Xtrackn as much as possible)
+      // 1. Classic (Authentic Legacy Xtrackn)
       QFont timesFont("Times New Roman", 11);
       timesFont.setStyleHint(QFont::Times);
       m_curBtnFont = timesFont;
@@ -966,12 +1371,7 @@ void AppearanceDialog::setupUI() {
       m_curGraphFont = timesFont;
       m_curRootFontIdx = 13; // ROOT Font 13: Times
 
-      // Exact legacy Xtrackn colors from glwlib.c and screenshot:
-      // GLW_LABELCOLOR_1 = rgb(119, 144, 173) -> #7790ad
-      // Button text = CYAN -> #00ffff
-      // Readouts = GLW_LABELCOLOR_1 -> #7790ad with BLACK text -> #000000
-      // Frame = GLW_FRAMECOLOR = rgb(112, 128, 144) -> #708090
-      // Dark Frame = GLW_FRAMECOLOR_DARK = rgb(47, 79, 79) -> #2f4f4f
+      m_curUIBg = QColor("#708090");
       m_curBtnBg = QColor("#7790ad");
       m_curBtnFg = QColor("#00ffff");
       m_curPromptBg = QColor("#7790ad");
@@ -982,8 +1382,25 @@ void AppearanceDialog::setupUI() {
       m_curDlgAccent = QColor("#2f4f4f");
 
       m_curGraphBg = QColor("#000000");
-      m_curSpec = QColor("#ffffff");
+      m_curSpectrumColors = {
+          QColor("#ffffff"),
+          QColor("#ff0000"),
+          QColor("#00ff00"),
+          QColor("#00ffff"),
+          QColor("#ff00ff"),
+          QColor("#ffff00"),
+          QColor("#3399ff"),
+          QColor("#ff9900"),
+          QColor("#cc66ff")
+      };
+
       m_curPeak = QColor("#ffff00");
+      m_curZoom = QColor("#00ffff");
+      m_curBgMarker = QColor("#3366ff");
+      m_curIntegral = QColor("#ffff00");
+      m_curRange = QColor("#ffff00");
+      m_curGauss = QColor("#ff69b4");
+      m_curGate = QColor("#ff00ff");
 
       m_spinBtnSize->setValue(11);
       m_spinDlgSize->setValue(11);
@@ -1000,12 +1417,36 @@ void AppearanceDialog::setupUI() {
       m_curGraphFont = modernFont;
       m_curRootFontIdx = 4; // ROOT Font 4: Helvetica / Sans-Serif
 
-      m_curBtnBg = QColor("#1e2638"); m_curBtnFg = QColor("#e2e8f0");
-      m_curPromptBg = QColor("#121824"); m_curPromptFg = QColor("#38bdf8");
+      m_curUIBg = QColor("#0f172a");
+      m_curBtnBg = QColor("#1e2638");
+      m_curBtnFg = QColor("#e2e8f0");
+      m_curPromptBg = QColor("#121824");
+      m_curPromptFg = QColor("#38bdf8");
 
-      m_curDlgBg = QColor("#151b26"); m_curDlgFg = QColor("#e2e8f0"); m_curDlgAccent = QColor("#00d2ff");
+      m_curDlgBg = QColor("#151b26");
+      m_curDlgFg = QColor("#e2e8f0");
+      m_curDlgAccent = QColor("#00d2ff");
 
-      m_curGraphBg = QColor("#0c1017"); m_curSpec = QColor("#00f0ff"); m_curPeak = QColor("#ff2d75");
+      m_curGraphBg = QColor("#0c1017");
+      m_curSpectrumColors = {
+          QColor("#00f0ff"),
+          QColor("#ff3366"),
+          QColor("#10b981"),
+          QColor("#fbbf24"),
+          QColor("#a855f7"),
+          QColor("#38bdf8"),
+          QColor("#f97316"),
+          QColor("#4ade80"),
+          QColor("#e879f9")
+      };
+
+      m_curPeak = QColor("#ff2d75");
+      m_curZoom = QColor("#00f0ff");
+      m_curBgMarker = QColor("#3b82f6");
+      m_curIntegral = QColor("#f59e0b");
+      m_curRange = QColor("#fb923c");
+      m_curGauss = QColor("#f472b6");
+      m_curGate = QColor("#c084fc");
 
       m_spinBtnSize->setValue(10);
       m_spinDlgSize->setValue(10);
@@ -1042,6 +1483,7 @@ void AppearanceDialog::setupUI() {
 
     m_curBtnBg = Design::getButtonBackgroundColor();
     m_curBtnFg = Design::getButtonTextColor();
+    m_curUIBg = Design::getUIBackgroundColor();
     m_curPromptBg = Design::getPromptBackgroundColor();
     m_curPromptFg = Design::getPromptTextColor();
 
@@ -1050,8 +1492,18 @@ void AppearanceDialog::setupUI() {
     m_curDlgAccent = Design::getDialogAccentColor();
 
     m_curGraphBg = Design::getGraphBackgroundColor();
-    m_curSpec = Design::getSpectrumColor();
+    m_curSpectrumColors = Design::getSpectrumColors();
+    while (m_curSpectrumColors.size() < 9) {
+      m_curSpectrumColors.push_back(QColor("#ffffff"));
+    }
+
     m_curPeak = Design::getPeakMarkerColor();
+    m_curZoom = Design::getZoomMarkerColor();
+    m_curBgMarker = Design::getBackgroundMarkerColor();
+    m_curIntegral = Design::getIntegralMarkerColor();
+    m_curRange = Design::getRangeMarkerColor();
+    m_curGauss = Design::getGaussMarkerColor();
+    m_curGate = Design::getGateMarkerColor();
 
     m_spinBtnSize->setValue(m_curBtnFont.pointSize());
     m_spinDlgSize->setValue(m_curDialogFont.pointSize());
@@ -1080,14 +1532,20 @@ void AppearanceDialog::setupUI() {
   updateBtnPreview();
   updateDlgPreview();
   updateGraphPreview();
+  updateCanvasPreview();
 }
 
 void AppearanceDialog::updateBtnPreview() {
-  if (!m_lblBtnFontDesc || !m_sampleBtn || !m_samplePrompt) return;
+  if (!m_lblBtnFontDesc || !m_sampleBtn || !m_samplePrompt || !m_mockToolbarBox) return;
   m_lblBtnFontDesc->setText(QString("%1, %2pt, %3")
                                .arg(m_curBtnFont.family())
                                .arg(m_curBtnFont.pointSize() > 0 ? m_curBtnFont.pointSize() : 11)
                                .arg(m_curBtnFont.bold() ? "Bold" : "Normal"));
+
+  m_mockToolbarBox->setStyleSheet(QString(
+      "QFrame { background-color: %1; border: 1px solid #777777; border-radius: 4px; padding: 6px; }"
+  ).arg(m_curUIBg.name()));
+
   QFont f = m_curBtnFont;
   f.setBold(true);
   m_sampleBtn->setFont(f);
@@ -1123,17 +1581,30 @@ void AppearanceDialog::updateDlgPreview() {
 }
 
 void AppearanceDialog::updateGraphPreview() {
-  if (!m_lblGraphFontDesc || !m_mockCanvasBox || !m_mockPeakLabel) return;
+  if (!m_lblGraphFontDesc || !m_mockGraphBox || !m_mockGraphSampleLabel) return;
   m_lblGraphFontDesc->setText(QString("%1, %2pt")
                                 .arg(m_curGraphFont.family())
                                 .arg(m_curGraphFont.pointSize() > 0 ? m_curGraphFont.pointSize() : 10));
-  m_mockCanvasBox->setStyleSheet(QString(
-      "QFrame { background-color: %1; border: 1px solid %2; border-radius: 4px; }"
-  ).arg(m_curGraphBg.name(), m_curSpec.name()));
-  QFont gf = m_curGraphFont;
-  gf.setBold(true);
-  m_mockPeakLabel->setFont(gf);
-  m_mockPeakLabel->setStyleSheet(QString("color: %1; border: none; font-weight: bold;").arg(m_curPeak.name()));
+  m_mockGraphBox->setStyleSheet(QString(
+      "QFrame { background-color: %1; border: 1px solid #666666; border-radius: 4px; }"
+  ).arg(m_curGraphBg.name()));
+
+  m_mockGraphSampleLabel->setFont(m_curGraphFont);
+  m_mockGraphSampleLabel->setStyleSheet(QString("color: %1; border: none;").arg(
+      m_curSpectrumColors.empty() ? "#ffffff" : m_curSpectrumColors[0].name()));
+}
+
+void AppearanceDialog::updateCanvasPreview() {
+  if (m_canvasPreview) {
+    m_canvasPreview->setPreviewData(m_curGraphBg,
+                                   m_curSpectrumColors,
+                                   m_curPeak,
+                                   m_curZoom,
+                                   m_curIntegral,
+                                   m_curGauss,
+                                   m_curGate);
+  }
+  updateGraphPreview();
 }
 
 void AppearanceDialog::refreshDialogTheme() {
@@ -1189,12 +1660,14 @@ void AppearanceDialog::updateAllSwatches() {
   updateBtnPreview();
   updateDlgPreview();
   updateGraphPreview();
+  updateCanvasPreview();
 }
 
 void AppearanceDialog::commitChanges() {
   Design::setButtonPromptFont(m_curBtnFont);
   Design::setButtonBackgroundColor(m_curBtnBg);
   Design::setButtonTextColor(m_curBtnFg);
+  Design::setUIBackgroundColor(m_curUIBg);
   Design::setPromptBackgroundColor(m_curPromptBg);
   Design::setPromptTextColor(m_curPromptFg);
 
@@ -1205,8 +1678,15 @@ void AppearanceDialog::commitChanges() {
 
   Design::setGraphFont(m_curGraphFont, m_curRootFontIdx);
   Design::setGraphBackgroundColor(m_curGraphBg);
-  Design::setSpectrumColor(m_curSpec);
+  Design::setSpectrumColors(m_curSpectrumColors);
+
   Design::setPeakMarkerColor(m_curPeak);
+  Design::setZoomMarkerColor(m_curZoom);
+  Design::setBackgroundMarkerColor(m_curBgMarker);
+  Design::setIntegralMarkerColor(m_curIntegral);
+  Design::setRangeMarkerColor(m_curRange);
+  Design::setGaussMarkerColor(m_curGauss);
+  Design::setGateMarkerColor(m_curGate);
 
   Design::saveSettings();
   Design::applyUITheme(m_canvasWidget);
@@ -1218,6 +1698,7 @@ void AppearanceDialog::revertChanges() {
   Design::setButtonPromptFont(m_origBtnFont);
   Design::setButtonBackgroundColor(m_origBtnBg);
   Design::setButtonTextColor(m_origBtnFg);
+  Design::setUIBackgroundColor(m_origUIBg);
   Design::setPromptBackgroundColor(m_origPromptBg);
   Design::setPromptTextColor(m_origPromptFg);
 
@@ -1228,8 +1709,15 @@ void AppearanceDialog::revertChanges() {
 
   Design::setGraphFont(m_origGraphFont, m_origRootFontIdx);
   Design::setGraphBackgroundColor(m_origGraphBg);
-  Design::setSpectrumColor(m_origSpec);
+  Design::setSpectrumColors(m_origSpectrumColors);
+
   Design::setPeakMarkerColor(m_origPeak);
+  Design::setZoomMarkerColor(m_origZoom);
+  Design::setBackgroundMarkerColor(m_origBgMarker);
+  Design::setIntegralMarkerColor(m_origIntegral);
+  Design::setRangeMarkerColor(m_origRange);
+  Design::setGaussMarkerColor(m_origGauss);
+  Design::setGateMarkerColor(m_origGate);
 
   Design::saveSettings();
   Design::applyUITheme(m_canvasWidget);

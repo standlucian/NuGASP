@@ -77,12 +77,33 @@ namespace Design {
     int getRootFontFamilyIndex();
     void setGraphFont(const QFont &qtFont, int rootFontFamilyIndex = 4);
 
+    QColor getUIBackgroundColor();
+    void setUIBackgroundColor(const QColor &color);
+
     QColor getGraphBackgroundColor();
     void setGraphBackgroundColor(const QColor &color);
+
+    std::vector<QColor> getSpectrumColors();
     QColor getSpectrumColor();
+    QColor getSpectrumColor(int index);
     void setSpectrumColor(const QColor &color);
+    void setSpectrumColor(int index, const QColor &color);
+    void setSpectrumColors(const std::vector<QColor> &colors);
+
     QColor getPeakMarkerColor();
     void setPeakMarkerColor(const QColor &color);
+    QColor getZoomMarkerColor();
+    void setZoomMarkerColor(const QColor &color);
+    QColor getBackgroundMarkerColor();
+    void setBackgroundMarkerColor(const QColor &color);
+    QColor getIntegralMarkerColor();
+    void setIntegralMarkerColor(const QColor &color);
+    QColor getRangeMarkerColor();
+    void setRangeMarkerColor(const QColor &color);
+    QColor getGaussMarkerColor();
+    void setGaussMarkerColor(const QColor &color);
+    QColor getGateMarkerColor();
+    void setGateMarkerColor(const QColor &color);
 
     /**
      * @brief Applies graph typography to CERN ROOT gStyle.

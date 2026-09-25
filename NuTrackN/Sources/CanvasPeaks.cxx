@@ -10,6 +10,7 @@
 #include <TAxis.h>
 #include <TVirtualPad.h>
 #include <TList.h>
+#include <TColor.h>
 
 #include <QString>
 #include <iostream>
@@ -264,8 +265,8 @@ void QMainCanvas::renderPeakSearchLabels(int z, int g)
     }
     const double yRange = yMax - yMin;
 
-    // High-visibility golden yellow matching legacy GASP color(YELLOW)
-    Color_t peakColor = kYellow + 1;
+    // Peak marker color configured via Design system
+    Color_t peakColor = TColor::GetColor(Design::getPeakMarkerColor().name().toUtf8().constData());
 
     for (size_t k = 0; k < peakSearchCenters[z][g].size(); ++k) {
         const double center = peakSearchCenters[z][g][k];
