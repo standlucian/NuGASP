@@ -112,6 +112,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
         QPushButton *btn = new QPushButton(text, parent);
         btn->setFocusPolicy(Qt::NoFocus);
         btn->setEnabled(enabled);
+        btn->setFont(Design::getButtonFont());
         btn->setStyleSheet(
             "QPushButton {"
             "  border-top: 2px solid #ffffff;"
@@ -120,8 +121,6 @@ QMainCanvas::QMainCanvas(QWidget *parent)
             "  border-bottom: 2px solid #606060;"
             "  background-color: #e0e0e0;"
             "  color: #000000;"
-            "  font-weight: bold;"
-            "  font-size: 16px;"
             "  padding: 3px 6px;"
             "}"
             "QPushButton:pressed {"
@@ -147,13 +146,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
         QLabel *lbl = new QLabel(text, parent);
         lbl->setAlignment(align | Qt::AlignVCenter);
         lbl->setFixedHeight(33);
+        lbl->setFont(Design::getButtonFont());
         lbl->setStyleSheet(
             "background-color: #ffffff;"
             "color: #000000;"
             "border: 1px solid #999999;"
             "padding: 2px 6px;"
-            "font-size: 16px;"
-            "font-weight: normal;"
         );
         return lbl;
     };
@@ -416,10 +414,11 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     outBox->addWidget(iconButton);
 
     QPushButton *btnMacro = new QPushButton(tr("MAC"), topContainer);
+    btnMacro->setFont(Design::getButtonFont());
     btnMacro->setToolTip(tr("Macros & Command Strings (Block 4) [Shortcut: D+M]"));
     btnMacro->setFixedSize(38, 33);
     btnMacro->setStyleSheet(
-        "QPushButton { border: 1px solid #007acc; background: #252526; color: #00ffff; font-weight: bold; border-radius: 3px; font-size: 11px; }"
+        "QPushButton { border: 1px solid #007acc; background: #252526; color: #00ffff; border-radius: 3px; }"
         "QPushButton:hover { background: #007acc; color: #ffffff; }"
         "QPushButton:pressed { background: #0e639c; }"
     );
@@ -534,6 +533,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     fRootTimer->start(20);
 
     // 7. Initialize default 10240-channel TracknHistogram for the primary spectrum cell
+    Design::applyGraphTypography();
     gStyle->SetOptTitle(0);
     gStyle->SetGridColor(kGray + 2);
     gStyle->SetGridStyle(2); // Dashed lines

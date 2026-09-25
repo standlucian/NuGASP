@@ -1,4 +1,5 @@
 #include "SpectrumExportDialog.h"
+#include "Design.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -206,20 +207,10 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
 {
     setWindowTitle(tr("Export Spectrum (W)"));
     setMinimumWidth(560);
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #d4d4d4; font-family: sans-serif; font-size: 12px; }"
-        "QLabel { color: #cccccc; }"
-        "QLineEdit { background-color: #2d2d2d; color: #ffffff; border: 1px solid #3c3c3c; border-radius: 3px; padding: 4px; }"
-        "QLineEdit:focus { border: 1px solid #3b82f6; }"
-        "QComboBox { background-color: #2d2d2d; color: #ffffff; border: 1px solid #3c3c3c; border-radius: 3px; padding: 4px 8px; }"
-        "QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 20px; border-left: 1px solid #3c3c3c; }"
-        "QComboBox QAbstractItemView { background-color: #252526; color: #ffffff; selection-background-color: #3b82f6; selection-color: #ffffff; border: 1px solid #454545; }"
-        "QSpinBox { background-color: #2d2d2d; color: #ffffff; border: 1px solid #3c3c3c; border-radius: 3px; padding: 4px; }"
-        "QPushButton { background-color: #333333; color: #ffffff; border: 1px solid #444444; border-radius: 4px; padding: 6px 14px; font-weight: bold; }"
-        "QPushButton:hover { background-color: #444444; border-color: #555555; }"
-        "QPushButton:pressed { background-color: #222222; }"
-        "QPushButton#btnExport { background-color: #15803d; border-color: #16a34a; }"
-        "QPushButton#btnExport:hover { background-color: #16a34a; border-color: #22c55e; }"
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet() +
+        "\nQPushButton#btnExport { background-color: #15803d; border-color: #16a34a; }"
+        "\nQPushButton#btnExport:hover { background-color: #16a34a; border-color: #22c55e; }"
     );
 
     auto *mainLayout = new QVBoxLayout(this);

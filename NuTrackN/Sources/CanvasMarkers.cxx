@@ -98,7 +98,7 @@ void QMainCanvas::areaFunction()
 
         TLatex *lbl = new TLatex(peak.centroid, labelY, labelBuf);
         lbl->SetName(Form("IntPeakLabel_%d", peak.index));
-        lbl->SetTextFont(43);
+        lbl->SetTextFont(Design::getRootGraphFont(3));
         lbl->SetTextSize(18);
         lbl->SetTextColor(kCyan);
         lbl->SetTextAlign(21);
@@ -176,7 +176,7 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog)
 
         TLatex *lbl = new TLatex(peak.centroid, labelY, labelBuf);
         lbl->SetName(Form("IntPeakLabel_%d", peak.index));
-        lbl->SetTextFont(43);
+        lbl->SetTextFont(Design::getRootGraphFont(3));
         lbl->SetTextSize(18);
         lbl->SetTextColor(kCyan);
         lbl->SetTextAlign(21);

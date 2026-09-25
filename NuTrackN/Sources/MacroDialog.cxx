@@ -12,6 +12,7 @@
 #include <QGroupBox>
 #include <QTextBrowser>
 #include <QFileDialog>
+#include "Design.h"
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
@@ -22,20 +23,8 @@ MacroDialog::MacroDialog(QMainCanvas *mainCanvas, QWidget *parent)
 {
     setWindowTitle(tr("Automatic Command Strings & Macros (Block 4)"));
     resize(740, 680);
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-        "QLabel { color: #cccccc; font-size: 12px; }"
-        "QLineEdit, QSpinBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 3px 6px; font-size: 12px; }"
-        "QLineEdit:focus, QSpinBox:focus { border: 1px solid #007acc; }"
-        "QTableWidget { background-color: #252526; color: #ffffff; gridline-color: #3e3e42; border: 1px solid #3e3e42; border-radius: 4px; font-size: 12px; }"
-        "QHeaderView::section { background-color: #333337; color: #00ffff; font-weight: bold; border: 1px solid #3e3e42; padding: 4px; }"
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 5px 12px; font-weight: bold; font-size: 12px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-        "QPushButton:pressed { background-color: #007acc; }"
-        "QTextBrowser { background-color: #252526; color: #d4d4d4; border: 1px solid #3e3e42; border-radius: 4px; font-size: 11px; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     setupUI();
     loadMacros();

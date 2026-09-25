@@ -14,18 +14,9 @@ int main(int argc, char **argv) {
   app.setApplicationName("NuTrackN");
   app.setApplicationDisplayName("NuTrackN - Gamma Spectroscopy Analysis");
   app.setOrganizationName("NuGASP");
-  // Scale global application default font by 50%
-  QFont appFont = app.font();
-  if (appFont.pointSizeF() > 0) {
-    appFont.setPointSizeF(appFont.pointSizeF() * 1.5);
-  } else if (appFont.pointSize() > 0) {
-    appFont.setPointSize(static_cast<int>(std::round(appFont.pointSize() * 1.5)));
-  } else if (appFont.pixelSize() > 0) {
-    appFont.setPixelSize(static_cast<int>(std::round(appFont.pixelSize() * 1.5)));
-  } else {
-    appFont.setPointSize(14);
-  }
-  app.setFont(appFont);
+  // Initialize standardized typography from Design module (Category 2: Dialogs & App default)
+  Design::initializeTypography();
+  app.setFont(Design::getDialogFont());
 
   // Instantiate main analysis canvas widget
   QMainCanvas mainWindow(nullptr);

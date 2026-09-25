@@ -2,6 +2,7 @@
 #include "canvas.h"
 
 #include <QFontDatabase>
+#include <QSettings>
 #include <QVBoxLayout>
 #include <QSplitter>
 #include <QDialog>
@@ -12,6 +13,169 @@
 
 #include <TCanvas.h>
 #include <TColor.h>
+#include <TStyle.h>
+
+//==============================================================================
+// Design Typography Implementation
+//==============================================================================
+namespace Design {
+
+static QFont s_buttonPromptFont;
+static QFont s_dialogFont;
+static QFont s_graphFont;
+static int s_rootFontFamilyIndex = 4; // 4 = Helvetica scalable
+static bool s_typographyInitialized = false;
+
+void initializeTypography() {
+  if (s_typographyInitialized) return;
+
+  // Category 1: Buttons and Prompt (Monospace / tabular clean font)
+  QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+  mono.setPointSize(11);
+  s_buttonPromptFont = mono;
+
+  // Category 2: Dialogs (Clean modern sans-serif UI font)
+  QFont dialogFont("DejaVu Sans", 11, QFont::Normal);
+  dialogFont.setStyleHint(QFont::SansSerif);
+  s_dialogFont = dialogFont;
+
+  // Category 3: Graph itself (ROOT scalable font 42/43 + matching Qt font)
+  QFont graphFont("DejaVu Sans", 10, QFont::Normal);
+  graphFont.setStyleHint(QFont::SansSerif);
+  s_graphFont = graphFont;
+  s_rootFontFamilyIndex = 4; // Helvetica
+
+  // Load any previously persisted user customizations from QSettings
+  loadTypographySettings();
+
+  s_typographyInitialized = true;
+}
+
+void saveTypographySettings() {
+  QSettings settings("NuGASP", "NuTrackN");
+  settings.setValue("Typography/ButtonPromptFont", s_buttonPromptFont);
+  settings.setValue("Typography/DialogFont", s_dialogFont);
+  settings.setValue("Typography/GraphFont", s_graphFont);
+  settings.setValue("Typography/RootFontFamilyIndex", s_rootFontFamilyIndex);
+}
+
+void loadTypographySettings() {
+  QSettings settings("NuGASP", "NuTrackN");
+  if (settings.contains("Typography/ButtonPromptFont")) {
+    s_buttonPromptFont = settings.value("Typography/ButtonPromptFont").value<QFont>();
+  }
+  if (settings.contains("Typography/DialogFont")) {
+    s_dialogFont = settings.value("Typography/DialogFont").value<QFont>();
+  }
+  if (settings.contains("Typography/GraphFont")) {
+    s_graphFont = settings.value("Typography/GraphFont").value<QFont>();
+  }
+  if (settings.contains("Typography/RootFontFamilyIndex")) {
+    s_rootFontFamilyIndex = settings.value("Typography/RootFontFamilyIndex", 4).toInt();
+  }
+}
+
+QFont getButtonFont() {
+  if (!s_typographyInitialized) initializeTypography();
+  QFont btnFont = s_buttonPromptFont;
+  btnFont.setBold(true);
+  return btnFont;
+}
+
+QFont getPromptFont() {
+  if (!s_typographyInitialized) initializeTypography();
+  QFont pFont = s_buttonPromptFont;
+  int pt = pFont.pointSize() > 0 ? pFont.pointSize() : 11;
+  pFont.setPointSize(pt + 2); // 2pt larger for terminal readout readability
+  pFont.setBold(false);
+  return pFont;
+}
+
+QFont getButtonPromptFont() {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_buttonPromptFont;
+}
+
+void setButtonPromptFont(const QFont &font) {
+  s_buttonPromptFont = font;
+  saveTypographySettings();
+  if (CommandPrompt::getInstance()) {
+    CommandPrompt::getInstance()->setFont(getPromptFont());
+  }
+}
+
+QFont getDialogFont() {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_dialogFont;
+}
+
+void setDialogFont(const QFont &font) {
+  s_dialogFont = font;
+  saveTypographySettings();
+}
+
+QString getDialogStyleSheet() {
+  if (!s_typographyInitialized) initializeTypography();
+  const QString family = s_dialogFont.family();
+  const int pt = s_dialogFont.pointSize() > 0 ? s_dialogFont.pointSize() : 11;
+  return QString(
+      "QDialog { background-color: #1e1e1e; color: #ffffff; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }\n"
+      "QLabel { color: #cccccc; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 6px; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus { border: 1px solid #007acc; }\n"
+      "QCheckBox, QRadioButton { color: #ffffff; font-family: \"%1\"; font-size: %2pt; spacing: 6px; }\n"
+      "QTableWidget { background-color: #252526; color: #ffffff; gridline-color: #3e3e42; border: 1px solid #3e3e42; border-radius: 4px; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QHeaderView::section { background-color: #333337; color: #00ffff; font-weight: bold; border: 1px solid #3e3e42; padding: 4px; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QPushButton:hover { background-color: #4e4e52; }\n"
+      "QPushButton:pressed { background-color: #007acc; }\n"
+      "QPushButton:disabled { color: #888888; background-color: #2d2d30; border: 1px solid #3e3e42; }\n"
+      "QTextBrowser, QTextEdit, QPlainTextEdit { background-color: #252526; color: #d4d4d4; border: 1px solid #3e3e42; border-radius: 4px; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QTabWidget::pane { border: 1px solid #3e3e42; background-color: #1e1e1e; }\n"
+      "QTabBar::tab { background-color: #2d2d30; color: #cccccc; padding: 6px 14px; border: 1px solid #3e3e42; font-family: \"%1\"; font-size: %2pt; }\n"
+      "QTabBar::tab:selected { background-color: #1e1e1e; color: #00ffff; border-bottom: 2px solid #007acc; }\n"
+  ).arg(family).arg(pt);
+}
+
+QFont getGraphFont() {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_graphFont;
+}
+
+int getRootGraphFont(int precision) {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_rootFontFamilyIndex * 10 + precision;
+}
+
+int getRootFontFamilyIndex() {
+  if (!s_typographyInitialized) initializeTypography();
+  return s_rootFontFamilyIndex;
+}
+
+void setGraphFont(const QFont &qtFont, int rootFontFamilyIndex) {
+  s_graphFont = qtFont;
+  s_rootFontFamilyIndex = rootFontFamilyIndex;
+  saveTypographySettings();
+  applyGraphTypography();
+}
+
+void applyGraphTypography() {
+  if (gStyle) {
+    int rf = getRootGraphFont(2);
+    gStyle->SetTextFont(rf);
+    gStyle->SetLabelFont(rf, "x");
+    gStyle->SetLabelFont(rf, "y");
+    gStyle->SetLabelFont(rf, "z");
+    gStyle->SetTitleFont(rf, "x");
+    gStyle->SetTitleFont(rf, "y");
+    gStyle->SetTitleFont(rf, "z");
+    gStyle->SetStatFont(rf);
+  }
+}
+
+} // namespace Design
 
 // Static member definitions for the CommandPrompt singleton
 CommandPrompt *CommandPrompt::instance = nullptr;
@@ -28,12 +192,8 @@ CommandPrompt::CommandPrompt(QWidget *parent) : QPlainTextEdit(parent) {
   setPlaceholderText("NuTrackN Output Console...");
   setReadOnly(true);
 
-  // Typography: Cross-platform monospace font ensuring ASCII tables and statistical
-  // uncertainties (e.g. centroid, FWHM, Poisson errors) align column-by-column
-  // across different operating systems (Linux, Windows, macOS).
-  QFont monoFont = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-  monoFont.setPointSize(14);
-  setFont(monoFont);
+  // Typography: Category 1 (Prompt Font)
+  setFont(Design::getPromptFont());
 
   // Buffer Management: Limit maximum line history to 10,000 blocks to prevent
   // memory exhaustion during heavy analysis or multi-peak scanning loops.
@@ -141,14 +301,8 @@ void openColorSelectionDialog(QWidget *parent, QMainCanvas *canvasWidget) {
   // Construct dialog modal
   QDialog dialog(parent);
   dialog.setWindowTitle("Color & Theme Settings");
-  dialog.setStyleSheet(
-      "QDialog { background-color: #2b2b2b; color: #ffffff; font-size: 16px; }"
-      "QLabel { color: #ffffff; font-size: 16px; }"
-      "QComboBox { background-color: #ffffff; color: #000000; font-size: 16px; padding: 4px 8px; border-radius: 3px; }"
-      "QPushButton { background-color: #4a4a4a; color: #ffffff; border: 1px solid #707070; "
-      "border-radius: 4px; padding: 6px 20px; font-weight: bold; font-size: 16px; min-height: 28px; }"
-      "QPushButton:hover { background-color: #5a5a5a; }"
-  );
+  dialog.setFont(Design::getDialogFont());
+  dialog.setStyleSheet(Design::getDialogStyleSheet());
   QFormLayout form(&dialog);
 
   // Theme dropdown options

@@ -2,6 +2,7 @@
 #include "canvas.h"
 #include "Integral.h"
 #include "tracknhistogram.h"
+#include "Design.h"
 
 #include <QGridLayout>
 #include <QSpinBox>
@@ -16,14 +17,8 @@ IntegralDialog::IntegralDialog(QMainCanvas *canvas, QWidget *parent)
     setWindowTitle("Integration Parameters");
     setAttribute(Qt::WA_ShowWithoutActivating); // Don't steal focus
     
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-        "QLabel { color: #e0e0e0; font-size: 13px; }"
-        "QSpinBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 8px; font-size: 13px; }"
-        "QSpinBox:focus { border: 1px solid #007acc; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 }
 
 IntegralDialog::~IntegralDialog()

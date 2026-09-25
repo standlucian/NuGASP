@@ -476,7 +476,7 @@ void QMainCanvas::renderPeakLabels(int z, int g)
 
         TLatex *lbl = new TLatex(center, height, buffer);
         lbl->SetName("PeakLabel");
-        lbl->SetTextFont(43); // Font 4 (Helvetica), Precision 3 (exact screen pixels)
+        lbl->SetTextFont(Design::getRootGraphFont(3)); // Font from Design, Precision 3 (exact screen pixels)
         lbl->SetTextSize(20); // Fixed 20-pixel font size (increased by ~50% from 13px)
         lbl->SetTextAlign(21); // Centered horizontally at peak center, bottom-aligned
         lbl->Draw();

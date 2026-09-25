@@ -325,7 +325,7 @@ void QMainCanvas::renderPeakSearchLabels(int z, int g)
 
         TLatex *lbl = new TLatex(center, yText, buffer);
         lbl->SetName("PeakSearchLabel");
-        lbl->SetTextFont(43); // Fixed screen pixel font (Helvetica)
+        lbl->SetTextFont(Design::getRootGraphFont(3)); // Fixed screen pixel font from Design
         lbl->SetTextSize(14); // 14px crisp screen text
         int align = 21; // Centered horizontally at peak center, bottom-aligned
         if (xRange > 0.0) {

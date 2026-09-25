@@ -1,5 +1,6 @@
 #include "canvas.h"
 #include "tracknhistogram.h"
+#include "Design.h"
 
 #include <QPainter>
 #include <QPen>
@@ -105,13 +106,17 @@ void QZoomHUD::paintEvent(QPaintEvent *)
 
     // 2. Top Header / Target readout
     painter.setPen(QColor(255, 255, 255, 220));
-    QFont headerFont("sans-serif", 10, QFont::Bold);
+    QFont headerFont = Design::getGraphFont();
+    headerFont.setPointSize(10);
+    headerFont.setBold(true);
     painter.setFont(headerFont);
     painter.drawText(QRectF(10, 8, 140, 20), Qt::AlignLeft | Qt::AlignVCenter, "🎯 AutoFit Target");
 
     // Fit status badge in top right of header
     if (m_hasFit && !m_fitInfo.isEmpty()) {
-        QFont badgeFont("sans-serif", 8, QFont::Bold);
+        QFont badgeFont = Design::getGraphFont();
+        badgeFont.setPointSize(8);
+        badgeFont.setBold(true);
         painter.setFont(badgeFont);
         QFontMetrics fm(badgeFont);
         int badgeTextW = fm.horizontalAdvance(m_fitInfo);
@@ -126,7 +131,8 @@ void QZoomHUD::paintEvent(QPaintEvent *)
         painter.drawText(badgeRect, Qt::AlignCenter, m_fitInfo);
     }
 
-    QFont readoutFont("sans-serif", 9, QFont::Normal);
+    QFont readoutFont = Design::getGraphFont();
+    readoutFont.setPointSize(9);
     painter.setFont(readoutFont);
     QString readout;
     if (m_isCalibrated && m_targetEnergy > 0.0) {
@@ -268,7 +274,8 @@ void QZoomHUD::paintEvent(QPaintEvent *)
     }
 
     // 8. X-axis channel bounds labels
-    QFont axisFont("sans-serif", 8, QFont::Normal);
+    QFont axisFont = Design::getGraphFont();
+    axisFont.setPointSize(8);
     painter.setFont(axisFont);
     painter.setPen(QColor(180, 180, 180));
     painter.drawText(QRectF(plotLeft, plotBottom + 2, 60, 18), Qt::AlignLeft | Qt::AlignVCenter, QString::number(m_startBin));

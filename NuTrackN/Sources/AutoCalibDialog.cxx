@@ -21,6 +21,7 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
+#include "Design.h"
 #include <algorithm>
 #include <cmath>
 
@@ -29,20 +30,8 @@ AutoCalibDialog::AutoCalibDialog(QMainCanvas *mainCanvas, QWidget *parent)
 {
     setWindowTitle(tr("Automatic Energy Calibration (AK)"));
     resize(680, 620);
-    setStyleSheet(
-        "QDialog { background-color: #1e1e1e; color: #ffffff; }"
-        "QGroupBox { border: 1px solid #3e3e42; border-radius: 4px; margin-top: 10px; font-weight: bold; color: #00ffff; font-size: 13px; }"
-        "QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; }"
-        "QLabel { color: #cccccc; font-size: 12px; }"
-        "QComboBox, QLineEdit, QDoubleSpinBox { background-color: #2b2b2b; color: #ffffff; border: 1px solid #555555; border-radius: 3px; padding: 4px 6px; font-size: 12px; }"
-        "QComboBox:focus, QLineEdit:focus, QDoubleSpinBox:focus { border: 1px solid #007acc; }"
-        "QRadioButton { color: #ffffff; font-size: 12px; spacing: 6px; }"
-        "QTableWidget { background-color: #252526; color: #ffffff; gridline-color: #3e3e42; font-size: 12px; }"
-        "QHeaderView::section { background-color: #2d2d30; color: #cccccc; padding: 4px; border: 1px solid #3e3e42; font-weight: bold; }"
-        "QPushButton { background-color: #3e3e42; color: #ffffff; border: 1px solid #555555; border-radius: 4px; padding: 6px 14px; font-weight: bold; font-size: 12px; }"
-        "QPushButton:hover { background-color: #4e4e52; }"
-        "QPushButton:pressed { background-color: #007acc; }"
-    );
+    setFont(Design::getDialogFont());
+    setStyleSheet(Design::getDialogStyleSheet());
 
     initIsotopes();
     setupUI();
