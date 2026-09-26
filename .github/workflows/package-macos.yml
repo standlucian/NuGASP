@@ -25,15 +25,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-          cache: 'pip'
-
-      - name: Install Python Pillow for icon generation
-        run: pip install Pillow
-
       - name: Install Homebrew dependencies (Qt5 & CERN ROOT)
         run: |
           brew update
