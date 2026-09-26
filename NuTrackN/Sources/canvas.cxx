@@ -380,8 +380,9 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     outBox->addWidget(labelOutputFile, 1);
 
     QPushButton *iconButton = new QPushButton(topContainer);
-    iconButton->setFocusPolicy(Qt::NoFocus);
-    iconButton->setIcon(QIcon("icon.png"));
+    QIcon themeBtnIcon(":/icon.png");
+    if (themeBtnIcon.isNull()) themeBtnIcon = QIcon("icon.png");
+    iconButton->setIcon(themeBtnIcon);
     iconButton->setIconSize(QSize(22, 22));
     iconButton->setToolTip(tr("Color & Theme Settings"));
     iconButton->setFixedSize(33, 33);

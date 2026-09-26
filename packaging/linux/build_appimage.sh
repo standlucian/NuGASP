@@ -93,13 +93,21 @@ cp -a "${NUTRACKN_DIR}/${APP_EXE}" "${APPDIR}/usr/bin/${APP_EXE}"
 cp -a "${SCRIPT_DIR}/nutrackn.desktop" "${APPDIR}/nutrackn.desktop"
 cp -a "${SCRIPT_DIR}/nutrackn.desktop" "${APPDIR}/usr/share/applications/${APP_EXE}.desktop"
 
-if [ -f "${NUTRACKN_DIR}/c2picon.png" ]; then
-    cp -a "${NUTRACKN_DIR}/c2picon.png" "${APPDIR}/nutrackn.png"
-    cp -a "${NUTRACKN_DIR}/c2picon.png" "${APPDIR}/usr/share/icons/hicolor/512x512/apps/${APP_EXE}.png"
+# Copy multi-resolution icons
+if [ -f "${NUTRACKN_DIR}/nutrackn.png" ]; then
+    cp -a "${NUTRACKN_DIR}/nutrackn.png" "${APPDIR}/nutrackn.png"
+    cp -a "${NUTRACKN_DIR}/nutrackn.png" "${APPDIR}/usr/share/icons/hicolor/512x512/apps/${APP_EXE}.png"
 elif [ -f "${NUTRACKN_DIR}/icon.png" ]; then
     cp -a "${NUTRACKN_DIR}/icon.png" "${APPDIR}/nutrackn.png"
     cp -a "${NUTRACKN_DIR}/icon.png" "${APPDIR}/usr/share/icons/hicolor/512x512/apps/${APP_EXE}.png"
 fi
+
+for s in 16 32 48 64 128 256; do
+    if [ -f "${NUTRACKN_DIR}/nutrackn_${s}.png" ]; then
+        mkdir -p "${APPDIR}/usr/share/icons/hicolor/${s}x${s}/apps"
+        cp -a "${NUTRACKN_DIR}/nutrackn_${s}.png" "${APPDIR}/usr/share/icons/hicolor/${s}x${s}/apps/${APP_EXE}.png"
+    fi
+done
 
 # Copy ROOT runtime data (etc/, fonts/)
 if [ -d "${ROOTSYS}/etc" ]; then
@@ -221,11 +229,17 @@ install_shortcut() {
         echo "    ✓ Created symlink: ${target_bin} -> ${SELF}"
     fi
 
-    # Install icon
+    # Install multi-resolution icons
     if [ -f "${APPDIR}/nutrackn.png" ]; then
         cp -a "${APPDIR}/nutrackn.png" "${icons_dir}/nutrackn.png"
-        echo "    ✓ Installed application icon"
     fi
+    for s in 16 32 48 64 128 256; do
+        if [ -d "${APPDIR}/usr/share/icons/hicolor/${s}x${s}/apps" ]; then
+            mkdir -p "${HOME}/.local/share/icons/hicolor/${s}x${s}/apps"
+            cp -a "${APPDIR}/usr/share/icons/hicolor/${s}x${s}/apps/"* "${HOME}/.local/share/icons/hicolor/${s}x${s}/apps/" 2>/dev/null || true
+        fi
+    done
+    echo "    ✓ Installed application icons"
 
     # Install desktop entry
     cat << DESKTOPEOF > "${apps_dir}/nutrackn.desktop"

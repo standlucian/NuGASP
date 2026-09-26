@@ -63,7 +63,11 @@ set(HEADERS
     Include/MacroDialog.h
 )
 
-add_executable(nutrackn ${SOURCES} ${HEADERS})
+set(RESOURCES
+    nutrackn.qrc
+)
+
+add_executable(nutrackn ${SOURCES} ${HEADERS} ${RESOURCES})
 
 target_link_libraries(nutrackn
     Qt5::Core

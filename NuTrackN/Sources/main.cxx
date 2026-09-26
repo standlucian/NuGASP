@@ -21,7 +21,12 @@ int main(int argc, char **argv) {
   // Instantiate main analysis canvas widget
   QMainCanvas mainWindow(nullptr);
   mainWindow.setWindowTitle("NuTrackN - Gamma Spectroscopy Analysis");
-  mainWindow.setWindowIcon(QIcon("icon.png"));
+  // Set application and window icon
+  QIcon appIcon(":/nutrackn.png");
+  if (appIcon.isNull()) appIcon = QIcon("nutrackn.png");
+  if (appIcon.isNull()) appIcon = QIcon("icon.png");
+  app.setWindowIcon(appIcon);
+  mainWindow.setWindowIcon(appIcon);
 
   // Set initial window geometry to comfortably accommodate 50% larger UI elements
   mainWindow.setGeometry(80, 80, 1200, 800);

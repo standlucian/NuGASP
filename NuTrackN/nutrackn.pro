@@ -81,4 +81,5 @@ SOURCES += \
     Sources/AutoCalibDialog.cxx \
     Sources/MacroDialog.cxx
 
-
+RESOURCES += \
+    nutrackn.qrc
