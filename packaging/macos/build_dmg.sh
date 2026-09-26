@@ -79,9 +79,15 @@ echo "    ✓ Found CERN ROOT at: ${ROOTSYS}"
 # ------------------------------------------------------------------------------
 echo "==> [2/6] Compiling NuTrackN binary (${ARCH})..."
 cd "${NUTRACKN_DIR}"
-ROOT_CFLAGS="$(root-config --cflags 2>/dev/null || echo '-std=c++17')"
-"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17" "CONFIG-=c++11" "CONFIG-=c++14" "QMAKE_CXXFLAGS+=-std=c++17 ${ROOT_CFLAGS}" "QMAKE_CXXFLAGS_CXX11=-std=c++17"
-make clean && make -j"$(sysctl -n hw.ncpu || echo 4)" CXXFLAGS+="-std=c++17"
+ROOT_CFLAGS="$(root-config --cflags 2>/dev/null || echo '-std=c++20')"
+"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17" "CONFIG+=c++20" "QMAKE_CXXFLAGS+=-std=c++20 ${ROOT_CFLAGS}"
+
+# Enforce -std=c++20 across the generated Makefile, replacing any old C++11/C++14/C++98 defaults injected by Qt mkspecs
+if [ -f Makefile ]; then
+    sed -i.bak -E 's/-std=(c\+\+11|gnu\+\+11|c\+\+14|gnu\+\+14|c\+\+1y|gnu\+\+1y|gnu\+\+98|c\+\+98)/-std=c++20/g' Makefile
+fi
+
+make clean && make -j"$(sysctl -n hw.ncpu || echo 4)"
 
 if [ ! -f "${NUTRACKN_DIR}/nutrackn" ]; then
     echo "[-] Error: Compilation failed. Binary not found." >&2
