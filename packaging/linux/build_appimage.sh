@@ -170,9 +170,9 @@ if [ -d "${ROOTSYS}/lib" ]; then
     done
 fi
 
-# Create AppRun launcher
+# Create AppRun launcher with smart 1-click terminal & desktop integration
 cat << 'EOF' > "${APPDIR}/AppRun"
-#!/bin/bash
+#!/usr/bin/env bash
 set -e
 
 # Resolve AppDir absolute path
@@ -193,6 +193,132 @@ if [ -d "${APPDIR}/usr/etc/root" ]; then
 fi
 if [ -d "${APPDIR}/usr/fonts" ]; then
     export ROOT_TTFONTS="${APPDIR}/usr/fonts"
+fi
+
+# ------------------------------------------------------------------------------
+# Smart Desktop & CLI Shortcut Integration Helper
+# ------------------------------------------------------------------------------
+install_shortcut() {
+    local target_bin="${HOME}/.local/bin/nutrackn"
+    local apps_dir="${HOME}/.local/share/applications"
+    local icons_dir="${HOME}/.local/share/icons/hicolor/512x512/apps"
+    local source_appimage="${APPIMAGE:-$SELF}"
+
+    mkdir -p "${HOME}/.local/bin"
+    mkdir -p "${apps_dir}"
+    mkdir -p "${icons_dir}"
+
+    echo "==> Integrating NuTrackN with your system..."
+
+    # Install executable binary / copy AppImage
+    if [ -n "${APPIMAGE}" ] && [ -f "${APPIMAGE}" ]; then
+        cp -a "${APPIMAGE}" "${target_bin}"
+        chmod +x "${target_bin}"
+        echo "    ✓ Installed 'nutrackn' command to: ${target_bin}"
+    else
+        # If running from extracted AppDir
+        ln -sf "${SELF}" "${target_bin}"
+        echo "    ✓ Created symlink: ${target_bin} -> ${SELF}"
+    fi
+
+    # Install icon
+    if [ -f "${APPDIR}/nutrackn.png" ]; then
+        cp -a "${APPDIR}/nutrackn.png" "${icons_dir}/nutrackn.png"
+        echo "    ✓ Installed application icon"
+    fi
+
+    # Install desktop entry
+    cat << DESKTOPEOF > "${apps_dir}/nutrackn.desktop"
+[Desktop Entry]
+Type=Application
+Name=NuTrackN
+GenericName=Nuclear Spectroscopy Analysis
+Comment=Interactive Nuclear Spectroscopy & Gamma-Ray Analysis
+Exec=${target_bin} %F
+Icon=nutrackn
+Terminal=false
+Categories=Science;Physics;DataVisualization;Qt;
+MimeType=application/x-root;
+StartupNotify=true
+StartupWMClass=nutrackn
+DESKTOPEOF
+    chmod +x "${apps_dir}/nutrackn.desktop"
+    echo "    ✓ Created Desktop menu shortcut: ${apps_dir}/nutrackn.desktop"
+
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "${apps_dir}" 2>/dev/null || true
+    fi
+
+    # Ensure ~/.local/bin is configured in shell profiles
+    local path_configured=false
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) path_configured=true ;;
+    esac
+
+    if [ "$path_configured" = false ]; then
+        echo "    ℹ Adding ~/.local/bin to PATH in shell startup files (~/.bashrc, ~/.zshrc)"
+        if [ -f "${HOME}/.bashrc" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.bashrc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.bashrc"
+        fi
+        if [ -f "${HOME}/.zshrc" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.zshrc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.zshrc"
+        fi
+    fi
+
+    echo ""
+    echo "======================================================================"
+    echo "    🎉 1-Click Terminal Shortcut Added Successfully!                  "
+    echo "======================================================================"
+    echo "    You can now launch NuTrackN from any terminal simply by typing:   "
+    echo ""
+    echo "        nutrackn"
+    echo ""
+    echo "    (or click 'NuTrackN' in your system Applications Menu)           "
+    echo "======================================================================"
+    echo ""
+}
+
+uninstall_shortcut() {
+    echo "==> Removing NuTrackN shortcuts from system..."
+    rm -f "${HOME}/.local/bin/nutrackn"
+    rm -f "${HOME}/.local/share/applications/nutrackn.desktop"
+    rm -f "${HOME}/.local/share/icons/hicolor/512x512/apps/nutrackn.png"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "${HOME}/.local/share/applications" 2>/dev/null || true
+    fi
+    echo "    ✓ NuTrackN terminal command and desktop shortcut removed successfully."
+}
+
+# Handle command-line options
+case "$1" in
+    --install|-i|--integrate)
+        install_shortcut
+        exit 0
+        ;;
+    --uninstall|-u|--remove)
+        uninstall_shortcut
+        exit 0
+        ;;
+    --help|-h)
+        echo "NuTrackN - Interactive Nuclear Spectroscopy"
+        echo ""
+        echo "Usage: nutrackn [options] [spectrum_files...]"
+        echo ""
+        echo "Integration Options:"
+        echo "  --install, -i    Install 'nutrackn' terminal command (~/.local/bin) & desktop shortcut"
+        echo "  --uninstall, -u  Remove 'nutrackn' terminal command & desktop shortcut"
+        echo "  --help, -h       Display this help message"
+        echo ""
+        exit 0
+        ;;
+esac
+
+# If running directly from terminal and not yet installed in ~/.local/bin/nutrackn, display helpful tip
+if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/nutrackn" ]; then
+    echo "----------------------------------------------------------------------"
+    echo " 💡 Tip: Add the 'nutrackn' terminal command (just like xtrackn) with:"
+    echo "         $0 --install"
+    echo "----------------------------------------------------------------------"
 fi
 
 exec "${APPDIR}/usr/bin/nutrackn" "$@"
