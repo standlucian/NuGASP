@@ -79,8 +79,9 @@ echo "    ✓ Found CERN ROOT at: ${ROOTSYS}"
 # ------------------------------------------------------------------------------
 echo "==> [2/6] Compiling NuTrackN binary (${ARCH})..."
 cd "${NUTRACKN_DIR}"
-"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17"
-make clean && make -j"$(sysctl -n hw.ncpu || echo 4)"
+ROOT_CFLAGS="$(root-config --cflags 2>/dev/null || echo '-std=c++17')"
+"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17" "CONFIG-=c++11" "CONFIG-=c++14" "QMAKE_CXXFLAGS+=-std=c++17 ${ROOT_CFLAGS}" "QMAKE_CXXFLAGS_CXX11=-std=c++17"
+make clean && make -j"$(sysctl -n hw.ncpu || echo 4)" CXXFLAGS+="-std=c++17"
 
 if [ ! -f "${NUTRACKN_DIR}/nutrackn" ]; then
     echo "[-] Error: Compilation failed. Binary not found." >&2
