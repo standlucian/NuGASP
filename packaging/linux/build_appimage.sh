@@ -109,7 +109,7 @@ for s in 16 32 48 64 128 256; do
     fi
 done
 
-# Copy ROOT runtime data (etc/, fonts/)
+# Copy ROOT runtime data (etc/, fonts/, include/)
 if [ -d "${ROOTSYS}/etc" ]; then
     mkdir -p "${APPDIR}/usr/etc"
     cp -a "${ROOTSYS}/etc" "${APPDIR}/usr/"
@@ -117,6 +117,10 @@ fi
 if [ -d "${ROOTSYS}/fonts" ]; then
     mkdir -p "${APPDIR}/usr/fonts"
     cp -a "${ROOTSYS}/fonts" "${APPDIR}/usr/"
+fi
+if [ -d "${ROOTSYS}/include" ]; then
+    mkdir -p "${APPDIR}/usr/include"
+    cp -a "${ROOTSYS}/include" "${APPDIR}/usr/"
 fi
 
 # ------------------------------------------------------------------------------
@@ -167,15 +171,11 @@ find "${APPDIR}/usr/plugins" -type f -name "*.so*" -exec ldd {} 2>/dev/null \; |
     fi
 done
 
-# Ensure all essential ROOT libraries and dictionaries are copied
+# Ensure all ROOT libraries, runtime plugins, Cling, and dictionaries are copied
 if [ -d "${ROOTSYS}/lib" ]; then
-    for rlib in libCore.so* libHist.so* libGraf.so* libGraf3d.so* libGpad.so* libMatrix.so* libMathCore.so* libSpectrum.so* libRIO.so* libThread.so* libImt.so* libNet.so* libMultiProc.so* libTree.so* libRint.so* libPhysics.so* libPostscript.so* libGui.so* *.pcm; do
-        for f in "${ROOTSYS}/lib/"${rlib}; do
-            if [ -f "$f" ]; then
-                cp -aL "$f" "${APPDIR}/usr/lib/"
-            fi
-        done
-    done
+    echo "    Bundling CERN ROOT libraries and Cling interpreter..."
+    cp -a "${ROOTSYS}/lib/"lib*.so* "${APPDIR}/usr/lib/" 2>/dev/null || true
+    cp -a "${ROOTSYS}/lib/"*.pcm "${APPDIR}/usr/lib/" 2>/dev/null || true
 fi
 
 # Create AppRun launcher with smart 1-click terminal & desktop integration
@@ -196,6 +196,7 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
 # Configure embedded ROOT runtime
 export ROOTSYS="${APPDIR}/usr"
 export ROOT_CONFIG_SEARCH_PATH="${APPDIR}/usr/etc/root"
+export ROOT_INCLUDE_PATH="${APPDIR}/usr/include"
 if [ -d "${APPDIR}/usr/etc/root" ]; then
     export ROOTRC="${APPDIR}/usr/etc/root/system.rootrc"
 fi

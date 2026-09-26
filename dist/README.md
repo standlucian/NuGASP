@@ -5,7 +5,7 @@ All required dependencies (including **CERN ROOT** and **Qt5**) are bundled insi
 
 ---
 
-## 🚀 Quick Start (Run Instantly)
+## Quick Start (Run Instantly)
 
 Make the AppImage executable (if needed) and run it:
 
@@ -21,7 +21,7 @@ You can also pass spectrum files directly as arguments:
 
 ---
 
-## 📦 1-Click System & Terminal Integration (`nutrackn`)
+## 1-Click System & Terminal Integration (`nutrackn`)
 
 To use `nutrackn` like a standard command line tool (just like you call `xtrackn`), run:
 
@@ -42,7 +42,7 @@ To use `nutrackn` like a standard command line tool (just like you call `xtrackn
 
 ---
 
-## 🗑️ 1-Click Uninstallation
+## 1-Click Uninstallation
 
 To cleanly remove the `nutrackn` terminal command, desktop menu launcher, and icons from your system:
 
@@ -53,7 +53,7 @@ To cleanly remove the `nutrackn` terminal command, desktop menu launcher, and ic
 
 ---
 
-## ℹ️ Command Options Summary
+## Command Options Summary
 
 | Command Option | Description |
 | :--- | :--- |
@@ -65,7 +65,7 @@ To cleanly remove the `nutrackn` terminal command, desktop menu launcher, and ic
 
 ---
 
-## 🛠️ Rebuilding the AppImage
+## Rebuilding the AppImage
 To rebuild the AppImage with any new code updates:
 ```bash
 ./packaging/linux/build_appimage.sh
