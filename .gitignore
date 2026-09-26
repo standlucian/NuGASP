@@ -39,3 +39,11 @@ NuTrackN/check
 NuTrackN/log.txt
 *.ps
 log.txt
+
+# Packaging & Distribution Artifacts
+dist/
+packaging/**/build/
+packaging/**/.cache/
+*.AppImage
+*.dmg
+

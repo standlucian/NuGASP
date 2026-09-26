@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=NuTrackN
+GenericName=Nuclear Spectroscopy Analysis
+Comment=Interactive Nuclear Spectroscopy & Gamma-Ray Analysis
+Exec=nutrackn %F
+Icon=nutrackn
+Terminal=false
+Categories=Science;Physics;DataVisualization;Qt;
+MimeType=application/x-root;
+StartupNotify=true
+StartupWMClass=nutrackn
