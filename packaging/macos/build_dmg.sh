@@ -27,13 +27,10 @@ echo "======================================================================"
 # ------------------------------------------------------------------------------
 echo "==> [1/6] Detecting toolchains and prerequisites..."
 
-if ! command -v brew >/dev/null 2>&1; then
-    echo "[-] Warning: Homebrew not found in PATH. Checking standard locations..."
-    if [ -f "/opt/homebrew/bin/brew" ]; then
-        eval "$(/opt/homebrew/bin/brew shellenv)"
-    elif [ -f "/usr/local/bin/brew" ]; then
-        eval "$(/usr/local/bin/brew shellenv)"
-    fi
+if [ -f "/opt/homebrew/bin/brew" ]; then
+    eval "$(/opt/homebrew/bin/brew shellenv)"
+elif [ -f "/usr/local/bin/brew" ]; then
+    eval "$(/usr/local/bin/brew shellenv)"
 fi
 
 # Detect Qt5
@@ -67,6 +64,11 @@ if [ -z "${ROOTSYS}" ] || [ ! -d "${ROOTSYS}" ]; then
     echo "    Please install ROOT or source thisroot.sh before running." >&2
     exit 1
 fi
+export ROOTSYS
+if [ -f "${ROOTSYS}/bin/thisroot.sh" ]; then
+    source "${ROOTSYS}/bin/thisroot.sh"
+fi
+export PATH="${ROOTSYS}/bin:${PATH}"
 
 echo "    ✓ Architecture: ${ARCH}"
 echo "    ✓ Found Qt5 at: ${QT5_PREFIX}"

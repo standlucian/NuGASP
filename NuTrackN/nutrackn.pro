@@ -10,14 +10,25 @@ CONFIG += qt warn_on thread
 QMAKE_CXXFLAGS += -fPIC
 
 # Project and ROOT header directories
-# ROOT installation is specified through the ROOTSYS environment variable.
+# Automatically detect ROOT via root-config or ROOTSYS environment variable.
+ROOT_INCDIR = $$system(root-config --incdir 2>/dev/null)
+isEmpty(ROOT_INCDIR) {
+    ROOT_INCDIR = $(ROOTSYS)/include $(ROOTSYS)/include/root
+}
 INCLUDEPATH += \
+            $$ROOT_INCDIR \
             $(ROOTSYS)/include \
+            $(ROOTSYS)/include/root \
             Include
+
+ROOT_LIBDIR = $$system(root-config --libdir 2>/dev/null)
+isEmpty(ROOT_LIBDIR) {
+    ROOT_LIBDIR = $(ROOTSYS)/lib
+}
 
 # ROOT libraries
 LIBS += \
-    -L$(ROOTSYS)/lib \
+    -L$$ROOT_LIBDIR \
     -lCore \
     -lRIO \
     -lNet \
