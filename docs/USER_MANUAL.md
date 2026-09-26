@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 1.0** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Qt5 + CERN ROOT Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** on the canvas at any time.
 
@@ -8,6 +8,8 @@
 
 ## Table of Contents
 1. [Introduction & Overview](#1-introduction--overview)
+   - [1.1 The Heritage of Xtrackn & GASPware](#11-the-heritage-of-xtrackn-and-gaspware)
+   - [1.2 Historical Attributions & Acknowledgments](#12-historical-attributions--acknowledgments)
 2. [Installation & Quick Start](#2-installation--quick-start)
 3. [Data Input & Output (I/O)](#3-data-input--output-io)
 4. [Canvas Navigation & Visualization](#4-canvas-navigation--visualization)
@@ -23,16 +25,32 @@
 
 ## 1. Introduction & Overview
 
-**NuTrackN** (part of the **NuGASP** suite) is an interactive, high-performance nuclear spectroscopy analysis application designed for experimental nuclear physicists, gamma-ray spectroscopists, and radiation detection laboratories.
+**NuTrackN** (part of the future **NuGASP** suite) is an interactive, high-performance nuclear spectroscopy analysis application designed for experimental nuclear physicists, gamma-ray spectroscopists, and radiation detection laboratories.
 
-### 1.1 The Heritage of Xtrack / Xtrackn
-For decades, the classic Fortran/C software **Xtrack** and **Xtrackn** (developed across European and international heavy-ion and gamma-ray facilities like GASP, AGATA, and EUROBALL) served as the gold standard for high-throughput gamma-gamma matrix gating and spectrum analysis. Experimentalists developed deep muscle memory for its single-character and two-character command strings.
+### 1.1 The Heritage of Xtrackn and GASPware
+For decades, the classic Fortran/C software **Xtrackn** and the larger **GASPware suite** (developed across European and international heavy-ion and gamma-ray facilities like GASP, AGATA, and EUROBALL) served as the gold standard for high-throughput gamma-gamma matrix gating and spectrum analysis. Experimentalists developed deep muscle memory for its single-character and two-character command strings.
 
 **NuTrackN** preserves **100% of authentic Xtrack keyboard commands**, while re-engineering the underlying platform into modern C++ with:
 - **CERN ROOT Graphics Engine**: Sub-millisecond rendering of high-statistics histograms and logarithmic axes.
 - **Modern Qt5 User Interface**: High-DPI screen support, responsive dialogs, live parameter tables, and curated dark/light themes.
 - **2D Matrix Coincidence Viewer**: Fast slicing and projection of multi-gigabyte $\gamma$-$\gamma$ coincidence matrices (`.cmat`).
 - **Autonomous Standalone Deployment**: 1-click execution without requiring users to configure compiler paths or install CERN ROOT manually.
+- **An enlargement of the available developer base** due to migration to newer technologies
+- **Extended maintenance and upgrade potential**
+- **A comprehensive user manual**
+
+### 1.2 Historical Attributions & Acknowledgments
+The algorithms, design philosophies, and core workflows of NuTrackN stand upon decades of foundational work by the creators and maintainers of **GASPware** and **Xtrackn**, originally created for the GASP $\gamma$-ray spectrometer at the INFN Laboratori Nazionali di Legnaro (LNL) and Padova, Italy.
+
+We gratefully acknowledge and credit:
+- **Dino Bazzacco** (*INFN Sezione di Padova*): Main designer and author of the core GASP data analysis programs, including **TRACKN**, **CMAT**, and **GSORT**.
+- **Călin A. Ur** (*INFN Padova / IFIN-HH Bucharest*): Co-author and core collaborator on the **GSORT** event-sorting engine.
+- **Nicolae Mărginean** (*INFN LNL / IFIN-HH Bucharest*): Longtime maintainer and developer of GASPware, author of individual peak-width fitting routines in XTRACKN, asynchronous tape/data I/O, canvas enhancements, and cross-platform Unix/Linux/macOS ports.
+
+Special thanks are also due to the authors of key open-source utilities and algorithms integrated into the original GASP ecosystem:
+- **Fred Hucht** (*Universität Duisburg*): Creator of the **Ygl** library, which provided SGI GL graphics emulation under the X Window System.
+- **Takuji Nishimura & Makoto Matsumoto**: Creators of the **Mersenne Twister** pseudorandom number generator used in event simulation and background generation.
+- The authors at **M.S.I. Stockholm** and the **Niels Bohr Institute (NBI)** for the **laslib** PostScript plotting packages.
 
 ---
 
