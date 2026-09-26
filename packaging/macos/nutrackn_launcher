@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# NuTrackN - macOS Application Bundle Launcher & CLI Integration
+# ==============================================================================
+
+set -e
+
+# Resolve Bundle directory
+BIN_DIR="$(cd "$(dirname "$0")" && pwd)"
+BUNDLE_DIR="$(cd "${BIN_DIR}/.." && pwd)"
+
+# Configure embedded ROOT and Qt runtime environments
+export ROOTSYS="${BUNDLE_DIR}/Resources/root"
+export DYLD_LIBRARY_PATH="${BUNDLE_DIR}/Frameworks:${DYLD_LIBRARY_PATH}"
+export ROOT_CONFIG_SEARCH_PATH="${BUNDLE_DIR}/Resources/root/etc/root"
+export ROOT_INCLUDE_PATH="${BUNDLE_DIR}/Resources/root/include"
+
+if [ -d "${BUNDLE_DIR}/Resources/root/etc/root" ]; then
+    export ROOTRC="${BUNDLE_DIR}/Resources/root/etc/root/system.rootrc"
+fi
+if [ -d "${BUNDLE_DIR}/Resources/root/fonts" ]; then
+    export ROOT_TTFONTS="${BUNDLE_DIR}/Resources/root/fonts"
+fi
+if [ -d "${BUNDLE_DIR}/PlugIns" ]; then
+    export QT_PLUGIN_PATH="${BUNDLE_DIR}/PlugIns"
+fi
+
+# ------------------------------------------------------------------------------
+# 1-Click Terminal Shortcut Integration Helper
+# ------------------------------------------------------------------------------
+install_cli() {
+    local self_path="${BIN_DIR}/nutrackn"
+    local target_dir="/usr/local/bin"
+
+    # Fallback to ~/.local/bin if /usr/local/bin is not writable without sudo
+    if [ ! -w "/usr/local/bin" ] && [ "$(id -u)" != "0" ]; then
+        target_dir="${HOME}/.local/bin"
+    fi
+
+    mkdir -p "${target_dir}"
+    local target_bin="${target_dir}/nutrackn"
+
+    echo "==> Creating terminal shortcut for NuTrackN..."
+    ln -sf "${self_path}" "${target_bin}"
+    echo "    ✓ Created symlink: ${target_bin} -> ${self_path}"
+
+    # Ensure ~/.local/bin is in PATH if used
+    if [ "${target_dir}" = "${HOME}/.local/bin" ]; then
+        case ":$PATH:" in
+            *":$HOME/.local/bin:"*) ;;
+            *)
+                echo "    ℹ Adding ~/.local/bin to PATH in ~/.zshrc and ~/.bash_profile"
+                [ -f "${HOME}/.zshrc" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.zshrc" && echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.zshrc"
+                [ -f "${HOME}/.bash_profile" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.bash_profile" && echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.bash_profile"
+                ;;
+        esac
+    fi
+
+    echo ""
+    echo "======================================================================"
+    echo "    🎉 Terminal Command 'nutrackn' Installed Successfully!           "
+    echo "======================================================================"
+    echo "    You can now launch NuTrackN from Terminal by simply typing:      "
+    echo ""
+    echo "        nutrackn"
+    echo ""
+    echo "======================================================================"
+    echo ""
+}
+
+uninstall_cli() {
+    echo "==> Removing NuTrackN terminal shortcut..."
+    rm -f "/usr/local/bin/nutrackn" "${HOME}/.local/bin/nutrackn"
+    echo "    ✓ Terminal shortcut removed."
+}
+
+# Handle command-line options
+case "$1" in
+    --install-cli|-i|--integrate)
+        install_cli
+        exit 0
+        ;;
+    --uninstall-cli|--remove-cli)
+        uninstall_cli
+        exit 0
+        ;;
+    --help|-h)
+        echo "NuTrackN - Interactive Nuclear Spectroscopy (macOS)"
+        echo ""
+        echo "Usage: nutrackn [options] [spectrum_files...]"
+        echo ""
+        echo "Options:"
+        echo "  --install-cli, -i    Add 'nutrackn' command to your Terminal PATH"
+        echo "  --uninstall-cli      Remove 'nutrackn' Terminal command"
+        echo "  --help, -h           Show this help message"
+        echo ""
+        exit 0
+        ;;
+esac
+
+# Execute native binary
+exec "${BIN_DIR}/nutrackn_bin" "$@"
