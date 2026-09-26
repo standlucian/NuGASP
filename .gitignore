@@ -41,7 +41,9 @@ NuTrackN/log.txt
 log.txt
 
 # Packaging & Distribution Artifacts
-dist/
+dist/*.AppImage
+dist/*.dmg
+!dist/README.md
 packaging/**/build/
 packaging/**/.cache/
 *.AppImage
