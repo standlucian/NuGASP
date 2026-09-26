@@ -156,6 +156,27 @@ void HelpDialog::setupUI() {
     manualLayout->addWidget(m_manualBrowser);
     m_tabs->addTab(tabManual, tr("📖 Full User Manual"));
 
+    // Tab 3: Heritage & Credits
+    QWidget *tabCredits = new QWidget(this);
+    QVBoxLayout *creditsLayout = new QVBoxLayout(tabCredits);
+    creditsLayout->setContentsMargins(12, 12, 12, 12);
+    QTextBrowser *creditsBrowser = new QTextBrowser(this);
+    creditsBrowser->setOpenExternalLinks(true);
+    creditsBrowser->setMarkdown(
+        tr("## Historical Attributions & Acknowledgments\n\n"
+           "The algorithms, design philosophies, and core workflows of **NuTrackN** stand upon decades of foundational work by the creators and maintainers of **GASPware** and **Xtrackn**, originally created for the GASP &gamma;-ray spectrometer at the **INFN Laboratori Nazionali di Legnaro (LNL)** and Padova, Italy.\n\n"
+           "### Original Authors & Collaborators\n"
+           "- **Dino Bazzacco** (*INFN Sezione di Padova*): Main designer and author of the core GASP data analysis programs, including **TRACKN**, **CMAT**, and **GSORT**.\n"
+           "- **Călin A. Ur** (*INFN Padova / IFIN-HH Bucharest*): Co-author and collaborator on event reconstruction and the **GSORT** event-sorting engine.\n"
+           "- **Nicolae Mărginean** (*INFN LNL / IFIN-HH Bucharest*): Longtime maintainer and developer of GASPware, author of individual peak-width fitting routines in XTRACKN, asynchronous tape/data I/O, canvas enhancements, and cross-platform Unix/Linux/macOS ports.\n\n"
+           "### Third-Party & Scientific Algorithms\n"
+           "- **Fred Hucht** (*Universität Duisburg*): Creator of the **Ygl** library (SGI GL graphics emulation under X11).\n"
+           "- **Takuji Nishimura & Makoto Matsumoto**: Creators of the **Mersenne Twister** pseudorandom number generator.\n"
+           "- The authors at **M.S.I. Stockholm** and the **Niels Bohr Institute (NBI)** for the **laslib** PostScript plotting packages.")
+    );
+    creditsLayout->addWidget(creditsBrowser);
+    m_tabs->addTab(tabCredits, tr("🏛️ Heritage & Credits"));
+
     mainLayout->addWidget(m_tabs, 1);
 
     // Bottom action buttons
@@ -211,14 +232,14 @@ void HelpDialog::filterShortcuts(const QString &text) {
 }
 
 void HelpDialog::loadUserManual() {
-    // Attempt to locate USER_MANUAL.md from embedded resource or disk
+    // Prioritize active disk files so edits are reflected immediately, falling back to embedded QRC
     QStringList candidates = {
-        ":/USER_MANUAL.md",
+        "/home/lucian/Desktop/NuGASP/docs/USER_MANUAL.md",
         QDir::currentPath() + "/docs/USER_MANUAL.md",
         QDir::currentPath() + "/../docs/USER_MANUAL.md",
         QCoreApplication::applicationDirPath() + "/docs/USER_MANUAL.md",
         QCoreApplication::applicationDirPath() + "/../Resources/docs/USER_MANUAL.md",
-        "/home/lucian/Desktop/NuGASP/docs/USER_MANUAL.md"
+        ":/USER_MANUAL.md"
     };
 
     QString manualContent;

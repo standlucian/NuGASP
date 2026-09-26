@@ -120,3 +120,7 @@
 | **`M` + `0..9`** | **Show Macro** | Display stored command sequence in Command Prompt |
 | **`Z` + `0..9`** | **Clear Macro** | Erase stored macro definition |
 | **`Ctrl` + `C`** | **Quit NuTrackN** | Prompt confirmation dialog and exit cleanly |
+
+---
+
+*Historical Note: NuTrackN preserves 100% of authentic Xtrack commands originally created for the GASP spectrometer by Dino Bazzacco, Călin A. Ur, and Nicolae Mărginean (INFN Padova / Legnaro).*
