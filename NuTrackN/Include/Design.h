@@ -5,6 +5,7 @@
 #include <QColor>
 #include <QPlainTextEdit>
 #include <QString>
+#include <vector>
 
 // Forward declarations to avoid circular dependencies
 class QMainCanvas;
@@ -115,6 +116,64 @@ namespace Design {
      * @brief Applies the full theme (fonts, sizes, colors) to the active main window and canvas.
      */
     void applyUITheme(QMainCanvas *mainCanvas);
+
+    struct ThemeSettings {
+        QFont buttonPromptFont;
+        QFont dialogFont;
+        QFont graphFont;
+        int rootFontFamilyIndex{13};
+
+        QColor buttonBgColor;
+        QColor buttonTextColor;
+        QColor uiBgColor;
+        QColor promptBgColor;
+        QColor promptTextColor;
+
+        QColor dialogBgColor;
+        QColor dialogTextColor;
+        QColor dialogAccentColor;
+
+        QColor graphBgColor;
+        std::vector<QColor> spectrumColors;
+
+        QColor peakMarkerColor;
+        QColor zoomMarkerColor;
+        QColor bgMarkerColor;
+        QColor integralMarkerColor;
+        QColor rangeMarkerColor;
+        QColor gaussMarkerColor;
+        QColor gateMarkerColor;
+    };
+
+    /**
+     * @brief Retrieves the active theme settings snapshot.
+     */
+    ThemeSettings getCurrentTheme();
+
+    /**
+     * @brief Applies and stores the specified theme settings.
+     */
+    void setCurrentTheme(const ThemeSettings &theme);
+
+    /**
+     * @brief Exports the specified theme settings to a JSON/nugasp-theme file.
+     */
+    bool exportThemeToFile(const QString &filePath, const ThemeSettings &theme, QString *errorMessage = nullptr);
+
+    /**
+     * @brief Exports the active theme settings to a JSON/nugasp-theme file.
+     */
+    bool exportCurrentTheme(const QString &filePath, QString *errorMessage = nullptr);
+
+    /**
+     * @brief Imports theme settings from a JSON/nugasp-theme file into a ThemeSettings struct.
+     */
+    bool importThemeFromFile(const QString &filePath, ThemeSettings &theme, QString *errorMessage = nullptr);
+
+    /**
+     * @brief Imports theme settings from a file and applies them directly to the application.
+     */
+    bool importAndApplyTheme(const QString &filePath, QMainCanvas *canvasWidget = nullptr, QString *errorMessage = nullptr);
 
     // Aliases for compatibility
     inline void saveTypographySettings() { saveSettings(); }

@@ -24,6 +24,15 @@
 #include <QScrollArea>
 #include <QPainter>
 #include <QPainterPath>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QFile>
+#include <QFileInfo>
+#include <QDir>
+#include <QDateTime>
+#include <QMessageBox>
+#include <QFileDialog>
 #include <iostream>
 #include <cmath>
 
@@ -711,6 +720,259 @@ void applyUITheme(QMainCanvas *mainCanvas) {
   }
 }
 
+ThemeSettings getCurrentTheme() {
+  if (!s_typographyInitialized) initializeTypography();
+  ThemeSettings theme;
+  theme.buttonPromptFont = s_buttonPromptFont;
+  theme.dialogFont = s_dialogFont;
+  theme.graphFont = s_graphFont;
+  theme.rootFontFamilyIndex = s_rootFontFamilyIndex;
+
+  theme.buttonBgColor = s_buttonBgColor;
+  theme.buttonTextColor = s_buttonTextColor;
+  theme.uiBgColor = s_uiBgColor;
+  theme.promptBgColor = s_promptBgColor;
+  theme.promptTextColor = s_promptTextColor;
+
+  theme.dialogBgColor = s_dialogBgColor;
+  theme.dialogTextColor = s_dialogTextColor;
+  theme.dialogAccentColor = s_dialogAccentColor;
+
+  theme.graphBgColor = s_graphBgColor;
+  theme.spectrumColors = s_spectrumColors;
+
+  theme.peakMarkerColor = s_peakMarkerColor;
+  theme.zoomMarkerColor = s_zoomMarkerColor;
+  theme.bgMarkerColor = s_bgMarkerColor;
+  theme.integralMarkerColor = s_integralMarkerColor;
+  theme.rangeMarkerColor = s_rangeMarkerColor;
+  theme.gaussMarkerColor = s_gaussMarkerColor;
+  theme.gateMarkerColor = s_gateMarkerColor;
+  return theme;
+}
+
+void setCurrentTheme(const ThemeSettings &theme) {
+  if (!s_typographyInitialized) initializeTypography();
+  s_buttonPromptFont = theme.buttonPromptFont;
+  s_dialogFont = theme.dialogFont;
+  s_graphFont = theme.graphFont;
+  s_rootFontFamilyIndex = theme.rootFontFamilyIndex;
+
+  s_buttonBgColor = theme.buttonBgColor;
+  s_buttonTextColor = theme.buttonTextColor;
+  s_uiBgColor = theme.uiBgColor;
+  s_promptBgColor = theme.promptBgColor;
+  s_promptTextColor = theme.promptTextColor;
+
+  s_dialogBgColor = theme.dialogBgColor;
+  s_dialogTextColor = theme.dialogTextColor;
+  s_dialogAccentColor = theme.dialogAccentColor;
+
+  s_graphBgColor = theme.graphBgColor;
+  s_spectrumColors = theme.spectrumColors;
+  while (s_spectrumColors.size() < 9) {
+    s_spectrumColors.push_back(QColor("#ffffff"));
+  }
+
+  s_peakMarkerColor = theme.peakMarkerColor;
+  s_zoomMarkerColor = theme.zoomMarkerColor;
+  s_bgMarkerColor = theme.bgMarkerColor;
+  s_integralMarkerColor = theme.integralMarkerColor;
+  s_rangeMarkerColor = theme.rangeMarkerColor;
+  s_gaussMarkerColor = theme.gaussMarkerColor;
+  s_gateMarkerColor = theme.gateMarkerColor;
+
+  saveSettings();
+}
+
+bool exportThemeToFile(const QString &filePath, const ThemeSettings &theme, QString *errorMessage) {
+  QJsonObject rootObj;
+  rootObj["format"] = "NuGASP-Theme";
+  rootObj["version"] = 1;
+  rootObj["description"] = "NuTrackN Aesthetic Theme Settings";
+  rootObj["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+
+  // Typography
+  QJsonObject typObj;
+  auto fontToJson = [](const QFont &f) -> QJsonObject {
+    QJsonObject obj;
+    obj["family"] = f.family();
+    obj["pointSize"] = f.pointSize() > 0 ? f.pointSize() : 11;
+    obj["bold"] = f.bold();
+    obj["italic"] = f.italic();
+    obj["rawString"] = f.toString();
+    return obj;
+  };
+
+  typObj["buttonPromptFont"] = fontToJson(theme.buttonPromptFont);
+  typObj["dialogFont"] = fontToJson(theme.dialogFont);
+  typObj["graphFont"] = fontToJson(theme.graphFont);
+  typObj["rootFontFamilyIndex"] = theme.rootFontFamilyIndex;
+  rootObj["typography"] = typObj;
+
+  // Colors
+  QJsonObject colObj;
+  colObj["buttonBgColor"] = theme.buttonBgColor.name();
+  colObj["buttonTextColor"] = theme.buttonTextColor.name();
+  colObj["uiBgColor"] = theme.uiBgColor.name();
+  colObj["promptBgColor"] = theme.promptBgColor.name();
+  colObj["promptTextColor"] = theme.promptTextColor.name();
+
+  colObj["dialogBgColor"] = theme.dialogBgColor.name();
+  colObj["dialogTextColor"] = theme.dialogTextColor.name();
+  colObj["dialogAccentColor"] = theme.dialogAccentColor.name();
+
+  colObj["graphBgColor"] = theme.graphBgColor.name();
+
+  QJsonArray specArr;
+  for (const auto &c : theme.spectrumColors) {
+    specArr.append(c.name());
+  }
+  colObj["spectrumColors"] = specArr;
+
+  QJsonObject markObj;
+  markObj["peakMarkerColor"] = theme.peakMarkerColor.name();
+  markObj["zoomMarkerColor"] = theme.zoomMarkerColor.name();
+  markObj["bgMarkerColor"] = theme.bgMarkerColor.name();
+  markObj["integralMarkerColor"] = theme.integralMarkerColor.name();
+  markObj["rangeMarkerColor"] = theme.rangeMarkerColor.name();
+  markObj["gaussMarkerColor"] = theme.gaussMarkerColor.name();
+  markObj["gateMarkerColor"] = theme.gateMarkerColor.name();
+  colObj["markers"] = markObj;
+
+  rootObj["colors"] = colObj;
+
+  QJsonDocument doc(rootObj);
+  QFile file(filePath);
+  if (!file.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+    if (errorMessage) *errorMessage = file.errorString();
+    return false;
+  }
+  file.write(doc.toJson(QJsonDocument::Indented));
+  file.close();
+  return true;
+}
+
+bool exportCurrentTheme(const QString &filePath, QString *errorMessage) {
+  return exportThemeToFile(filePath, getCurrentTheme(), errorMessage);
+}
+
+bool importThemeFromFile(const QString &filePath, ThemeSettings &theme, QString *errorMessage) {
+  QFile file(filePath);
+  if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+    if (errorMessage) *errorMessage = file.errorString();
+    return false;
+  }
+
+  QByteArray data = file.readAll();
+  file.close();
+
+  QJsonParseError parseErr;
+  QJsonDocument doc = QJsonDocument::fromJson(data, &parseErr);
+  if (doc.isNull()) {
+    if (errorMessage) *errorMessage = parseErr.errorString();
+    return false;
+  }
+
+  if (!doc.isObject()) {
+    if (errorMessage) *errorMessage = "Invalid theme file format: Root JSON element is not an object.";
+    return false;
+  }
+
+  QJsonObject rootObj = doc.object();
+
+  auto jsonToFont = [](const QJsonObject &obj, const QFont &fallback) -> QFont {
+    if (obj.contains("rawString")) {
+      QFont f;
+      if (f.fromString(obj["rawString"].toString())) {
+        return f;
+      }
+    }
+    QFont f = fallback;
+    if (obj.contains("family")) f.setFamily(obj["family"].toString());
+    if (obj.contains("pointSize")) f.setPointSize(obj["pointSize"].toInt());
+    if (obj.contains("bold")) f.setBold(obj["bold"].toBool());
+    if (obj.contains("italic")) f.setItalic(obj["italic"].toBool());
+    return f;
+  };
+
+  // Typography
+  if (rootObj.contains("typography") && rootObj["typography"].isObject()) {
+    QJsonObject typObj = rootObj["typography"].toObject();
+    if (typObj.contains("buttonPromptFont")) {
+      theme.buttonPromptFont = jsonToFont(typObj["buttonPromptFont"].toObject(), theme.buttonPromptFont);
+    }
+    if (typObj.contains("dialogFont")) {
+      theme.dialogFont = jsonToFont(typObj["dialogFont"].toObject(), theme.dialogFont);
+    }
+    if (typObj.contains("graphFont")) {
+      theme.graphFont = jsonToFont(typObj["graphFont"].toObject(), theme.graphFont);
+    }
+    if (typObj.contains("rootFontFamilyIndex")) {
+      theme.rootFontFamilyIndex = typObj["rootFontFamilyIndex"].toInt(13);
+    }
+  }
+
+  // Colors
+  if (rootObj.contains("colors") && rootObj["colors"].isObject()) {
+    QJsonObject colObj = rootObj["colors"].toObject();
+    if (colObj.contains("buttonBgColor")) theme.buttonBgColor = QColor(colObj["buttonBgColor"].toString());
+    if (colObj.contains("buttonTextColor")) theme.buttonTextColor = QColor(colObj["buttonTextColor"].toString());
+    if (colObj.contains("uiBgColor")) theme.uiBgColor = QColor(colObj["uiBgColor"].toString());
+    if (colObj.contains("promptBgColor")) theme.promptBgColor = QColor(colObj["promptBgColor"].toString());
+    if (colObj.contains("promptTextColor")) theme.promptTextColor = QColor(colObj["promptTextColor"].toString());
+
+    if (colObj.contains("dialogBgColor")) theme.dialogBgColor = QColor(colObj["dialogBgColor"].toString());
+    if (colObj.contains("dialogTextColor")) theme.dialogTextColor = QColor(colObj["dialogTextColor"].toString());
+    if (colObj.contains("dialogAccentColor")) theme.dialogAccentColor = QColor(colObj["dialogAccentColor"].toString());
+
+    if (colObj.contains("graphBgColor")) theme.graphBgColor = QColor(colObj["graphBgColor"].toString());
+
+    if (colObj.contains("spectrumColors") && colObj["spectrumColors"].isArray()) {
+      QJsonArray specArr = colObj["spectrumColors"].toArray();
+      theme.spectrumColors.clear();
+      for (int i = 0; i < specArr.size(); ++i) {
+        theme.spectrumColors.push_back(QColor(specArr[i].toString()));
+      }
+    }
+
+    if (colObj.contains("markers") && colObj["markers"].isObject()) {
+      QJsonObject markObj = colObj["markers"].toObject();
+      if (markObj.contains("peakMarkerColor")) theme.peakMarkerColor = QColor(markObj["peakMarkerColor"].toString());
+      if (markObj.contains("zoomMarkerColor")) theme.zoomMarkerColor = QColor(markObj["zoomMarkerColor"].toString());
+      if (markObj.contains("bgMarkerColor")) theme.bgMarkerColor = QColor(markObj["bgMarkerColor"].toString());
+      if (markObj.contains("integralMarkerColor")) theme.integralMarkerColor = QColor(markObj["integralMarkerColor"].toString());
+      if (markObj.contains("rangeMarkerColor")) theme.rangeMarkerColor = QColor(markObj["rangeMarkerColor"].toString());
+      if (markObj.contains("gaussMarkerColor")) theme.gaussMarkerColor = QColor(markObj["gaussMarkerColor"].toString());
+      if (markObj.contains("gateMarkerColor")) theme.gateMarkerColor = QColor(markObj["gateMarkerColor"].toString());
+    } else {
+      if (colObj.contains("peakMarkerColor")) theme.peakMarkerColor = QColor(colObj["peakMarkerColor"].toString());
+      if (colObj.contains("zoomMarkerColor")) theme.zoomMarkerColor = QColor(colObj["zoomMarkerColor"].toString());
+      if (colObj.contains("bgMarkerColor")) theme.bgMarkerColor = QColor(colObj["bgMarkerColor"].toString());
+      if (colObj.contains("integralMarkerColor")) theme.integralMarkerColor = QColor(colObj["integralMarkerColor"].toString());
+      if (colObj.contains("rangeMarkerColor")) theme.rangeMarkerColor = QColor(colObj["rangeMarkerColor"].toString());
+      if (colObj.contains("gaussMarkerColor")) theme.gaussMarkerColor = QColor(colObj["gaussMarkerColor"].toString());
+      if (colObj.contains("gateMarkerColor")) theme.gateMarkerColor = QColor(colObj["gateMarkerColor"].toString());
+    }
+  }
+
+  while (theme.spectrumColors.size() < 9) {
+    theme.spectrumColors.push_back(QColor("#ffffff"));
+  }
+
+  return true;
+}
+
+bool importAndApplyTheme(const QString &filePath, QMainCanvas *canvasWidget, QString *errorMessage) {
+  ThemeSettings theme = getCurrentTheme();
+  if (!importThemeFromFile(filePath, theme, errorMessage)) {
+    return false;
+  }
+  setCurrentTheme(theme);
+  applyUITheme(canvasWidget);
+  return true;
+}
+
 } // namespace Design
 
 // Static member definitions for the CommandPrompt singleton
@@ -952,6 +1214,8 @@ private:
   void refreshDialogTheme();
   void commitChanges();
   void revertChanges();
+  void exportTheme();
+  void importTheme();
 
   QMainCanvas *m_canvasWidget;
 
@@ -1149,23 +1413,37 @@ void AppearanceDialog::setupUI() {
   dialogLayout->setSpacing(10);
   dialogLayout->setContentsMargins(14, 14, 14, 14);
 
-  // Top header with quick theme presets dropdown (Classic Xtrackn & Modern)
+  // Top header with quick theme presets dropdown (Classic Xtrackn, Modern Dark & Modern Light)
   QHBoxLayout *presetLayout = new QHBoxLayout();
   QLabel *lblPreset = new QLabel("<b>Theme Preset:</b>", this);
   m_presetCombo = new QComboBox(this);
   m_presetCombo->addItem("(Custom / Keep Current)");
   m_presetCombo->addItem("Classic (Legacy Xtrackn)");
-  m_presetCombo->addItem("Modern (Deep Space Cyan)");
+  m_presetCombo->addItem("Modern Dark (Deep Space Cyan)");
+  m_presetCombo->addItem("Modern Light (Crisp Clean)");
   if (m_curUIBg == QColor("#708090") && m_curDlgBg == QColor("#708090")) {
     m_presetCombo->setCurrentIndex(1);
   } else if (m_curUIBg == QColor("#0f172a") && m_curDlgBg == QColor("#151b26")) {
     m_presetCombo->setCurrentIndex(2);
+  } else if (m_curUIBg == QColor("#f1f5f9") && m_curDlgBg == QColor("#f8fafc")) {
+    m_presetCombo->setCurrentIndex(3);
   } else {
     m_presetCombo->setCurrentIndex(0);
   }
+  QPushButton *btnImport = new QPushButton(tr("📥 Import Theme..."), this);
+  btnImport->setToolTip(tr("Import a theme file (*.nugasp-theme, *.json) to preview and apply"));
+  QPushButton *btnExport = new QPushButton(tr("📤 Export Theme..."), this);
+  btnExport->setToolTip(tr("Export current aesthetic settings (colors & fonts) to share with colleagues"));
+
   presetLayout->addWidget(lblPreset);
   presetLayout->addWidget(m_presetCombo, 1);
+  presetLayout->addSpacing(8);
+  presetLayout->addWidget(btnImport);
+  presetLayout->addWidget(btnExport);
   dialogLayout->addLayout(presetLayout);
+
+  connect(btnExport, &QPushButton::clicked, this, &AppearanceDialog::exportTheme);
+  connect(btnImport, &QPushButton::clicked, this, &AppearanceDialog::importTheme);
 
   // 4-Category Tabs
   QTabWidget *tabs = new QTabWidget(this);
@@ -1549,6 +1827,52 @@ void AppearanceDialog::setupUI() {
       m_spinGraphSize->setValue(10);
       int rootIdx = m_comboRootFont->findData(4);
       if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
+    } else if (idx == 3) {
+      // 3. Modern Light (Crisp Clean)
+      QFont modernFont("DejaVu Sans", 10);
+      modernFont.setStyleHint(QFont::SansSerif);
+      m_curBtnFont = modernFont;
+      m_curBtnFont.setBold(true);
+      m_curDialogFont = modernFont;
+      m_curGraphFont = modernFont;
+      m_curRootFontIdx = 4; // ROOT Font 4: Helvetica / Sans-Serif
+
+      m_curUIBg = QColor("#f1f5f9");
+      m_curBtnBg = QColor("#e2e8f0");
+      m_curBtnFg = QColor("#0f172a");
+      m_curPromptBg = QColor("#ffffff");
+      m_curPromptFg = QColor("#0f172a");
+
+      m_curDlgBg = QColor("#f8fafc");
+      m_curDlgFg = QColor("#0f172a");
+      m_curDlgAccent = QColor("#0284c7");
+
+      m_curGraphBg = QColor("#ffffff");
+      m_curSpectrumColors = {
+          QColor("#0284c7"), // Ocean / Deep Sky Blue
+          QColor("#dc2626"), // Crimson Red
+          QColor("#16a34a"), // Forest Green
+          QColor("#d97706"), // Amber Orange
+          QColor("#7c3aed"), // Royal Purple
+          QColor("#0891b2"), // Deep Cyan / Teal
+          QColor("#ea580c"), // Vibrant Tangerine
+          QColor("#db2777"), // Deep Rose
+          QColor("#2563eb")  // Indigo Blue
+      };
+
+      m_curPeak = QColor("#e11d48");
+      m_curZoom = QColor("#0284c7");
+      m_curBgMarker = QColor("#2563eb");
+      m_curIntegral = QColor("#d97706");
+      m_curRange = QColor("#ea580c");
+      m_curGauss = QColor("#9333ea");
+      m_curGate = QColor("#b91c1c");
+
+      m_spinBtnSize->setValue(10);
+      m_spinDlgSize->setValue(10);
+      m_spinGraphSize->setValue(10);
+      int rootIdx = m_comboRootFont->findData(4);
+      if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
     }
     updateAllSwatches();
     refreshDialogTheme();
@@ -1819,6 +2143,128 @@ void AppearanceDialog::revertChanges() {
   m_curDlgFg = m_origDlgFg;
   m_curDlgAccent = m_origDlgAccent;
   refreshDialogTheme();
+}
+
+void AppearanceDialog::exportTheme() {
+  QString defaultPath = QDir::currentPath() + "/MyTheme.nugasp-theme";
+  QString filter = tr("NuGASP Theme Files (*.nugasp-theme *.json);;All Files (*)");
+  QString filePath = QFileDialog::getSaveFileName(this, tr("Export Aesthetic Theme Settings"), defaultPath, filter);
+  if (filePath.isEmpty()) return;
+
+  if (!filePath.endsWith(".nugasp-theme", Qt::CaseInsensitive) && !filePath.endsWith(".json", Qt::CaseInsensitive)) {
+    filePath += ".nugasp-theme";
+  }
+
+  Design::ThemeSettings theme;
+  theme.buttonPromptFont = m_curBtnFont;
+  theme.dialogFont = m_curDialogFont;
+  theme.graphFont = m_curGraphFont;
+  theme.rootFontFamilyIndex = m_curRootFontIdx;
+
+  theme.buttonBgColor = m_curBtnBg;
+  theme.buttonTextColor = m_curBtnFg;
+  theme.uiBgColor = m_curUIBg;
+  theme.promptBgColor = m_curPromptBg;
+  theme.promptTextColor = m_curPromptFg;
+
+  theme.dialogBgColor = m_curDlgBg;
+  theme.dialogTextColor = m_curDlgFg;
+  theme.dialogAccentColor = m_curDlgAccent;
+
+  theme.graphBgColor = m_curGraphBg;
+  theme.spectrumColors = m_curSpectrumColors;
+
+  theme.peakMarkerColor = m_curPeak;
+  theme.zoomMarkerColor = m_curZoom;
+  theme.bgMarkerColor = m_curBgMarker;
+  theme.integralMarkerColor = m_curIntegral;
+  theme.rangeMarkerColor = m_curRange;
+  theme.gaussMarkerColor = m_curGauss;
+  theme.gateMarkerColor = m_curGate;
+
+  QString errorMsg;
+  if (Design::exportThemeToFile(filePath, theme, &errorMsg)) {
+    if (CommandPrompt::getInstance()) {
+      CommandPrompt::getInstance()->appendPlainText(QString("[Theme] Aesthetic settings exported to: %1").arg(filePath));
+    }
+    QMessageBox::information(this, tr("Theme Exported Successfully"),
+      tr("Aesthetic settings have been exported to:\n\n%1\n\nYou can now share this file with colleagues so they can import your custom colors and fonts.")
+      .arg(filePath));
+  } else {
+    QMessageBox::critical(this, tr("Export Failed"),
+      tr("Failed to export aesthetic settings to:\n\n%1\n\nError: %2")
+      .arg(filePath, errorMsg));
+  }
+}
+
+void AppearanceDialog::importTheme() {
+  QString filter = tr("NuGASP Theme Files (*.nugasp-theme *.json);;All Files (*)");
+  QString filePath = QFileDialog::getOpenFileName(this, tr("Import Aesthetic Theme Settings"), QDir::currentPath(), filter);
+  if (filePath.isEmpty()) return;
+
+  Design::ThemeSettings theme;
+  QString errorMsg;
+  if (!Design::importThemeFromFile(filePath, theme, &errorMsg)) {
+    QMessageBox::critical(this, tr("Import Failed"),
+      tr("Failed to import theme from:\n\n%1\n\nError: %2")
+      .arg(filePath, errorMsg));
+    return;
+  }
+
+  // Populate working copies
+  m_curBtnFont = theme.buttonPromptFont;
+  m_curDialogFont = theme.dialogFont;
+  m_curGraphFont = theme.graphFont;
+  m_curRootFontIdx = theme.rootFontFamilyIndex;
+
+  m_curBtnBg = theme.buttonBgColor;
+  m_curBtnFg = theme.buttonTextColor;
+  m_curUIBg = theme.uiBgColor;
+  m_curPromptBg = theme.promptBgColor;
+  m_curPromptFg = theme.promptTextColor;
+
+  m_curDlgBg = theme.dialogBgColor;
+  m_curDlgFg = theme.dialogTextColor;
+  m_curDlgAccent = theme.dialogAccentColor;
+
+  m_curGraphBg = theme.graphBgColor;
+  m_curSpectrumColors = theme.spectrumColors;
+  while (m_curSpectrumColors.size() < 9) {
+    m_curSpectrumColors.push_back(QColor("#ffffff"));
+  }
+
+  m_curPeak = theme.peakMarkerColor;
+  m_curZoom = theme.zoomMarkerColor;
+  m_curBgMarker = theme.bgMarkerColor;
+  m_curIntegral = theme.integralMarkerColor;
+  m_curRange = theme.rangeMarkerColor;
+  m_curGauss = theme.gaussMarkerColor;
+  m_curGate = theme.gateMarkerColor;
+
+  // Update controls
+  if (m_spinBtnSize) m_spinBtnSize->setValue(m_curBtnFont.pointSize() > 0 ? m_curBtnFont.pointSize() : 11);
+  if (m_spinDlgSize) m_spinDlgSize->setValue(m_curDialogFont.pointSize() > 0 ? m_curDialogFont.pointSize() : 11);
+  if (m_spinGraphSize) m_spinGraphSize->setValue(m_curGraphFont.pointSize() > 0 ? m_curGraphFont.pointSize() : 10);
+  if (m_comboRootFont) {
+    int rootIdx = m_comboRootFont->findData(m_curRootFontIdx);
+    if (rootIdx >= 0) m_comboRootFont->setCurrentIndex(rootIdx);
+  }
+  if (m_presetCombo) {
+    m_presetCombo->blockSignals(true);
+    m_presetCombo->setCurrentIndex(0);
+    m_presetCombo->blockSignals(false);
+  }
+
+  updateAllSwatches();
+  refreshDialogTheme();
+
+  if (CommandPrompt::getInstance()) {
+    CommandPrompt::getInstance()->appendPlainText(QString("[Theme] Imported settings from: %1").arg(QFileInfo(filePath).fileName()));
+  }
+
+  QMessageBox::information(this, tr("Theme Loaded into Preview"),
+    tr("Theme '%1' was loaded successfully into the preview tabs!\n\nYou can review the colors and typography, then click 'Apply' or 'OK' to save and use it.")
+    .arg(QFileInfo(filePath).fileName()));
 }
 
 namespace Design {
