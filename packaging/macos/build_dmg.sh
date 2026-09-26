@@ -79,7 +79,7 @@ echo "    ✓ Found CERN ROOT at: ${ROOTSYS}"
 # ------------------------------------------------------------------------------
 echo "==> [2/6] Compiling NuTrackN binary (${ARCH})..."
 cd "${NUTRACKN_DIR}"
-"${QMAKE_BIN}" nutrackn.pro -spec macx-clang
+"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17"
 make clean && make -j"$(sysctl -n hw.ncpu || echo 4)"
 
 if [ ! -f "${NUTRACKN_DIR}/nutrackn" ]; then
