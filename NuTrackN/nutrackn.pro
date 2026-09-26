@@ -52,7 +52,8 @@ HEADERS += \
     Include/DisplayParamsDialog.h \
     Include/EfficiencyDialog.h \
     Include/AutoCalibDialog.h \
-    Include/MacroDialog.h
+    Include/MacroDialog.h \
+    Include/HelpDialog.h
 
 # Project source files
 SOURCES += \
@@ -79,7 +80,8 @@ SOURCES += \
     Sources/DisplayParamsDialog.cxx \
     Sources/EfficiencyDialog.cxx \
     Sources/AutoCalibDialog.cxx \
-    Sources/MacroDialog.cxx
+    Sources/MacroDialog.cxx \
+    Sources/HelpDialog.cxx
 
 RESOURCES += \
     nutrackn.qrc

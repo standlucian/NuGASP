@@ -13,6 +13,7 @@
 #include "AutoCalibDialog.h"
 #include "MacroDialog.h"
 #include "IntegralDialog.h"
+#include "HelpDialog.h"
 #include <QInputDialog>
 #include <QShortcut>
 
@@ -395,6 +396,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnMacro->setFixedSize(38, 33);
     connect(btnMacro, &QPushButton::clicked, this, &QMainCanvas::openMacroDialog);
     outBox->addWidget(btnMacro);
+
+    QPushButton *btnHelp = makeButton(tr("?"), topContainer, true);
+    btnHelp->setToolTip(tr("Help & Command Reference Guide (Shortcut: H, ?, or F1)"));
+    btnHelp->setFixedSize(33, 33);
+    connect(btnHelp, &QPushButton::clicked, this, &QMainCanvas::offerHelp);
+    outBox->addWidget(btnHelp);
 
     bottomStatusGrid->addLayout(outBox, 1, 2);
 
@@ -1532,10 +1539,23 @@ void QMainCanvas::offerHelp()
     prompt->appendPlainText(" CTL_DOWNARROW          Decrease # of windows deleting last row\n");
     prompt->appendPlainText(" CTL_C CTL_Y CTL_Z      Close the program\n");
     prompt->appendPlainText(" _________________________________________________________\n\n");
+
+    // Launch interactive in-app Help & Reference Guide Dialog
+    if (!m_helpDialog) {
+        m_helpDialog = new HelpDialog(this);
+    }
+    m_helpDialog->show();
+    m_helpDialog->raise();
+    m_helpDialog->activateWindow();
 }
 
 void QMainCanvas::keyPressEvent(QKeyEvent *event)
 {
+    if (event->key() == Qt::Key_F1) {
+        offerHelp();
+        return;
+    }
+
     if (((event->modifiers() & Qt::ControlModifier) && (event->modifiers() & Qt::ShiftModifier) && event->key() == Qt::Key_D) ||
         event->key() == Qt::Key_F12) {
         openAllDialogsForInspection();

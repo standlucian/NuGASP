@@ -20,6 +20,7 @@
 #include <memory>
 
 class MatrixReader;
+class HelpDialog;
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
@@ -624,6 +625,9 @@ protected:
 
     // Block 4: Macros
     std::map<int, MacroDefinition> m_macros;
+
+    // Interactive In-App Help
+    HelpDialog      *m_helpDialog{nullptr};
 };
 
 

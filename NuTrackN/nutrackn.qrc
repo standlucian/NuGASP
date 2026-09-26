@@ -4,5 +4,7 @@
     <file>nutrackn.png</file>
     <file>readicon.png</file>
     <file>c2picon.png</file>
+    <file alias="USER_MANUAL.md">../docs/USER_MANUAL.md</file>
+    <file alias="SHORTCUTS.md">../docs/SHORTCUTS.md</file>
 </qresource>
 </RCC>

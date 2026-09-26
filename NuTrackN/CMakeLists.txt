@@ -42,6 +42,7 @@ set(SOURCES
     Sources/EfficiencyDialog.cxx
     Sources/AutoCalibDialog.cxx
     Sources/MacroDialog.cxx
+    Sources/HelpDialog.cxx
 )
 
 set(HEADERS
@@ -61,6 +62,7 @@ set(HEADERS
     Include/EfficiencyDialog.h
     Include/AutoCalibDialog.h
     Include/MacroDialog.h
+    Include/HelpDialog.h
 )
 
 set(RESOURCES
