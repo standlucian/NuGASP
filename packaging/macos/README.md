@@ -13,12 +13,14 @@ Both packages are completely self-contained with bundled Qt5 frameworks, CERN RO
 
 ---
 
-## 🚀 Automated Builds via GitHub Actions (Recommended)
+## 🚀 Automated Builds via GitHub Actions (Apple Silicon ARM64)
 
-You don't need a Mac locally! The repository includes a GitHub Actions workflow:
+The repository includes a GitHub Actions workflow that automatically builds Apple Silicon packages:
 - Go to the **Actions** tab on your GitHub repository.
-- Select **Build & Package macOS (ARM64 & Intel)** and click **Run workflow**.
-- GitHub will spin up real Apple Silicon and Intel Macs, compile both versions, and make the `.dmg` files available for download under Artifacts or Releases.
+- Select **Build & Package macOS (Apple Silicon ARM64)** and click **Run workflow**.
+- GitHub will spin up an Apple Silicon Mac runner, compile, and make **`NuTrackN-macOS-arm64.dmg`** available for download under Artifacts or Releases in ~15 minutes.
+
+For older Intel Macs (x86_64), build directly on a physical Intel machine using the local build steps below.
 
 ---
 

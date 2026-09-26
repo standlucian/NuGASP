@@ -1,4 +1,4 @@
-name: Build & Package macOS (ARM64 & Intel)
+name: Build & Package macOS (Apple Silicon ARM64)
 
 on:
   workflow_dispatch:
@@ -8,19 +8,8 @@ on:
 
 jobs:
   build-macos:
-    name: Build macOS DMG (${{ matrix.name }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: "Apple Silicon (ARM64)"
-            os: macos-latest
-            arch: arm64
-          - name: "Intel (x86_64)"
-            os: macos-13
-            arch: x86_64
-
+    name: Build macOS DMG (Apple Silicon ARM64)
+    runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - name: Check out repository
@@ -40,7 +29,7 @@ jobs:
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NuTrackN-macOS-${{ matrix.arch }}
+          name: NuTrackN-macOS-arm64
           path: dist/NuTrackN-macOS-*.dmg
           if-no-files-found: error
 
