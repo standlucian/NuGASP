@@ -4,16 +4,19 @@ TEMPLATE = app
 QT += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
-# Compiler configuration (C++17/C++20 required by modern CERN ROOT)
+# Compiler configuration (matches installed CERN ROOT C++17 configuration)
 CONFIG += qt warn_on thread c++17
 CONFIG -= c++11 c++14
-QMAKE_CXXFLAGS += -fPIC -std=c++20
-QMAKE_CXXFLAGS_CXX11 = -std=c++20
-QMAKE_CXXFLAGS_CXX14 = -std=c++20
-QMAKE_CXXFLAGS_CXX1Z = -std=c++20
-QMAKE_CXXFLAGS_CXX17 = -std=c++20
-QMAKE_CXXFLAGS_CXX2A = -std=c++20
-QMAKE_CXXFLAGS_CXX20 = -std=c++20
+
+# Use GCC 14 if installed, otherwise use system default compiler
+exists(/usr/bin/g++-14) {
+    QMAKE_CXX = g++-14
+    QMAKE_CC = gcc-14
+    QMAKE_LINK = g++-14
+}
+
+QMAKE_CXXFLAGS += -fPIC
+QMAKE_CXXFLAGS_CXX17 = -std=c++17
 
 # Project and ROOT header directories
 # Automatically detect ROOT via root-config or ROOTSYS environment variable.
