@@ -1,0 +1,63 @@
+name: Build & Package Linux (Ubuntu 22.04 LTS Baseline)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-linux:
+    name: Build Linux AppImage (Ubuntu 22.04 LTS)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies & Qt5
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            qtbase5-dev \
+            libqt5svg5-dev \
+            libx11-dev \
+            libxpm-dev \
+            libxft-dev \
+            libxext-dev \
+            libtbb-dev \
+            wget \
+            curl
+
+      - name: Download & Setup CERN ROOT for Ubuntu 22.04
+        run: |
+          wget -q https://root.cern/download/root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz
+          sudo tar -xzf root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz -C /opt
+          rm -f root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz
+          echo "/opt/root/bin" >> $GITHUB_PATH
+          echo "ROOTSYS=/opt/root" >> $GITHUB_ENV
+
+      - name: Build Standalone NuTrackN AppImage
+        run: |
+          source /opt/root/bin/thisroot.sh
+          chmod +x packaging/linux/build_appimage.sh
+          ./packaging/linux/build_appimage.sh
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: NuTrackN-Linux-x86_64
+          path: dist/NuTrackN-x86_64.AppImage
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/NuTrackN-x86_64.AppImage
+            dist/NuTrackN-linux-x86_64-portable.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

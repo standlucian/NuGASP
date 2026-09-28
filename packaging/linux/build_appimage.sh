@@ -153,6 +153,8 @@ if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
         echo " ${APPDIR}/usr/include/c++/13" >&2
         [ -d "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" ] && echo " ${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" >&2
         [ -d "${APPDIR}/usr/include/c++/13/backward" ] && echo " ${APPDIR}/usr/include/c++/13/backward" >&2
+        echo "End of search list." >&2
+        exit 0
     fi
     for cxx_dir in /usr/include/c++/*; do
         if [ -d "$cxx_dir" ]; then
@@ -161,6 +163,8 @@ if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
             for sub in "/usr/include/x86_64-linux-gnu/c++/$ver" "/usr/include/c++/$ver/backward"; do
                 [ -d "$sub" ] && echo " $sub" >&2
             done
+            echo "End of search list." >&2
+            exit 0
         fi
     done
     echo "End of search list." >&2
@@ -257,7 +261,11 @@ for glibc_lib in /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
                  /lib/x86_64-linux-gnu/libdl.so.2 \
                  /lib/x86_64-linux-gnu/librt.so.1 \
                  /lib/x86_64-linux-gnu/libresolv.so.2 \
-                 /lib/x86_64-linux-gnu/libutil.so.1; do
+                 /lib/x86_64-linux-gnu/libutil.so.1 \
+                 /lib/x86_64-linux-gnu/libnss_files.so.2 \
+                 /lib/x86_64-linux-gnu/libnss_dns.so.2 \
+                 /lib/x86_64-linux-gnu/libnss_compat.so.2 \
+                 /lib/x86_64-linux-gnu/libnss_hesiod.so.2; do
     if [ -f "$glibc_lib" ]; then
         cp -aL "$glibc_lib" "${APPDIR}/usr/lib/compat/"
     fi
@@ -280,11 +288,12 @@ export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
 
 # Configure embedded ROOT runtime
 export ROOTSYS="${APPDIR}/usr"
-export ROOT_CONFIG_SEARCH_PATH="${APPDIR}/usr/etc/root"
+export ROOT_CONFIG_SEARCH_PATH="${APPDIR}/usr/etc"
 export ROOT_INCLUDE_PATH="${APPDIR}/usr/include"
-if [ -d "${APPDIR}/usr/etc/root" ]; then
-    export ROOTRC="${APPDIR}/usr/etc/root/system.rootrc"
+if [ -f "${APPDIR}/usr/etc/system.rootrc" ]; then
+    export ROOTRC="${APPDIR}/usr/etc/system.rootrc"
 fi
+export CLING_STANDARD_PCH=none
 if [ -d "${APPDIR}/usr/fonts" ]; then
     export ROOT_TTFONTS="${APPDIR}/usr/fonts"
 fi
