@@ -22,12 +22,17 @@ jobs:
             build-essential \
             cmake \
             qtbase5-dev \
+            qtchooser \
+            qt5-qmake \
+            qtbase5-dev-tools \
             libqt5svg5-dev \
             libx11-dev \
             libxpm-dev \
             libxft-dev \
             libxext-dev \
             libtbb-dev \
+            libglu1-mesa-dev \
+            libgl1-mesa-dev \
             wget \
             curl
 
