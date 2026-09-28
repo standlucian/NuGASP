@@ -282,7 +282,17 @@ APPDIR="$(dirname "$SELF")"
 
 export APPDIR="${APPDIR}"
 export PATH="${APPDIR}/usr/bin:${PATH}"
-export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${LD_LIBRARY_PATH}"
+# Strip foreign ROOT installations from library paths to prevent library hijacking
+CLEAN_LD_PATH=""
+if [ -n "$LD_LIBRARY_PATH" ]; then
+    CLEAN_LD_PATH="$(echo "$LD_LIBRARY_PATH" | tr ':' '\n' | grep -v "/root/lib" | grep -v "/Installed/root" | tr '\n' ':' | sed 's/:$//')"
+fi
+if [ -n "$CLEAN_LD_PATH" ]; then
+    export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${CLEAN_LD_PATH}"
+else
+    export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
+fi
+unset LD_PRELOAD
 export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
 
