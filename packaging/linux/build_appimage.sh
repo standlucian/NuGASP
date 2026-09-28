@@ -129,6 +129,50 @@ if [ -d "${ROOT_DIR}/docs" ]; then
     cp -a "${ROOT_DIR}/docs/"* "${APPDIR}/usr/share/doc/nutrackn/"
 fi
 
+# Create Cling compiler shim and clean sed wrapper in usr/bin
+# (Prevents ROOT Cling JIT crashes when host has GCC 11/12 or missing g++-13)
+cat << 'SHIM_EOF' > "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
+#!/usr/bin/env bash
+FILTERED_PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')"
+for comp in g++-14 g++-13 g++-12 g++-11 g++ c++ x86_64-linux-gnu-g++ clang++; do
+    COMP_BIN="$(PATH="$FILTERED_PATH" which "$comp" 2>/dev/null || true)"
+    if [ -n "$COMP_BIN" ] && [ -x "$COMP_BIN" ]; then
+        exec "$COMP_BIN" "$@"
+    fi
+done
+if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
+    FOUND_INC=false
+    for cxx_dir in /usr/include/c++/*; do
+        if [ -d "$cxx_dir" ]; then
+            FOUND_INC=true
+            echo "#include <...> search starts here:" >&2
+            echo " $cxx_dir" >&2
+            ver="$(basename "$cxx_dir")"
+            for sub in "/usr/include/x86_64-linux-gnu/c++/$ver" "/usr/include/c++/$ver/backward"; do
+                [ -d "$sub" ] && echo " $sub" >&2
+            done
+        fi
+    done
+    if [ "$FOUND_INC" = true ]; then
+        echo "End of search list." >&2
+        exit 0
+    fi
+fi
+exit 0
+SHIM_EOF
+chmod +x "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
+ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-14"
+ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/g++-13"
+ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/g++-14"
+
+# Create clean sed wrapper that unsets LD_LIBRARY_PATH so host sed never loads AppDir libraries
+cat << 'SED_EOF' > "${APPDIR}/usr/bin/sed"
+#!/usr/bin/env bash
+SYSTEM_SED="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')" which sed 2>/dev/null || echo "/bin/sed")"
+LD_LIBRARY_PATH="" exec "$SYSTEM_SED" "$@"
+SED_EOF
+chmod +x "${APPDIR}/usr/bin/sed"
+
 # ------------------------------------------------------------------------------
 # 4. Bundle Shared Libraries & Qt Plugins
 # ------------------------------------------------------------------------------
@@ -157,6 +201,9 @@ collect_libs() {
                     continue
                     ;;
                 libX11.so*|libxcb.so*|libXau.so*|libXdmcp.so*|libXext.so*)
+                    continue
+                    ;;
+                libselinux.so*|libpcre*.so*|libsystemd.so*|libudev.so*|libcap.so*|libgcrypt.so*|libgpg-error.so*|libaudit.so*)
                     continue
                     ;;
                 *)
