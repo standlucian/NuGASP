@@ -43,6 +43,8 @@ log.txt
 # Packaging & Distribution Artifacts
 dist/*.AppImage
 dist/*.dmg
+dist/*.tar.gz
+dist/*.zip
 !dist/README.md
 packaging/**/build/
 packaging/**/.cache/

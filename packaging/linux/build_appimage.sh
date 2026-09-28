@@ -347,34 +347,229 @@ EOF
 chmod +x "${APPDIR}/AppRun"
 
 # ------------------------------------------------------------------------------
-# 5. Acquire appimagetool and package
+# 5. Generate 1-Click Universal Standalone AppImage (Zero-Dependency, FUSE-Free)
 # ------------------------------------------------------------------------------
-echo "==> [5/6] Generating AppImage bundle..."
+echo "==> [5/6] Generating 1-Click Universal Standalone AppImage..."
 
-APPIMAGETOOL=""
-if command -v appimagetool >/dev/null 2>&1; then
-    APPIMAGETOOL="$(command -v appimagetool)"
-elif [ -f "${CACHE_DIR}/appimagetool-x86_64.AppImage" ]; then
-    APPIMAGETOOL="${CACHE_DIR}/appimagetool-x86_64.AppImage"
-else
-    echo "    Downloading appimagetool utility..."
-    APPIMAGETOOL_URL="https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage"
-    curl -sSL -o "${CACHE_DIR}/appimagetool-x86_64.AppImage" "${APPIMAGETOOL_URL}" || \
-    wget -q -O "${CACHE_DIR}/appimagetool-x86_64.AppImage" "${APPIMAGETOOL_URL}"
-    chmod +x "${CACHE_DIR}/appimagetool-x86_64.AppImage"
-    APPIMAGETOOL="${CACHE_DIR}/appimagetool-x86_64.AppImage"
+GIT_HASH="$(git rev-parse --short HEAD 2>/dev/null || echo "release")"
+BUILD_ID="nutrackn-${GIT_HASH}-$(date +%Y%m%d)"
+
+RUNNER_TMP="${BUILD_DIR}/runner_header.sh"
+cat << 'RUNNER_EOF' > "${RUNNER_TMP}"
+#!/usr/bin/env bash
+# ==============================================================================
+# NuTrackN - 1-Click Universal Standalone Linux Executable
+# Zero External Dependencies • No FUSE Required • No Root Privileges Required
+# Works out of the box on Ubuntu 20.04+, 22.04+, 24.04+, Debian, Fedora, Arch, etc.
+# ==============================================================================
+set -eo pipefail
+
+SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+APP_NAME="NuTrackN"
+APP_EXE="nutrackn"
+BUILD_ID="@@BUILD_ID@@"
+
+# Locate archive payload separator
+PAYLOAD_LINE=$(grep -a -m 1 -n '^__NUTRACKN_PAYLOAD_BELOW__$' "$SELF" 2>/dev/null | cut -d: -f1)
+if [ -z "$PAYLOAD_LINE" ]; then
+    echo "[-] Error: Embedded application payload could not be located in $SELF" >&2
+    exit 1
 fi
 
-# Run appimagetool
-export ARCH="x86_64"
-echo "    Executing: appimagetool ..."
-ARCH=x86_64 "${APPIMAGETOOL}" --appimage-extract-and-run "${APPDIR}" "${APPIMAGE_OUTPUT}" 2>&1 || \
-ARCH=x86_64 "${APPIMAGETOOL}" "${APPDIR}" "${APPIMAGE_OUTPUT}"
+extract_payload() {
+    local target_dir="$1"
+    mkdir -p "$target_dir"
+    tail -n +"$((PAYLOAD_LINE + 1))" "$SELF" | tar -xz -C "$target_dir"
+}
 
+install_system() {
+    local install_dir="${HOME}/.local/share/nutrackn"
+    local bin_dir="${HOME}/.local/bin"
+    local apps_dir="${HOME}/.local/share/applications"
+    local icons_base="${HOME}/.local/share/icons/hicolor"
+
+    echo "======================================================================"
+    echo "    🚀  Installing NuTrackN to User Environment (~/.local)...         "
+    echo "======================================================================"
+    
+    mkdir -p "${install_dir}" "${bin_dir}" "${apps_dir}" "${icons_base}/512x512/apps"
+
+    echo "==> [1/3] Extracting application payload to ${install_dir}..."
+    rm -rf "${install_dir}"/*
+    extract_payload "${install_dir}"
+    chmod +x "${install_dir}/AppRun" "${install_dir}/usr/bin/${APP_EXE}"
+    echo "    ✓ Application runtime and libraries installed"
+
+    echo "==> [2/3] Setting up 'nutrackn' terminal command in ${bin_dir}..."
+    cat << RUNNER > "${bin_dir}/${APP_EXE}"
+#!/usr/bin/env bash
+exec "${install_dir}/AppRun" "\$@"
+RUNNER
+    chmod +x "${bin_dir}/${APP_EXE}"
+    echo "    ✓ Created launcher command: ${bin_dir}/${APP_EXE}"
+
+    echo "==> [3/3] Setting up desktop menu shortcut and icons..."
+    if [ -f "${install_dir}/nutrackn.png" ]; then
+        cp -a "${install_dir}/nutrackn.png" "${icons_base}/512x512/apps/${APP_EXE}.png"
+    fi
+    for s in 16 32 48 64 128 256; do
+        if [ -d "${install_dir}/usr/share/icons/hicolor/${s}x${s}/apps" ]; then
+            mkdir -p "${icons_base}/${s}x${s}/apps"
+            cp -a "${install_dir}/usr/share/icons/hicolor/${s}x${s}/apps/"* "${icons_base}/${s}x${s}/apps/" 2>/dev/null || true
+        fi
+    done
+
+    cat << DESKTOPEOF > "${apps_dir}/${APP_EXE}.desktop"
+[Desktop Entry]
+Type=Application
+Name=NuTrackN
+GenericName=Nuclear Spectroscopy Analysis
+Comment=Interactive Nuclear Spectroscopy & Gamma-Ray Analysis
+Exec=${bin_dir}/${APP_EXE} %F
+Icon=nutrackn
+Terminal=false
+Categories=Science;Physics;DataVisualization;Qt;
+MimeType=application/x-root;
+StartupNotify=true
+StartupWMClass=nutrackn
+DESKTOPEOF
+    chmod +x "${apps_dir}/${APP_EXE}.desktop"
+    echo "    ✓ Created desktop shortcut: ${apps_dir}/${APP_EXE}.desktop"
+
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "${apps_dir}" 2>/dev/null || true
+    fi
+
+    # Ensure ~/.local/bin is in PATH
+    local path_configured=false
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) path_configured=true ;;
+    esac
+
+    if [ "$path_configured" = false ]; then
+        echo "    ℹ Adding ~/.local/bin to PATH in ~/.bashrc and ~/.zshrc..."
+        if [ -f "${HOME}/.bashrc" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.bashrc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.bashrc"
+        fi
+        if [ -f "${HOME}/.zshrc" ] && ! grep -q 'export PATH="$HOME/.local/bin:$PATH"' "${HOME}/.zshrc"; then
+            echo 'export PATH="$HOME/.local/bin:$PATH"' >> "${HOME}/.zshrc"
+        fi
+    fi
+
+    echo ""
+    echo "======================================================================"
+    echo "    🎉 1-Click Installation Complete! All is ready.                   "
+    echo "======================================================================"
+    echo "    You can now launch NuTrackN simply by typing:                     "
+    echo ""
+    echo "        nutrackn"
+    echo ""
+    echo "    (or open 'NuTrackN' from your system Applications menu)           "
+    echo "======================================================================"
+    echo ""
+}
+
+uninstall_system() {
+    local install_dir="${HOME}/.local/share/nutrackn"
+    local bin_dir="${HOME}/.local/bin"
+    local apps_dir="${HOME}/.local/share/applications"
+    local icons_base="${HOME}/.local/share/icons/hicolor"
+
+    echo "==> Uninstalling NuTrackN from system..."
+    rm -rf "${install_dir}"
+    rm -f "${bin_dir}/${APP_EXE}"
+    rm -f "${apps_dir}/${APP_EXE}.desktop"
+    rm -f "${icons_base}/512x512/apps/${APP_EXE}.png"
+    for s in 16 32 48 64 128 256; do
+        rm -f "${icons_base}/${s}x${s}/apps/${APP_EXE}.png"
+    done
+    rm -rf "${HOME}/.cache/nutrackn"
+    if command -v update-desktop-database >/dev/null 2>&1; then
+        update-desktop-database "${apps_dir}" 2>/dev/null || true
+    fi
+    echo "    ✓ NuTrackN removed successfully from ~/.local"
+}
+
+show_help() {
+    echo "NuTrackN - Interactive Nuclear Spectroscopy"
+    echo ""
+    echo "Usage: ./NuTrackN-x86_64.AppImage [options] [spectrum_files...]"
+    echo ""
+    echo "Options:"
+    echo "  --install, -i        Install 'nutrackn' terminal command & desktop shortcut"
+    echo "  --uninstall, -u      Remove 'nutrackn' terminal command & desktop shortcut"
+    echo "  --extract-to DIR     Extract application files to specified directory"
+    echo "  --version, -v        Display version and build information"
+    echo "  --help, -h           Display this help message"
+    echo ""
+    echo "Example:"
+    echo "  chmod +x NuTrackN-x86_64.AppImage"
+    echo "  ./NuTrackN-x86_64.AppImage --install"
+    echo "  nutrackn spectrum.spe"
+    echo ""
+}
+
+case "$1" in
+    --install|-i|--integrate)
+        install_system
+        exit 0
+        ;;
+    --uninstall|-u|--remove)
+        uninstall_system
+        exit 0
+        ;;
+    --help|-h)
+        show_help
+        exit 0
+        ;;
+    --version|-v)
+        echo "NuTrackN standalone bundle (Build: ${BUILD_ID})"
+        exit 0
+        ;;
+    --extract-to)
+        if [ -z "$2" ]; then
+            echo "[-] Error: --extract-to requires a destination directory." >&2
+            exit 1
+        fi
+        echo "==> Extracting NuTrackN to: $2..."
+        extract_payload "$2"
+        echo "    ✓ Extraction completed."
+        exit 0
+        ;;
+esac
+
+# Direct execution (without --install)
+CACHE_DIR="${HOME}/.cache/nutrackn/${BUILD_ID}"
+if [ ! -f "${CACHE_DIR}/AppRun" ]; then
+    echo "==> [NuTrackN] Preparing standalone environment (one-time setup, ~4s)..."
+    rm -rf "${HOME}/.cache/nutrackn"/*
+    extract_payload "${CACHE_DIR}"
+    chmod +x "${CACHE_DIR}/AppRun" "${CACHE_DIR}/usr/bin/${APP_EXE}"
+fi
+
+if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/${APP_EXE}" ]; then
+    echo "----------------------------------------------------------------------"
+    echo " 💡 Tip: Add the 'nutrackn' terminal command (just like xtrackn) with:"
+    echo "         $SELF --install"
+    echo "----------------------------------------------------------------------"
+fi
+
+exec "${CACHE_DIR}/AppRun" "$@"
+
+__NUTRACKN_PAYLOAD_BELOW__
+RUNNER_EOF
+
+sed -i "s/@@BUILD_ID@@/${BUILD_ID}/" "${RUNNER_TMP}"
+
+# Assemble standalone AppImage
+echo "    Packaging standalone self-executing bundle..."
+cp "${RUNNER_TMP}" "${APPIMAGE_OUTPUT}"
+tar -czf - -C "${APPDIR}" . >> "${APPIMAGE_OUTPUT}"
 chmod +x "${APPIMAGE_OUTPUT}"
+rm -f "${RUNNER_TMP}"
 
-# Also generate a standalone portable tarball (100% FUSE-free, runs anywhere)
-echo "==> Packaging standalone portable tarball (zero-dependency, FUSE-free)..."
+# Also generate a standalone portable tarball
+echo "==> Packaging standalone portable tarball..."
 TARBALL_OUTPUT="${DIST_DIR}/${APP_NAME}-linux-x86_64-portable.tar.gz"
 (
     cd "${BUILD_DIR}"
@@ -391,22 +586,17 @@ echo ""
 echo "======================================================================"
 echo "    🎉 Linux Packages Built Successfully!                            "
 echo "======================================================================"
-echo "    1. Standalone AppImage:"
+echo "    1. Standalone Universal AppImage (100% FUSE-Free, Zero-Dependency):"
 echo "       ${APPIMAGE_OUTPUT} ($(du -h "${APPIMAGE_OUTPUT}" | awk '{print $1}'))"
 echo ""
-echo "    2. Portable FUSE-Free Tarball:"
+echo "    2. Portable Tarball:"
 echo "       ${TARBALL_OUTPUT} ($(du -h "${TARBALL_OUTPUT}" | awk '{print $1}'))"
 echo ""
 echo "----------------------------------------------------------------------"
-echo " 💡 Running on other Linux systems (Ubuntu 22.04/24.04, Debian, etc.):"
-echo "    - Direct run:"
-echo "        ${APPIMAGE_OUTPUT}"
-echo "    - If the target machine shows 'open dir error' (missing libfuse2):"
-echo "        ${APPIMAGE_OUTPUT} --appimage-extract-and-run"
-echo "      or:"
-echo "        APPIMAGE_EXTRACT_AND_RUN=1 ${APPIMAGE_OUTPUT}"
-echo "      or install FUSE: sudo apt install libfuse2 (or libfuse2t64 on 24.04+)"
-echo "    - Or extract the portable tarball anywhere and execute:"
-echo "        ./${APP_NAME}/AppRun"
+echo " 💡 Standard 1-Click Workflow on ANY Linux computer:"
+echo "    chmod +x $(basename "${APPIMAGE_OUTPUT}")"
+echo "    ./$(basename "${APPIMAGE_OUTPUT}") --install"
+echo "    nutrackn"
 echo "======================================================================"
+
 
