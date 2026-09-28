@@ -129,23 +129,33 @@ if [ -d "${ROOT_DIR}/docs" ]; then
     cp -a "${ROOT_DIR}/docs/"* "${APPDIR}/usr/share/doc/nutrackn/"
 fi
 
+# Bundle C++ standard library headers to make Cling JIT 100% self-contained
+if [ -d "/usr/include/c++/13" ]; then
+    echo "    Bundling C++ standard library headers for Cling JIT..."
+    mkdir -p "${APPDIR}/usr/include/c++"
+    cp -a /usr/include/c++/13 "${APPDIR}/usr/include/c++/"
+    if [ -d "/usr/include/x86_64-linux-gnu/c++/13" ]; then
+        mkdir -p "${APPDIR}/usr/include/x86_64-linux-gnu/c++"
+        cp -a /usr/include/x86_64-linux-gnu/c++/13 "${APPDIR}/usr/include/x86_64-linux-gnu/c++/"
+    fi
+fi
+
 # Create Cling compiler shim and clean sed wrapper in usr/bin
 # (Prevents ROOT Cling JIT crashes when host has GCC 11/12 or missing g++-13)
 cat << 'SHIM_EOF' > "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
 #!/usr/bin/env bash
-FILTERED_PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')"
-for comp in g++-14 g++-13 g++-12 g++-11 g++ c++ x86_64-linux-gnu-g++ clang++; do
-    COMP_BIN="$(PATH="$FILTERED_PATH" which "$comp" 2>/dev/null || true)"
-    if [ -n "$COMP_BIN" ] && [ -x "$COMP_BIN" ]; then
-        exec "$COMP_BIN" "$@"
-    fi
-done
+SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
+APPDIR="$(cd "$(dirname "$SELF")/../.." && pwd)"
+
 if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
-    FOUND_INC=false
+    echo "#include <...> search starts here:" >&2
+    if [ -d "${APPDIR}/usr/include/c++/13" ]; then
+        echo " ${APPDIR}/usr/include/c++/13" >&2
+        [ -d "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" ] && echo " ${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" >&2
+        [ -d "${APPDIR}/usr/include/c++/13/backward" ] && echo " ${APPDIR}/usr/include/c++/13/backward" >&2
+    fi
     for cxx_dir in /usr/include/c++/*; do
         if [ -d "$cxx_dir" ]; then
-            FOUND_INC=true
-            echo "#include <...> search starts here:" >&2
             echo " $cxx_dir" >&2
             ver="$(basename "$cxx_dir")"
             for sub in "/usr/include/x86_64-linux-gnu/c++/$ver" "/usr/include/c++/$ver/backward"; do
@@ -153,11 +163,17 @@ if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
             done
         fi
     done
-    if [ "$FOUND_INC" = true ]; then
-        echo "End of search list." >&2
-        exit 0
-    fi
+    echo "End of search list." >&2
+    exit 0
 fi
+
+FILTERED_PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')"
+for comp in g++-14 g++-13 g++-12 g++-11 g++ c++ x86_64-linux-gnu-g++ clang++; do
+    COMP_BIN="$(PATH="$FILTERED_PATH" which "$comp" 2>/dev/null || true)"
+    if [ -n "$COMP_BIN" ] && [ -x "$COMP_BIN" ]; then
+        exec "$COMP_BIN" "$@"
+    fi
+done
 exit 0
 SHIM_EOF
 chmod +x "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
