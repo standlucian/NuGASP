@@ -184,6 +184,22 @@ if [ -d "${ROOTSYS}/lib" ]; then
     cp -a "${ROOTSYS}/lib/"*.pcm "${APPDIR}/usr/lib/" 2>/dev/null || true
 fi
 
+# Bundle backward-compatibility glibc runtime to support older distributions (e.g. Ubuntu 22.04 with glibc 2.35)
+echo "    Bundling backward-compatibility glibc runtime..."
+mkdir -p "${APPDIR}/usr/lib/compat"
+for glibc_lib in /lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 \
+                 /lib/x86_64-linux-gnu/libc.so.6 \
+                 /lib/x86_64-linux-gnu/libm.so.6 \
+                 /lib/x86_64-linux-gnu/libpthread.so.0 \
+                 /lib/x86_64-linux-gnu/libdl.so.2 \
+                 /lib/x86_64-linux-gnu/librt.so.1 \
+                 /lib/x86_64-linux-gnu/libresolv.so.2 \
+                 /lib/x86_64-linux-gnu/libutil.so.1; do
+    if [ -f "$glibc_lib" ]; then
+        cp -aL "$glibc_lib" "${APPDIR}/usr/lib/compat/"
+    fi
+done
+
 # Create AppRun launcher with smart 1-click terminal & desktop integration
 cat << 'EOF' > "${APPDIR}/AppRun"
 #!/usr/bin/env bash
@@ -383,7 +399,29 @@ if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/nutrackn" ]; then
     echo "----------------------------------------------------------------------"
 fi
 
-exec "${APPDIR}/usr/bin/nutrackn" "$@"
+# Detect if host glibc satisfies requirement (GLIBC_2.38)
+HOST_LIBC="$(ldconfig -p 2>/dev/null | awk '/libc\.so\.6/ { print $NF; exit }')"
+[ -z "$HOST_LIBC" ] && [ -f /lib/x86_64-linux-gnu/libc.so.6 ] && HOST_LIBC="/lib/x86_64-linux-gnu/libc.so.6"
+[ -z "$HOST_LIBC" ] && [ -f /lib64/libc.so.6 ] && HOST_LIBC="/lib64/libc.so.6"
+
+USE_COMPAT_LOADER=false
+if [ -f "${APPDIR}/usr/lib/compat/ld-linux-x86-64.so.2" ]; then
+    if [ -n "$HOST_LIBC" ] && [ -f "$HOST_LIBC" ]; then
+        if ! grep -a -q "GLIBC_2.38" "$HOST_LIBC" 2>/dev/null; then
+            USE_COMPAT_LOADER=true
+        fi
+    else
+        USE_COMPAT_LOADER=true
+    fi
+fi
+
+if [ "$USE_COMPAT_LOADER" = true ]; then
+    exec "${APPDIR}/usr/lib/compat/ld-linux-x86-64.so.2" \
+         --library-path "${APPDIR}/usr/lib:${APPDIR}/usr/lib/compat:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/lib64:/usr/lib64" \
+         "${APPDIR}/usr/bin/nutrackn" "$@"
+else
+    exec "${APPDIR}/usr/bin/nutrackn" "$@"
+fi
 EOF
 chmod +x "${APPDIR}/AppRun"
 
