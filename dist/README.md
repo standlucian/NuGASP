@@ -17,16 +17,16 @@ chmod +x NuTrackN-x86_64.AppImage
 **All is ready!** 
 No installing FUSE (`libfuse2`), no manual unpacking, and no administrator (`sudo`) privileges required.
 
-You can now immediately launch NuTrackN from anywhere:
-```bash
-nutrackn
-```
-Or open **NuTrackN** from your desktop Applications menu (under *Science* or *Education*).
-
-You can also pass spectrum files directly as arguments:
-```bash
-nutrackn my_spectrum.spe
-```
+You can now immediately launch NuTrackN:
+- **From your Desktop**: Double-click **NuTrackN** on your desktop.
+- **From Applications menu**: Open **NuTrackN** (under *Science* or *Education*).
+- **From any terminal**:
+  ```bash
+  nutrackn
+  # or with a spectrum file:
+  nutrackn my_spectrum.spe
+  ```
+  *(If using the exact same terminal where you just ran `--install`, run `source ~/.profile` or open a new terminal window).*
 
 ---
 
@@ -52,14 +52,11 @@ To use `nutrackn` like a standard command line tool (just like you call `xtrackn
 *(or `./NuTrackN-x86_64.AppImage -i`)*
 
 ### What `--install` does:
-1. **Terminal Command**: Installs `nutrackn` into `~/.local/bin/nutrackn` so you can launch it simply by typing:
-   ```bash
-   nutrackn
-   ```
-   from any terminal in any directory.
-2. **Desktop Launcher**: Creates an application entry in your system's desktop menu (`~/.local/share/applications/nutrackn.desktop`).
-3. **High-Res Icon**: Installs high-resolution icons into your system's icon theme.
-4. **PATH Configuration**: Automatically ensures `~/.local/bin` is in your shell `$PATH` (in `~/.bashrc` / `~/.zshrc`).
+1. **Desktop Shortcut**: Creates a trusted double-clickable application launcher on your actual Desktop (`~/Desktop/NuTrackN.desktop`).
+2. **Terminal Command**: Installs `nutrackn` into `~/.local/bin/nutrackn` and `~/bin/nutrackn`.
+3. **Application Menu**: Adds **NuTrackN** to your system's desktop menu (`~/.local/share/applications/nutrackn.desktop`).
+4. **High-Res Icon**: Installs high-resolution icons (512x512 down to 16x16) into your icon theme.
+5. **PATH Configuration**: Ensures `~/.local/bin` and `~/bin` are configured across shell profiles (`~/.bashrc`, `~/.profile`, `~/.zshrc`).
 
 ---
 
