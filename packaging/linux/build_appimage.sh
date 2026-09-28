@@ -129,70 +129,6 @@ if [ -d "${ROOT_DIR}/docs" ]; then
     cp -a "${ROOT_DIR}/docs/"* "${APPDIR}/usr/share/doc/nutrackn/"
 fi
 
-# Bundle C++ standard library headers to make Cling JIT 100% self-contained
-if [ -d "/usr/include/c++/13" ]; then
-    echo "    Bundling C++ standard library headers for Cling JIT..."
-    mkdir -p "${APPDIR}/usr/include/c++"
-    cp -a /usr/include/c++/13 "${APPDIR}/usr/include/c++/"
-    if [ -d "/usr/include/x86_64-linux-gnu/c++/13" ]; then
-        mkdir -p "${APPDIR}/usr/include/x86_64-linux-gnu/c++"
-        cp -a /usr/include/x86_64-linux-gnu/c++/13 "${APPDIR}/usr/include/x86_64-linux-gnu/c++/"
-    fi
-fi
-
-# Create Cling compiler shim and clean sed wrapper in usr/bin
-# (Prevents ROOT Cling JIT crashes when host has GCC 11/12 or missing g++-13)
-cat << 'SHIM_EOF' > "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
-#!/usr/bin/env bash
-SELF="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")"
-APPDIR="$(cd "$(dirname "$SELF")/../.." && pwd)"
-
-if [[ "$*" == *"-xc++"* ]] && [[ "$*" == *"-E"* ]]; then
-    echo "#include <...> search starts here:" >&2
-    if [ -d "${APPDIR}/usr/include/c++/13" ]; then
-        echo " ${APPDIR}/usr/include/c++/13" >&2
-        [ -d "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" ] && echo " ${APPDIR}/usr/include/x86_64-linux-gnu/c++/13" >&2
-        [ -d "${APPDIR}/usr/include/c++/13/backward" ] && echo " ${APPDIR}/usr/include/c++/13/backward" >&2
-        echo "End of search list." >&2
-        exit 0
-    fi
-    for cxx_dir in /usr/include/c++/*; do
-        if [ -d "$cxx_dir" ]; then
-            echo " $cxx_dir" >&2
-            ver="$(basename "$cxx_dir")"
-            for sub in "/usr/include/x86_64-linux-gnu/c++/$ver" "/usr/include/c++/$ver/backward"; do
-                [ -d "$sub" ] && echo " $sub" >&2
-            done
-            echo "End of search list." >&2
-            exit 0
-        fi
-    done
-    echo "End of search list." >&2
-    exit 0
-fi
-
-FILTERED_PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')"
-for comp in g++-14 g++-13 g++-12 g++-11 g++ c++ x86_64-linux-gnu-g++ clang++; do
-    COMP_BIN="$(PATH="$FILTERED_PATH" which "$comp" 2>/dev/null || true)"
-    if [ -n "$COMP_BIN" ] && [ -x "$COMP_BIN" ]; then
-        exec "$COMP_BIN" "$@"
-    fi
-done
-exit 0
-SHIM_EOF
-chmod +x "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-13"
-ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-14"
-ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/g++-13"
-ln -sf x86_64-linux-gnu-g++-13 "${APPDIR}/usr/bin/g++-14"
-
-# Create clean sed wrapper that unsets LD_LIBRARY_PATH so host sed never loads AppDir libraries
-cat << 'SED_EOF' > "${APPDIR}/usr/bin/sed"
-#!/usr/bin/env bash
-SYSTEM_SED="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "/\.local/share/nutrackn" | grep -v "/AppDir" | grep -v "/\.cache/nutrackn" | tr '\n' ':')" which sed 2>/dev/null || echo "/bin/sed")"
-LD_LIBRARY_PATH="" exec "$SYSTEM_SED" "$@"
-SED_EOF
-chmod +x "${APPDIR}/usr/bin/sed"
-
 # ------------------------------------------------------------------------------
 # 4. Bundle Shared Libraries & Qt Plugins
 # ------------------------------------------------------------------------------
@@ -282,16 +218,8 @@ APPDIR="$(dirname "$SELF")"
 
 export APPDIR="${APPDIR}"
 export PATH="${APPDIR}/usr/bin:${PATH}"
-# Strip foreign ROOT installations from library paths to prevent library hijacking
-CLEAN_LD_PATH=""
-if [ -n "$LD_LIBRARY_PATH" ]; then
-    CLEAN_LD_PATH="$(echo "$LD_LIBRARY_PATH" | tr ':' '\n' | grep -v "/root/lib" | grep -v "/Installed/root" | tr '\n' ':' | sed 's/:$//')"
-fi
-if [ -n "$CLEAN_LD_PATH" ]; then
-    export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${CLEAN_LD_PATH}"
-else
-    export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
-fi
+# Strictly isolate library paths to bundled runtime
+export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
 unset LD_PRELOAD
 export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
 export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
@@ -499,7 +427,7 @@ fi
 
 if [ "$USE_COMPAT_LOADER" = true ]; then
     exec "${APPDIR}/usr/lib/compat/ld-linux-x86-64.so.2" \
-         --library-path "${APPDIR}/usr/lib:${APPDIR}/usr/lib/compat:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:/lib64:/usr/lib64" \
+         --library-path "${APPDIR}/usr/lib:${APPDIR}/usr/lib/compat:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu" \
          "${APPDIR}/usr/bin/nutrackn" "$@"
 else
     exec "${APPDIR}/usr/bin/nutrackn" "$@"
