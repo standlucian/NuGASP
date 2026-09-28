@@ -134,8 +134,8 @@ fi
 # ------------------------------------------------------------------------------
 echo "==> [4/6] Bundling Qt5 and CERN ROOT runtime libraries..."
 
-# Copy Qt plugins
-for plugin in platforms xcbglintegrations imageformats iconengines styles platformthemes; do
+# Copy essential Qt plugins (avoid platformthemes/gtk3 which crash on host glibc mismatch)
+for plugin in platforms xcbglintegrations imageformats iconengines; do
     if [ -d "${QT_PLUGINS_DIR}/${plugin}" ]; then
         cp -a "${QT_PLUGINS_DIR}/${plugin}" "${APPDIR}/usr/plugins/"
     fi
@@ -221,8 +221,11 @@ export PATH="${APPDIR}/usr/bin:${PATH}"
 # Strictly isolate library paths to bundled runtime
 export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
 unset LD_PRELOAD
-export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
+export QT_QPA_PLATFORM=xcb
 export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
+export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
+export QT_QPA_PLATFORMTHEME=""
+export QT_STYLE_OVERRIDE="Fusion"
 
 # Configure embedded ROOT runtime
 export ROOTSYS="${APPDIR}/usr"
