@@ -41,8 +41,8 @@ QT_LIBS_DIR="$("${QMAKE_BIN}" -query QT_INSTALL_LIBS)"
 if [ -z "${ROOTSYS}" ]; then
     if command -v root-config >/dev/null 2>&1; then
         ROOTSYS="$(root-config --prefix)"
-    elif [ -d "/home/lucian/root" ]; then
-        ROOTSYS="/home/lucian/root"
+    elif [ -d "${HOME}/root" ]; then
+        ROOTSYS="${HOME}/root"
     elif [ -d "/opt/root" ]; then
         ROOTSYS="/opt/root"
     fi
@@ -121,6 +121,12 @@ fi
 if [ -d "${ROOTSYS}/include" ]; then
     mkdir -p "${APPDIR}/usr/include"
     cp -a "${ROOTSYS}/include" "${APPDIR}/usr/"
+fi
+
+# Copy documentation
+if [ -d "${ROOT_DIR}/docs" ]; then
+    mkdir -p "${APPDIR}/usr/share/doc/nutrackn"
+    cp -a "${ROOT_DIR}/docs/"* "${APPDIR}/usr/share/doc/nutrackn/"
 fi
 
 # ------------------------------------------------------------------------------
@@ -367,15 +373,40 @@ ARCH=x86_64 "${APPIMAGETOOL}" "${APPDIR}" "${APPIMAGE_OUTPUT}"
 
 chmod +x "${APPIMAGE_OUTPUT}"
 
+# Also generate a standalone portable tarball (100% FUSE-free, runs anywhere)
+echo "==> Packaging standalone portable tarball (zero-dependency, FUSE-free)..."
+TARBALL_OUTPUT="${DIST_DIR}/${APP_NAME}-linux-x86_64-portable.tar.gz"
+(
+    cd "${BUILD_DIR}"
+    rm -rf "${APP_NAME}"
+    cp -a "AppDir" "${APP_NAME}"
+    tar -czf "${TARBALL_OUTPUT}" "${APP_NAME}"
+    rm -rf "${APP_NAME}"
+)
+
 # ------------------------------------------------------------------------------
 # 6. Summary
 # ------------------------------------------------------------------------------
 echo ""
 echo "======================================================================"
-echo "    🎉 AppImage built successfully!                                  "
+echo "    🎉 Linux Packages Built Successfully!                            "
 echo "======================================================================"
-echo "    File: $(ls -lh "${APPIMAGE_OUTPUT}" | awk '{print $9, "(" $5 ")"}')"
+echo "    1. Standalone AppImage:"
+echo "       ${APPIMAGE_OUTPUT} ($(du -h "${APPIMAGE_OUTPUT}" | awk '{print $1}'))"
 echo ""
-echo "    To test and run directly on any Linux machine:"
-echo "      ${APPIMAGE_OUTPUT}"
+echo "    2. Portable FUSE-Free Tarball:"
+echo "       ${TARBALL_OUTPUT} ($(du -h "${TARBALL_OUTPUT}" | awk '{print $1}'))"
+echo ""
+echo "----------------------------------------------------------------------"
+echo " 💡 Running on other Linux systems (Ubuntu 22.04/24.04, Debian, etc.):"
+echo "    - Direct run:"
+echo "        ${APPIMAGE_OUTPUT}"
+echo "    - If the target machine shows 'open dir error' (missing libfuse2):"
+echo "        ${APPIMAGE_OUTPUT} --appimage-extract-and-run"
+echo "      or:"
+echo "        APPIMAGE_EXTRACT_AND_RUN=1 ${APPIMAGE_OUTPUT}"
+echo "      or install FUSE: sudo apt install libfuse2 (or libfuse2t64 on 24.04+)"
+echo "    - Or extract the portable tarball anywhere and execute:"
+echo "        ./${APP_NAME}/AppRun"
 echo "======================================================================"
+

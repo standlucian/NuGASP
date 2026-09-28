@@ -234,10 +234,10 @@ void HelpDialog::filterShortcuts(const QString &text) {
 void HelpDialog::loadUserManual() {
     // Prioritize active disk files so edits are reflected immediately, falling back to embedded QRC
     QStringList candidates = {
-        "/home/lucian/Desktop/NuGASP/docs/USER_MANUAL.md",
         QDir::currentPath() + "/docs/USER_MANUAL.md",
         QDir::currentPath() + "/../docs/USER_MANUAL.md",
         QCoreApplication::applicationDirPath() + "/docs/USER_MANUAL.md",
+        QCoreApplication::applicationDirPath() + "/../share/doc/nutrackn/USER_MANUAL.md",
         QCoreApplication::applicationDirPath() + "/../Resources/docs/USER_MANUAL.md",
         ":/USER_MANUAL.md"
     };

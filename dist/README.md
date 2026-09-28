@@ -19,6 +19,38 @@ You can also pass spectrum files directly as arguments:
 ./NuTrackN-x86_64.AppImage my_spectrum.spe
 ```
 
+### ⚠️ Troubleshooting: "open dir error" (Missing FUSE on Ubuntu 22.04 / 24.04)
+If you run the AppImage on another computer and see:
+```text
+open dir error: No such file or directory
+Cannot mount AppImage, please check your FUSE setup.
+```
+This is because modern Linux distributions (such as Ubuntu 22.04+, Ubuntu 24.04, Debian 12+) do not include `libfuse2` by default.
+
+**You have three easy ways to resolve this:**
+
+1. **Run with `--appimage-extract-and-run` (No root/install needed):**
+   ```bash
+   ./NuTrackN-x86_64.AppImage --appimage-extract-and-run
+   ```
+   Or set the environment variable:
+   ```bash
+   APPIMAGE_EXTRACT_AND_RUN=1 ./NuTrackN-x86_64.AppImage
+   ```
+
+2. **Or install the FUSE library on the host system:**
+   - **Ubuntu 22.04 / Debian 11/12:** `sudo apt install libfuse2`
+   - **Ubuntu 24.04+:** `sudo apt install libfuse2t64`
+   - **Fedora:** `sudo dnf install fuse fuse-libs`
+   - **Arch:** `sudo pacman -S fuse2`
+
+3. **Or use the standalone portable tarball (100% FUSE-Free):**
+   ```bash
+   tar -xzf NuTrackN-linux-x86_64-portable.tar.gz
+   ./NuTrackN/AppRun
+   ```
+
+
 ---
 
 ## 1-Click System & Terminal Integration (`nutrackn`)
