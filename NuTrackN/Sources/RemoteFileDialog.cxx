@@ -95,11 +95,11 @@ void RemoteFileDialog::setupUI()
 
     m_comboTypeFilter = new QComboBox(this);
     m_comboTypeFilter->setFont(dlgFont);
+    m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
     m_comboTypeFilter->addItem(tr("All Nuclear Data (*.spe *.spk *.mat *.cmat *.chn *.root *.asc *.dat)"), "data");
     m_comboTypeFilter->addItem(tr("1D Spectra (*.spe *.spk *.chn *.asc *.dat)"), "spectra");
     m_comboTypeFilter->addItem(tr("2D Matrices (*.cmat *.mat)"), "matrix");
     m_comboTypeFilter->addItem(tr("ROOT Files (*.root)"), "root");
-    m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
     connect(m_comboTypeFilter, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &RemoteFileDialog::onFilterChanged);
     filterLayout->addWidget(m_comboTypeFilter);
 
