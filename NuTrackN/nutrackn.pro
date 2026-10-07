@@ -52,7 +52,8 @@ LIBS += \
     -lPhysics \
     -lGui \
     -lMathCore \
-    -lSpectrum
+    -lSpectrum \
+    -lssh2
 
 # Project headers
 HEADERS += \
@@ -73,7 +74,10 @@ HEADERS += \
     Include/EfficiencyDialog.h \
     Include/AutoCalibDialog.h \
     Include/MacroDialog.h \
-    Include/HelpDialog.h
+    Include/HelpDialog.h \
+    Include/RemoteClient.h \
+    Include/RemoteConnectDialog.h \
+    Include/RemoteFileDialog.h
 
 # Project source files
 SOURCES += \
@@ -101,7 +105,10 @@ SOURCES += \
     Sources/EfficiencyDialog.cxx \
     Sources/AutoCalibDialog.cxx \
     Sources/MacroDialog.cxx \
-    Sources/HelpDialog.cxx
+    Sources/HelpDialog.cxx \
+    Sources/RemoteClient.cxx \
+    Sources/RemoteConnectDialog.cxx \
+    Sources/RemoteFileDialog.cxx
 
 RESOURCES += \
     nutrackn.qrc

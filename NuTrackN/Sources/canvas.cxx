@@ -14,6 +14,9 @@
 #include "MacroDialog.h"
 #include "IntegralDialog.h"
 #include "HelpDialog.h"
+#include "RemoteClient.h"
+#include "RemoteConnectDialog.h"
+#include "RemoteFileDialog.h"
 #include <QInputDialog>
 #include <QShortcut>
 
@@ -354,13 +357,19 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnOpenCM->setFixedHeight(36);
     btnOpenCM->setToolTip(tr("Open GASPware compressed coincidence matrix (.cmat)."));
     connect(btnOpenCM, &QPushButton::clicked, this, &QMainCanvas::onOpenCMClicked);
-    bottomBtnGrid->addWidget(btnOpenCM, 1, 0, 1, 2);
+    bottomBtnGrid->addWidget(btnOpenCM, 1, 0);
 
     btnGateCM = makeButton("Gate CM", topContainer, true);
     btnGateCM->setFixedHeight(36);
     btnGateCM->setToolTip(tr("Project 1D coincidence gate from loaded matrix."));
     connect(btnGateCM, &QPushButton::clicked, this, &QMainCanvas::onGateCMClicked);
-    bottomBtnGrid->addWidget(btnGateCM, 1, 2, 1, 2);
+    bottomBtnGrid->addWidget(btnGateCM, 1, 1);
+
+    btnRemote = makeButton("SSH Remote", topContainer, true);
+    btnRemote->setFixedHeight(36);
+    btnRemote->setToolTip(tr("Connect to Remote Data Acquisition Computer over SSH/SFTP (Ctrl+Shift+R)."));
+    connect(btnRemote, &QPushButton::clicked, this, &QMainCanvas::onOpenRemoteDataClicked);
+    bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 2);
 
     bottomLayout->addLayout(bottomBtnGrid);
 
@@ -547,6 +556,9 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     QShortcut *shortcutF12 = new QShortcut(QKeySequence(Qt::Key_F12), this, nullptr, nullptr, Qt::ApplicationShortcut);
     connect(shortcutF12, &QShortcut::activated, this, &QMainCanvas::openAllDialogsForInspection);
+
+    QShortcut *shortcutRemote = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R), this, nullptr, nullptr, Qt::ApplicationShortcut);
+    connect(shortcutRemote, &QShortcut::activated, this, &QMainCanvas::onOpenRemoteDataClicked);
 }
 
 //==============================================================================
@@ -858,6 +870,29 @@ void QMainCanvas::clickedW()
             .arg(modeDesc)
             .arg(QFileInfo(m_currentOutputFile).fileName()));
 
+    // If currently operating on a remote session file, offer to sync back over SFTP
+    if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+        QFileInfo exportInfo(m_currentOutputFile);
+        QFileInfo remoteInfo(m_currentRemotePath);
+        QString remoteDestDir = remoteInfo.dir().path();
+        QString remoteDestPath = remoteDestDir + "/" + exportInfo.fileName();
+
+        if (QMessageBox::question(this, tr("Upload to Remote Data Computer"),
+                tr("Would you like to sync and upload the exported spectrum to the remote computer?\n\nRemote Destination:\n%1")
+                    .arg(remoteDestPath),
+                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+            QString uploadErr;
+            if (m_remoteSession->uploadFile(m_currentOutputFile, remoteDestPath, nullptr, &uploadErr)) {
+                CommandPrompt::getInstance()->appendPlainText(
+                    QString("Uploaded %1 to remote server: %2\n")
+                        .arg(exportInfo.fileName(), remoteDestPath));
+            } else {
+                CommandPrompt::getInstance()->appendPlainText(
+                    QString("Failed to upload to remote server: %1\n").arg(uploadErr));
+            }
+        }
+    }
+
     if (canvas) {
         canvas->setFocus();
     }
@@ -1028,6 +1063,8 @@ bool QMainCanvas::executeMacroCommand(const QString &token)
         onRunIncrement();
     } else if (t == "*4" || t == "R-" || t == "PR") {
         onRunDecrement();
+    } else if (t == "OR" || t == "DR" || t == "SSH") {
+        onOpenRemoteDataClicked();
     } else if (t == "FF") {
         zoomOut();
     } else if (t == "FX") {
@@ -1327,6 +1364,63 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
 //==============================================================================
 void QMainCanvas::stepRun(int delta)
 {
+    // 1. Check if we are operating in a remote SSH/SFTP session
+    if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+        QFileInfo remoteInfo(m_currentRemotePath);
+        QString remoteDir = remoteInfo.dir().path();
+        QString suffix = remoteInfo.suffix();
+
+        std::vector<RemoteFileInfo> remoteRunFiles;
+        QString err;
+        if (!m_remoteSession->listRunFiles(remoteDir, suffix, remoteRunFiles, &err) || remoteRunFiles.empty()) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Failed to query remote run files in %1: %2\n").arg(remoteDir, err));
+            return;
+        }
+
+        int currentIndex = -1;
+        for (int i = 0; i < static_cast<int>(remoteRunFiles.size()); ++i) {
+            if (remoteRunFiles[i].fullPath == m_currentRemotePath ||
+                remoteRunFiles[i].name.compare(remoteInfo.fileName(), Qt::CaseInsensitive) == 0) {
+                currentIndex = i;
+                break;
+            }
+        }
+
+        if (currentIndex == -1) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Could not locate active file %1 in remote directory list.\n").arg(remoteInfo.fileName()));
+            return;
+        }
+
+        int targetIndex = currentIndex + delta;
+        if (targetIndex < 0) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Already at first remote run file (%1).\n").arg(remoteInfo.fileName()));
+            return;
+        }
+        if (targetIndex >= static_cast<int>(remoteRunFiles.size())) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Already at last remote run file (%1).\n").arg(remoteInfo.fileName()));
+            return;
+        }
+
+        QString targetRemotePath = remoteRunFiles[targetIndex].fullPath;
+        QString targetLocalPath;
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Fetching remote run %1 ...\n").arg(remoteRunFiles[targetIndex].name));
+        qApp->processEvents();
+
+        if (!m_remoteSession->syncRemoteFileToCache(targetRemotePath, targetLocalPath, nullptr, &err)) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Failed to download remote run %1: %2\n").arg(remoteRunFiles[targetIndex].name, err));
+            return;
+        }
+
+        m_currentRemotePath = targetRemotePath;
+        m_currentSpectrumFile = targetLocalPath;
+    }
+
     QString currentFilePath = m_currentSpectrumFile;
     bool isMatrixMode = false;
     if (currentFilePath.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
@@ -2383,4 +2477,162 @@ double QMainCanvas::evaluateEfficiency(double energyKeV) const {
         }
     }
     return 1.0;
+}
+
+//==============================================================================
+// QMainCanvas::onOpenRemoteDataClicked
+//==============================================================================
+// Establishes/manages secure SSH/SFTP session to a remote computer, opens the
+// remote file browser, caches selected data locally, and loads spectra/matrices.
+//==============================================================================
+void QMainCanvas::onOpenRemoteDataClicked()
+{
+    if (!m_remoteSession) {
+        m_remoteSession = std::make_shared<RemoteSession>();
+    }
+
+    // If not currently connected, prompt for connection profile
+    if (!m_remoteSession->isConnected()) {
+        RemoteConnectDialog connectDlg(m_remoteSession, this);
+        if (connectDlg.exec() != QDialog::Accepted || !m_remoteSession->isConnected()) {
+            if (canvas) canvas->setFocus();
+            return;
+        }
+    }
+
+    // Open the Remote File Browser dialog
+    RemoteFileDialog fileDlg(m_remoteSession, this);
+    if (fileDlg.exec() != QDialog::Accepted) {
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    QString localPath = fileDlg.getLocalCachedPath();
+    QString remotePath = fileDlg.getSelectedRemotePath();
+    RemoteOpenAction action = fileDlg.getOpenAction();
+
+    if (localPath.isEmpty() || !QFile::exists(localPath)) {
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    m_currentRemotePath = remotePath;
+
+    if (action == RemoteOpenAction::OpenMatrix) {
+        if (!m_currentMatrix) {
+            m_currentMatrix = std::make_shared<MatrixReader>();
+        }
+        QString errMsg;
+        if (!m_currentMatrix->open(localPath, &errMsg)) {
+            QMessageBox::critical(this, tr("Matrix Open Error"),
+                tr("Failed to open remote matrix:\n%1").arg(errMsg));
+            if (canvas) canvas->setFocus();
+            return;
+        }
+
+        TracknHistogram *trackHist = getActiveTracknHistogram();
+        bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
+        double a0 = trackHist ? trackHist->GetCalibA0() : 0.0;
+        double a1 = trackHist ? trackHist->GetCalibA1() : 1.0;
+        double a2 = trackHist ? trackHist->GetCalibA2() : 0.0;
+
+        MatrixDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, this);
+        connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
+                [this, remotePath](const std::vector<double> &data, const QString &title,
+                                   const std::vector<double> &bgData, const QString &bgTitle) {
+                    loadSpectrumDataToPad(data, title, false);
+                    if (!bgData.empty()) {
+                        loadSpectrumDataToPad(bgData, bgTitle, true);
+                    }
+                    if (labelSpectrumFile) {
+                        labelSpectrumFile->setText(QString("[Remote] %1").arg(QFileInfo(remotePath).fileName()));
+                    }
+                });
+        dlg.exec();
+    } else if (action == RemoteOpenAction::OpenSpectrum) {
+        SpectrumImportDialog importDlg(localPath, this);
+        if (importDlg.exec() != QDialog::Accepted) {
+            if (canvas) canvas->setFocus();
+            return;
+        }
+
+        std::vector<double> spectrumData = importDlg.getLoadedData();
+        if (spectrumData.empty()) {
+            CommandPrompt::getInstance()->appendPlainText("Error: Remote spectrum data is empty.\n");
+            if (canvas) canvas->setFocus();
+            return;
+        }
+
+        if (HijF[SelectedElement_i][SelectedElement_j]) {
+            delete HijF[SelectedElement_i][SelectedElement_j];
+            HijF[SelectedElement_i][SelectedElement_j] = nullptr;
+        }
+        for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
+            delete h;
+        }
+        HijC[SelectedElement_i][SelectedElement_j].clear();
+
+        QString histName = QString("HijF[%1][%2]").arg(SelectedElement_i).arg(SelectedElement_j);
+        HijF[SelectedElement_i][SelectedElement_j] = new TracknHistogram(
+            histName.toUtf8().constData(),
+            remotePath.toUtf8().constData(),
+            spectrumData.size(),
+            0,
+            spectrumData.size()
+        );
+
+        TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+        if (trackHist) {
+            trackHist->LoadFromData(spectrumData, localPath.toStdString());
+        }
+
+        TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        baseClone->SetLineColor(colors_hist[0]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
+        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
+
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+        HijF[SelectedElement_i][SelectedElement_j]->Draw();
+
+        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
+            HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
+
+        selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
+        ColorTheFrameOfTheHistogram();
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+
+        m_currentSpectrumFile = localPath;
+        m_currentSpectrumIndex = importDlg.getSelectedSpectrumIndex();
+        m_currentSpectrumCount = importDlg.getTotalSpectraCount();
+        m_currentSpectrumLength = importDlg.getSelectedLength();
+        m_currentSpectrumFormat = importDlg.getSelectedFormat();
+
+        if (labelSpectrumFile) {
+            QString disp = QString("[Remote] %1").arg(QFileInfo(remotePath).fileName());
+            if (m_currentSpectrumCount > 1) {
+                disp += QString("#%1").arg(m_currentSpectrumIndex);
+            }
+            labelSpectrumFile->setText(disp);
+        }
+        updateAxisStatusLabels();
+
+        if (m_currentSpectrumCount > 1) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Loaded remote spectrum %1#%2 (%3 of %4, %5 channels)\n")
+                    .arg(QFileInfo(remotePath).fileName())
+                    .arg(m_currentSpectrumIndex)
+                    .arg(m_currentSpectrumIndex + 1)
+                    .arg(m_currentSpectrumCount)
+                    .arg(spectrumData.size()));
+        } else {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Loaded remote spectrum %1 (%2 channels)\n")
+                    .arg(QFileInfo(remotePath).fileName())
+                    .arg(spectrumData.size()));
+        }
+    }
+
+    if (canvas) canvas->setFocus();
 }

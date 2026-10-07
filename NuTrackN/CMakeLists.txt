@@ -43,6 +43,9 @@ set(SOURCES
     Sources/AutoCalibDialog.cxx
     Sources/MacroDialog.cxx
     Sources/HelpDialog.cxx
+    Sources/RemoteClient.cxx
+    Sources/RemoteConnectDialog.cxx
+    Sources/RemoteFileDialog.cxx
 )
 
 set(HEADERS
@@ -63,6 +66,9 @@ set(HEADERS
     Include/AutoCalibDialog.h
     Include/MacroDialog.h
     Include/HelpDialog.h
+    Include/RemoteClient.h
+    Include/RemoteConnectDialog.h
+    Include/RemoteFileDialog.h
 )
 
 set(RESOURCES
@@ -76,4 +82,5 @@ target_link_libraries(nutrackn
     Qt5::Gui
     Qt5::Widgets
     ${ROOT_LIBRARIES}
+    ssh2
 )

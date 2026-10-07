@@ -21,6 +21,7 @@
 
 class MatrixReader;
 class HelpDialog;
+class RemoteSession;
 #include <cstdlib>
 #include <cstdio>
 #include <QComboBox>
@@ -475,6 +476,7 @@ public slots:
     // GASPware Compressed Matrix slots
     void onOpenCMClicked();
     void onGateCMClicked();
+    void onOpenRemoteDataClicked();
     void loadSpectrumDataToPad(const std::vector<double> &data, const QString &title, bool asOverlay = false);
 
     TracknHistogram* getActiveTracknHistogram() const {
@@ -608,7 +610,10 @@ protected:
     QPushButton                   *btnDec{nullptr};
     QPushButton                   *btnOpenCM{nullptr};
     QPushButton                   *btnGateCM{nullptr};
+    QPushButton                   *btnRemote{nullptr};
     std::shared_ptr<MatrixReader>  m_currentMatrix;
+    std::shared_ptr<RemoteSession> m_remoteSession;
+    QString                        m_currentRemotePath;
 
     // Area Output Logging
     bool            m_isAreaLoggingEnabled{false};

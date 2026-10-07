@@ -22,6 +22,7 @@ struct ShortcutEntry {
 static const std::vector<ShortcutEntry> s_shortcuts = {
     // 1. I/O
     {"Spectrum I/O", "N", "New Spectrum", "Open and load a new 1D spectrum file (.spe, .chn, .root, ASCII)"},
+    {"Spectrum I/O", "OR / Ctrl+Shift+R", "Remote SSH/SFTP", "Connect to remote data acquisition computer, browse files & auto-sync"},
     {"Spectrum I/O", "OS", "Output Spectrum", "Export active spectrum data to ASCII / CSV"},
     {"Spectrum I/O", "O=", "Output Plot", "Generate vector Postscript / PDF print of current view"},
     {"Spectrum I/O", "1 - 9", "Select Spectrum", "Switch active spectrum buffer / toggle overlay"},
