@@ -11,6 +11,7 @@
 #include "DisplayParamsDialog.h"
 #include "EfficiencyDialog.h"
 #include "AutoCalibDialog.h"
+#include "RunByRunManager.h"
 #include "MacroDialog.h"
 #include "IntegralDialog.h"
 #include "HelpDialog.h"
@@ -486,6 +487,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(canvas, &QRootCanvas::requestPeakWidthMode, this, &QMainCanvas::openPeakWidthModeDialog);
     connect(canvas, &QRootCanvas::requestMatrixSetup, this, &QMainCanvas::onOpenCMClicked);
     connect(canvas, &QRootCanvas::requestAutoCalibDialog, this, &QMainCanvas::openAutoCalibDialog);
+    connect(canvas, &QRootCanvas::requestRunByRunManager, this, &QMainCanvas::openRunByRunManager);
 
     // Block 4: Command Strings / Macros (Dn, Cn, Mn, Zn, n)
     connect(canvas, &QRootCanvas::requestDefineMacro, this, &QMainCanvas::defineMacro);
@@ -2586,6 +2588,12 @@ void QMainCanvas::openPeakWidthModeDialog() {
 
 void QMainCanvas::openAutoCalibDialog() {
     AutoCalibDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openRunByRunManager() {
+    RunByRunManager dlg(this, this);
     dlg.exec();
     if (canvas) canvas->setFocus();
 }

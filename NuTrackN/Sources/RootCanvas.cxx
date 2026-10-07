@@ -702,6 +702,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 // A + K: Automatic Energy Calibration (autoECALIBRATION)
                 emit requestAutoCalibDialog();
                 break;
+            case Qt::Key_R:
+                // A + R: Run-by-run calibration manager (In-Beam Drift Alignment)
+                emit requestRunByRunManager();
+                break;
             case Qt::Key_A:
                 // Redundant A press: cancel prefix
                 break;

@@ -105,6 +105,7 @@ class TH1F;
 class QMainCanvas;
 class DisplayParamsDialog;
 class AutoCalibDialog;
+class RunByRunManager;
 
 class QZoomHUD : public QWidget
 {
@@ -178,6 +179,7 @@ signals:
    void requestPeakWidthMode();
    void requestMatrixSetup();
    void requestAutoCalibDialog();
+   void requestRunByRunManager();
    void requestIntegrationNoBackground();
    void requestIntegrationWithBackground();
    void requestGoToEnergy();
@@ -297,6 +299,7 @@ class QMainCanvas : public QWidget
    friend class DisplayParamsDialog;
    friend class EfficiencyDialog;
    friend class AutoCalibDialog;
+   friend class RunByRunManager;
    friend class MacroDialog;
 
 public:
@@ -343,6 +346,7 @@ public:
    void openEfficiencyDialog();
    void openPeakWidthModeDialog();
    void openAutoCalibDialog();
+   void openRunByRunManager();
    const EfficiencyConfig& getEfficiencyConfig() const { return m_efficiencyConfig; }
    void setEfficiencyConfig(const EfficiencyConfig &cfg) { m_efficiencyConfig = cfg; }
    double evaluateEfficiency(double energyKeV) const;
@@ -491,6 +495,9 @@ public slots:
     const std::vector<Double_t>& getGateMarkers() const { return gate_markers; }
     const std::vector<Double_t>& getGaussCenters(int i, int j) const { return gaussCenters[i][j]; }
     int getCurrentSpectrumIndex() const { return m_currentSpectrumIndex; }
+    QString getCurrentSpectrumFile() const { return m_currentSpectrumFile; }
+    int getCurrentSpectrumCount() const { return m_currentSpectrumCount; }
+    int getCurrentSpectrumLength() const { return m_currentSpectrumLength; }
     QRootCanvas* getRootCanvas() const { return canvas; }
 
 protected:

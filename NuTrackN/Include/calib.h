@@ -35,6 +35,31 @@ bool SaveCalibrationFile(const QString &filePath,
                          const std::vector<CalibDetector> &detectors,
                          bool isMcalFormat);
 
+struct RunCalibResult;
+
+/**
+ * @brief Saves run-by-run calibration in strict legacy Xtrackn format:
+ *        IlTAP  IlADC  NlCO  a0  a1  [a2]
+ */
+bool SaveXtracknCalFile(const QString &filePath,
+                        const std::vector<RunCalibResult> &results,
+                        QString *errorMsg = nullptr);
+
+/**
+ * @brief Saves individual per-run Xtrackn .cal files into a directory: <runName>.cal
+ */
+bool SaveXtracknPerRunCalFiles(const QString &outputDir,
+                               const std::vector<RunCalibResult> &results,
+                               QString *errorMsg = nullptr);
+
+/**
+ * @brief Saves NuTrackN extended uncertainty calibration file (.ucal) with full
+ *        parameter errors, residuals, covariance, and goodness-of-fit metrics.
+ */
+bool SaveNuTrackNUcalFile(const QString &filePath,
+                          const std::vector<RunCalibResult> &results,
+                          QString *errorMsg = nullptr);
+
 /**
  * @brief Computes linear energy calibration coefficients A0 (intercept) and A1 (slope)
  *        from two reference channel points and their known energies.

@@ -77,7 +77,9 @@ HEADERS += \
     Include/HelpDialog.h \
     Include/RemoteClient.h \
     Include/RemoteConnectDialog.h \
-    Include/RemoteFileDialog.h
+    Include/RemoteFileDialog.h \
+    Include/RunByRunEngine.h \
+    Include/RunByRunManager.h
 
 # Project source files
 SOURCES += \
@@ -108,7 +110,9 @@ SOURCES += \
     Sources/HelpDialog.cxx \
     Sources/RemoteClient.cxx \
     Sources/RemoteConnectDialog.cxx \
-    Sources/RemoteFileDialog.cxx
+    Sources/RemoteFileDialog.cxx \
+    Sources/RunByRunEngine.cxx \
+    Sources/RunByRunManager.cxx
 
 RESOURCES += \
     nutrackn.qrc

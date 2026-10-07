@@ -70,6 +70,7 @@ static const std::vector<ShortcutEntry> s_shortcuts = {
     {"Calibration", "K", "2-Point Calibrate", "Fast 2-point energy calibration using last two peak energies"},
     {"Calibration", "DK", "Define Calibration", "Open full energy and FWHM polynomial calibration dialog"},
     {"Calibration", "AK", "Auto Calibration", "Automated multi-source calibration (Co-60, Cs-137, Eu-152)"},
+    {"Calibration", "AR", "Run-by-Run Calib", "Automated in-beam drift alignment manager (.cal & .ucal export)"},
     {"Calibration", "DT", "TrackFit Calib", "Recalibration using track polynomial fitting"},
     {"Calibration", "DE", "Define Efficiency", "Open detector full-energy peak efficiency calibration dialog"},
 

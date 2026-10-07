@@ -1,4 +1,5 @@
 #include "calib.h"
+#include "RunByRunEngine.h"
 #include "Design.h"
 #include "canvas.h"
 #include "tracknhistogram.h"
@@ -220,6 +221,119 @@ bool SaveCalibrationFile(const QString &filePath,
             out << "\n";
         }
     }
+    return true;
+}
+
+//==============================================================================
+// SaveXtracknCalFile
+//==============================================================================
+// Strict legacy Xtrackn format:
+//   WRITE(lun, '(I5,I5,I3,F10.3,F10.6,<NlORD>G14.6)') IlTAP, IlADC, NlCO, a0, a1, [a2]
+//==============================================================================
+bool SaveXtracknCalFile(const QString &filePath,
+                        const std::vector<RunCalibResult> &results,
+                        QString *errorMsg)
+{
+    std::ofstream out(filePath.toStdString());
+    if (!out.is_open()) {
+        if (errorMsg) *errorMsg = QString("Could not open file for writing: %1").arg(filePath);
+        return false;
+    }
+
+    const char *oldLocale = std::setlocale(LC_NUMERIC, nullptr);
+    std::string prevLoc = oldLocale ? oldLocale : "C";
+    std::setlocale(LC_NUMERIC, "C");
+
+    for (const auto &res : results) {
+        char line[256];
+        if (res.numCoeffs >= 3 && std::abs(res.a2) > 1e-15) {
+            std::snprintf(line, sizeof(line), "%5d%5d%3d%10.3f%10.6f%14.6e\n",
+                          res.runNumber, res.detectorId, 3, res.a0, res.a1, res.a2);
+        } else {
+            std::snprintf(line, sizeof(line), "%5d%5d%3d%10.3f%10.6f\n",
+                          res.runNumber, res.detectorId, 2, res.a0, res.a1);
+        }
+        for (char *p = line; *p; ++p) {
+            if (*p == ',') *p = '.';
+        }
+        out << line;
+    }
+
+    std::setlocale(LC_NUMERIC, prevLoc.c_str());
+    return true;
+}
+
+//==============================================================================
+// SaveXtracknPerRunCalFiles
+//==============================================================================
+bool SaveXtracknPerRunCalFiles(const QString &outputDir,
+                               const std::vector<RunCalibResult> &results,
+                               QString *errorMsg)
+{
+    QDir dir(outputDir);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+
+    std::map<QString, std::vector<RunCalibResult>> byRun;
+    for (const auto &r : results) {
+        QString base = r.runFileName;
+        if (base.isEmpty()) {
+            base = QString("run_%1").arg(r.runNumber, 4, 10, QChar('0'));
+        }
+        byRun[base].push_back(r);
+    }
+
+    for (const auto &pair : byRun) {
+        QString runBase = pair.first;
+        QString filePath = dir.filePath(runBase + ".cal");
+        if (!SaveXtracknCalFile(filePath, pair.second, errorMsg)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+//==============================================================================
+// SaveNuTrackNUcalFile
+//==============================================================================
+// NuTrackN Extended format with uncertainties & goodness-of-fit metrics
+//==============================================================================
+bool SaveNuTrackNUcalFile(const QString &filePath,
+                          const std::vector<RunCalibResult> &results,
+                          QString *errorMsg)
+{
+    std::ofstream out(filePath.toStdString());
+    if (!out.is_open()) {
+        if (errorMsg) *errorMsg = QString("Could not open file for writing: %1").arg(filePath);
+        return false;
+    }
+
+    const char *oldLocale = std::setlocale(LC_NUMERIC, nullptr);
+    std::string prevLoc = oldLocale ? oldLocale : "C";
+    std::setlocale(LC_NUMERIC, "C");
+
+    out << "# NuTrackN Extended Uncertainty Calibration File (.ucal)\n";
+    out << "# Format: Run Det NCoeff a0 a1 a2 sigma_a0 sigma_a1 sigma_a2 cov_a0_a1 s_res(keV) chi2/ndf Status\n";
+    for (const auto &res : results) {
+        char numBuf[384];
+        std::snprintf(numBuf, sizeof(numBuf),
+                      "%5d %4d %2d %11.4f %12.6f %14.6e %11.5f %12.7f %14.6e %13.5e %10.4f %9.3f  ",
+                      res.runNumber, res.detectorId, res.numCoeffs,
+                      res.a0, res.a1, res.a2,
+                      res.sigmaA0, res.sigmaA1, res.sigmaA2, res.covA0A1,
+                      res.sRes, res.chi2NDF);
+
+        for (char *p = numBuf; *p; ++p) {
+            if (*p == ',') *p = '.';
+        }
+
+        const char *statusStr = (res.status == RunCalibStatus::Success) ? "OK" :
+                                (res.failureReason.isEmpty() ? "FAILED" : res.failureReason.toUtf8().constData());
+        out << numBuf << statusStr << "\n";
+    }
+
+    std::setlocale(LC_NUMERIC, prevLoc.c_str());
     return true;
 }
 

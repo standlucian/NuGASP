@@ -46,6 +46,8 @@ set(SOURCES
     Sources/RemoteClient.cxx
     Sources/RemoteConnectDialog.cxx
     Sources/RemoteFileDialog.cxx
+    Sources/RunByRunEngine.cxx
+    Sources/RunByRunManager.cxx
 )
 
 set(HEADERS
@@ -69,6 +71,8 @@ set(HEADERS
     Include/RemoteClient.h
     Include/RemoteConnectDialog.h
     Include/RemoteFileDialog.h
+    Include/RunByRunEngine.h
+    Include/RunByRunManager.h
 )
 
 set(RESOURCES

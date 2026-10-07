@@ -78,6 +78,7 @@
 | **`K`** | **2-Point Calibrate** | Fast 2-point energy calibration using last two peak energies |
 | **`DK`** | **Define Calibration** | Open full energy and FWHM polynomial calibration dialog |
 | **`AK`** | **Auto Calibration** | Automated multi-source calibration ($^{60}\text{Co}$, $^{137}\text{Cs}$, $^{152}\text{Eu}$) |
+| **`AR`** | **Run-by-Run Calib** | Automated in-beam drift alignment manager (.cal & .ucal export) |
 | **`DT`** | **TrackFit Calib** | Recalibration using track polynomial fitting |
 | **`DE`** | **Define Efficiency** | Open detector full-energy peak efficiency calibration dialog |
 

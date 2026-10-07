@@ -155,8 +155,24 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
     if (fileSize % 4 == 0 && candidateChannels32 > 10240) {
         res.guessedFormat = SpectrumFormat::LongInt32;
         res.totalChannelsFound = candidateChannels32;
-        // Check standard nuclear spectroscopy multi-spectrum detector sizes: 4096 (4k), 2048 (2k), 1024 (1k), 8192 (8k)
-        if (fileSize % (4096 * 4) == 0) {
+        // Check standard nuclear spectroscopy multi-spectrum detector sizes
+        // Prioritize realistic array sizes (e.g. up to ~64 HPGe detectors) from 64k down to 1k
+        if (fileSize % (65536 * 4) == 0 && (candidateChannels32 / 65536) <= 64) {
+            res.guessedLength = 65536;
+            res.numSpectra = candidateChannels32 / 65536;
+        } else if (fileSize % (32768 * 4) == 0 && (candidateChannels32 / 32768) <= 64) {
+            res.guessedLength = 32768;
+            res.numSpectra = candidateChannels32 / 32768;
+        } else if (fileSize % (16384 * 4) == 0 && (candidateChannels32 / 16384) <= 128) {
+            res.guessedLength = 16384;
+            res.numSpectra = candidateChannels32 / 16384;
+        } else if (fileSize % (10240 * 4) == 0) {
+            res.guessedLength = 10240;
+            res.numSpectra = candidateChannels32 / 10240;
+        } else if (fileSize % (8192 * 4) == 0 && (candidateChannels32 / 8192) <= 128) {
+            res.guessedLength = 8192;
+            res.numSpectra = candidateChannels32 / 8192;
+        } else if (fileSize % (4096 * 4) == 0) {
             res.guessedLength = 4096;
             res.numSpectra = candidateChannels32 / 4096;
         } else if (fileSize % (2048 * 4) == 0) {
@@ -165,15 +181,6 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
         } else if (fileSize % (1024 * 4) == 0) {
             res.guessedLength = 1024;
             res.numSpectra = candidateChannels32 / 1024;
-        } else if (fileSize % (8192 * 4) == 0) {
-            res.guessedLength = 8192;
-            res.numSpectra = candidateChannels32 / 8192;
-        } else if (fileSize % (10240 * 4) == 0) {
-            res.guessedLength = 10240;
-            res.numSpectra = candidateChannels32 / 10240;
-        } else if (fileSize % (65536 * 4) == 0) {
-            res.guessedLength = 65536;
-            res.numSpectra = candidateChannels32 / 65536;
         } else {
             res.guessedLength = 4096;
             res.numSpectra = std::max(1, candidateChannels32 / 4096);
