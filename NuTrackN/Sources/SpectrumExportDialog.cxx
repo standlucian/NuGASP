@@ -281,7 +281,7 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     if (curSize <= 0) curSize = 10240;
 
     // Standard presets
-    const std::vector<int> presets = {1024, 2048, 4096, 8192, 10240, 16384, 32768};
+    const std::vector<int> presets = {1024, 2048, 4096, 8192, 10240, 16384, 32768, 65536};
     bool matchedCurrent = false;
     for (int p : presets) {
         if (p == curSize) {

@@ -79,7 +79,7 @@ public:
                               QString *errorMessage = nullptr);
 
     // Query remote files in same directory matching run pattern (for next/prev run cycling)
-    bool listRunFiles(const QString &remoteDirPath, const QString &extension,
+    bool listRunFiles(const QString &remoteDirPath, const QString &currentFileName,
                       std::vector<RemoteFileInfo> &outRunFiles, QString *errorMessage = nullptr);
 
 private:

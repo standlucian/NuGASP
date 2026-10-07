@@ -139,6 +139,7 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
     else if (fileSize == 40960) { res.guessedLength = 10240; matchesStandard32 = true; } // NuTrackN/XTrackN standard
     else if (fileSize == 65536) { res.guessedLength = 16384; matchesStandard32 = true; }
     else if (fileSize == 131072){ res.guessedLength = 32768; matchesStandard32 = true; }
+    else if (fileSize == 262144){ res.guessedLength = 65536; matchesStandard32 = true; } // 64k channels
 
     if (matchesStandard32) {
         res.guessedFormat = SpectrumFormat::LongInt32;
@@ -170,6 +171,9 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
         } else if (fileSize % (10240 * 4) == 0) {
             res.guessedLength = 10240;
             res.numSpectra = candidateChannels32 / 10240;
+        } else if (fileSize % (65536 * 4) == 0) {
+            res.guessedLength = 65536;
+            res.numSpectra = candidateChannels32 / 65536;
         } else {
             res.guessedLength = 4096;
             res.numSpectra = std::max(1, candidateChannels32 / 4096);
@@ -572,6 +576,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_comboLength->addItem(tr("10240 channels (10k)"), 10240);
     m_comboLength->addItem(tr("16384 channels (16k)"), 16384);
     m_comboLength->addItem(tr("32768 channels (32k)"), 32768);
+    m_comboLength->addItem(tr("65536 channels (64k)"), 65536);
     m_comboLength->addItem(tr("All Channels in File"), -1);
     m_comboLength->addItem(tr("Custom..."), 0);
 

@@ -555,7 +555,7 @@ bool RemoteSession::syncRemoteFileToCache(const QString &remotePath, QString &ou
     return downloadFile(remotePath, outLocalPath, progressCallback, errorMessage);
 }
 
-bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &extension,
+bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &currentFileName,
                                  std::vector<RemoteFileInfo> &outRunFiles, QString *errorMessage)
 {
     std::vector<RemoteFileInfo> allEntries;
@@ -564,18 +564,78 @@ bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &ex
     }
 
     outRunFiles.clear();
-    QString ext = extension.trimmed().toLower();
-    if (ext.startsWith('.')) ext = ext.mid(1);
+    QString fileName = QFileInfo(currentFileName).fileName();
 
+    // Case 1: GASP style "PREFIX.DIGITS" (e.g. G0.0007, G1.0042, F.0001)
+    int lastDot = fileName.lastIndexOf('.');
+    if (lastDot > 0) {
+        QString afterDot = fileName.mid(lastDot + 1);
+        bool isAllDigits = !afterDot.isEmpty();
+        for (QChar c : afterDot) {
+            if (!c.isDigit()) { isAllDigits = false; break; }
+        }
+        if (isAllDigits) {
+            QString prefix = fileName.left(lastDot + 1); // e.g. "G0."
+            for (const auto &info : allEntries) {
+                if (info.isDirectory) continue;
+                if (info.name.startsWith(prefix, Qt::CaseInsensitive)) {
+                    QString rest = info.name.mid(prefix.length());
+                    bool ok = false;
+                    rest.toInt(&ok);
+                    if (ok) {
+                        outRunFiles.push_back(info);
+                    }
+                }
+            }
+
+            QCollator collator;
+            collator.setNumericMode(true);
+            collator.setCaseSensitivity(Qt::CaseInsensitive);
+            std::sort(outRunFiles.begin(), outRunFiles.end(), [&collator](const RemoteFileInfo &a, const RemoteFileInfo &b) {
+                return collator.compare(a.name, b.name) < 0;
+            });
+            return !outRunFiles.empty();
+        }
+    }
+
+    // Case 2: Standard filenames with embedded run numbers (e.g. run_007.spk, r05.mat)
+    QFileInfo fInfo(fileName);
+    QString base = fInfo.baseName();
+    QString suffix = fInfo.completeSuffix().toLower();
+    int digitStart = base.length();
+    while (digitStart > 0 && base[digitStart - 1].isDigit()) {
+        digitStart--;
+    }
+
+    if (digitStart < base.length()) {
+        QString prefix = base.left(digitStart);
+        for (const auto &info : allEntries) {
+            if (info.isDirectory) continue;
+            QFileInfo eInfo(info.name);
+            if (eInfo.completeSuffix().toLower() == suffix && eInfo.baseName().startsWith(prefix, Qt::CaseInsensitive)) {
+                QString rest = eInfo.baseName().mid(prefix.length());
+                bool ok = false;
+                rest.toInt(&ok);
+                if (ok) {
+                    outRunFiles.push_back(info);
+                }
+            }
+        }
+
+        QCollator collator;
+        collator.setNumericMode(true);
+        collator.setCaseSensitivity(Qt::CaseInsensitive);
+        std::sort(outRunFiles.begin(), outRunFiles.end(), [&collator](const RemoteFileInfo &a, const RemoteFileInfo &b) {
+            return collator.compare(a.name, b.name) < 0;
+        });
+        return !outRunFiles.empty();
+    }
+
+    // Fallback: Same extension
     for (const auto &info : allEntries) {
         if (info.isDirectory) continue;
-        if (ext.isEmpty()) {
+        if (suffix.isEmpty() || QFileInfo(info.name).completeSuffix().toLower() == suffix) {
             outRunFiles.push_back(info);
-        } else {
-            QString itemExt = QFileInfo(info.name).suffix().toLower();
-            if (itemExt == ext) {
-                outRunFiles.push_back(info);
-            }
         }
     }
 
@@ -586,5 +646,5 @@ bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &ex
         return collator.compare(a.name, b.name) < 0;
     });
 
-    return true;
+    return !outRunFiles.empty();
 }
