@@ -3,6 +3,8 @@ name: Build & Package Linux (Ubuntu 22.04 LTS Baseline)
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -33,6 +35,8 @@ jobs:
             libtbb-dev \
             libglu1-mesa-dev \
             libgl1-mesa-dev \
+            libssh2-1-dev \
+            libssl-dev \
             wget \
             curl
 
@@ -50,11 +54,13 @@ jobs:
           chmod +x packaging/linux/build_appimage.sh
           ./packaging/linux/build_appimage.sh
 
-      - name: Upload AppImage Artifact
+      - name: Upload Standalone Linux Packages
         uses: actions/upload-artifact@v4
         with:
           name: NuTrackN-Linux-x86_64
-          path: dist/NuTrackN-x86_64.AppImage
+          path: |
+            dist/NuTrackN-x86_64.AppImage
+            dist/NuTrackN-linux-x86_64-portable.tar.gz
           if-no-files-found: error
 
       - name: Attach to GitHub Release (on tag)

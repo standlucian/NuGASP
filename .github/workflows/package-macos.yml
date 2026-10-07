@@ -3,6 +3,8 @@ name: Build & Package macOS (Apple Silicon ARM64)
 on:
   workflow_dispatch:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
 
@@ -15,11 +17,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install Homebrew dependencies (Qt5 & CERN ROOT)
+      - name: Install Homebrew dependencies (Qt5, CERN ROOT, libssh2)
         run: |
           export HOMEBREW_NO_AUTO_UPDATE=1
           export HOMEBREW_NO_INSTALL_CLEANUP=1
-          brew install qt@5 root
+          brew install qt@5 root libssh2
 
       - name: Build Standalone NuTrackN DMG
         run: |
