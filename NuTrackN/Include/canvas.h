@@ -446,7 +446,10 @@ public slots:
     void onSpectrumDecrement();
     void onSpectrumIncrementSameScale();
     void onSpectrumDecrementSameScale();
+    void onRunIncrement();
+    void onRunDecrement();
     void stepSpectrumIndex(int delta, bool preserveScale = false);
+    void stepRun(int delta);
 
     // Block 4: Command Strings / Macros Slots (Dn, Cn, Mn, Zn, n)
     void defineMacro(int macroId);

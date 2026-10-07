@@ -125,9 +125,9 @@ void MacroDialog::setupUI()
     helpBrowser->setHtml(QString(
         "<table style='width:100%; font-family:\"%1\", sans-serif; font-size:%2pt; color:%3;'>"
         "<tr>"
-        "<td><b>N / N+</b>: Next Spectrum</td>"
-        "<td><b>N-</b>: Prev Spectrum</td>"
-        "<td><b>*1..*4</b>: Fast Spectrum Steps</td>"
+        "<td><b>*1 / *2</b>: Next/Prev Det</td>"
+        "<td><b>*3 / *4</b>: Next/Prev Run</td>"
+        "<td><b>N / N-</b>: Next/Prev Spec</td>"
         "<td><b>FF</b>: Full Zoom (FX+FY)</td>"
         "</tr><tr>"
         "<td><b>FX</b>: Full X (keep Y)</td>"

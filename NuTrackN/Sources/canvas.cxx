@@ -45,6 +45,7 @@
 #include <QPushButton>
 #include <QSplitter>
 #include <QDir>
+#include <QCollator>
 
 #include <iostream>
 #include <fstream>
@@ -336,7 +337,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnDec = makeButton("# -", topContainer, true);
     btnDec->setFixedWidth(54);
     btnDec->setFixedHeight(36);
-    btnDec->setToolTip(tr("Previous spectrum in file:\nLeft click: Revert spectrum (*2)\nRight click: Same scale/limits (*4)\nCtrl + Left click: Macro 2\nCtrl + Right click: Macro 4"));
+    btnDec->setToolTip(tr("Previous spectrum / run:\nLeft click: Previous detector (*2)\nRight click: Previous run (same detector) (*4)\nCtrl + Left click: Macro 2\nCtrl + Right click: Macro 4"));
     btnDec->installEventFilter(this);
     connect(btnDec, &QPushButton::clicked, this, &QMainCanvas::onSpectrumDecrement);
     bottomBtnGrid->addWidget(btnDec, 0, 2);
@@ -344,7 +345,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnInc = makeButton("# +", topContainer, true);
     btnInc->setFixedWidth(54);
     btnInc->setFixedHeight(36);
-    btnInc->setToolTip(tr("Next spectrum in file:\nLeft click: Advance spectrum (*1)\nRight click: Same scale/limits (*3)\nCtrl + Left click: Macro 1\nCtrl + Right click: Macro 3"));
+    btnInc->setToolTip(tr("Next spectrum / run:\nLeft click: Next detector (*1)\nRight click: Next run (same detector) (*3)\nCtrl + Left click: Macro 1\nCtrl + Right click: Macro 3"));
     btnInc->installEventFilter(this);
     connect(btnInc, &QPushButton::clicked, this, &QMainCanvas::onSpectrumIncrement);
     bottomBtnGrid->addWidget(btnInc, 0, 3);
@@ -530,10 +531,10 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     HijF[1][1]->SetStats(0);
 
     // Block 4: Initialize default macro presets
-    m_macros[1] = {1, "*1", "", 1, "Next Spectrum (Autoscale)"};
-    m_macros[2] = {2, "*2", "", 1, "Previous Spectrum (Autoscale)"};
-    m_macros[3] = {3, "*3", "", 1, "Next Spectrum (Preserve Scale)"};
-    m_macros[4] = {4, "*4", "", 1, "Previous Spectrum (Preserve Scale)"};
+    m_macros[1] = {1, "*1", "", 1, "Next Spectrum / Detector (Current Run)"};
+    m_macros[2] = {2, "*2", "", 1, "Previous Spectrum / Detector (Current Run)"};
+    m_macros[3] = {3, "*3", "", 1, "Next Run (Same Detector)"};
+    m_macros[4] = {4, "*4", "", 1, "Previous Run (Same Detector)"};
     for (int i = 0; i <= 9; ++i) {
         if (m_macros.find(i) == m_macros.end()) {
             m_macros[i] = {i, "", "", 1, ""};
@@ -901,6 +902,16 @@ void QMainCanvas::onSpectrumDecrementSameScale()
     stepSpectrumIndex(-1, true);
 }
 
+void QMainCanvas::onRunIncrement()
+{
+    stepRun(+1);
+}
+
+void QMainCanvas::onRunDecrement()
+{
+    stepRun(-1);
+}
+
 //==============================================================================
 // Block 4: Command Strings / Macros Implementation (Dn, Cn, Mn, Zn, n)
 //==============================================================================
@@ -1013,10 +1024,10 @@ bool QMainCanvas::executeMacroCommand(const QString &token)
         onSpectrumIncrement();
     } else if (t == "N-" || t == "*2") {
         onSpectrumDecrement();
-    } else if (t == "*3") {
-        onSpectrumIncrementSameScale();
-    } else if (t == "*4") {
-        onSpectrumDecrementSameScale();
+    } else if (t == "*3" || t == "R+" || t == "NR") {
+        onRunIncrement();
+    } else if (t == "*4" || t == "R-" || t == "PR") {
+        onRunDecrement();
     } else if (t == "FF") {
         zoomOut();
     } else if (t == "FX") {
@@ -1302,6 +1313,219 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
             .arg(m_currentSpectrumIndex + 1)
             .arg(m_currentSpectrumCount)
             .arg(spectrumData.size()));
+
+    if (canvas) {
+        canvas->setFocus();
+    }
+}
+
+//==============================================================================
+// QMainCanvas::stepRun
+//==============================================================================
+// Cycles to the next or previous run file in the current directory while
+// keeping the exact same detector / spectrum index active and preserving zoom.
+//==============================================================================
+void QMainCanvas::stepRun(int delta)
+{
+    QString currentFilePath = m_currentSpectrumFile;
+    bool isMatrixMode = false;
+    if (currentFilePath.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
+        currentFilePath = m_currentMatrix->getFilePath();
+        isMatrixMode = true;
+    }
+
+    if (currentFilePath.isEmpty()) {
+        CommandPrompt::getInstance()->appendPlainText("No spectrum or matrix file currently loaded.\n");
+        return;
+    }
+
+    QFileInfo currentInfo(currentFilePath);
+    QDir dir = currentInfo.dir();
+    if (!dir.exists()) {
+        CommandPrompt::getInstance()->appendPlainText("Error: Current data directory does not exist.\n");
+        return;
+    }
+
+    QString suffix = currentInfo.suffix();
+    QStringList nameFilters;
+    if (!suffix.isEmpty()) {
+        nameFilters << QString("*.%1").arg(suffix)
+                    << QString("*.%1").arg(suffix.toLower())
+                    << QString("*.%1").arg(suffix.toUpper());
+        nameFilters.removeDuplicates();
+    } else {
+        nameFilters << "*";
+    }
+
+    QFileInfoList fileList = dir.entryInfoList(nameFilters, QDir::Files | QDir::Readable, QDir::NoSort);
+    if (fileList.isEmpty()) {
+        CommandPrompt::getInstance()->appendPlainText("No run files found in current directory.\n");
+        return;
+    }
+
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(fileList.begin(), fileList.end(), [&collator](const QFileInfo &a, const QFileInfo &b) {
+        return collator.compare(a.fileName(), b.fileName()) < 0;
+    });
+
+    int currentIndex = -1;
+    QString currentCanonical = currentInfo.canonicalFilePath();
+    for (int i = 0; i < fileList.size(); ++i) {
+        if (fileList[i].canonicalFilePath() == currentCanonical ||
+            fileList[i].absoluteFilePath() == currentInfo.absoluteFilePath() ||
+            fileList[i].fileName().compare(currentInfo.fileName(), Qt::CaseInsensitive) == 0) {
+            currentIndex = i;
+            break;
+        }
+    }
+
+    if (currentIndex == -1) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Could not locate current file %1 in directory list.\n").arg(currentInfo.fileName()));
+        return;
+    }
+
+    int targetFileIndex = currentIndex + delta;
+    if (targetFileIndex < 0) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Already at first run file (%1).\n").arg(currentInfo.fileName()));
+        return;
+    }
+    if (targetFileIndex >= fileList.size()) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Already at last run file (%1).\n").arg(currentInfo.fileName()));
+        return;
+    }
+
+    QString targetFilePath = fileList[targetFileIndex].absoluteFilePath();
+
+    if (isMatrixMode) {
+        QString errMsg;
+        if (!m_currentMatrix->open(targetFilePath, &errMsg)) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Failed to open matrix run %1: %2\n").arg(QFileInfo(targetFilePath).fileName()).arg(errMsg));
+            return;
+        }
+        std::vector<double> proj = m_currentMatrix->getProjectionX();
+        if (proj.empty()) proj = m_currentMatrix->getProjectionY();
+        if (!proj.empty()) {
+            loadSpectrumDataToPad(proj, QString("Matrix Proj: %1").arg(QFileInfo(targetFilePath).fileName()), false);
+        }
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Switched to matrix run %1 (%2 of %3)\n")
+                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(targetFileIndex + 1)
+                .arg(fileList.size()));
+        return;
+    }
+
+    // Multi-spectrum / 1D Spectrum run file
+    const int targetDetIndex = m_currentSpectrumIndex;
+    SpectrumDetectionResult det = AutoDetectSpectrumFile(targetFilePath.toStdString());
+    SpectrumFormat fmt = !det.confidenceReason.isEmpty() ? det.guessedFormat : m_currentSpectrumFormat;
+    int length = !det.confidenceReason.isEmpty() ? det.guessedLength : m_currentSpectrumLength;
+    int totalCount = !det.confidenceReason.isEmpty() ? det.numSpectra : m_currentSpectrumCount;
+
+    int detIndexToLoad = targetDetIndex;
+    if (detIndexToLoad >= totalCount) {
+        detIndexToLoad = std::max(0, totalCount - 1);
+    }
+
+    std::vector<double> spectrumData;
+    QString err;
+    if (!ReadSpectrumData(targetFilePath.toStdString(), fmt, length, detIndexToLoad, spectrumData, &err) || spectrumData.empty()) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Failed to read run file %1 (detector #%2): %3\n")
+                .arg(QFileInfo(targetFilePath).fileName()).arg(detIndexToLoad).arg(err));
+        return;
+    }
+
+    // Preserve active zoom window and vertical scale
+    TAxis *xAxis = HijF[SelectedElement_i][SelectedElement_j]->GetXaxis();
+    bool wasZoomed = false;
+    double prevXmin = 0.0, prevXmax = 0.0;
+    if (xAxis && (xAxis->GetFirst() > 1 || xAxis->GetLast() < xAxis->GetNbins())) {
+        wasZoomed = true;
+        prevXmin = xAxis->GetBinLowEdge(xAxis->GetFirst());
+        prevXmax = xAxis->GetBinUpEdge(xAxis->GetLast());
+    }
+    const double prevYmin = HijF[SelectedElement_i][SelectedElement_j]->GetMinimum();
+    const double prevYmax = HijF[SelectedElement_i][SelectedElement_j]->GetMaximum();
+
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
+    if (!trackHist) return;
+
+    if (!trackHist->LoadFromData(spectrumData, targetFilePath.toStdString())) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Failed to load spectrum data for run %1.\n").arg(QFileInfo(targetFilePath).fileName()));
+        return;
+    }
+
+    // Clear old overlays when switching to a new run
+    for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
+        delete h;
+    }
+    HijC[SelectedElement_i][SelectedElement_j].clear();
+
+    TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+    baseClone->SetLineColor(colors_hist[0]);
+    HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
+
+    m_currentSpectrumFile = targetFilePath;
+    m_currentSpectrumIndex = detIndexToLoad;
+    m_currentSpectrumCount = totalCount;
+    m_currentSpectrumLength = length;
+    m_currentSpectrumFormat = fmt;
+
+    if (labelSpectrumFile) {
+        QString disp = QFileInfo(targetFilePath).fileName();
+        if (m_currentSpectrumCount > 1) {
+            disp += QString("#%1").arg(m_currentSpectrumIndex);
+        }
+        labelSpectrumFile->setText(disp);
+    }
+    updateAxisStatusLabels();
+
+    if (m_loadBehavior == LoadBehavior::PreserveScale) {
+        if (wasZoomed && xAxis) {
+            xAxis->SetRangeUser(prevXmin, prevXmax);
+        }
+        HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYmin);
+        HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYmax);
+    } else {
+        if (wasZoomed && xAxis) {
+            xAxis->SetRangeUser(prevXmin, prevXmax);
+            adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        } else {
+            adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        }
+    }
+
+    ColorTheFrameOfTheHistogram();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+
+    if (m_currentSpectrumCount > 1) {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Loaded run %1 [Detector #%2] (run %3 of %4, %5 channels)\n")
+                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(m_currentSpectrumIndex)
+                .arg(targetFileIndex + 1)
+                .arg(fileList.size())
+                .arg(spectrumData.size()));
+    } else {
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Loaded run %1 (run %2 of %3, %4 channels)\n")
+                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(targetFileIndex + 1)
+                .arg(fileList.size())
+                .arg(spectrumData.size()));
+    }
 
     if (canvas) {
         canvas->setFocus();
@@ -1623,7 +1847,7 @@ bool QMainCanvas::eventFilter(QObject *watched, QEvent *event)
                 if (hasCtrl) {
                     executeMacro(3);
                 } else {
-                    onSpectrumIncrementSameScale();
+                    onRunIncrement();
                 }
                 return true;
             }
@@ -1635,7 +1859,7 @@ bool QMainCanvas::eventFilter(QObject *watched, QEvent *event)
                 if (hasCtrl) {
                     executeMacro(4);
                 } else {
-                    onSpectrumDecrementSameScale();
+                    onRunDecrement();
                 }
                 return true;
             }
