@@ -770,6 +770,7 @@ void QMainCanvas::clicked1()
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
+    m_currentRemotePath.clear();
     m_currentSpectrumFile = fileName;
     m_currentSpectrumIndex = importDlg.getSelectedSpectrumIndex();
     m_currentSpectrumCount = importDlg.getTotalSpectraCount();
@@ -1364,6 +1365,16 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
 //==============================================================================
 void QMainCanvas::stepRun(int delta)
 {
+    QString targetFilePath;
+    int targetFileIndex = -1;
+    int totalRunFiles = 0;
+    QString displayFileName;
+    bool isMatrixMode = false;
+
+    if (m_currentSpectrumFile.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
+        isMatrixMode = true;
+    }
+
     // 1. Check if we are operating in a remote SSH/SFTP session
     if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
         QFileInfo remoteInfo(m_currentRemotePath);
@@ -1395,12 +1406,12 @@ void QMainCanvas::stepRun(int delta)
         int targetIndex = currentIndex + delta;
         if (targetIndex < 0) {
             CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at first remote run file (%1).\n").arg(remoteInfo.fileName()));
+                QString("Already at first run file (%1).\n").arg(remoteInfo.fileName()));
             return;
         }
         if (targetIndex >= static_cast<int>(remoteRunFiles.size())) {
             CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at last remote run file (%1).\n").arg(remoteInfo.fileName()));
+                QString("Already at last run file (%1).\n").arg(remoteInfo.fileName()));
             return;
         }
 
@@ -1418,171 +1429,176 @@ void QMainCanvas::stepRun(int delta)
 
         m_currentRemotePath = targetRemotePath;
         m_currentSpectrumFile = targetLocalPath;
-    }
-
-    QString currentFilePath = m_currentSpectrumFile;
-    bool isMatrixMode = false;
-    if (currentFilePath.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
-        currentFilePath = m_currentMatrix->getFilePath();
-        isMatrixMode = true;
-    }
-
-    if (currentFilePath.isEmpty()) {
-        CommandPrompt::getInstance()->appendPlainText("No spectrum or matrix file currently loaded.\n");
-        return;
-    }
-
-    QFileInfo currentInfo(currentFilePath);
-    QDir dir = currentInfo.dir();
-    if (!dir.exists()) {
-        CommandPrompt::getInstance()->appendPlainText("Error: Current data directory does not exist.\n");
-        return;
-    }
-
-    // 2. Discover local sibling run files matching the same parameter prefix & extension
-    std::vector<QString> candidateFilePaths;
-    QString currentFileName = currentInfo.fileName();
-
-    // Case A: GASP style "PREFIX.DIGITS" (e.g. G0.0007, G1.0042, F.0001)
-    int lastDot = currentFileName.lastIndexOf('.');
-    bool isGaspFormat = false;
-    if (lastDot > 0) {
-        QString afterDot = currentFileName.mid(lastDot + 1);
-        bool isAllDigits = !afterDot.isEmpty();
-        for (QChar c : afterDot) {
-            if (!c.isDigit()) { isAllDigits = false; break; }
+        targetFilePath = targetLocalPath;
+        targetFileIndex = targetIndex;
+        totalRunFiles = static_cast<int>(remoteRunFiles.size());
+        displayFileName = remoteRunFiles[targetIndex].name;
+    } else {
+        // 2. Discover local sibling run files matching the same parameter prefix & extension
+        QString currentFilePath = m_currentSpectrumFile;
+        if (currentFilePath.isEmpty() && isMatrixMode && m_currentMatrix) {
+            currentFilePath = m_currentMatrix->getFilePath();
         }
-        if (isAllDigits) {
-            isGaspFormat = true;
-            QString prefix = currentFileName.left(lastDot + 1); // e.g. "G0."
-            QStringList entries = dir.entryList(QDir::Files | QDir::Readable, QDir::NoSort);
-            struct RunItem { QString path; int runNum; };
-            std::vector<RunItem> gaspRuns;
-            for (const QString &entry : entries) {
-                if (entry.startsWith(prefix, Qt::CaseInsensitive)) {
-                    QString rest = entry.mid(prefix.length());
-                    bool ok = false;
-                    int r = rest.toInt(&ok);
-                    if (ok) {
-                        gaspRuns.push_back({dir.filePath(entry), r});
+
+        if (currentFilePath.isEmpty()) {
+            CommandPrompt::getInstance()->appendPlainText("No spectrum or matrix file currently loaded.\n");
+            return;
+        }
+
+        QFileInfo currentInfo(currentFilePath);
+        QDir dir = currentInfo.dir();
+        if (!dir.exists()) {
+            CommandPrompt::getInstance()->appendPlainText("Error: Current data directory does not exist.\n");
+            return;
+        }
+
+        std::vector<QString> candidateFilePaths;
+        QString currentFileName = currentInfo.fileName();
+
+        // Case A: GASP style "PREFIX.DIGITS" (e.g. G0.0007, G1.0042, F.0001)
+        int lastDot = currentFileName.lastIndexOf('.');
+        bool isGaspFormat = false;
+        if (lastDot > 0) {
+            QString afterDot = currentFileName.mid(lastDot + 1);
+            bool isAllDigits = !afterDot.isEmpty();
+            for (QChar c : afterDot) {
+                if (!c.isDigit()) { isAllDigits = false; break; }
+            }
+            if (isAllDigits) {
+                isGaspFormat = true;
+                QString prefix = currentFileName.left(lastDot + 1); // e.g. "G0."
+                QStringList entries = dir.entryList(QDir::Files | QDir::Readable, QDir::NoSort);
+                struct RunItem { QString path; int runNum; };
+                std::vector<RunItem> gaspRuns;
+                for (const QString &entry : entries) {
+                    if (entry.startsWith(prefix, Qt::CaseInsensitive)) {
+                        QString rest = entry.mid(prefix.length());
+                        bool ok = false;
+                        int r = rest.toInt(&ok);
+                        if (ok) {
+                            gaspRuns.push_back({dir.filePath(entry), r});
+                        }
                     }
                 }
-            }
-            std::sort(gaspRuns.begin(), gaspRuns.end(), [](const RunItem &a, const RunItem &b) {
-                return a.runNum < b.runNum;
-            });
-            for (const auto &item : gaspRuns) {
-                candidateFilePaths.push_back(item.path);
-            }
-        }
-    }
-
-    if (!isGaspFormat) {
-        // Case B: Standard filenames with embedded run numbers (e.g. run_007.spk, r05.mat)
-        QString base = currentInfo.baseName();
-        QString suffix = currentInfo.completeSuffix().toLower();
-        int digitStart = base.length();
-        while (digitStart > 0 && base[digitStart - 1].isDigit()) {
-            digitStart--;
-        }
-
-        if (digitStart < base.length()) {
-            QString prefix = base.left(digitStart);
-            QStringList entries = dir.entryList(QDir::Files | QDir::Readable, QDir::NoSort);
-            struct RunItem { QString path; int runNum; };
-            std::vector<RunItem> standardRuns;
-            for (const QString &entry : entries) {
-                QFileInfo eInfo(entry);
-                if (eInfo.completeSuffix().toLower() == suffix && eInfo.baseName().startsWith(prefix, Qt::CaseInsensitive)) {
-                    QString rest = eInfo.baseName().mid(prefix.length());
-                    bool ok = false;
-                    int r = rest.toInt(&ok);
-                    if (ok) {
-                        standardRuns.push_back({dir.filePath(entry), r});
-                    }
+                std::sort(gaspRuns.begin(), gaspRuns.end(), [](const RunItem &a, const RunItem &b) {
+                    return a.runNum < b.runNum;
+                });
+                for (const auto &item : gaspRuns) {
+                    candidateFilePaths.push_back(item.path);
                 }
             }
-            std::sort(standardRuns.begin(), standardRuns.end(), [](const RunItem &a, const RunItem &b) {
-                return a.runNum < b.runNum;
-            });
-            for (const auto &item : standardRuns) {
-                candidateFilePaths.push_back(item.path);
+        }
+
+        if (!isGaspFormat) {
+            // Case B: Standard filenames with embedded run numbers (e.g. run_007.spk, r05.mat)
+            QString base = currentInfo.baseName();
+            QString suffix = currentInfo.completeSuffix().toLower();
+            int digitStart = base.length();
+            while (digitStart > 0 && base[digitStart - 1].isDigit()) {
+                digitStart--;
             }
-        } else {
-            // Fallback: Natural sort of all files with same extension in directory
-            QStringList filters;
-            if (!suffix.isEmpty()) {
-                filters << QString("*.%1").arg(suffix);
+
+            if (digitStart < base.length()) {
+                QString prefix = base.left(digitStart);
+                QStringList entries = dir.entryList(QDir::Files | QDir::Readable, QDir::NoSort);
+                struct RunItem { QString path; int runNum; };
+                std::vector<RunItem> standardRuns;
+                for (const QString &entry : entries) {
+                    QFileInfo eInfo(entry);
+                    if (eInfo.completeSuffix().toLower() == suffix && eInfo.baseName().startsWith(prefix, Qt::CaseInsensitive)) {
+                        QString rest = eInfo.baseName().mid(prefix.length());
+                        bool ok = false;
+                        int r = rest.toInt(&ok);
+                        if (ok) {
+                            standardRuns.push_back({dir.filePath(entry), r});
+                        }
+                    }
+                }
+                std::sort(standardRuns.begin(), standardRuns.end(), [](const RunItem &a, const RunItem &b) {
+                    return a.runNum < b.runNum;
+                });
+                for (const auto &item : standardRuns) {
+                    candidateFilePaths.push_back(item.path);
+                }
             } else {
-                filters << "*";
-            }
-            QStringList entries = dir.entryList(filters, QDir::Files | QDir::Readable, QDir::NoSort);
-            QCollator collator;
-            collator.setNumericMode(true);
-            collator.setCaseSensitivity(Qt::CaseInsensitive);
-            std::sort(entries.begin(), entries.end(), [&collator](const QString &a, const QString &b) {
-                return collator.compare(a, b) < 0;
-            });
-            for (const auto &e : entries) {
-                candidateFilePaths.push_back(dir.filePath(e));
+                // Fallback: Natural sort of all files with same extension in directory
+                QStringList filters;
+                if (!suffix.isEmpty()) {
+                    filters << QString("*.%1").arg(suffix);
+                } else {
+                    filters << "*";
+                }
+                QStringList entries = dir.entryList(filters, QDir::Files | QDir::Readable, QDir::NoSort);
+                QCollator collator;
+                collator.setNumericMode(true);
+                collator.setCaseSensitivity(Qt::CaseInsensitive);
+                std::sort(entries.begin(), entries.end(), [&collator](const QString &a, const QString &b) {
+                    return collator.compare(a, b) < 0;
+                });
+                for (const auto &e : entries) {
+                    candidateFilePaths.push_back(dir.filePath(e));
+                }
             }
         }
-    }
 
-    if (candidateFilePaths.empty()) {
-        CommandPrompt::getInstance()->appendPlainText("No sibling run files found in current directory.\n");
-        return;
-    }
-
-    int currentIndex = -1;
-    QString currentCanonical = currentInfo.canonicalFilePath();
-    for (int i = 0; i < static_cast<int>(candidateFilePaths.size()); ++i) {
-        QFileInfo cInfo(candidateFilePaths[i]);
-        if (cInfo.canonicalFilePath() == currentCanonical ||
-            cInfo.absoluteFilePath() == currentInfo.absoluteFilePath() ||
-            cInfo.fileName().compare(currentInfo.fileName(), Qt::CaseInsensitive) == 0) {
-            currentIndex = i;
-            break;
+        if (candidateFilePaths.empty()) {
+            CommandPrompt::getInstance()->appendPlainText("No sibling run files found in current directory.\n");
+            return;
         }
-    }
 
-    if (currentIndex == -1) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Could not locate current file %1 in run list.\n").arg(currentInfo.fileName()));
-        return;
-    }
+        int currentIndex = -1;
+        QString currentCanonical = currentInfo.canonicalFilePath();
+        for (int i = 0; i < static_cast<int>(candidateFilePaths.size()); ++i) {
+            QFileInfo cInfo(candidateFilePaths[i]);
+            if (cInfo.canonicalFilePath() == currentCanonical ||
+                cInfo.absoluteFilePath() == currentInfo.absoluteFilePath() ||
+                cInfo.fileName().compare(currentInfo.fileName(), Qt::CaseInsensitive) == 0) {
+                currentIndex = i;
+                break;
+            }
+        }
 
-    int targetFileIndex = currentIndex + delta;
-    if (targetFileIndex < 0) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at first run file (%1).\n").arg(currentInfo.fileName()));
-        return;
-    }
-    if (targetFileIndex >= static_cast<int>(candidateFilePaths.size())) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at last run file (%1).\n").arg(currentInfo.fileName()));
-        return;
-    }
+        if (currentIndex == -1) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Could not locate current file %1 in run list.\n").arg(currentInfo.fileName()));
+            return;
+        }
 
-    QString targetFilePath = candidateFilePaths[targetFileIndex];
+        int targetIdx = currentIndex + delta;
+        if (targetIdx < 0) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Already at first run file (%1).\n").arg(currentInfo.fileName()));
+            return;
+        }
+        if (targetIdx >= static_cast<int>(candidateFilePaths.size())) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Already at last run file (%1).\n").arg(currentInfo.fileName()));
+            return;
+        }
+
+        targetFilePath = candidateFilePaths[targetIdx];
+        targetFileIndex = targetIdx;
+        totalRunFiles = static_cast<int>(candidateFilePaths.size());
+        displayFileName = QFileInfo(targetFilePath).fileName();
+    }
 
     if (isMatrixMode) {
         QString errMsg;
         if (!m_currentMatrix->open(targetFilePath, &errMsg)) {
             CommandPrompt::getInstance()->appendPlainText(
-                QString("Failed to open matrix run %1: %2\n").arg(QFileInfo(targetFilePath).fileName()).arg(errMsg));
+                QString("Failed to open matrix run %1: %2\n").arg(displayFileName).arg(errMsg));
             return;
         }
         std::vector<double> proj = m_currentMatrix->getProjectionX();
         if (proj.empty()) proj = m_currentMatrix->getProjectionY();
         if (!proj.empty()) {
-            loadSpectrumDataToPad(proj, QString("Matrix Proj: %1").arg(QFileInfo(targetFilePath).fileName()), false);
+            loadSpectrumDataToPad(proj, QString("Matrix Proj: %1").arg(displayFileName), false);
         }
         CommandPrompt::getInstance()->appendPlainText(
             QString("Switched to matrix run %1 (%2 of %3)\n")
-                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(displayFileName)
                 .arg(targetFileIndex + 1)
-                .arg(candidateFilePaths.size()));
+                .arg(totalRunFiles));
         return;
     }
 
@@ -1603,7 +1619,7 @@ void QMainCanvas::stepRun(int delta)
     if (!ReadSpectrumData(targetFilePath.toStdString(), fmt, length, detIndexToLoad, spectrumData, &err) || spectrumData.empty()) {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Failed to read run file %1 (detector #%2): %3\n")
-                .arg(QFileInfo(targetFilePath).fileName()).arg(detIndexToLoad).arg(err));
+                .arg(displayFileName).arg(detIndexToLoad).arg(err));
         return;
     }
 
@@ -1624,7 +1640,7 @@ void QMainCanvas::stepRun(int delta)
 
     if (!trackHist->LoadFromData(spectrumData, targetFilePath.toStdString())) {
         CommandPrompt::getInstance()->appendPlainText(
-            QString("Failed to load spectrum data for run %1.\n").arg(QFileInfo(targetFilePath).fileName()));
+            QString("Failed to load spectrum data for run %1.\n").arg(displayFileName));
         return;
     }
 
@@ -1677,7 +1693,7 @@ void QMainCanvas::stepRun(int delta)
     m_currentSpectrumFormat = fmt;
 
     if (labelSpectrumFile) {
-        QString disp = QFileInfo(targetFilePath).fileName();
+        QString disp = displayFileName;
         if (m_currentSpectrumCount > 1) {
             disp += QString("#%1").arg(m_currentSpectrumIndex);
         }
@@ -1726,17 +1742,17 @@ void QMainCanvas::stepRun(int delta)
     if (m_currentSpectrumCount > 1) {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Loaded run %1 [Detector #%2] (run %3 of %4, %5 channels)\n")
-                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(displayFileName)
                 .arg(m_currentSpectrumIndex)
                 .arg(targetFileIndex + 1)
-                .arg(candidateFilePaths.size())
+                .arg(totalRunFiles)
                 .arg(spectrumData.size()));
     } else {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Loaded run %1 (run %2 of %3, %4 channels)\n")
-                .arg(QFileInfo(targetFilePath).fileName())
+                .arg(displayFileName)
                 .arg(targetFileIndex + 1)
-                .arg(candidateFilePaths.size())
+                .arg(totalRunFiles)
                 .arg(spectrumData.size()));
     }
 
@@ -2118,6 +2134,8 @@ void QMainCanvas::onOpenCMClicked()
         if (canvas) canvas->setFocus();
         return;
     }
+
+    m_currentRemotePath.clear();
 
     if (btnGateCM) {
         btnGateCM->setEnabled(true);

@@ -1,0 +1,61 @@
+{
+    "colors": {
+        "buttonBgColor": "#7790ad",
+        "buttonTextColor": "#a51d2d",
+        "dialogAccentColor": "#2f4f4f",
+        "dialogBgColor": "#708090",
+        "dialogTextColor": "#000000",
+        "graphBgColor": "#000000",
+        "markers": {
+            "bgMarkerColor": "#0000ff",
+            "gateMarkerColor": "#ff0000",
+            "gaussMarkerColor": "#ffff00",
+            "integralMarkerColor": "#ffff00",
+            "peakMarkerColor": "#ffff00",
+            "rangeMarkerColor": "#ff00ff",
+            "zoomMarkerColor": "#00ffff"
+        },
+        "promptBgColor": "#7790ad",
+        "promptTextColor": "#613583",
+        "spectrumColors": [
+            "#ffffff",
+            "#ff0000",
+            "#00ff00",
+            "#ffff00",
+            "#0000ff",
+            "#00ffff",
+            "#ff00ff",
+            "#ff9900",
+            "#800080"
+        ],
+        "uiBgColor": "#708090"
+    },
+    "description": "NuTrackN Aesthetic Theme Settings",
+    "format": "NuGASP-Theme",
+    "timestamp": "2026-09-26T07:53:16",
+    "typography": {
+        "buttonPromptFont": {
+            "bold": true,
+            "family": "Times New Roman",
+            "italic": false,
+            "pointSize": 11,
+            "rawString": "Times New Roman,11,-1,1,75,0,0,0,0,0"
+        },
+        "dialogFont": {
+            "bold": false,
+            "family": "Times New Roman",
+            "italic": false,
+            "pointSize": 11,
+            "rawString": "Times New Roman,11,-1,1,50,0,0,0,0,0"
+        },
+        "graphFont": {
+            "bold": false,
+            "family": "Times New Roman",
+            "italic": false,
+            "pointSize": 11,
+            "rawString": "Times New Roman,11,-1,1,50,0,0,0,0,0"
+        },
+        "rootFontFamilyIndex": 13
+    },
+    "version": 1
+}

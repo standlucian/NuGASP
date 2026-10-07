@@ -576,24 +576,26 @@ bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &cu
         }
         if (isAllDigits) {
             QString prefix = fileName.left(lastDot + 1); // e.g. "G0."
+            struct RemoteRunItem { RemoteFileInfo info; int runNum; };
+            std::vector<RemoteRunItem> gaspRuns;
             for (const auto &info : allEntries) {
                 if (info.isDirectory) continue;
                 if (info.name.startsWith(prefix, Qt::CaseInsensitive)) {
                     QString rest = info.name.mid(prefix.length());
                     bool ok = false;
-                    rest.toInt(&ok);
+                    int r = rest.toInt(&ok);
                     if (ok) {
-                        outRunFiles.push_back(info);
+                        gaspRuns.push_back({info, r});
                     }
                 }
             }
 
-            QCollator collator;
-            collator.setNumericMode(true);
-            collator.setCaseSensitivity(Qt::CaseInsensitive);
-            std::sort(outRunFiles.begin(), outRunFiles.end(), [&collator](const RemoteFileInfo &a, const RemoteFileInfo &b) {
-                return collator.compare(a.name, b.name) < 0;
+            std::sort(gaspRuns.begin(), gaspRuns.end(), [](const RemoteRunItem &a, const RemoteRunItem &b) {
+                return a.runNum < b.runNum;
             });
+            for (const auto &item : gaspRuns) {
+                outRunFiles.push_back(item.info);
+            }
             return !outRunFiles.empty();
         }
     }
@@ -609,25 +611,27 @@ bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &cu
 
     if (digitStart < base.length()) {
         QString prefix = base.left(digitStart);
+        struct RemoteRunItem { RemoteFileInfo info; int runNum; };
+        std::vector<RemoteRunItem> standardRuns;
         for (const auto &info : allEntries) {
             if (info.isDirectory) continue;
             QFileInfo eInfo(info.name);
             if (eInfo.completeSuffix().toLower() == suffix && eInfo.baseName().startsWith(prefix, Qt::CaseInsensitive)) {
                 QString rest = eInfo.baseName().mid(prefix.length());
                 bool ok = false;
-                rest.toInt(&ok);
+                int r = rest.toInt(&ok);
                 if (ok) {
-                    outRunFiles.push_back(info);
+                    standardRuns.push_back({info, r});
                 }
             }
         }
 
-        QCollator collator;
-        collator.setNumericMode(true);
-        collator.setCaseSensitivity(Qt::CaseInsensitive);
-        std::sort(outRunFiles.begin(), outRunFiles.end(), [&collator](const RemoteFileInfo &a, const RemoteFileInfo &b) {
-            return collator.compare(a.name, b.name) < 0;
+        std::sort(standardRuns.begin(), standardRuns.end(), [](const RemoteRunItem &a, const RemoteRunItem &b) {
+            return a.runNum < b.runNum;
         });
+        for (const auto &item : standardRuns) {
+            outRunFiles.push_back(item.info);
+        }
         return !outRunFiles.empty();
     }
 
