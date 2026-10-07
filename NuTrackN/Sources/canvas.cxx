@@ -1628,16 +1628,47 @@ void QMainCanvas::stepRun(int delta)
         return;
     }
 
-    // Clear old overlays when switching to a new run
-    for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
-        delete h;
+    // Ensure baseline spectrum is present in HijC if it was previously empty
+    if (HijC[SelectedElement_i][SelectedElement_j].empty()) {
+        TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        baseClone->SetLineColor(colors_hist[0]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
     }
-    HijC[SelectedElement_i][SelectedElement_j].clear();
 
-    TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
-    baseClone->SetLineColor(colors_hist[0]);
-    HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
-    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
+    if (delta > 0) {
+        // Overlay new spectrum with the next color in palette
+        TH1F *newClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+        const int colorIdx = HijC[SelectedElement_i][SelectedElement_j].size() % colors_hist.size();
+        newClone->SetLineColor(colors_hist[colorIdx]);
+        HijC[SelectedElement_i][SelectedElement_j].push_back(newClone);
+    } else {
+        // Stepping backwards (delta < 0, Macro 4):
+        // If overlays exist, remove the most recent overlay so navigation steps back cleanly
+        if (HijC[SelectedElement_i][SelectedElement_j].size() > 1) {
+            delete HijC[SelectedElement_i][SelectedElement_j].back();
+            HijC[SelectedElement_i][SelectedElement_j].pop_back();
+        } else {
+            // Single spectrum displayed: replace it with the new target spectrum
+            if (!HijC[SelectedElement_i][SelectedElement_j].empty()) {
+                delete HijC[SelectedElement_i][SelectedElement_j].back();
+                HijC[SelectedElement_i][SelectedElement_j].pop_back();
+            }
+            TH1F *newClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
+            newClone->SetLineColor(colors_hist[0]);
+            HijC[SelectedElement_i][SelectedElement_j].push_back(newClone);
+        }
+    }
+
+    // Ensure line colors match their respective positions in colors_hist
+    for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size(); ++k) {
+        if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+            HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
+                colors_hist[k % colors_hist.size()]);
+        }
+    }
+
+    const int activeColorIdx = (HijC[SelectedElement_i][SelectedElement_j].size() - 1) % colors_hist.size();
+    HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[activeColorIdx]);
 
     m_currentSpectrumFile = targetFilePath;
     m_currentSpectrumIndex = detIndexToLoad;
@@ -1666,6 +1697,23 @@ void QMainCanvas::stepRun(int delta)
             adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
         } else {
             adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
+        }
+    }
+
+    maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
+        HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
+    selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
+
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    HijF[SelectedElement_i][SelectedElement_j]->Draw();
+
+    // Redraw all previous spectra in HijC with "SAME" option
+    for (std::size_t k = 0; k < HijC[SelectedElement_i][SelectedElement_j].size() - 1; ++k) {
+        if (HijC[SelectedElement_i][SelectedElement_j][k]) {
+            HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
+                colors_hist[k % colors_hist.size()]);
+            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
         }
     }
 
