@@ -2132,12 +2132,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QVBoxLayout *peaksVBox = new QVBoxLayout(grpPeaks);
 
     QTableWidget *tbl = new QTableWidget(&dlg);
-    tbl->setColumnCount(8);
+    tbl->setColumnCount(9);
     tbl->setHorizontalHeaderLabels({
         tr("Use"),
         tr("Energy (keV)"),
         tr("Centroid (ch) 🔒"),
         tr("Shift (\u0394 ch)"),
+        tr("Window (\u00b1 ch)"),
         tr("FWHM (ch) 🔒"),
         tr("Baseline (cts) 🔒"),
         tr("Slope (cts/ch) 🔒"),
@@ -2159,6 +2160,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QPushButton *btnFixCentroid{nullptr};
 
         QLabel *lblShift{nullptr};
+
+        QDoubleSpinBox *spinWindow{nullptr};
 
         QDoubleSpinBox *spinFwhm{nullptr};
         QPushButton *btnFixFwhm{nullptr};
@@ -2278,7 +2281,17 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].lblShift = lblShift;
         tbl->setCellWidget(i, 3, lblShift);
 
-        // Col 4: FWHM SpinBox + Lock Button
+        // Col 4: Search Window SpinBox
+        QDoubleSpinBox *spinW = new QDoubleSpinBox(tbl);
+        spinW->setRange(2.0, 200.0);
+        spinW->setDecimals(1);
+        spinW->setSingleStep(1.0);
+        spinW->setValue(initWin);
+        spinW->setToolTip(tr("Search and fit half-window in channels (\u00b1 \u0394ch) around centroid."));
+        rowWidgets[i].spinWindow = spinW;
+        tbl->setCellWidget(i, 4, spinW);
+
+        // Col 5: FWHM SpinBox + Lock Button
         QWidget *wFwhm = new QWidget(tbl);
         QHBoxLayout *lFwhm = new QHBoxLayout(wFwhm);
         lFwhm->setContentsMargins(2, 2, 2, 2);
@@ -2293,9 +2306,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lFwhm->addWidget(btnFixF);
         rowWidgets[i].spinFwhm = spinF;
         rowWidgets[i].btnFixFwhm = btnFixF;
-        tbl->setCellWidget(i, 4, wFwhm);
+        tbl->setCellWidget(i, 5, wFwhm);
 
-        // Col 5: Baseline Background SpinBox + Lock Button
+        // Col 6: Baseline Background SpinBox + Lock Button
         QWidget *wBkg = new QWidget(tbl);
         QHBoxLayout *lBkg = new QHBoxLayout(wBkg);
         lBkg->setContentsMargins(2, 2, 2, 2);
@@ -2311,9 +2324,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lBkg->addWidget(btnFixB);
         rowWidgets[i].spinBkg = spinB;
         rowWidgets[i].btnFixBkg = btnFixB;
-        tbl->setCellWidget(i, 5, wBkg);
+        tbl->setCellWidget(i, 6, wBkg);
 
-        // Col 6: Background Slope SpinBox + Lock Button
+        // Col 7: Background Slope SpinBox + Lock Button
         QWidget *wSlope = new QWidget(tbl);
         QHBoxLayout *lSlope = new QHBoxLayout(wSlope);
         lSlope->setContentsMargins(2, 2, 2, 2);
@@ -2329,9 +2342,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lSlope->addWidget(btnFixS);
         rowWidgets[i].spinSlope = spinS;
         rowWidgets[i].btnFixSlope = btnFixS;
-        tbl->setCellWidget(i, 6, wSlope);
+        tbl->setCellWidget(i, 7, wSlope);
 
-        // Col 7: Refit button with high-contrast, fully readable theme-compliant styling
+        // Col 8: Refit button with high-contrast, fully readable theme-compliant styling
         QPushButton *btnRefit = new QPushButton(tr("🔄 Refit Peak"), tbl);
         btnRefit->setStyleSheet(
             "QPushButton {"
@@ -2346,7 +2359,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             "QPushButton:pressed { background-color: #01579b; }"
         );
         rowWidgets[i].btnRefit = btnRefit;
-        tbl->setCellWidget(i, 7, btnRefit);
+        tbl->setCellWidget(i, 8, btnRefit);
     }
 
     peaksVBox->addWidget(tbl);
@@ -2372,7 +2385,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double bkgVal = rowWidgets[peakIdx].spinBkg->value();
         double slopeVal = rowWidgets[peakIdx].spinSlope->value();
         double nomCh = rowWidgets[peakIdx].nominalCentroid;
-        double wCh = std::clamp(fCh * 3.5, 12.0, 45.0);
+        double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
 
         // 1. Update table shift badge
         double delta = cCh - nomCh;
@@ -2539,6 +2552,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             updateCanvasPeakOverlay(peakIdx);
         });
 
+        connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+        });
+
         connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
@@ -2560,8 +2578,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             double fCh = rowWidgets[peakIdx].spinFwhm->value();
             double bkgVal = rowWidgets[peakIdx].spinBkg->value();
             double slopeVal = rowWidgets[peakIdx].spinSlope->value();
+            double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
             double en = rowWidgets[peakIdx].energy;
-            double wCh = std::clamp(fCh * 3.5, 12.0, 45.0);
 
             FitFixedParams fixed;
             fixed.fixCentroid = rowWidgets[peakIdx].btnFixCentroid && rowWidgets[peakIdx].btnFixCentroid->isChecked();
