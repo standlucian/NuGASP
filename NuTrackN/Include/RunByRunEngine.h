@@ -37,6 +37,9 @@ struct FittedAnchor {
     double centroidCh{0.0};
     double centroidErrCh{0.0};
     double fwhmCh{0.0};
+    double amplitude{0.0};
+    double background{0.0};
+    double bkgSlope{0.0};
     double area{0.0};
     double chi2{0.0};
     bool   isValid{false};

@@ -6,6 +6,7 @@
 
 #include "TH1F.h"
 #include "TF1.h"
+#include "TLine.h"
 #include "TFitResult.h"
 #include "TVirtualPad.h"
 
@@ -372,8 +373,10 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
             ptColor = QColor("#ffa726"); // Amber
         } else if (pt.isValid) {
             ptColor = QColor("#4caf50"); // Green
+        } else if (pt.status == RunCalibStatus::BadChi2) {
+            ptColor = QColor("#f57c00"); // Orange for Intervene
         } else {
-            ptColor = QColor("#ef5350"); // Red
+            ptColor = QColor("#ef5350"); // Red for Fail
         }
 
         // Gain point
@@ -1340,7 +1343,7 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
                              .arg(result.a0, 0, 'f', 4)
                              .arg(result.a1, 0, 'f', 6)
                              .arg(result.failureReason));
-    } else {
+    } else if (result.status == RunCalibStatus::BadChi2) {
         item->setText(tr("INTERVENE"));
         item->setBackground(QBrush(QColor("#f57c00"))); // Vibrant Amber / Orange
         item->setForeground(QBrush(Qt::white));
@@ -1348,6 +1351,13 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
                              .arg(result.runFileName).arg(detId)
                              .arg(result.failureReason)
                              .arg(result.chi2NDF > 0.0 ? QString::number(result.chi2NDF, 'f', 2) : "-"));
+    } else {
+        item->setText(tr("FAIL"));
+        item->setBackground(QBrush(QColor("#c62828"))); // Red for genuine failures (no peaks found, low stats, etc.)
+        item->setForeground(QBrush(Qt::white));
+        item->setToolTip(QString("Run: %1 | Det: %2 [FAIL]\nReason: %3\nDouble-click to inspect spectrum.")
+                             .arg(result.runFileName).arg(detId)
+                             .arg(result.failureReason.isEmpty() ? "No peaks found or fit failed" : result.failureReason));
     }
 
     m_gridMatrix->viewport()->update();
@@ -1606,7 +1616,7 @@ void RunByRunManager::updatePlot(int detId)
             st->setTextAlignment(Qt::AlignCenter);
             st->setToolTip(res.failureReason);
             m_tablePlotData->setItem(r, 6, st);
-        } else {
+        } else if (res.status == RunCalibStatus::BadChi2) {
             pt.isValid = false;
             m_tablePlotData->setItem(r, 2, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
@@ -1616,6 +1626,17 @@ void RunByRunManager::updatePlot(int detId)
             st->setForeground(QBrush(QColor("#ffa726")));
             st->setTextAlignment(Qt::AlignCenter);
             st->setToolTip(res.failureReason.isEmpty() ? tr("Double-click to inspect and intervene") : res.failureReason);
+            m_tablePlotData->setItem(r, 6, st);
+        } else {
+            pt.isValid = false;
+            m_tablePlotData->setItem(r, 2, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 4, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 5, new QTableWidgetItem("-"));
+            QTableWidgetItem *st = new QTableWidgetItem("FAIL");
+            st->setForeground(QBrush(QColor("#ef5350")));
+            st->setTextAlignment(Qt::AlignCenter);
+            st->setToolTip(res.failureReason.isEmpty() ? tr("No peaks found or fit failed") : res.failureReason);
             m_tablePlotData->setItem(r, 6, st);
         }
 
@@ -2019,7 +2040,7 @@ void RunByRunManager::onExportUcalClicked()
 
 //==============================================================================
 // openInterventionDialog: Modal for manual peak inspection, tuning, refitting,
-// and discrimination (Option A: Accept As-Is, Option B: Apply Fit, Option C: Reject)
+// background adjustment, visual centroid shift feedback, and discrimination.
 //==============================================================================
 void RunByRunManager::openInterventionDialog(int row, int col)
 {
@@ -2075,7 +2096,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Create Modal Dialog
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Intervene & Discriminate Fits — Run: %1, Detector #%2").arg(runName).arg(detId));
-    dlg.resize(920, 580);
+    dlg.resize(980, 600);
     dlg.setFont(Design::getDialogFont());
     dlg.setStyleSheet(Design::getDialogStyleSheet());
 
@@ -2087,9 +2108,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QHBoxLayout *infoLayout = new QHBoxLayout(grpInfo);
     QLabel *lblCurStatus = new QLabel(&dlg);
     QString statusColor = (curRes.status == RunCalibStatus::Success && !curRes.isFallbackFromPrevious) ? "#4caf50"
-                         : (curRes.isFallbackFromPrevious ? "#ff9800" : "#f44336");
+                         : (curRes.isFallbackFromPrevious ? "#ff9800"
+                         : (curRes.status == RunCalibStatus::BadChi2 ? "#ffa726" : "#f44336"));
     QString statusName = (curRes.status == RunCalibStatus::Success && !curRes.isFallbackFromPrevious) ? "GOOD"
-                        : (curRes.isFallbackFromPrevious ? QString("FALLBACK (Adopted R%1)").arg(curRes.fallbackSourceRun) : "FLAGGED / FAILED");
+                        : (curRes.isFallbackFromPrevious ? QString("FALLBACK (Adopted R%1)").arg(curRes.fallbackSourceRun)
+                        : (curRes.status == RunCalibStatus::BadChi2 ? "INTERVENE (High \u03c7\u00b2)" : "FAILED (No Peak / Stats)"));
     lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
                                   "<b>Gain (a1):</b> %3 keV/ch &nbsp;|&nbsp; "
                                   "<b>Offset (a0):</b> %4 keV &nbsp;|&nbsp; "
@@ -2104,19 +2127,21 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     infoLayout->addWidget(lblCurStatus);
     mainVBox->addWidget(grpInfo);
 
-    // 2. Interactive Peak Table
-    QGroupBox *grpPeaks = new QGroupBox(tr("Peak Anchors & Manual Centroid Adjustment"), &dlg);
+    // 2. Interactive Peak Table with Background and Visual Shift Indicator
+    QGroupBox *grpPeaks = new QGroupBox(tr("Peak Anchors, Background Tuning & Centroid Shift Controls"), &dlg);
     QVBoxLayout *peaksVBox = new QVBoxLayout(grpPeaks);
 
     QTableWidget *tbl = new QTableWidget(&dlg);
-    tbl->setColumnCount(6);
+    tbl->setColumnCount(8);
     tbl->setHorizontalHeaderLabels({
         tr("Use"),
         tr("Energy (keV)"),
         tr("Centroid (ch)"),
+        tr("Shift (\u0394 ch)"),
         tr("FWHM (ch)"),
-        tr("Window (± ch)"),
-        tr("Actions")
+        tr("Background (cts)"),
+        tr("Window (\u00b1 ch)"),
+        tr("Action")
     });
     tbl->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tbl->horizontalHeader()->setStretchLastSection(true);
@@ -2128,10 +2153,16 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QCheckBox *chkUse{nullptr};
         double energy{0.0};
         double energyError{0.05};
+        double nominalCentroid{0.0};
         QDoubleSpinBox *spinCentroid{nullptr};
+        QLabel *lblShift{nullptr};
         QDoubleSpinBox *spinFwhm{nullptr};
+        QDoubleSpinBox *spinBkg{nullptr};
         QDoubleSpinBox *spinWindow{nullptr};
         QPushButton *btnRefit{nullptr};
+        TLine *guideLine{nullptr};
+        TF1 *fitFunc{nullptr};
+        TF1 *bkgFunc{nullptr};
     };
     std::vector<PeakRowWidgets> rowWidgets(nAnchors);
 
@@ -2140,9 +2171,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].energy = anc.physicalEnergy;
         rowWidgets[i].energyError = anc.energyError;
 
-        double initCentroid = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
+        double nominalCh = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
+        rowWidgets[i].nominalCentroid = nominalCh;
+
+        double initCentroid = nominalCh;
         double initFwhm = (anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : 3.5;
         double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
+        double initBkg = 10.0;
         bool isUsed = true;
 
         for (const auto &fa : curRes.fittedAnchors) {
@@ -2150,9 +2185,21 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (fa.isValid && fa.centroidCh > 0.0) {
                     initCentroid = fa.centroidCh;
                     initFwhm = fa.fwhmCh;
+                    if (fa.background > 0.0) {
+                        initBkg = fa.background;
+                    }
                 }
                 isUsed = fa.isValid;
                 break;
+            }
+        }
+
+        // Estimate background from spectrum edges if not yet known
+        if (initBkg <= 10.0 && !specData.empty()) {
+            int lowB = std::max(0, static_cast<int>(initCentroid - initWin));
+            int highB = std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(initCentroid + initWin));
+            if (lowB < highB) {
+                initBkg = std::max(0.0, (specData[lowB] + specData[highB]) / 2.0);
             }
         }
 
@@ -2168,7 +2215,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         tbl->setCellWidget(i, 0, chkWidget);
 
         // Col 1: Energy label
-        QTableWidgetItem *eItem = new QTableWidgetItem(QString("%1 ± %2").arg(anc.physicalEnergy, 0, 'f', 2).arg(anc.energyError, 0, 'f', 2));
+        QTableWidgetItem *eItem = new QTableWidgetItem(QString("%1 \u00b1 %2").arg(anc.physicalEnergy, 0, 'f', 2).arg(anc.energyError, 0, 'f', 2));
         eItem->setFlags(Qt::ItemIsEnabled);
         eItem->setTextAlignment(Qt::AlignCenter);
         tbl->setItem(i, 1, eItem);
@@ -2182,29 +2229,60 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].spinCentroid = spinC;
         tbl->setCellWidget(i, 2, spinC);
 
-        // Col 3: FWHM SpinBox
+        // Col 3: Shift Indicator Badge
+        QLabel *lblShift = new QLabel(tbl);
+        lblShift->setAlignment(Qt::AlignCenter);
+        double delta = initCentroid - nominalCh;
+        QString sign = (delta > 0.005) ? "+" : "";
+        lblShift->setText(QString("\u0394 %1%2 ch").arg(sign).arg(delta, 0, 'f', 2));
+        lblShift->setStyleSheet("color: #90a4ae; font-weight: bold; padding: 2px 6px;");
+        rowWidgets[i].lblShift = lblShift;
+        tbl->setCellWidget(i, 3, lblShift);
+
+        // Col 4: FWHM SpinBox
         QDoubleSpinBox *spinF = new QDoubleSpinBox(tbl);
         spinF->setRange(0.2, 50.0);
         spinF->setDecimals(2);
         spinF->setSingleStep(0.1);
         spinF->setValue(initFwhm);
         rowWidgets[i].spinFwhm = spinF;
-        tbl->setCellWidget(i, 3, spinF);
+        tbl->setCellWidget(i, 4, spinF);
 
-        // Col 4: Window SpinBox
+        // Col 5: Background SpinBox
+        QDoubleSpinBox *spinB = new QDoubleSpinBox(tbl);
+        spinB->setRange(0.0, 10000000.0);
+        spinB->setDecimals(1);
+        spinB->setSingleStep(1.0);
+        spinB->setValue(initBkg);
+        spinB->setToolTip(tr("Baseline background level in counts under this peak. Adjusting this modifies the peak baseline fit live."));
+        rowWidgets[i].spinBkg = spinB;
+        tbl->setCellWidget(i, 5, spinB);
+
+        // Col 6: Window SpinBox
         QDoubleSpinBox *spinW = new QDoubleSpinBox(tbl);
         spinW->setRange(2.0, 100.0);
         spinW->setDecimals(1);
         spinW->setSingleStep(1.0);
         spinW->setValue(initWin);
         rowWidgets[i].spinWindow = spinW;
-        tbl->setCellWidget(i, 4, spinW);
+        tbl->setCellWidget(i, 6, spinW);
 
-        // Col 5: Refit button
+        // Col 7: Refit button with high-contrast, fully readable theme-compliant styling
         QPushButton *btnRefit = new QPushButton(tr("🔄 Refit Peak"), tbl);
-        btnRefit->setStyleSheet("background-color: #37474f; padding: 4px 10px; font-weight: normal;");
+        btnRefit->setStyleSheet(
+            "QPushButton {"
+            "  background-color: #0277bd;"
+            "  color: #ffffff;"
+            "  font-weight: bold;"
+            "  border-radius: 3px;"
+            "  padding: 4px 10px;"
+            "  border: 1px solid #0288d1;"
+            "}"
+            "QPushButton:hover { background-color: #039be5; }"
+            "QPushButton:pressed { background-color: #01579b; }"
+        );
         rowWidgets[i].btnRefit = btnRefit;
-        tbl->setCellWidget(i, 5, btnRefit);
+        tbl->setCellWidget(i, 7, btnRefit);
     }
 
     peaksVBox->addWidget(tbl);
@@ -2220,6 +2298,121 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
     RunCalibResult liveCalibResult;
 
+    // Helper to update on-screen visual ROOT canvas marker guideline, fit curve, and baseline
+    auto updateCanvasPeakOverlay = [&](int peakIdx) {
+        if (peakIdx < 0 || peakIdx >= nAnchors) return;
+        if (!m_mainCanvas) return;
+
+        double cCh = rowWidgets[peakIdx].spinCentroid->value();
+        double fCh = rowWidgets[peakIdx].spinFwhm->value();
+        double bkgVal = rowWidgets[peakIdx].spinBkg->value();
+        double wCh = rowWidgets[peakIdx].spinWindow->value();
+        double nomCh = rowWidgets[peakIdx].nominalCentroid;
+
+        // 1. Update table shift badge
+        double delta = cCh - nomCh;
+        QString sign = (delta > 0.005) ? "+" : "";
+        rowWidgets[peakIdx].lblShift->setText(QString("\u0394 %1%2 ch").arg(sign).arg(delta, 0, 'f', 2));
+        if (std::abs(delta) < 0.01) {
+            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #90a4ae; font-weight: bold; padding: 2px 6px;");
+        } else if (std::abs(delta) < 2.0) {
+            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #81c784; font-weight: bold; padding: 2px 6px; background-color: rgba(76, 175, 80, 0.18); border-radius: 3px;");
+        } else if (std::abs(delta) < 5.0) {
+            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ffb74d; font-weight: bold; padding: 2px 6px; background-color: rgba(255, 152, 0, 0.18); border-radius: 3px;");
+        } else {
+            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ef5350; font-weight: bold; padding: 2px 6px; background-color: rgba(244, 67, 54, 0.18); border-radius: 3px;");
+        }
+
+        // 2. Active ROOT pad & spectrum histogram
+        const int s_i = m_mainCanvas->SelectedElement_i;
+        const int s_j = m_mainCanvas->SelectedElement_j;
+        TH1F *h = m_mainCanvas->HijF[s_i][s_j];
+        if (!h) return;
+
+        TVirtualPad *activePad = nullptr;
+        if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+            activePad = (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1)
+                ? m_mainCanvas->canvas->getCanvas()->GetPad((s_i - 1) * m_mainCanvas->maxElement_j + s_j)
+                : m_mainCanvas->canvas->getCanvas();
+        }
+        if (!activePad) activePad = gPad;
+        if (!activePad) return;
+
+        activePad->cd();
+
+        // 3. Visual Guideline TLine at current centroid
+        TLine *guideLine = rowWidgets[peakIdx].guideLine;
+        if (!guideLine) {
+            guideLine = new TLine();
+            guideLine->SetLineColor(kYellow + 1);
+            guideLine->SetLineWidth(2);
+            guideLine->SetLineStyle(7); // Dashed bright yellow line
+            guideLine->Draw();
+            rowWidgets[peakIdx].guideLine = guideLine;
+            m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(guideLine);
+        }
+        double yMax = h->GetMaximum();
+        guideLine->SetX1(cCh);
+        guideLine->SetX2(cCh);
+        guideLine->SetY1(0.0);
+        guideLine->SetY2(yMax * 1.05);
+
+        // 4. Gaussian Fit Function TF1
+        int binC = h->FindBin(cCh);
+        double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
+        double ampl = std::max(1.0, binCounts - bkgVal);
+        double sigma = std::max(0.2, fCh / 2.35482);
+        double xMin = std::max(0.0, cCh - wCh);
+        double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
+
+        TF1 *fFit = rowWidgets[peakIdx].fitFunc;
+        if (!fFit) {
+            fFit = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_fit_%d_%d", detId, peakIdx)));
+        }
+        if (!fFit) {
+            fFit = new TF1(Form("rbr_fit_%d_%d", detId, peakIdx),
+                           "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", xMin, xMax);
+            fFit->SetLineColor(kRed);
+            fFit->SetLineWidth(2);
+            fFit->Draw("same");
+            m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(fFit);
+        }
+        rowWidgets[peakIdx].fitFunc = fFit;
+        fFit->SetRange(xMin, xMax);
+        fFit->SetParameter(0, ampl);
+        fFit->SetParameter(1, cCh);
+        fFit->SetParameter(2, sigma);
+        fFit->SetParameter(3, bkgVal);
+        fFit->SetParameter(4, 0.0);
+
+        // 5. Baseline Background Function TF1
+        TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
+        if (!fBkg) {
+            fBkg = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_background_%d_%d", detId, peakIdx)));
+        }
+        if (!fBkg) {
+            fBkg = new TF1(Form("rbr_background_%d_%d", detId, peakIdx),
+                           "[0] + [1]*(x-[2])", xMin, xMax);
+            fBkg->SetLineColor(kBlue);
+            fBkg->SetLineWidth(1);
+            fBkg->SetLineStyle(2);
+            fBkg->Draw("same");
+            m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(fBkg);
+        }
+        rowWidgets[peakIdx].bkgFunc = fBkg;
+        fBkg->SetRange(xMin, xMax);
+        fBkg->SetParameter(0, bkgVal);
+        fBkg->SetParameter(1, 0.0);
+        fBkg->SetParameter(2, cCh);
+
+        activePad->Modified();
+        activePad->Update();
+        if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+            m_mainCanvas->canvas->getCanvas()->Modified();
+            m_mainCanvas->canvas->getCanvas()->Update();
+        }
+    };
+
     auto recalcLivePreview = [&]() {
         std::vector<FittedAnchor> activeAnchors;
         for (int i = 0; i < nAnchors; ++i) {
@@ -2229,6 +2422,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 fa.energyErr = rowWidgets[i].energyError;
                 fa.centroidCh = rowWidgets[i].spinCentroid->value();
                 fa.fwhmCh = rowWidgets[i].spinFwhm->value();
+                fa.background = rowWidgets[i].spinBkg->value();
                 fa.isValid = true;
                 activeAnchors.push_back(fa);
             }
@@ -2265,14 +2459,35 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
     };
 
-    // Connect spinboxes and checkboxes to live recalc
+    // Connect spinboxes and checkboxes to live recalc and on-screen canvas feedback
     for (int i = 0; i < nAnchors; ++i) {
-        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, recalcLivePreview);
-        connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, recalcLivePreview);
-        connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, recalcLivePreview);
+        int peakIdx = i;
+
+        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [=]() {
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+        });
+
+        connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+        });
+
+        connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+        });
+
+        connect(rowWidgets[i].spinBkg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+        });
+
+        connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+            updateCanvasPeakOverlay(peakIdx);
+        });
 
         // Refit button action
-        int peakIdx = i;
         connect(rowWidgets[i].btnRefit, &QPushButton::clicked, &dlg, [&, peakIdx]() {
             double cCh = rowWidgets[peakIdx].spinCentroid->value();
             double wCh = rowWidgets[peakIdx].spinWindow->value();
@@ -2281,13 +2496,18 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             if (fa.isValid) {
                 rowWidgets[peakIdx].spinCentroid->setValue(fa.centroidCh);
                 rowWidgets[peakIdx].spinFwhm->setValue(std::max(0.5, fa.fwhmCh));
+                if (fa.background > 0.0) {
+                    rowWidgets[peakIdx].spinBkg->setValue(fa.background);
+                }
                 rowWidgets[peakIdx].chkUse->setChecked(true);
                 recalcLivePreview();
+                updateCanvasPeakOverlay(peakIdx);
                 QToolTip::showText(rowWidgets[peakIdx].btnRefit->mapToGlobal(QPoint(0, 0)),
-                                   tr("Fitted successfully: centroid = %1 ch, FWHM = %2 ch").arg(fa.centroidCh, 0, 'f', 2).arg(fa.fwhmCh, 0, 'f', 2));
+                                   tr("Fitted successfully: centroid = %1 ch, FWHM = %2 ch, Bkg = %3 cts")
+                                       .arg(fa.centroidCh, 0, 'f', 2).arg(fa.fwhmCh, 0, 'f', 2).arg(fa.background, 0, 'f', 1));
             } else {
                 QMessageBox::information(&dlg, tr("Refit Notice"),
-                                         tr("Could not converge Gaussian fit around channel %1 (±%2 ch). You can nudge the centroid manually.")
+                                         tr("Could not converge Gaussian fit around channel %1 (±%2 ch). You can nudge the centroid and background manually.")
                                              .arg(cCh, 0, 'f', 1).arg(wCh, 0, 'f', 1));
             }
         });
@@ -2299,6 +2519,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
     QPushButton *btnCanvas = new QPushButton(tr("🔍 Inspect Spectrum on Canvas"), &dlg);
+    btnCanvas->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 6px 12px;");
     connect(btnCanvas, &QPushButton::clicked, &dlg, [&]() {
         inspectSpectrumOnCanvas(row, col);
     });
@@ -2309,12 +2530,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     btnOptionB->setStyleSheet("font-weight: bold; background-color: #2e7d32; color: white; padding: 6px 14px;");
 
     QPushButton *btnOptionA = new QPushButton(tr("⚠️ Force Accept As-Is"), &dlg);
-    btnOptionA->setStyleSheet("background-color: #f57c00; color: white; padding: 6px 12px;");
+    btnOptionA->setStyleSheet("font-weight: bold; background-color: #f57c00; color: white; padding: 6px 12px;");
 
     QPushButton *btnOptionC = new QPushButton(tr("❌ Reject (Make it FAIL)"), &dlg);
-    btnOptionC->setStyleSheet("background-color: #c62828; color: white; padding: 6px 12px;");
+    btnOptionC->setStyleSheet("font-weight: bold; background-color: #c62828; color: white; padding: 6px 12px;");
 
     QPushButton *btnCancel = new QPushButton(tr("Cancel"), &dlg);
+    btnCancel->setStyleSheet("font-weight: bold; background-color: #455a64; color: white; padding: 6px 12px;");
 
     actionLayout->addWidget(btnOptionB);
     actionLayout->addWidget(btnOptionA);
@@ -2426,7 +2648,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Apply Option C: Reject entirely
     connect(btnOptionC, &QPushButton::clicked, &dlg, [&]() {
         if (targetTraj && row < static_cast<int>(targetTraj->runResults.size())) {
-            targetTraj->runResults[row].status = RunCalibStatus::BadChi2;
+            targetTraj->runResults[row].status = RunCalibStatus::NoPeakInWindow;
             targetTraj->runResults[row].failureReason = "Manually rejected by user";
             targetTraj->runResults[row].a0 = 0.0;
             targetTraj->runResults[row].a1 = 0.0;

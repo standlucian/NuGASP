@@ -125,6 +125,9 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
             result.centroidCh = fittedMean;
             result.centroidErrCh = std::max(0.005, fittedMeanErr);
             result.fwhmCh = fwhm;
+            result.amplitude = fittedAmpl;
+            result.background = fGaus.GetParameter(3);
+            result.bkgSlope = fGaus.GetParameter(4);
             result.area = area;
             result.chi2 = chi2;
             result.isValid = true;
@@ -152,6 +155,9 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
         result.centroidCh = centroid;
         result.centroidErrCh = std::max(0.02, sigma / std::sqrt(sumW));
         result.fwhmCh = 2.35482 * sigma;
+        result.amplitude = std::max(1.0, maxVal - momBase);
+        result.background = momBase;
+        result.bkgSlope = 0.0;
         result.area = sumW;
         result.chi2 = 1.0;
         result.isValid = (centroid >= lowCh && centroid <= highCh);
