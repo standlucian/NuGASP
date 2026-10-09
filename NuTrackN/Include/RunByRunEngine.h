@@ -14,6 +14,7 @@ enum class RunCalibStatus {
     NoPeakInWindow,
     LowStatistics,
     BadFWHM,
+    BadChi2,
     ExcessiveDrift,
     FileError,
     RefAnchorFailed
@@ -22,6 +23,7 @@ enum class RunCalibStatus {
 // Configuration for a single anchor line
 struct AnchorPeakDef {
     double physicalEnergy{0.0};    // Known physical energy in keV (e.g. 1460.8)
+    double energyError{0.0};       // Known energy error in keV
     double initialChannel{0.0};    // Approximate reference channel (0 = auto-find around energy / gain)
     double searchWindowCh{15.0};   // +- delta channel window
     double minCounts{25.0};        // Minimum peak area or amplitude
@@ -31,6 +33,7 @@ struct AnchorPeakDef {
 // Results of fitting a single anchor line in a given run
 struct FittedAnchor {
     double energy{0.0};
+    double energyErr{0.0};
     double centroidCh{0.0};
     double centroidErrCh{0.0};
     double fwhmCh{0.0};
@@ -47,6 +50,8 @@ struct RunCalibResult {
     int detectorId{0};
     RunCalibStatus status{RunCalibStatus::Success};
     QString failureReason;
+    bool isFallbackFromPrevious{false};
+    int fallbackSourceRun{0};
 
     // Calibration coefficients: E = a0 + a1*ch (+ a2*ch^2)
     int numCoeffs{2};
@@ -77,7 +82,6 @@ struct DetectorTrajectory {
 // Configuration passed into the batch engine
 struct RunByRunConfig {
     std::vector<QString> runFilePaths; // In sequence order (e.g. Run 1 to Run N)
-    int referenceRunIndex{0};          // Index in runFilePaths to establish initial anchors
     int detectorStart{0};              // e.g. 0
     int detectorEnd{24};               // e.g. 24
     int spectrumChannels{65536};       // e.g. 65536 (64k), 4096 (4k), etc.
@@ -85,6 +89,7 @@ struct RunByRunConfig {
     std::vector<AnchorPeakDef> anchors;
     bool useQuadratic{false};          // true = quadratic (a0, a1, a2); false = linear (a0, a1)
     double maxAllowedDriftCh{25.0};    // Max allowed drift from last valid centroid before failure
+    double maxAllowedChi2NDF{5.0};     // Max allowed reduced Chi2/ndf before flagging/rejection
 };
 
 /**
@@ -100,9 +105,11 @@ public:
     void setConfig(const RunByRunConfig &config);
     const RunByRunConfig& getConfig() const { return m_config; }
 
+public slots:
     // Start batch calibration (can be called asynchronously)
     void run();
 
+public:
     // Request non-blocking cancellation
     void requestStop();
     bool isStopRequested() const { return m_stopRequested.load(); }
@@ -119,7 +126,8 @@ public:
     // Helper to compute polynomial calibration coefficients and uncertainties
     static bool computeCalibration(const std::vector<FittedAnchor> &anchors,
                                    bool useQuadratic,
-                                   RunCalibResult &outResult);
+                                   RunCalibResult &outResult,
+                                   double maxAllowedChi2NDF = 5.0);
 
 signals:
     void detectorStarted(int detectorId, int totalDetectors);
@@ -133,5 +141,7 @@ private:
     std::atomic<bool> m_stopRequested{false};
     std::vector<DetectorTrajectory> m_trajectories;
 };
+
+Q_DECLARE_METATYPE(RunCalibResult)
 
 #endif // RUNBYRUNENGINE_H

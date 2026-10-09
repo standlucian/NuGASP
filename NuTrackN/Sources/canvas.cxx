@@ -190,6 +190,13 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     leftBar->setSpacing(2);
     leftBar->addStretch(1);
 
+    QPushButton *btnRunByRun = makeButton("Run-by-Run", topContainer, true);
+    btnRunByRun->setFixedWidth(93);
+    btnRunByRun->setFixedHeight(36);
+    btnRunByRun->setToolTip(tr("Open Run-by-Run Energy Calibration Manager (In-Beam Drift Alignment) [Shortcut: A+R]"));
+    leftBar->addWidget(btnRunByRun);
+    connect(btnRunByRun, &QPushButton::clicked, this, &QMainCanvas::openRunByRunManager);
+
     QPushButton *btnEnCal = makeButton("EnCal", topContainer, true);
     btnEnCal->setFixedWidth(93);
     btnEnCal->setFixedHeight(36);

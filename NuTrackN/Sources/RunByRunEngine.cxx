@@ -93,21 +93,22 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
         hTemp.SetBinError(i + 1, std::max(1.0, std::sqrt(std::max(0.0, spectrum[ch]))));
     }
 
-    TF1 fGaus("fAnchorGaus", "gaus(0) + pol1(3)", fitMin - 0.5, fitMax + 0.5);
+    // Centered formula: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
+    // Parameter 3 is the local baseline AT the centroid, avoiding huge/negative extrapolations to channel 0
+    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
     const double bkgSlope = (spectrum[fitMax] - spectrum[fitMin]) / static_cast<double>(nFitBins);
-    const double bkgConst = spectrum[fitMin];
     const double estAmpl = std::max(1.0, maxVal - baseVal);
     const double estMean = static_cast<double>(maxBin);
-    const double estSigma = 2.5;
+    const double estSigma = 2.0;
 
     fGaus.SetParameter(0, estAmpl);
     fGaus.SetParameter(1, estMean);
     fGaus.SetParameter(2, estSigma);
-    fGaus.SetParameter(3, bkgConst);
+    fGaus.SetParameter(3, baseVal);
     fGaus.SetParameter(4, bkgSlope);
 
     fGaus.SetParLimits(1, fitMin, fitMax);
-    fGaus.SetParLimits(2, 0.4, 20.0); // HPGe physical peak width boundaries
+    fGaus.SetParLimits(2, 0.4, 25.0); // HPGe physical peak width boundaries
     fGaus.SetParLimits(0, 0.0, maxVal * 3.0);
 
     TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
@@ -120,7 +121,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
         const double area = fittedAmpl * fittedSigma * std::sqrt(2.0 * M_PI);
         const double chi2 = fitRes->Chi2() / std::max(1, static_cast<int>(fitRes->Ndf()));
 
-        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.8 && fwhm <= 40.0) {
+        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.6 && fwhm <= 50.0 && chi2 <= 50.0) {
             result.centroidCh = fittedMean;
             result.centroidErrCh = std::max(0.005, fittedMeanErr);
             result.fwhmCh = fwhm;
@@ -164,7 +165,8 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
 //==============================================================================
 bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors,
                                        bool useQuadratic,
-                                       RunCalibResult &outResult)
+                                       RunCalibResult &outResult,
+                                       double maxAllowedChi2NDF)
 {
     std::vector<FittedAnchor> valid;
     for (const auto &a : anchors) {
@@ -185,7 +187,9 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         double sumW = 0.0, sumWX = 0.0, sumWY = 0.0, sumWXX = 0.0, sumWXY = 0.0;
 
         for (const auto &a : valid) {
-            const double w = 1.0 / (a.centroidErrCh * a.centroidErrCh + 1e-4);
+            const double sigTotSq = (a.energyErr > 0.0 ? a.energyErr * a.energyErr : 0.0) +
+                                    (a.centroidErrCh * a.centroidErrCh + 1e-4);
+            const double w = 1.0 / sigTotSq;
             sumW += w;
             sumWX += w * a.centroidCh;
             sumWY += w * a.energy;
@@ -209,19 +213,29 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         outResult.sigmaA2 = 0.0;
         outResult.covA0A1 = -sumWX / delta;
 
-        // Residual calculation
+        // Residual and Chi2 calculation
         double sumResSq = 0.0, sumChi2 = 0.0;
         for (const auto &a : valid) {
             const double fitE = outResult.a0 + outResult.a1 * a.centroidCh;
             const double res = a.energy - fitE;
             sumResSq += res * res;
-            const double sigE = std::max(0.05, std::abs(outResult.a1) * a.centroidErrCh);
+            const double sigE = std::sqrt(std::max(0.001, (a.energyErr * a.energyErr) +
+                                                          (outResult.a1 * outResult.a1 * a.centroidErrCh * a.centroidErrCh)));
             sumChi2 += (res * res) / (sigE * sigE);
         }
 
         const int ndf = std::max(1, static_cast<int>(valid.size()) - 2);
         outResult.sRes = std::sqrt(sumResSq / static_cast<double>(ndf));
         outResult.chi2NDF = sumChi2 / static_cast<double>(ndf);
+
+        if (outResult.chi2NDF > maxAllowedChi2NDF || std::isnan(outResult.chi2NDF)) {
+            outResult.status = RunCalibStatus::BadChi2;
+            outResult.failureReason = QString("Reduced Chi2/ndf (%1) exceeds acceptable cutoff of %2.")
+                                          .arg(outResult.chi2NDF, 0, 'f', 2)
+                                          .arg(maxAllowedChi2NDF, 0, 'f', 1);
+            return false;
+        }
+
         outResult.status = RunCalibStatus::Success;
         outResult.failureReason.clear();
         return true;
@@ -233,7 +247,9 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
     double b[3] = {0.0};
 
     for (const auto &a : valid) {
-        const double w = 1.0 / (a.centroidErrCh * a.centroidErrCh + 1e-4);
+        const double sigTotSq = (a.energyErr > 0.0 ? a.energyErr * a.energyErr : 0.0) +
+                                (a.centroidErrCh * a.centroidErrCh + 1e-4);
+        const double w = 1.0 / sigTotSq;
         const double x = a.centroidCh;
         const double x2 = x * x;
         const double x3 = x2 * x;
@@ -292,6 +308,15 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
     const int ndf = std::max(1, static_cast<int>(valid.size()) - 3);
     outResult.sRes = std::sqrt(sumResSq / static_cast<double>(ndf));
     outResult.chi2NDF = sumChi2 / static_cast<double>(ndf);
+
+    if (outResult.chi2NDF > maxAllowedChi2NDF || std::isnan(outResult.chi2NDF)) {
+        outResult.status = RunCalibStatus::BadChi2;
+        outResult.failureReason = QString("Reduced Chi2/ndf (%1) exceeds acceptable cutoff of %2.")
+                                      .arg(outResult.chi2NDF, 0, 'f', 2)
+                                      .arg(maxAllowedChi2NDF, 0, 'f', 1);
+        return false;
+    }
+
     outResult.status = RunCalibStatus::Success;
     outResult.failureReason.clear();
     return true;
@@ -312,9 +337,6 @@ void RunByRunEngine::run()
         return;
     }
 
-    const int refRunIdx = std::clamp(m_config.referenceRunIndex, 0, nRuns - 1);
-    const QString refRunPath = m_config.runFilePaths[refRunIdx];
-
     int overallSuccessCount = 0;
     int overallFailureCount = 0;
     int processedSteps = 0;
@@ -329,42 +351,13 @@ void RunByRunEngine::run()
         DetectorTrajectory traj;
         traj.detectorId = detId;
 
-        // 1. Establish reference centroids on reference run for detector d
-        std::vector<double> refSpectrum;
-        QString err;
-        std::vector<double> currentTrajectoryCentroids;
-
-        bool refLoaded = ReadSpectrumData(refRunPath.toStdString(),
-                                          m_config.spectrumFormat,
-                                          m_config.spectrumChannels,
-                                          detId,
-                                          refSpectrum,
-                                          &err);
-
-        bool refAnchorsValid = false;
-        if (refLoaded && !refSpectrum.empty()) {
-            std::vector<FittedAnchor> refFitted;
-            for (const auto &anchorDef : m_config.anchors) {
-                double guessCh = anchorDef.initialChannel;
-                if (guessCh <= 0.0) {
-                    // Approximate initial channel from 1.0 keV/ch baseline if unprovided
-                    guessCh = anchorDef.physicalEnergy;
-                }
-                FittedAnchor fa = fitAnchorPeak(refSpectrum, guessCh,
-                                               anchorDef.searchWindowCh,
-                                               anchorDef.minCounts,
-                                               anchorDef.physicalEnergy);
-                if (fa.isValid) {
-                    currentTrajectoryCentroids.push_back(fa.centroidCh);
-                    refFitted.push_back(fa);
-                } else {
-                    currentTrajectoryCentroids.push_back(guessCh);
-                }
-            }
-            refAnchorsValid = (refFitted.size() >= 2);
+        // Initialize base centroids directly from anchor definitions (initialChannel or physicalEnergy)
+        std::vector<double> baseCentroids;
+        for (const auto &anchorDef : m_config.anchors) {
+            double guessCh = (anchorDef.initialChannel > 0.0) ? anchorDef.initialChannel : anchorDef.physicalEnergy;
+            baseCentroids.push_back(guessCh);
         }
-
-        traj.lastValidCentroids = currentTrajectoryCentroids;
+        traj.lastValidCentroids = baseCentroids;
 
         // 2. INNER LOOP: Run r in [0 .. nRuns - 1]
         for (int rIdx = 0; rIdx < nRuns; ++rIdx) {
@@ -388,20 +381,9 @@ void RunByRunEngine::run()
             res.fullFilePath = runPath;
             res.detectorId = detId;
 
-            if (!refAnchorsValid) {
-                res.status = RunCalibStatus::RefAnchorFailed;
-                res.failureReason = QString("Failed to establish baseline anchor peaks on Reference Run (%1)")
-                                        .arg(QFileInfo(refRunPath).fileName());
-                traj.runResults.push_back(res);
-                traj.failureCount++;
-                overallFailureCount++;
-                processedSteps++;
-                emit runProcessed(detId, rIdx, nRuns, res);
-                continue;
-            }
-
             // Load detector d spectrum for run r
             std::vector<double> runSpectrum;
+            QString err;
             if (!ReadSpectrumData(runPath.toStdString(),
                                  m_config.spectrumFormat,
                                  m_config.spectrumChannels,
@@ -420,64 +402,80 @@ void RunByRunEngine::run()
 
             // Fit each anchor peak within bounded search window around detector's moving centroid
             std::vector<FittedAnchor> fittedRunAnchors;
-            bool allAnchorsFound = true;
-            QString missingAnchorDesc;
 
             for (size_t aIdx = 0; aIdx < m_config.anchors.size(); ++aIdx) {
                 const auto &anchorDef = m_config.anchors[aIdx];
                 const double centerCh = (aIdx < traj.lastValidCentroids.size())
                                             ? traj.lastValidCentroids[aIdx]
-                                            : anchorDef.physicalEnergy;
+                                            : baseCentroids[aIdx];
 
                 FittedAnchor fa = fitAnchorPeak(runSpectrum,
                                                centerCh,
                                                anchorDef.searchWindowCh,
                                                anchorDef.minCounts,
                                                anchorDef.physicalEnergy);
+                fa.energyErr = anchorDef.energyError;
 
-                // Verify drift from last valid centroid does not exceed max tolerance
+                // If not found around previous good centroid, try searching around initial base channel as fallback
+                if (!fa.isValid && std::abs(centerCh - baseCentroids[aIdx]) > 0.5) {
+                    fa = fitAnchorPeak(runSpectrum,
+                                       baseCentroids[aIdx],
+                                       anchorDef.searchWindowCh,
+                                       anchorDef.minCounts,
+                                       anchorDef.physicalEnergy);
+                    fa.energyErr = anchorDef.energyError;
+                }
+
+                // Verify FWHM and drift from base centroid does not exceed max tolerance
                 if (fa.isValid) {
-                    const double drift = std::abs(fa.centroidCh - centerCh);
+                    if (anchorDef.expectedFwhmCh > 0.0 && fa.fwhmCh > anchorDef.expectedFwhmCh * 2.5) {
+                        fa.isValid = false;
+                    }
+                    const double drift = std::abs(fa.centroidCh - baseCentroids[aIdx]);
                     if (drift > m_config.maxAllowedDriftCh) {
                         fa.isValid = false;
-                        allAnchorsFound = false;
-                        missingAnchorDesc = QString("Drift on %1 keV peak (%2 ch) exceeded limit (%3 ch)")
-                                                .arg(anchorDef.physicalEnergy, 0, 'f', 1)
-                                                .arg(drift, 0, 'f', 1)
-                                                .arg(m_config.maxAllowedDriftCh, 0, 'f', 1);
-                        break;
                     }
-                } else {
-                    allAnchorsFound = false;
-                    missingAnchorDesc = QString("Anchor peak %1 keV not found or counts too low")
-                                            .arg(anchorDef.physicalEnergy, 0, 'f', 1);
-                    break;
                 }
 
                 fittedRunAnchors.push_back(fa);
             }
 
-            if (!allAnchorsFound) {
+            int validAnchorCount = 0;
+            for (const auto &fa : fittedRunAnchors) {
+                if (fa.isValid) validAnchorCount++;
+            }
+            const int minRequiredAnchors = m_config.useQuadratic ? 3 : 2;
+
+            bool calibSuccess = false;
+            if (validAnchorCount >= minRequiredAnchors) {
+                calibSuccess = computeCalibration(fittedRunAnchors, m_config.useQuadratic, res, m_config.maxAllowedChi2NDF);
+            } else {
                 res.status = RunCalibStatus::NoPeakInWindow;
-                res.failureReason = missingAnchorDesc;
+                res.failureReason = QString("Only %1 of %2 valid anchor peaks found (minimum %3 required).")
+                                        .arg(validAnchorCount).arg(m_config.anchors.size()).arg(minRequiredAnchors);
+            }
+
+            if (calibSuccess) {
+                res.status = RunCalibStatus::Success;
+                res.isFallbackFromPrevious = false;
+                // Update moving anchor centroids for all successfully fitted peaks
+                for (size_t aIdx = 0; aIdx < fittedRunAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
+                    if (fittedRunAnchors[aIdx].isValid) {
+                        traj.lastValidCentroids[aIdx] = fittedRunAnchors[aIdx].centroidCh;
+                    }
+                }
+                traj.runResults.push_back(res);
+                traj.successCount++;
+                overallSuccessCount++;
+            } else {
+                // Calibration for this run failed. In no way should run n copy parameters from n-1!
+                // Keep res recorded as failed with its actual failure status and reason.
+                res.isFallbackFromPrevious = false;
+                // traj.lastValidCentroids remains as the centroids from the last good run (n-1),
+                // allowing run n+1 to resume tracking from the last good parameters.
                 traj.runResults.push_back(res);
                 traj.failureCount++;
                 overallFailureCount++;
-            } else {
-                // Compute calibration coefficients and update detector's trajectory
-                if (computeCalibration(fittedRunAnchors, m_config.useQuadratic, res)) {
-                    // Update moving anchor centroids for detector d
-                    for (size_t aIdx = 0; aIdx < fittedRunAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
-                        traj.lastValidCentroids[aIdx] = fittedRunAnchors[aIdx].centroidCh;
-                    }
-                    traj.runResults.push_back(res);
-                    traj.successCount++;
-                    overallSuccessCount++;
-                } else {
-                    traj.runResults.push_back(res);
-                    traj.failureCount++;
-                    overallFailureCount++;
-                }
             }
 
             processedSteps++;
