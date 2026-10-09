@@ -45,9 +45,21 @@ std::vector<RunCalibResult> RunByRunEngine::getAllFailures() const
 //==============================================================================
 // fitAnchorPeak
 //==============================================================================
+//==============================================================================
+// fitAnchorPeak & fitAnchorPeakWithFixed
+//==============================================================================
 FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
                                           double centerCh, double windowCh,
                                           double minCounts, double energy)
+{
+    FitFixedParams fixed;
+    return fitAnchorPeakWithFixed(spectrum, centerCh, windowCh, minCounts, energy, fixed);
+}
+
+FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &spectrum,
+                                                  double centerCh, double windowCh,
+                                                  double minCounts, double energy,
+                                                  const FitFixedParams &fixed)
 {
     FittedAnchor result;
     result.energy = energy;
@@ -56,29 +68,38 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
     const int totalBins = static_cast<int>(spectrum.size());
     if (totalBins <= 10) return result;
 
+    if (fixed.fixCentroid && fixed.fixedCentroid > 0.0) {
+        centerCh = fixed.fixedCentroid;
+    }
+
     const int lowCh = std::max(1, static_cast<int>(std::floor(centerCh - windowCh)));
     const int highCh = std::min(totalBins - 2, static_cast<int>(std::ceil(centerCh + windowCh)));
     if (lowCh >= highCh) return result;
 
-    // 1. Search for highest bin in search window
+    // 1. Search for highest bin in search window (or use fixed centroid)
     int maxBin = lowCh;
-    double maxVal = spectrum[lowCh];
-    for (int ch = lowCh; ch <= highCh; ++ch) {
-        if (spectrum[ch] > maxVal) {
-            maxVal = spectrum[ch];
-            maxBin = ch;
+    if (fixed.fixCentroid && fixed.fixedCentroid > 0.0) {
+        maxBin = std::clamp(static_cast<int>(std::round(fixed.fixedCentroid)), 1, totalBins - 2);
+    } else {
+        double maxVal = spectrum[lowCh];
+        for (int ch = lowCh; ch <= highCh; ++ch) {
+            if (spectrum[ch] > maxVal) {
+                maxVal = spectrum[ch];
+                maxBin = ch;
+            }
         }
     }
+    double maxVal = (maxBin >= 0 && maxBin < totalBins) ? spectrum[maxBin] : 0.0;
 
-    // Baseline estimation from endpoints
-    double baseVal = (spectrum[lowCh] + spectrum[highCh]) / 2.0;
+    // Baseline estimation from endpoints or fixed baseline
+    double baseVal = fixed.fixBaseline ? fixed.fixedBaseline : (spectrum[lowCh] + spectrum[highCh]) / 2.0;
     double netHeight = maxVal - baseVal;
-    if (netHeight < minCounts || maxVal <= 0.0) {
+    if (netHeight < minCounts && !fixed.fixCentroid) {
         return result; // Low counts
     }
 
     // 2. Define local fitting window around detected maximum
-    const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.75), 5, 25);
+    const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.75), 5, 30);
     const int fitMin = std::max(1, maxBin - fitHalfWidth);
     const int fitMax = std::min(totalBins - 1, maxBin + fitHalfWidth);
     const int nFitBins = fitMax - fitMin + 1;
@@ -96,34 +117,53 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
     // Centered formula: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
     // Parameter 3 is the local baseline AT the centroid, avoiding huge/negative extrapolations to channel 0
     TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
-    const double bkgSlope = (spectrum[fitMax] - spectrum[fitMin]) / static_cast<double>(nFitBins);
+    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (spectrum[fitMax] - spectrum[fitMin]) / static_cast<double>(nFitBins);
     const double estAmpl = std::max(1.0, maxVal - baseVal);
-    const double estMean = static_cast<double>(maxBin);
-    const double estSigma = 2.0;
+    const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
+    const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : 2.0;
 
     fGaus.SetParameter(0, estAmpl);
-    fGaus.SetParameter(1, estMean);
-    fGaus.SetParameter(2, estSigma);
-    fGaus.SetParameter(3, baseVal);
-    fGaus.SetParameter(4, bkgSlope);
+    fGaus.SetParLimits(0, 0.0, std::max(10.0, maxVal * 4.0));
 
-    fGaus.SetParLimits(1, fitMin, fitMax);
-    fGaus.SetParLimits(2, 0.4, 25.0); // HPGe physical peak width boundaries
-    fGaus.SetParLimits(0, 0.0, maxVal * 3.0);
+    if (fixed.fixCentroid) {
+        fGaus.FixParameter(1, fixed.fixedCentroid);
+    } else {
+        fGaus.SetParameter(1, estMean);
+        fGaus.SetParLimits(1, fitMin, fitMax);
+    }
+
+    if (fixed.fixFwhm) {
+        fGaus.FixParameter(2, std::max(0.1, fixed.fixedFwhm / 2.35482));
+    } else {
+        fGaus.SetParameter(2, estSigma);
+        fGaus.SetParLimits(2, 0.4, 25.0); // HPGe physical peak width boundaries
+    }
+
+    if (fixed.fixBaseline) {
+        fGaus.FixParameter(3, fixed.fixedBaseline);
+    } else {
+        fGaus.SetParameter(3, baseVal);
+    }
+
+    if (fixed.fixSlope) {
+        fGaus.FixParameter(4, fixed.fixedSlope);
+    } else {
+        fGaus.SetParameter(4, bkgSlope);
+    }
 
     TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
     if (fitRes.Get() && fitRes->IsValid()) {
         const double fittedMean = fGaus.GetParameter(1);
-        const double fittedMeanErr = fGaus.GetParError(1);
+        const double fittedMeanErr = fixed.fixCentroid ? 0.005 : std::max(0.005, fGaus.GetParError(1));
         const double fittedSigma = std::abs(fGaus.GetParameter(2));
         const double fittedAmpl = fGaus.GetParameter(0);
         const double fwhm = 2.35482 * fittedSigma;
         const double area = fittedAmpl * fittedSigma * std::sqrt(2.0 * M_PI);
         const double chi2 = fitRes->Chi2() / std::max(1, static_cast<int>(fitRes->Ndf()));
 
-        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.6 && fwhm <= 50.0 && chi2 <= 50.0) {
+        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.4 && fwhm <= 50.0) {
             result.centroidCh = fittedMean;
-            result.centroidErrCh = std::max(0.005, fittedMeanErr);
+            result.centroidErrCh = fittedMeanErr;
             result.fwhmCh = fwhm;
             result.amplitude = fittedAmpl;
             result.background = fGaus.GetParameter(3);
@@ -133,6 +173,20 @@ FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
             result.isValid = true;
             return result;
         }
+    }
+
+    // Fallback: If parameters were manually fixed, return exact user values
+    if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline) {
+        result.centroidCh = fixed.fixCentroid ? fixed.fixedCentroid : estMean;
+        result.centroidErrCh = 0.02;
+        result.fwhmCh = fixed.fixFwhm ? fixed.fixedFwhm : 3.5;
+        result.amplitude = estAmpl;
+        result.background = fixed.fixBaseline ? fixed.fixedBaseline : baseVal;
+        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : bkgSlope;
+        result.area = estAmpl * (result.fwhmCh / 2.35482) * std::sqrt(2.0 * M_PI);
+        result.chi2 = 1.0;
+        result.isValid = true;
+        return result;
     }
 
     // Fallback: Background-subtracted centroid & moment

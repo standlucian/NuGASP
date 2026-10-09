@@ -45,6 +45,18 @@ struct FittedAnchor {
     bool   isValid{false};
 };
 
+// Interactive peak refit parameter fixing / locking flags
+struct FitFixedParams {
+    bool fixCentroid{false};
+    double fixedCentroid{0.0};
+    bool fixFwhm{false};
+    double fixedFwhm{0.0};
+    bool fixBaseline{false};
+    double fixedBaseline{0.0};
+    bool fixSlope{false};
+    double fixedSlope{0.0};
+};
+
 // Result for a specific (Run, Detector)
 struct RunCalibResult {
     int runNumber{0};
@@ -125,6 +137,12 @@ public:
     static FittedAnchor fitAnchorPeak(const std::vector<double> &spectrum,
                                      double centerCh, double windowCh,
                                      double minCounts, double energy);
+
+    // Helper to fit a single anchor peak with optional fixed/locked parameters
+    static FittedAnchor fitAnchorPeakWithFixed(const std::vector<double> &spectrum,
+                                               double centerCh, double windowCh,
+                                               double minCounts, double energy,
+                                               const FitFixedParams &fixed);
 
     // Helper to compute polynomial calibration coefficients and uncertainties
     static bool computeCalibration(const std::vector<FittedAnchor> &anchors,
