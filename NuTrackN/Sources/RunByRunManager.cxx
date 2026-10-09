@@ -1341,11 +1341,13 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
                              .arg(result.a1, 0, 'f', 6)
                              .arg(result.failureReason));
     } else {
-        item->setText(tr("FAIL"));
-        item->setBackground(QBrush(QColor("#c62828"))); // Red
+        item->setText(tr("INTERVENE"));
+        item->setBackground(QBrush(QColor("#f57c00"))); // Vibrant Amber / Orange
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2\nFAILURE: %3")
-                             .arg(result.runFileName).arg(detId).arg(result.failureReason));
+        item->setToolTip(QString("Run: %1 | Det: %2 [INTERVENE]\nReason: %3\n\u03c7\u00b2/ndf: %4\nDouble-click to open spectrum and intervene.")
+                             .arg(result.runFileName).arg(detId)
+                             .arg(result.failureReason)
+                             .arg(result.chi2NDF > 0.0 ? QString::number(result.chi2NDF, 'f', 2) : "-"));
     }
 
     m_gridMatrix->viewport()->update();
@@ -1610,10 +1612,10 @@ void RunByRunManager::updatePlot(int detId)
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 4, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 5, new QTableWidgetItem(res.chi2NDF > 0.0 ? QString::number(res.chi2NDF, 'f', 2) : "-"));
-            QTableWidgetItem *st = new QTableWidgetItem("FAILED");
-            st->setForeground(QBrush(QColor("#f44336")));
+            QTableWidgetItem *st = new QTableWidgetItem("INTERVENE");
+            st->setForeground(QBrush(QColor("#ffa726")));
             st->setTextAlignment(Qt::AlignCenter);
-            st->setToolTip(res.failureReason);
+            st->setToolTip(res.failureReason.isEmpty() ? tr("Double-click to inspect and intervene") : res.failureReason);
             m_tablePlotData->setItem(r, 6, st);
         }
 
@@ -1634,12 +1636,13 @@ void RunByRunManager::onDetectorPlotSelectionChanged(int detIdx)
 }
 
 //==============================================================================
-// onCellDoubleClicked: Jump directly to the spectrum in NuTrackN
+// inspectSpectrumOnCanvas: Loads spectrum into active pad, fits peaks & auto-zooms
 //==============================================================================
-void RunByRunManager::onCellDoubleClicked(int row, int col)
+void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 {
     if (row < 0 || row >= static_cast<int>(m_runFilePaths.size())) return;
-    const int detId = col + m_spinDetStart->value();
+    const int detStart = m_spinDetStart ? m_spinDetStart->value() : 0;
+    const int detId = col + detStart;
     const QString filePath = m_runFilePaths[row];
     if (!m_mainCanvas) return;
 
@@ -1894,6 +1897,42 @@ void RunByRunManager::onCellDoubleClicked(int row, int col)
 }
 
 //==============================================================================
+// onCellDoubleClicked: Inspects spectrum on canvas, and if cell needs intervention,
+// immediately opens the intervention dialog
+//==============================================================================
+void RunByRunManager::onCellDoubleClicked(int row, int col)
+{
+    if (row < 0 || row >= static_cast<int>(m_runFilePaths.size())) return;
+    const int detStart = m_spinDetStart ? m_spinDetStart->value() : 0;
+    const int detId = col + detStart;
+
+    // 1. Automatically load spectrum and auto-zoom to peak area on canvas
+    inspectSpectrumOnCanvas(row, col);
+
+    // 2. If flagged or needs intervention, immediately open intervention dialog
+    bool needsIntervention = false;
+    QTableWidgetItem *item = m_gridMatrix->item(row, col);
+    if (item && (item->text() == tr("INTERVENE") || item->text() == "INTERVENE")) {
+        needsIntervention = true;
+    } else {
+        for (const auto &traj : m_completedTrajectories) {
+            if (traj.detectorId == detId) {
+                if (row >= 0 && row < static_cast<int>(traj.runResults.size())) {
+                    if (traj.runResults[row].status != RunCalibStatus::Success) {
+                        needsIntervention = true;
+                    }
+                }
+                break;
+            }
+        }
+    }
+
+    if (needsIntervention) {
+        openInterventionDialog(row, col);
+    }
+}
+
+//==============================================================================
 // onExportCalClicked: Strict legacy Xtrackn format
 //==============================================================================
 void RunByRunManager::onExportCalClicked()
@@ -1995,6 +2034,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QMessageBox::warning(this, tr("No Anchors"), tr("No anchor lines are defined. Please set up anchor lines first."));
         return;
     }
+
+    // Automatically load spectrum and auto-zoom to peak area on main canvas
+    inspectSpectrumOnCanvas(row, col);
 
     // Read spectrum for this run and detector
     std::vector<double> specData;
@@ -2258,7 +2300,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
     QPushButton *btnCanvas = new QPushButton(tr("🔍 Inspect Spectrum on Canvas"), &dlg);
     connect(btnCanvas, &QPushButton::clicked, &dlg, [&]() {
-        onCellDoubleClicked(row, col);
+        inspectSpectrumOnCanvas(row, col);
     });
     actionLayout->addWidget(btnCanvas);
     actionLayout->addStretch(1);
@@ -2336,6 +2378,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                              .arg(liveCalibResult.a1, 0, 'f', 6)
                              .arg(liveCalibResult.sRes, 0, 'f', 4)
                              .arg(liveCalibResult.chi2NDF, 0, 'f', 2));
+
+        // Refresh canvas with updated calibration & peak fits
+        inspectSpectrumOnCanvas(row, col);
 
         // Refresh plot if detector selected
         if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {

@@ -103,6 +103,7 @@ private:
     void syncAnchorsFromTable();
     void updatePlot(int detId);
     void showIssueReportModal(int totalSuccess, int totalFailures);
+    void inspectSpectrumOnCanvas(int row, int col);
     void openInterventionDialog(int row, int col);
 
     QMainCanvas            *m_mainCanvas{nullptr};
