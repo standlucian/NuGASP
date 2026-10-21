@@ -2314,21 +2314,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
         m_mainCanvas->canvas->getCanvas()->Update();
     }
 
-    // 8. Update fit residuals strip on canvas with the first fitted peak if available
-    TF1 *firstFit = nullptr;
-    for (auto *obj : m_mainCanvas->autoFitMarkers[sel_i][sel_j]) {
-        TF1 *f = dynamic_cast<TF1*>(obj);
-        if (f && TString(f->GetName()).BeginsWith("rbr_fit_")) {
-            firstFit = f;
-            break;
-        }
-    }
-    if (firstFit) {
-        double rMin = 0.0, rMax = 0.0;
-        firstFit->GetRange(rMin, rMax);
-        m_mainCanvas->updateFitResiduals(hist, firstFit, rMin, rMax,
-                                        QString("Run %1 Det %2 Peak").arg(row + 1).arg(detId));
-    }
+
 
     CommandPrompt::getInstance()->appendPlainText(
         QString("Inspecting run %1 [Detector #%2]: auto-zoomed to peak region, displayed %3 peak fit(s)\n")
@@ -2826,6 +2812,18 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     prevLayout->addWidget(lblPreviewStatus);
     mainVBox->addWidget(grpPreview);
 
+    QPushButton *btnOptionB = new QPushButton(tr("✅ Apply Adjusted Fit (Mark GOOD)"), &dlg);
+    btnOptionB->setStyleSheet("font-weight: bold; background-color: #2e7d32; color: white; padding: 6px 14px;");
+
+    QPushButton *btnOptionA = new QPushButton(tr("⚠️ Force Accept As-Is"), &dlg);
+    btnOptionA->setStyleSheet("font-weight: bold; background-color: #f57c00; color: white; padding: 6px 12px;");
+
+    QPushButton *btnOptionC = new QPushButton(tr("❌ Reject (Make it FAIL)"), &dlg);
+    btnOptionC->setStyleSheet("font-weight: bold; background-color: #c62828; color: white; padding: 6px 12px;");
+
+    QPushButton *btnCancel = new QPushButton(tr("Done / Cancel"), &dlg);
+    btnCancel->setStyleSheet("font-weight: bold; background-color: #455a64; color: white; padding: 6px 12px;");
+
     RunCalibResult liveCalibResult;
 
     // Helper to update on-screen visual ROOT canvas marker guideline, fit curve, and baseline
@@ -2840,18 +2838,25 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double nomCh = rowWidgets[peakIdx].nominalCentroid;
         double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
 
+        bool isUsed = rowWidgets[peakIdx].chkUse ? rowWidgets[peakIdx].chkUse->isChecked() : true;
+
         // 1. Update table shift badge
-        double delta = cCh - nomCh;
-        QString sign = (delta > 0.005) ? "+" : "";
-        rowWidgets[peakIdx].lblShift->setText(QString("\u0394 %1%2 ch").arg(sign).arg(delta, 0, 'f', 2));
-        if (std::abs(delta) < 0.01) {
-            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #90a4ae; font-weight: bold; padding: 2px 6px;");
-        } else if (std::abs(delta) < 2.0) {
-            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #81c784; font-weight: bold; padding: 2px 6px; background-color: rgba(76, 175, 80, 0.18); border-radius: 3px;");
-        } else if (std::abs(delta) < 5.0) {
-            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ffb74d; font-weight: bold; padding: 2px 6px; background-color: rgba(255, 152, 0, 0.18); border-radius: 3px;");
+        if (isUsed) {
+            double delta = cCh - nomCh;
+            QString sign = (delta > 0.005) ? "+" : "";
+            rowWidgets[peakIdx].lblShift->setText(QString("\u0394 %1%2 ch").arg(sign).arg(delta, 0, 'f', 2));
+            if (std::abs(delta) < 0.01) {
+                rowWidgets[peakIdx].lblShift->setStyleSheet("color: #90a4ae; font-weight: bold; padding: 2px 6px;");
+            } else if (std::abs(delta) < 2.0) {
+                rowWidgets[peakIdx].lblShift->setStyleSheet("color: #81c784; font-weight: bold; padding: 2px 6px; background-color: rgba(76, 175, 80, 0.18); border-radius: 3px;");
+            } else if (std::abs(delta) < 5.0) {
+                rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ffb74d; font-weight: bold; padding: 2px 6px; background-color: rgba(255, 152, 0, 0.18); border-radius: 3px;");
+            } else {
+                rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ef5350; font-weight: bold; padding: 2px 6px; background-color: rgba(244, 67, 54, 0.18); border-radius: 3px;");
+            }
         } else {
-            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #ef5350; font-weight: bold; padding: 2px 6px; background-color: rgba(244, 67, 54, 0.18); border-radius: 3px;");
+            rowWidgets[peakIdx].lblShift->setText(tr("(Excluded)"));
+            rowWidgets[peakIdx].lblShift->setStyleSheet("color: #78909c; font-style: italic; padding: 2px 6px;");
         }
 
         // 2. Active ROOT pad & spectrum histogram
@@ -2937,7 +2942,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fBkg->SetParameter(1, slopeVal);
         fBkg->SetParameter(2, cCh);
 
-        bool isUsed = rowWidgets[peakIdx].chkUse ? rowWidgets[peakIdx].chkUse->isChecked() : true;
         if (!isUsed) {
             guideLine->SetLineColor(kGray);
             guideLine->SetLineStyle(3);
@@ -2961,12 +2965,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
             m_mainCanvas->canvas->getCanvas()->Modified();
             m_mainCanvas->canvas->getCanvas()->Update();
-        }
-
-        if (isUsed && fFit) {
-            m_mainCanvas->updateFitResiduals(h, fFit, xMin, xMax,
-                QString("Run %1 Det %2 Peak @ %3 keV").arg(row + 1).arg(detId).arg(rowWidgets[peakIdx].energy, 0, 'f', 1),
-                rowWidgets[peakIdx].peakChi2, 1);
         }
     };
 
@@ -2992,16 +2990,32 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
 
         if (activeAnchors.size() < 2) {
-            lblPreviewStatus->setText(tr("<span style='color:#f44336;'>⚠️ Insufficient peaks selected (%1). At least 2 required.</span>").arg(activeAnchors.size()));
+            lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:#f44336; font-weight:bold;'>INSUFFICIENT PEAKS (%1 &lt; 2)</span> &nbsp;|&nbsp; "
+                                          "<b>Gain (a1):</b> - &nbsp;|&nbsp; "
+                                          "<b>Offset (a0):</b> - &nbsp;|&nbsp; "
+                                          "<b>Residual (s_res):</b> - &nbsp;|&nbsp; "
+                                          "<b>Calibration Line \u03c7\u00b2/ndf:</b> - &nbsp;|&nbsp; "
+                                          "<b>Cutoff:</b> \u2264 %2")
+                                      .arg(activeAnchors.size())
+                                      .arg(QString::number(maxChi2, 'f', 1)));
+            lblPreviewStatus->setText(tr("<span style='color:#f44336;'>⚠️ Insufficient peaks selected (%1). At least 2 required for energy calibration.</span>").arg(activeAnchors.size()));
+            if (btnOptionB) {
+                btnOptionB->setEnabled(false);
+                btnOptionB->setText(tr("⚠️ Insufficient Peaks"));
+                btnOptionB->setStyleSheet("font-weight: bold; background-color: #78909c; color: white; padding: 6px 14px;");
+            }
+
             liveCalibResult = RunCalibResult();
             liveCalibResult.detectorId = detId;
             liveCalibResult.runNumber = row + 1;
             liveCalibResult.runFileName = runName;
             liveCalibResult.fullFilePath = filePath;
             liveCalibResult.fittedAnchors = allAnchors;
-            liveCalibResult.status = RunCalibStatus::BadChi2;
+            liveCalibResult.status = RunCalibStatus::NoPeakInWindow;
             return;
         }
+
+        if (btnOptionB) btnOptionB->setEnabled(true);
 
         RunCalibResult res;
         res.detectorId = detId;
@@ -3020,14 +3034,55 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QString offStr = QString::number(res.a0, 'f', 4);
         QString resStr = QString::number(res.sRes, 'f', 4);
 
+        QString statusColor = (ok && res.status == RunCalibStatus::Success) ? "#4caf50" : "#ffa726";
+        QString statusName = (ok && res.status == RunCalibStatus::Success) ? "GOOD (Acceptable \u03c7\u00b2)" : "INTERVENE (High \u03c7\u00b2)";
+
+        lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
+                                      "<b>Gain (a1):</b> %3 keV/ch &nbsp;|&nbsp; "
+                                      "<b>Offset (a0):</b> %4 keV &nbsp;|&nbsp; "
+                                      "<b>Residual (s_res):</b> %5 keV &nbsp;|&nbsp; "
+                                      "<b>Calibration Line \u03c7\u00b2/ndf:</b> <span style='color:%1; font-weight:bold;'>%6</span> &nbsp;|&nbsp; "
+                                      "<b>Cutoff:</b> \u2264 %7")
+                                  .arg(statusColor)
+                                  .arg(statusName)
+                                  .arg(gainStr)
+                                  .arg(offStr)
+                                  .arg(resStr)
+                                  .arg(chi2Str)
+                                  .arg(QString::number(maxChi2, 'f', 1)));
+
         if (ok && res.status == RunCalibStatus::Success) {
             lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>"
-                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Note: Linear calibration \u03c7\u00b2/ndf measures alignment of all %6 anchors (E vs ch), weighted by energy and centroid uncertainties.</span>")
+                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Calibration successfully recomputed using %6 anchor(s).</span>")
                                           .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
+            if (btnOptionB) {
+                btnOptionB->setText(tr("✅ Apply Adjusted Fit (Mark GOOD)"));
+                btnOptionB->setStyleSheet("font-weight: bold; background-color: #2e7d32; color: white; padding: 6px 14px;");
+            }
         } else {
             lblPreviewStatus->setText(QString("<span style='color:#ff9800;'>⚠️ HIGH \u03c7\u00b2 CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (> %5 cutoff)</span>"
-                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Note: Linear calibration \u03c7\u00b2/ndf measures alignment of all %6 anchors (E vs ch), weighted by energy and centroid uncertainties.</span>")
+                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Calibration recomputed with %6 anchor(s), but \u03c7\u00b2/ndf exceeds threshold.</span>")
                                           .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
+            if (btnOptionB) {
+                btnOptionB->setText(tr("⚠️ Apply Fit (High \u03c7\u00b2)"));
+                btnOptionB->setStyleSheet("font-weight: bold; background-color: #f57c00; color: white; padding: 6px 14px;");
+            }
+        }
+
+        // Live update active canvas histogram calibration so peak labels and cursor readouts match live fit!
+        if (m_mainCanvas) {
+            const int s_i = m_mainCanvas->SelectedElement_i;
+            const int s_j = m_mainCanvas->SelectedElement_j;
+            TH1F *activeHist = m_mainCanvas->HijF[s_i][s_j];
+            TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(activeHist);
+            if (tHist && res.a1 > 0.0) {
+                tHist->SetCalibration(res.a0, res.a1, res.a2);
+                m_mainCanvas->renderPeakLabels(s_i, s_j);
+                if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+                    m_mainCanvas->canvas->getCanvas()->Modified();
+                    m_mainCanvas->canvas->getCanvas()->Update();
+                }
+            }
         }
     };
 
@@ -3120,7 +3175,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     for (int i = 0; i < nAnchors; ++i) {
         int peakIdx = i;
 
-        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx]() {
+        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx](bool checked) {
+            if (!checked) {
+                rowWidgets[peakIdx].lblShift->setText(tr("(Excluded)"));
+                rowWidgets[peakIdx].lblShift->setStyleSheet("color: #78909c; font-style: italic; padding: 2px 6px;");
+            }
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
@@ -3194,18 +3253,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
     actionLayout->addStretch(1);
 
-    QPushButton *btnOptionB = new QPushButton(tr("✅ Apply Adjusted Fit (Mark GOOD)"), &dlg);
-    btnOptionB->setStyleSheet("font-weight: bold; background-color: #2e7d32; color: white; padding: 6px 14px;");
-
-    QPushButton *btnOptionA = new QPushButton(tr("⚠️ Force Accept As-Is"), &dlg);
-    btnOptionA->setStyleSheet("font-weight: bold; background-color: #f57c00; color: white; padding: 6px 12px;");
-
-    QPushButton *btnOptionC = new QPushButton(tr("❌ Reject (Make it FAIL)"), &dlg);
-    btnOptionC->setStyleSheet("font-weight: bold; background-color: #c62828; color: white; padding: 6px 12px;");
-
-    QPushButton *btnCancel = new QPushButton(tr("Done / Cancel"), &dlg);
-    btnCancel->setStyleSheet("font-weight: bold; background-color: #455a64; color: white; padding: 6px 12px;");
-
     actionLayout->addWidget(btnOptionB);
     actionLayout->addWidget(btnOptionA);
     actionLayout->addWidget(btnOptionC);
@@ -3227,9 +3274,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             return;
         }
 
-        liveCalibResult.status = RunCalibStatus::Success;
+        liveCalibResult.status = (liveCalibResult.chi2NDF <= maxChi2 && !std::isnan(liveCalibResult.chi2NDF))
+                                 ? RunCalibStatus::Success : RunCalibStatus::BadChi2;
         liveCalibResult.isFallbackFromPrevious = false;
-        liveCalibResult.failureReason.clear();
+        liveCalibResult.failureReason = (liveCalibResult.status == RunCalibStatus::BadChi2)
+                                        ? QString("Reduced Chi2/ndf (%1) exceeds cutoff of %2").arg(liveCalibResult.chi2NDF, 0, 'f', 2).arg(maxChi2, 0, 'f', 1)
+                                        : "";
 
         // Update or insert into trajectories
         if (!targetTraj) {
@@ -3250,9 +3300,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         if (row < static_cast<int>(targetTraj->runResults.size())) {
             const bool wasFailure = (targetTraj->runResults[row].status != RunCalibStatus::Success);
             targetTraj->runResults[row] = liveCalibResult;
-            if (wasFailure) {
+            if (wasFailure && liveCalibResult.status == RunCalibStatus::Success) {
                 targetTraj->successCount++;
                 if (targetTraj->failureCount > 0) targetTraj->failureCount--;
+            } else if (!wasFailure && liveCalibResult.status != RunCalibStatus::Success) {
+                if (targetTraj->successCount > 0) targetTraj->successCount--;
+                targetTraj->failureCount++;
             }
         }
 
@@ -3270,8 +3323,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             item = new QTableWidgetItem();
             m_gridMatrix->setItem(row, col, item);
         }
-        item->setText("GOOD");
-        item->setBackground(QBrush(QColor("#2e7d32")));
+        if (liveCalibResult.status == RunCalibStatus::Success) {
+            item->setText("GOOD");
+            item->setBackground(QBrush(QColor("#2e7d32")));
+        } else {
+            item->setText("INTERVENE");
+            item->setBackground(QBrush(QColor("#ffa726")));
+        }
         item->setForeground(QBrush(Qt::white));
         item->setToolTip(QString("Run: %1 | Det: %2 [MANUALLY ADJUSTED]\na0: %3 keV\na1: %4 keV/ch\ns_res: %5 keV\nchi2/ndf: %6")
                              .arg(runName).arg(detId)
@@ -3283,8 +3341,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // Refresh canvas with updated calibration & peak fits
         inspectSpectrumOnCanvas(row, col);
 
-        // Refresh plot if detector selected
-        if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {
+        // Refresh plot and table in main window
+        if (m_comboPlotDet) {
+            int dIdx = m_comboPlotDet->findData(detId);
+            if (dIdx >= 0 && m_comboPlotDet->currentIndex() != dIdx) {
+                m_comboPlotDet->setCurrentIndex(dIdx);
+            }
             updatePlot(detId);
         }
 
@@ -3355,7 +3417,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // Refresh canvas with updated calibration & peak fits
         inspectSpectrumOnCanvas(row, col);
 
-        if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {
+        if (m_comboPlotDet) {
+            int dIdx = m_comboPlotDet->findData(detId);
+            if (dIdx >= 0 && m_comboPlotDet->currentIndex() != dIdx) {
+                m_comboPlotDet->setCurrentIndex(dIdx);
+            }
             updatePlot(detId);
         }
 
@@ -3382,7 +3448,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             item->setToolTip(QString("Run: %1 | Det: %2\nFAILURE: Manually rejected by user (Chi2/ndf was %3)")
                                  .arg(runName).arg(detId).arg(curRes.chi2NDF, 0, 'f', 2));
 
-            if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {
+            if (m_comboPlotDet) {
+                int dIdx = m_comboPlotDet->findData(detId);
+                if (dIdx >= 0 && m_comboPlotDet->currentIndex() != dIdx) {
+                    m_comboPlotDet->setCurrentIndex(dIdx);
+                }
                 updatePlot(detId);
             }
         }

@@ -80,14 +80,12 @@ HEADERS += \
     Include/RemoteFileDialog.h \
     Include/NuFileDialog.h \
     Include/RunByRunEngine.h \
-    Include/RunByRunManager.h \
-    Include/FitResidualsWidget.h
+    Include/RunByRunManager.h
 
 # Project source files
 SOURCES += \
     Sources/canvas.cxx \
     Sources/ZoomHUD.cxx \
-    Sources/FitResidualsWidget.cxx \
     Sources/RootCanvas.cxx \
     Sources/CanvasGrid.cxx \
     Sources/CanvasNavigation.cxx \

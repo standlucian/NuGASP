@@ -19,7 +19,6 @@
 #include "RemoteConnectDialog.h"
 #include "RemoteFileDialog.h"
 #include "NuFileDialog.h"
-#include "FitResidualsWidget.h"
 #include <QInputDialog>
 #include <QShortcut>
 
@@ -223,35 +222,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     middleLayout->addLayout(leftBar);
 
-    // Center column: Main Canvas + Residuals Sub-Pad in a vertical splitter
-    canvasSplitter = new QSplitter(Qt::Vertical, topContainer);
-    canvasSplitter->setObjectName("canvasSplitter");
-    canvasSplitter->setHandleWidth(5);
-    canvasSplitter->setStyleSheet(
-        "QSplitter::handle:vertical {"
-        "  background-color: #3e4451;"
-        "  height: 5px;"
-        "}"
-        "QSplitter::handle:vertical:hover {"
-        "  background-color: #61afef;"
-        "}"
-    );
-
-    canvas = new QRootCanvas(canvasSplitter);
+    // Interactive ROOT canvas
+    canvas = new QRootCanvas(topContainer);
     canvas->setMainCanvas(this);
     canvas->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     canvas->setStyleSheet("border: 1px solid #707070;");
-    canvasSplitter->addWidget(canvas);
-
-    m_residualsWidget = new QFitResidualsWidget(canvasSplitter);
-    m_residualsWidget->setMainCanvas(this);
-    canvasSplitter->addWidget(m_residualsWidget);
-    m_residualsWidget->hide();
-
-    canvasSplitter->setStretchFactor(0, 4);
-    canvasSplitter->setStretchFactor(1, 1);
-
-    middleLayout->addWidget(canvasSplitter, 1);
+    middleLayout->addWidget(canvas, 1);
 
     // Right button column (11 rows)
     QVBoxLayout *rightBar = new QVBoxLayout();
@@ -270,14 +246,6 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnFit->setToolTip(tr("Gaussian multi-peak fit over marked region [Shortcut: C+V]"));
     rightBar->addWidget(btnFit);
     connect(btnFit, &QPushButton::clicked, this, &QMainCanvas::fitGauss);
-
-    QPushButton *btnResid = makeButton("Resid", topContainer, true);
-    btnResid->setFixedWidth(93);
-    btnResid->setFixedHeight(36);
-    btnResid->setToolTip(tr("Toggle Fit Residuals & Pulls strip below canvas [Shortcut: Shift+R]"));
-    rightBar->addWidget(btnResid);
-    connect(btnResid, &QPushButton::clicked, this, &QMainCanvas::toggleFitResiduals);
-    new QShortcut(QKeySequence(Qt::SHIFT | Qt::Key_R), this, SLOT(toggleFitResiduals()));
 
     QPushButton *btnPkS = makeButton("PkS", topContainer, true);
     btnPkS->setFixedWidth(93);
@@ -2760,35 +2728,4 @@ void QMainCanvas::updateSSHButtonState()
     }
 }
 
-void QMainCanvas::updateFitResiduals(TH1F *hist, TF1 *fitFunc, double xMin, double xMax,
-                                    const QString &title, double chi2, int ndf)
-{
-    if (!m_residualsWidget) return;
-    m_residualsWidget->updateResiduals(hist, fitFunc, xMin, xMax, title, chi2, ndf);
-    if (!m_residualsWidget->isVisible()) {
-        m_residualsWidget->show();
-        if (canvasSplitter) {
-            int totalH = canvasSplitter->height();
-            if (totalH > 150) {
-                canvasSplitter->setSizes({static_cast<int>(totalH * 0.78), static_cast<int>(totalH * 0.22)});
-            }
-        }
-    }
-}
-
-void QMainCanvas::toggleFitResiduals()
-{
-    if (!m_residualsWidget) return;
-    if (m_residualsWidget->isVisible()) {
-        m_residualsWidget->hide();
-    } else {
-        m_residualsWidget->show();
-        if (canvasSplitter) {
-            int totalH = canvasSplitter->height();
-            if (totalH > 150) {
-                canvasSplitter->setSizes({static_cast<int>(totalH * 0.78), static_cast<int>(totalH * 0.22)});
-            }
-        }
-    }
-}
 

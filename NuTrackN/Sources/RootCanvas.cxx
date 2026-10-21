@@ -1131,14 +1131,8 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 emit addBackgroundMarkerRequested(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_R:
-                if (event->modifiers() & Qt::ShiftModifier) {
-                    if (m_mainCanvas) {
-                        m_mainCanvas->toggleFitResiduals();
-                    }
-                } else {
-                    // 'R': Place fit range boundary marker at cursor
-                    emit requestAddRangeMarker(xMousePosition, yMousePosition);
-                }
+                // 'R': Place fit range boundary marker at cursor
+                emit requestAddRangeMarker(xMousePosition, yMousePosition);
                 break;
             case Qt::Key_G:
                 // 'G': Place Gaussian peak estimate marker at cursor

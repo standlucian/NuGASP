@@ -795,12 +795,6 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     showFitParametersDialog(mainCanvas, "AutoFit Parameters", autoHtml, peaks);
 
-    // Update fit residuals strip on canvas
-    QString autoTitle = isCalib ? QString("Peak @ %1 keV").arg(dispEnergy, 0, 'f', 1)
-                                : QString("Peak @ ch %1").arg(gaussianCenter, 0, 'f', 1);
-    mainCanvas->updateFitResiduals(hist, mainCanvas->gaussianWithBackgroundFunction, fitMin, fitMax,
-                                   autoTitle, totalChi2, ndf);
-
     if (mainCanvas->m_isAreaLoggingEnabled) {
         mainCanvas->writeAreaLogHeader(true);
         double bkgVal = mainCanvas->backgroundFunction ? mainCanvas->backgroundFunction->Integral(fitMin, fitMax) : 0.0;
@@ -1375,15 +1369,6 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     // Display unfocused floating dialog with all parameters docked in top right corner
     showFitParametersDialog(mainCanvas, "Multi-Peak Fit Parameters", html, peaks);
 
-    // Update fit residuals strip on canvas
-    QString fitTitle = (nPeaks > 1)
-        ? QString("%1-Peak Fit (%2 - %3)")
-            .arg(nPeaks)
-            .arg(isCalib ? trackHist->ChannelToEnergy(r0) : r0, 0, 'f', 0)
-            .arg(isCalib ? trackHist->ChannelToEnergy(r1) : r1, 0, 'f', 0)
-        : (isCalib ? QString("Peak @ %1 keV").arg(peaks[0].centroid, 0, 'f', 1)
-                   : QString("Peak @ ch %1").arg(peakCenters[0], 0, 'f', 1));
-    mainCanvas->updateFitResiduals(activeHist, fullFunction, r0, r1, fitTitle, totalChi2, ndf);
 }
 
 // Helper to ensure crisp spinbox arrow icons are available on disk
