@@ -33,6 +33,7 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QFileDialog>
+#include "NuFileDialog.h"
 #include <iostream>
 #include <cmath>
 
@@ -2146,9 +2147,11 @@ void AppearanceDialog::revertChanges() {
 }
 
 void AppearanceDialog::exportTheme() {
-  QString defaultPath = QDir::currentPath() + "/MyTheme.nugasp-theme";
+  QString defaultPath = "MyTheme.nugasp-theme";
   QString filter = tr("NuGASP Theme Files (*.nugasp-theme *.json);;All Files (*)");
-  QString filePath = QFileDialog::getSaveFileName(this, tr("Export Aesthetic Theme Settings"), defaultPath, filter);
+  QString remotePath;
+  bool isRemote = false;
+  QString filePath = NuFileDialog::getSaveFileName(this, tr("Export Aesthetic Theme Settings"), defaultPath, filter, nullptr, &remotePath, &isRemote);
   if (filePath.isEmpty()) return;
 
   if (!filePath.endsWith(".nugasp-theme", Qt::CaseInsensitive) && !filePath.endsWith(".json", Qt::CaseInsensitive)) {
@@ -2184,12 +2187,15 @@ void AppearanceDialog::exportTheme() {
 
   QString errorMsg;
   if (Design::exportThemeToFile(filePath, theme, &errorMsg)) {
+    if (isRemote && !remotePath.isEmpty()) {
+      NuFileDialog::finishRemoteSave(filePath, remotePath, nullptr, this);
+    }
     if (CommandPrompt::getInstance()) {
-      CommandPrompt::getInstance()->appendPlainText(QString("[Theme] Aesthetic settings exported to: %1").arg(filePath));
+      CommandPrompt::getInstance()->appendPlainText(QString("[Theme] Aesthetic settings exported to: %1").arg(isRemote ? remotePath : filePath));
     }
     QMessageBox::information(this, tr("Theme Exported Successfully"),
       tr("Aesthetic settings have been exported to:\n\n%1\n\nYou can now share this file with colleagues so they can import your custom colors and fonts.")
-      .arg(filePath));
+      .arg(isRemote ? remotePath : filePath));
   } else {
     QMessageBox::critical(this, tr("Export Failed"),
       tr("Failed to export aesthetic settings to:\n\n%1\n\nError: %2")
@@ -2199,7 +2205,9 @@ void AppearanceDialog::exportTheme() {
 
 void AppearanceDialog::importTheme() {
   QString filter = tr("NuGASP Theme Files (*.nugasp-theme *.json);;All Files (*)");
-  QString filePath = QFileDialog::getOpenFileName(this, tr("Import Aesthetic Theme Settings"), QDir::currentPath(), filter);
+  QString remotePath;
+  bool isRemote = false;
+  QString filePath = NuFileDialog::getOpenFileName(this, tr("Import Aesthetic Theme Settings"), QDir::currentPath(), filter, nullptr, &remotePath, &isRemote);
   if (filePath.isEmpty()) return;
 
   Design::ThemeSettings theme;

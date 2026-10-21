@@ -334,10 +334,11 @@ public:
 
    enum class AreaLogContext { None, Integration, Fitting };
 
-   bool startAreaLogging(const QString& fileName);
+   bool startAreaLogging(const QString& fileName, const QString& remotePath = QString());
    bool stopAreaLogging();
    bool isAreaLoggingEnabled() const { return m_isAreaLoggingEnabled; }
-   QString getAreaLogFileName() const { return m_areaLogFile.fileName(); }
+   QString getAreaLogFileName() const { return m_areaLogRemotePath.isEmpty() ? m_areaLogFile.fileName() : m_areaLogRemotePath; }
+   QString getAreaLogRemotePath() const { return m_areaLogRemotePath; }
    void writeAreaLogHeader(bool isFitting);
    void writeAreaLogData(double centroid, double fwhm, double gross, double net, double background, double error);
 
@@ -481,6 +482,7 @@ public slots:
     void onOpenCMClicked();
     void onGateCMClicked();
     void onOpenRemoteDataClicked();
+    void updateSSHButtonState();
     void loadSpectrumDataToPad(const std::vector<double> &data, const QString &title, bool asOverlay = false);
 
     TracknHistogram* getActiveTracknHistogram() const {
@@ -627,6 +629,7 @@ protected:
     AreaLogContext  m_lastAreaLogContext{AreaLogContext::None};
     QFile           m_areaLogFile;
     QTextStream     m_areaLogStream;
+    QString         m_areaLogRemotePath;
 
     // Block 3: Display Parameters (DD) & Efficiency (DE)
     double          m_autoscaleHeadroomLinear{10.0};

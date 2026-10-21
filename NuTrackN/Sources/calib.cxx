@@ -32,6 +32,7 @@
 #include <QMessageBox>
 #include <QGroupBox>
 #include <QFile>
+#include "NuFileDialog.h"
 
 //==============================================================================
 // Persistent energy memory retained across calibration dialog sessions
@@ -848,9 +849,12 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
     };
 
     QObject::connect(btnBrowse, &QPushButton::clicked, [&]() {
-        QString path = QFileDialog::getOpenFileName(
+        QString remotePath;
+        bool isRemote = false;
+        QString path = NuFileDialog::getOpenFileName(
             &dialog, "Select Energy Calibration File", "",
-            "Calibration Files (*.mcal *.cal *.dat *.txt);;All Files (*)");
+            "Calibration Files (*.mcal *.cal *.dat *.txt);;All Files (*)",
+            nullptr, &remotePath, &isRemote);
         if (!path.isEmpty()) {
             loadFile(path);
         }
@@ -1285,9 +1289,12 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
 
     // Connect Save
     QObject::connect(btnSave, &QPushButton::clicked, [&]() {
-        QString savePath = QFileDialog::getSaveFileName(
+        QString remotePath;
+        bool isRemote = false;
+        QString savePath = NuFileDialog::getSaveFileName(
             &dialog, "Save Calibration File", "calibration.cal",
-            "GASP Multi-detector (*.mcal);;Calibration Table (*.cal);;All Files (*)");
+            "GASP Multi-detector (*.mcal);;Calibration Table (*.cal);;All Files (*)",
+            nullptr, &remotePath, &isRemote);
         if (savePath.isEmpty()) return;
 
         bool isMcal = savePath.endsWith(".mcal", Qt::CaseInsensitive);
@@ -1310,7 +1317,10 @@ void runEnergyCalibrationDialog(QMainCanvas *mainCanvas, int currentDetId)
         }
 
         if (SaveCalibrationFile(savePath, detsToSave, isMcal)) {
-            QMessageBox::information(&dialog, "Save Calibration", "Calibration successfully saved to:\n" + savePath);
+            if (isRemote && !remotePath.isEmpty()) {
+                NuFileDialog::finishRemoteSave(savePath, remotePath, nullptr, &dialog);
+            }
+            QMessageBox::information(&dialog, "Save Calibration", "Calibration successfully saved to:\n" + (isRemote ? remotePath : savePath));
         } else {
             QMessageBox::critical(&dialog, "Save Calibration", "Failed to save calibration file.");
         }

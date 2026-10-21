@@ -26,6 +26,7 @@
 #include <QProgressBar>
 #include <QFileDialog>
 #include <QMessageBox>
+#include "NuFileDialog.h"
 #include <QThread>
 #include <QDir>
 #include <QFileInfo>
@@ -872,15 +873,18 @@ void RunByRunManager::populateAnchorTable()
 
 void RunByRunManager::onBrowseRunsClicked()
 {
-    QStringList selectedFiles = QFileDialog::getOpenFileNames(this, tr("Select Sequence Run Files"),
-                                                              m_runFilePaths.empty() ? QString() : m_runFilePaths.front(),
-                                                              tr("All Files (*);;Run Files (*.*)"));
+    QStringList remotePaths;
+    bool isRemote = false;
+    QStringList selectedFiles = NuFileDialog::getOpenFileNames(this, tr("Select Sequence Run Files"),
+                                                               m_runFilePaths.empty() ? QString() : m_runFilePaths.front(),
+                                                               tr("All Files (*);;Run Files (*.*)"),
+                                                               nullptr, &remotePaths, &isRemote);
     if (selectedFiles.isEmpty()) return;
 
     m_runFilePaths.clear();
 
-    if (selectedFiles.size() == 1) {
-        // Single file selected: check if it belongs to a sequence prefix in that folder
+    if (selectedFiles.size() == 1 && !isRemote) {
+        // Single local file selected: check if it belongs to a sequence prefix in that folder
         QFileInfo fi(selectedFiles.front());
         QDir dir = fi.dir();
         QString fileName = fi.fileName();
@@ -914,7 +918,7 @@ void RunByRunManager::onBrowseRunsClicked()
             m_runFilePaths.push_back(selectedFiles.front());
         }
     } else {
-        // Multiple files selected by user: sort naturally by numeric file order
+        // Multiple files selected (or remote runs): sort naturally by numeric file order
         QCollator collator;
         collator.setNumericMode(true);
         std::sort(selectedFiles.begin(), selectedFiles.end(), [&collator](const QString &a, const QString &b) {
@@ -931,9 +935,12 @@ void RunByRunManager::onBrowseRunsClicked()
     }
 
     if (!m_runFilePaths.empty()) {
+        QString dirName = isRemote && !remotePaths.isEmpty()
+            ? tr("Remote [%1]").arg(QFileInfo(remotePaths.front()).dir().dirName())
+            : QFileInfo(m_runFilePaths.front()).dir().dirName();
         m_lblRunsSummary->setText(tr("Loaded <b>%1</b> runs from %2 (%3 to %4)")
                                       .arg(m_runFilePaths.size())
-                                      .arg(QFileInfo(m_runFilePaths.front()).dir().dirName())
+                                      .arg(dirName)
                                       .arg(QFileInfo(m_runFilePaths.front()).fileName())
                                       .arg(QFileInfo(m_runFilePaths.back()).fileName()));
 
@@ -968,7 +975,7 @@ void RunByRunManager::onAddAnchorClicked()
 
 void RunByRunManager::onReadPeaksFromFileClicked()
 {
-    QString filePath = QFileDialog::getOpenFileName(
+    QString filePath = NuFileDialog::getOpenFileName(
         this, tr("Read Anchor Peaks from File"),
         QString(),
         tr("Peak Files (*.txt *.dat *.peaks *.csv);;All Files (*.*)"));
@@ -1981,25 +1988,45 @@ void RunByRunManager::onExportCalClicked()
     if (msgBox.clickedButton() == btnCancel) return;
 
     if (msgBox.clickedButton() == btnMaster) {
-        QString savePath = QFileDialog::getSaveFileName(this, tr("Save Master Xtrackn Calibration File"),
-                                                        "run_calibrations.cal", tr("Xtrackn Calibration (*.cal);;All Files (*.*)"));
+        QString remotePath;
+        bool isRemote = false;
+        QString savePath = NuFileDialog::getSaveFileName(this, tr("Save Master Xtrackn Calibration File"),
+                                                        "run_calibrations.cal", tr("Xtrackn Calibration (*.cal);;All Files (*.*)"),
+                                                        nullptr, &remotePath, &isRemote);
         if (!savePath.isEmpty()) {
             QString err;
             if (SaveXtracknCalFile(savePath, allResults, &err)) {
+                if (isRemote && !remotePath.isEmpty()) {
+                    NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this);
+                }
                 QMessageBox::information(this, tr("Export Successful"),
                                          tr("Successfully saved %1 calibration records to:\n%2")
-                                             .arg(allResults.size()).arg(savePath));
+                                             .arg(allResults.size()).arg(isRemote ? remotePath : savePath));
             } else {
                 QMessageBox::critical(this, tr("Export Error"), err);
             }
         }
     } else if (msgBox.clickedButton() == btnPerRun) {
-        QString dirPath = QFileDialog::getExistingDirectory(this, tr("Select Output Directory for Per-Run .cal Files"));
+        QString remotePath;
+        bool isRemote = false;
+        QString dirPath = NuFileDialog::getExistingDirectory(this, tr("Select Output Directory for Per-Run .cal Files"),
+                                                            QString(), &remotePath, &isRemote);
         if (!dirPath.isEmpty()) {
             QString err;
             if (SaveXtracknPerRunCalFiles(dirPath, allResults, &err)) {
+                if (isRemote && !remotePath.isEmpty()) {
+                    auto session = RemoteSession::globalSession();
+                    if (session && session->isConnected()) {
+                        session->createDirectory(remotePath);
+                        QDir localD(dirPath);
+                        for (const QString &f : localD.entryList(QStringList() << "*.cal", QDir::Files)) {
+                            session->uploadFile(localD.filePath(f), remotePath + "/" + f);
+                        }
+                    }
+                }
                 QMessageBox::information(this, tr("Export Successful"),
-                                         tr("Successfully generated per-run .cal files in directory:\n%1").arg(dirPath));
+                                         tr("Successfully generated per-run .cal files in directory:\n%1")
+                                             .arg(isRemote ? remotePath : dirPath));
             } else {
                 QMessageBox::critical(this, tr("Export Error"), err);
             }
@@ -2024,14 +2051,20 @@ void RunByRunManager::onExportUcalClicked()
         }
     }
 
-    QString savePath = QFileDialog::getSaveFileName(this, tr("Save NuTrackN Extended Calibration (.ucal)"),
-                                                    "run_calibrations.ucal", tr("NuTrackN Uncertainty Calib (*.ucal);;All Files (*.*)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString savePath = NuFileDialog::getSaveFileName(this, tr("Save NuTrackN Extended Calibration (.ucal)"),
+                                                    "run_calibrations.ucal", tr("NuTrackN Uncertainty Calib (*.ucal);;All Files (*.*)"),
+                                                    nullptr, &remotePath, &isRemote);
     if (!savePath.isEmpty()) {
         QString err;
         if (SaveNuTrackNUcalFile(savePath, allResults, &err)) {
+            if (isRemote && !remotePath.isEmpty()) {
+                NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this);
+            }
             QMessageBox::information(this, tr("Export Successful"),
                                      tr("Successfully saved %1 uncertainty calibration records to:\n%2")
-                                         .arg(allResults.size()).arg(savePath));
+                                         .arg(allResults.size()).arg(isRemote ? remotePath : savePath));
         } else {
             QMessageBox::critical(this, tr("Export Error"), err);
         }

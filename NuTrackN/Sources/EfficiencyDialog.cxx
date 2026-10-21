@@ -18,6 +18,7 @@
 #include <QTextStream>
 #include <cmath>
 #include "Design.h"
+#include "NuFileDialog.h"
 
 EfficiencyDialog::EfficiencyDialog(QMainCanvas *mainCanvas, QWidget *parent)
     : QDialog(parent), m_mainCanvas(mainCanvas)
@@ -223,8 +224,9 @@ void EfficiencyDialog::updateTestCalculation()
 
 void EfficiencyDialog::onBrowseSpectrum()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Select Efficiency Spectrum File"), "",
-        tr("Spectrum Files (*.spe *.txt *.dat);;All Files (*)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenSpectrum(this, tr("Select Efficiency Spectrum File"), "", &remotePath, &isRemote);
     if (!fileName.isEmpty()) {
         m_editSpecPath->setText(fileName);
     }
@@ -232,8 +234,10 @@ void EfficiencyDialog::onBrowseSpectrum()
 
 void EfficiencyDialog::onLoadFile()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Load Efficiency Polynomial"), "",
-        tr("Efficiency Files (*.eff *.txt);;All Files (*)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenFileName(this, tr("Load Efficiency Polynomial"), "",
+        tr("Efficiency Files (*.eff *.txt);;All Files (*)"), nullptr, &remotePath, &isRemote);
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);
@@ -258,8 +262,10 @@ void EfficiencyDialog::onLoadFile()
 
 void EfficiencyDialog::onSaveFile()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save Efficiency Polynomial"), "",
-        tr("Efficiency Files (*.eff);;Text Files (*.txt)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getSaveFileName(this, tr("Save Efficiency Polynomial"), "",
+        tr("Efficiency Files (*.eff);;Text Files (*.txt)"), nullptr, &remotePath, &isRemote);
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);
@@ -272,6 +278,11 @@ void EfficiencyDialog::onSaveFile()
     out << "# Efficiency polynomial coefficients ln(Eff) = sum( A[i] * (ln E)^i )\n";
     for (std::size_t i = 0; i < m_spinCoeffs.size(); ++i) {
         out << QString::number(m_spinCoeffs[i]->value(), 'g', 8) << "\n";
+    }
+    file.close();
+
+    if (isRemote && !remotePath.isEmpty()) {
+        NuFileDialog::finishRemoteSave(fileName, remotePath, nullptr, this);
     }
 }
 

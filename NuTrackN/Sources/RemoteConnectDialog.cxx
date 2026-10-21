@@ -38,16 +38,22 @@ void RemoteConnectDialog::setupUI()
     mainLayout->setSpacing(10);
     mainLayout->setContentsMargins(14, 14, 14, 14);
 
-    // 1. Header Banner
+    // 1. Session Status Banner
+    m_lblSessionBanner = new QLabel(this);
+    m_lblSessionBanner->setFont(dlgFont);
+    mainLayout->addWidget(m_lblSessionBanner);
+
+    // 2. Header Description
     QLabel *lblTitle = new QLabel(
-        tr("<b>Remote Data Session:</b> Connect directly to DAQ/lab computers over secure SFTP.<br>"
-           "Files are loaded locally with 0 network lag, with full run cycling and remote write-back."), this);
+        tr("<b>SSH Parameters & Verification:</b> Configure remote DAQ/host connection parameters.<br>"
+           "Once connected, spectrum reading ('R'), exporting ('W'), matrix inspection ('Open CM'),<br>"
+           "and Run-by-Run calibration will directly route through this verified SSH session."), this);
     lblTitle->setFont(dlgFont);
-    lblTitle->setStyleSheet(QString("color: %1; margin-bottom: 4px; font-family: \"%2\"; font-size: %3pt;")
+    lblTitle->setStyleSheet(QString("color: %1; margin-bottom: 2px; font-family: \"%2\"; font-size: %3pt;")
         .arg(Design::getDialogAccentColor().name(), dlgFont.family()).arg(pt));
     mainLayout->addWidget(lblTitle);
 
-    // 2. Profile Selection Bar
+    // 3. Profile Selection Bar
     QGroupBox *grpProfile = new QGroupBox(tr("Saved Profiles & Bookmarks"), this);
     QHBoxLayout *profileLayout = new QHBoxLayout(grpProfile);
     profileLayout->setSpacing(6);
@@ -75,7 +81,7 @@ void RemoteConnectDialog::setupUI()
 
     mainLayout->addWidget(grpProfile);
 
-    // 3. Connection Parameters Group
+    // 4. Connection Parameters Group
     QGroupBox *grpParams = new QGroupBox(tr("Host & Authentication Details"), this);
     QGridLayout *grid = new QGridLayout(grpParams);
     grid->setSpacing(8);
@@ -152,13 +158,20 @@ void RemoteConnectDialog::setupUI()
     grid->addWidget(m_editPassword, 5, 1, 1, 3);
 
     // Remote Default / Last Used Folder
-    grid->addWidget(new QLabel(tr("Remote Folder:"), grpParams), 6, 0);
+    grid->addWidget(new QLabel(tr("Remote Working Dir:"), grpParams), 6, 0);
     m_editStartDir = new QLineEdit(grpParams);
     m_editStartDir->setFont(dlgFont);
-    m_editStartDir->setPlaceholderText(tr("e.g. /home/data/exp_2026/runs"));
+    m_editStartDir->setPlaceholderText(tr("e.g. /home/data/runs"));
     grid->addWidget(m_editStartDir, 6, 1, 1, 3);
 
     mainLayout->addWidget(grpParams);
+
+    // Verification & Test Results Area
+    m_lblTestResults = new QLabel(this);
+    m_lblTestResults->setFont(dlgFont);
+    m_lblTestResults->setWordWrap(true);
+    m_lblTestResults->setVisible(false);
+    mainLayout->addWidget(m_lblTestResults);
 
     // Status / Message Label
     m_lblStatus = new QLabel(this);
@@ -167,26 +180,40 @@ void RemoteConnectDialog::setupUI()
     m_lblStatus->setStyleSheet("color: #e57373; margin-top: 2px;");
     mainLayout->addWidget(m_lblStatus);
 
-    // 4. Bottom Action Buttons
+    // 5. Bottom Action Buttons Bar
     QHBoxLayout *bottomLayout = new QHBoxLayout();
+
+    m_btnTestConnection = new QPushButton(tr("⚡ Test / Verify Connection"), this);
+    m_btnTestConnection->setFont(dlgFont);
+    m_btnTestConnection->setToolTip(tr("Test host reachability, authentication, and remote directory access without connecting"));
+    connect(m_btnTestConnection, &QPushButton::clicked, this, &RemoteConnectDialog::onTestConnectionClicked);
+    bottomLayout->addWidget(m_btnTestConnection);
+
+    m_btnDisconnect = new QPushButton(tr("Disconnect"), this);
+    m_btnDisconnect->setFont(dlgFont);
+    m_btnDisconnect->setStyleSheet("color: #ef5350; font-weight: bold;");
+    connect(m_btnDisconnect, &QPushButton::clicked, this, &RemoteConnectDialog::onDisconnectClicked);
+    bottomLayout->addWidget(m_btnDisconnect);
+
     bottomLayout->addStretch(1);
 
-    m_btnConnect = new QPushButton(tr("Connect & Open Browser"), this);
+    m_btnConnect = new QPushButton(tr("Connect"), this);
     m_btnConnect->setFont(dlgFont);
     m_btnConnect->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px 16px; border-radius: 4px; }"
                                         "QPushButton:hover { opacity: 0.9; }")
                                 .arg(Design::getDialogAccentColor().name()));
     connect(m_btnConnect, &QPushButton::clicked, this, &RemoteConnectDialog::onConnectClicked);
-
-    m_btnCancel = new QPushButton(tr("Cancel"), this);
-    m_btnCancel->setFont(dlgFont);
-    connect(m_btnCancel, &QPushButton::clicked, this, &QDialog::reject);
-
     bottomLayout->addWidget(m_btnConnect);
-    bottomLayout->addWidget(m_btnCancel);
+
+    m_btnClose = new QPushButton(tr("Close"), this);
+    m_btnClose->setFont(dlgFont);
+    connect(m_btnClose, &QPushButton::clicked, this, &QDialog::reject);
+    bottomLayout->addWidget(m_btnClose);
+
     mainLayout->addLayout(bottomLayout);
 
     onAuthTypeChanged();
+    updateSessionStateDisplay();
 }
 
 void RemoteConnectDialog::loadProfilesToCombo()
@@ -326,6 +353,79 @@ void RemoteConnectDialog::onAuthTypeChanged()
                                              : tr("Remote account password"));
 }
 
+void RemoteConnectDialog::updateSessionStateDisplay()
+{
+    if (m_session && m_session->isConnected()) {
+        const RemoteProfile &prof = m_session->getProfile();
+        QString hostDisp = QString("%1@%2:%3").arg(prof.user, prof.host).arg(prof.port);
+        QString dirDisp = m_session->getCurrentRemoteDir();
+        if (dirDisp.isEmpty()) dirDisp = prof.lastUsedPath;
+        if (dirDisp.isEmpty()) dirDisp = "/home/" + prof.user;
+
+        m_lblSessionBanner->setText(QString("● <b>Active SSH Session:</b> <span style='color: #81c784;'>Connected to %1</span> | Directory: <i>%2</i>")
+                                        .arg(hostDisp, dirDisp));
+        m_lblSessionBanner->setStyleSheet("background-color: rgba(46, 125, 50, 0.15); color: #c8e6c9; padding: 8px 12px; border: 1px solid #388e3c; border-radius: 4px;");
+        if (m_btnDisconnect) m_btnDisconnect->setVisible(true);
+        if (m_btnConnect) m_btnConnect->setText(tr("Reconnect / Switch"));
+    } else {
+        m_lblSessionBanner->setText(tr("○ <b>SSH Session Status:</b> <span style='color: #bbb;'>Disconnected (Offline)</span>"));
+        m_lblSessionBanner->setStyleSheet("background-color: rgba(255, 255, 255, 0.04); color: #aaa; padding: 8px 12px; border: 1px solid #444; border-radius: 4px;");
+        if (m_btnDisconnect) m_btnDisconnect->setVisible(false);
+        if (m_btnConnect) m_btnConnect->setText(tr("Connect"));
+    }
+}
+
+void RemoteConnectDialog::onTestConnectionClicked()
+{
+    m_lblStatus->clear();
+    m_lblTestResults->clear();
+    m_lblTestResults->setVisible(true);
+
+    RemoteProfile profile = readFormToProfile();
+
+    if (profile.host.isEmpty()) {
+        m_lblTestResults->setStyleSheet("background-color: rgba(239, 83, 80, 0.15); color: #ef9a9a; padding: 8px; border: 1px solid #c62828; border-radius: 4px;");
+        m_lblTestResults->setText(tr("✗ Error: Host address cannot be empty."));
+        return;
+    }
+    if (profile.user.isEmpty()) {
+        m_lblTestResults->setStyleSheet("background-color: rgba(239, 83, 80, 0.15); color: #ef9a9a; padding: 8px; border: 1px solid #c62828; border-radius: 4px;");
+        m_lblTestResults->setText(tr("✗ Error: Username cannot be empty."));
+        return;
+    }
+
+    m_btnTestConnection->setEnabled(false);
+    m_btnTestConnection->setText(tr("Testing..."));
+    m_lblTestResults->setStyleSheet("background-color: rgba(255, 255, 255, 0.05); color: #ffb74d; padding: 8px; border: 1px solid #ff9800; border-radius: 4px;");
+    m_lblTestResults->setText(tr("Connecting to %1:%2 and verifying credentials...").arg(profile.host).arg(profile.port));
+    qApp->processEvents();
+
+    QString details;
+    QString err;
+    bool ok = RemoteSession::testConnection(profile, details, &err);
+
+    m_btnTestConnection->setEnabled(true);
+    m_btnTestConnection->setText(tr("⚡ Test / Verify Connection"));
+
+    if (ok) {
+        m_lblTestResults->setStyleSheet("background-color: rgba(46, 125, 50, 0.18); color: #c8e6c9; padding: 8px; border: 1px solid #388e3c; border-radius: 4px;");
+        m_lblTestResults->setText(details);
+    } else {
+        m_lblTestResults->setStyleSheet("background-color: rgba(239, 83, 80, 0.18); color: #ef9a9a; padding: 8px; border: 1px solid #c62828; border-radius: 4px;");
+        m_lblTestResults->setText(QString("✗ Verification Failed:\n%1").arg(err));
+    }
+}
+
+void RemoteConnectDialog::onDisconnectClicked()
+{
+    if (m_session && m_session->isConnected()) {
+        m_session->disconnect();
+    }
+    updateSessionStateDisplay();
+    m_lblStatus->setStyleSheet("color: #ffb74d;");
+    m_lblStatus->setText(tr("SSH session disconnected. NuGASP returned to local mode."));
+}
+
 void RemoteConnectDialog::onConnectClicked()
 {
     m_lblStatus->clear();
@@ -349,10 +449,15 @@ void RemoteConnectDialog::onConnectClicked()
     QString errorMsg;
     if (!m_session->connectToHost(profile, &errorMsg)) {
         m_btnConnect->setEnabled(true);
-        m_btnConnect->setText(tr("Connect & Open Browser"));
+        m_btnConnect->setText(tr("Connect"));
         m_lblStatus->setStyleSheet("color: #e57373;");
         m_lblStatus->setText(QString("Connection failed: %1").arg(errorMsg));
         return;
+    }
+
+    // Set initial remote working directory if specified
+    if (!profile.lastUsedPath.trimmed().isEmpty()) {
+        m_session->setCurrentRemoteDir(profile.lastUsedPath.trimmed());
     }
 
     // Auto-save the profile upon successful connection
@@ -361,6 +466,8 @@ void RemoteConnectDialog::onConnectClicked()
 
     m_btnConnect->setEnabled(true);
     m_btnConnect->setText(tr("Connected!"));
+    updateSessionStateDisplay();
 
+    // Accept dialog and return to main window - do NOT launch any file browser!
     accept();
 }

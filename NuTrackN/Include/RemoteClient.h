@@ -54,10 +54,16 @@ public:
     RemoteSession();
     ~RemoteSession();
 
+    // Global shared session
+    static std::shared_ptr<RemoteSession> globalSession();
+
     // Connection lifecycle
     bool connectToHost(const RemoteProfile &profile, QString *errorMessage = nullptr);
     void disconnect();
     bool isConnected() const;
+
+    // Verification / Testing without altering active session state
+    static bool testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage = nullptr);
 
     const RemoteProfile& getProfile() const { return m_profile; }
     QString getCurrentRemoteDir() const { return m_currentRemoteDir; }
@@ -65,6 +71,8 @@ public:
 
     // SFTP Directory and File Operations
     bool listDirectory(const QString &remotePath, std::vector<RemoteFileInfo> &outList, QString *errorMessage = nullptr);
+    bool createDirectory(const QString &remotePath, QString *errorMessage = nullptr);
+    bool fileExists(const QString &remotePath, RemoteFileInfo *outInfo = nullptr);
     bool downloadFile(const QString &remotePath, const QString &localPath,
                       std::function<void(qint64 bytesDone, qint64 bytesTotal)> progressCallback = nullptr,
                       QString *errorMessage = nullptr);

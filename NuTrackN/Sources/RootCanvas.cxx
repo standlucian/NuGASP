@@ -25,6 +25,7 @@
 #include <QApplication>
 #include <QFileDialog>
 #include <QInputDialog>
+#include "NuFileDialog.h"
 #include <QGuiApplication>
 #include <QCursor>
 
@@ -1001,12 +1002,19 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_L: {
                 // D + F / D + L: Define Area Output File
                 if (m_mainCanvas) {
-                    QString fileName = QFileDialog::getSaveFileName(this, "Define Area Output File", "", "Area Log (*.area);;Text Files (*.txt);;All Files (*)");
+                    QString remotePath;
+                    bool isRemote = false;
+                    QString fileName = NuFileDialog::getSaveFileName(
+                        this, "Define Area Output File", "",
+                        "Area Log (*.area);;Text Files (*.txt);;All Files (*)",
+                        nullptr, &remotePath, &isRemote);
                     if (!fileName.isEmpty()) {
-                        if (m_mainCanvas->startAreaLogging(fileName)) {
-                            CommandPrompt::getInstance()->appendPlainText("Area output logging enabled -> " + fileName + "\n");
+                        if (m_mainCanvas->startAreaLogging(fileName, remotePath)) {
+                            CommandPrompt::getInstance()->appendPlainText(
+                                "Area output logging enabled -> " + (isRemote ? remotePath : fileName) + "\n");
                         } else {
-                            CommandPrompt::getInstance()->appendPlainText("Error: Failed to open area output file: " + fileName + "\n");
+                            CommandPrompt::getInstance()->appendPlainText(
+                                "Error: Failed to open area output file: " + fileName + "\n");
                         }
                     }
                 }

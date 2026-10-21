@@ -28,13 +28,16 @@ private slots:
     void onDeleteProfileClicked();
     void onBrowseKeyFileClicked();
     void onAuthTypeChanged();
+    void onTestConnectionClicked();
     void onConnectClicked();
+    void onDisconnectClicked();
 
 private:
     void setupUI();
     void loadProfilesToCombo();
     void populateFormFromProfile(const RemoteProfile &profile);
     RemoteProfile readFormToProfile() const;
+    void updateSessionStateDisplay();
 
     std::shared_ptr<RemoteSession> m_session;
     std::vector<RemoteProfile>      m_profiles;
@@ -56,9 +59,13 @@ private:
     QLineEdit    *m_editPassword{nullptr};
     QLineEdit    *m_editStartDir{nullptr};
 
+    QLabel       *m_lblSessionBanner{nullptr};
+    QLabel       *m_lblTestResults{nullptr};
     QLabel       *m_lblStatus{nullptr};
+    QPushButton  *m_btnTestConnection{nullptr};
+    QPushButton  *m_btnDisconnect{nullptr};
     QPushButton  *m_btnConnect{nullptr};
-    QPushButton  *m_btnCancel{nullptr};
+    QPushButton  *m_btnClose{nullptr};
 };
 
 #endif // REMOTECONNECTDIALOG_H

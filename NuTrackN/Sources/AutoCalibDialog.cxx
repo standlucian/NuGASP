@@ -22,6 +22,7 @@
 #include <QFile>
 #include <QTextStream>
 #include "Design.h"
+#include "NuFileDialog.h"
 #include <algorithm>
 #include <cmath>
 
@@ -242,8 +243,10 @@ void AutoCalibDialog::onSourceSelected(int)
 
 void AutoCalibDialog::onBrowseFile()
 {
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Select Energy Reference File"), "",
-        tr("Text Files (*.txt *.dat *.ener);;All Files (*)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenFileName(this, tr("Select Energy Reference File"), "",
+        tr("Text Files (*.txt *.dat *.ener);;All Files (*)"), nullptr, &remotePath, &isRemote);
     if (!fileName.isEmpty()) {
         m_editFilePath->setText(fileName);
     }

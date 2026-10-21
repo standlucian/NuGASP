@@ -18,6 +18,7 @@
 #include "RemoteClient.h"
 #include "RemoteConnectDialog.h"
 #include "RemoteFileDialog.h"
+#include "NuFileDialog.h"
 #include <QInputDialog>
 #include <QShortcut>
 
@@ -373,9 +374,9 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnGateCM, &QPushButton::clicked, this, &QMainCanvas::onGateCMClicked);
     bottomBtnGrid->addWidget(btnGateCM, 1, 1);
 
-    btnRemote = makeButton("SSH Remote", topContainer, true);
+    btnRemote = makeButton("SSH Connect", topContainer, true);
     btnRemote->setFixedHeight(36);
-    btnRemote->setToolTip(tr("Connect to Remote Data Acquisition Computer over SSH/SFTP (Ctrl+Shift+R)."));
+    btnRemote->setToolTip(tr("Configure parameters and connect to Remote DAQ Computer over SSH/SFTP (Ctrl+Shift+R)."));
     connect(btnRemote, &QPushButton::clicked, this, &QMainCanvas::onOpenRemoteDataClicked);
     bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 2);
 
@@ -568,6 +569,9 @@ QMainCanvas::QMainCanvas(QWidget *parent)
 
     QShortcut *shortcutRemote = new QShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_R), this, nullptr, nullptr, Qt::ApplicationShortcut);
     connect(shortcutRemote, &QShortcut::activated, this, &QMainCanvas::onOpenRemoteDataClicked);
+
+    m_remoteSession = RemoteSession::globalSession();
+    updateSSHButtonState();
 }
 
 //==============================================================================
@@ -669,12 +673,10 @@ int QMainCanvas::getBinFromClick(int x, int y)
 //==============================================================================
 void QMainCanvas::clicked1()
 {
-    // Display file chooser dialog defaulting to all files so extensionless spectra are visible
-    QString selectedFilter = tr("All Files (*)");
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Open Spectrum File"), QString(),
-        tr("All Files (*);;Spectra (*.spe *.dat *.txt *.asc);;All Files (*.*)"),
-        &selectedFilter);
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenSpectrum(
+        this, tr("Open Spectrum File"), QString(), &remotePath, &isRemote);
 
     // If the dialog was cancelled or no file was chosen, keep the existing spectrum
     // untouched and restore keyboard focus to the spectrum canvas
@@ -683,6 +685,12 @@ void QMainCanvas::clicked1()
             canvas->setFocus();
         }
         return;
+    }
+
+    if (isRemote) {
+        m_currentRemotePath = remotePath;
+    } else {
+        m_currentRemotePath.clear();
     }
 
     // Delegate format detection, length configuration, and parsing to SpectrumImportDialog
@@ -779,7 +787,9 @@ void QMainCanvas::clicked1()
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
 
-    m_currentRemotePath.clear();
+    if (!isRemote) {
+        m_currentRemotePath.clear();
+    }
     m_currentSpectrumFile = fileName;
     m_currentSpectrumIndex = importDlg.getSelectedSpectrumIndex();
     m_currentSpectrumCount = importDlg.getTotalSpectraCount();
@@ -787,7 +797,8 @@ void QMainCanvas::clicked1()
     m_currentSpectrumFormat = importDlg.getSelectedFormat();
 
     if (labelSpectrumFile) {
-        QString disp = QFileInfo(fileName).fileName();
+        QString disp = isRemote ? QString("[Remote] %1").arg(QFileInfo(remotePath).fileName())
+                                : QFileInfo(fileName).fileName();
         if (m_currentSpectrumCount > 1) {
             disp += QString("#%1").arg(m_currentSpectrumIndex);
         }
@@ -857,12 +868,26 @@ void QMainCanvas::clickedW()
 
     m_currentOutputFile = exportDlg.getSelectedFilePath();
 
-    if (labelOutputFile) {
-        QString outName = QFileInfo(m_currentOutputFile).fileName();
-        if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
-            outName += QString("#%1").arg(exportDlg.getTargetIndex());
+    if (exportDlg.isRemoteSave() && !exportDlg.getSelectedRemotePath().isEmpty()) {
+        m_currentRemotePath = exportDlg.getSelectedRemotePath();
+        if (labelOutputFile) {
+            QString outName = QString("[Remote] %1").arg(QFileInfo(exportDlg.getSelectedRemotePath()).fileName());
+            if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
+                outName += QString("#%1").arg(exportDlg.getTargetIndex());
+            }
+            labelOutputFile->setText(QString("-> %1").arg(outName));
         }
-        labelOutputFile->setText(QString("-> %1").arg(outName));
+        CommandPrompt::getInstance()->appendPlainText(
+            QString("Exported & uploaded spectrum to remote destination: %1\n")
+                .arg(exportDlg.getSelectedRemotePath()));
+    } else {
+        if (labelOutputFile) {
+            QString outName = QFileInfo(m_currentOutputFile).fileName();
+            if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
+                outName += QString("#%1").arg(exportDlg.getTargetIndex());
+            }
+            labelOutputFile->setText(QString("-> %1").arg(outName));
+        }
     }
 
     QString modeDesc;
@@ -879,29 +904,6 @@ void QMainCanvas::clickedW()
             .arg(exportDlg.getSelectedLength())
             .arg(modeDesc)
             .arg(QFileInfo(m_currentOutputFile).fileName()));
-
-    // If currently operating on a remote session file, offer to sync back over SFTP
-    if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
-        QFileInfo exportInfo(m_currentOutputFile);
-        QFileInfo remoteInfo(m_currentRemotePath);
-        QString remoteDestDir = remoteInfo.dir().path();
-        QString remoteDestPath = remoteDestDir + "/" + exportInfo.fileName();
-
-        if (QMessageBox::question(this, tr("Upload to Remote Data Computer"),
-                tr("Would you like to sync and upload the exported spectrum to the remote computer?\n\nRemote Destination:\n%1")
-                    .arg(remoteDestPath),
-                QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
-            QString uploadErr;
-            if (m_remoteSession->uploadFile(m_currentOutputFile, remoteDestPath, nullptr, &uploadErr)) {
-                CommandPrompt::getInstance()->appendPlainText(
-                    QString("Uploaded %1 to remote server: %2\n")
-                        .arg(exportInfo.fileName(), remoteDestPath));
-            } else {
-                CommandPrompt::getInstance()->appendPlainText(
-                    QString("Failed to upload to remote server: %1\n").arg(uploadErr));
-            }
-        }
-    }
 
     if (canvas) {
         canvas->setFocus();
@@ -2124,9 +2126,10 @@ void QMainCanvas::onOpenCMClicked()
         ? QDir::currentPath()
         : QFileInfo(m_currentSpectrumFile).absolutePath();
 
-    QString fileName = QFileDialog::getOpenFileName(
-        this, tr("Open Compressed Matrix (CM)"), initialDir,
-        tr("GASPware Matrix (*.cmat *.mat);;All Files (*)"));
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenMatrix(
+        this, tr("Open Compressed Matrix (CM)"), initialDir, &remotePath, &isRemote);
 
     if (fileName.isEmpty()) {
         if (canvas) canvas->setFocus();
@@ -2144,7 +2147,11 @@ void QMainCanvas::onOpenCMClicked()
         return;
     }
 
-    m_currentRemotePath.clear();
+    if (isRemote) {
+        m_currentRemotePath = remotePath;
+    } else {
+        m_currentRemotePath.clear();
+    }
 
     if (btnGateCM) {
         btnGateCM->setEnabled(true);
@@ -2158,11 +2165,18 @@ void QMainCanvas::onOpenCMClicked()
 
     MatrixDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, this);
     connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
-            [this](const std::vector<double> &data, const QString &title,
+            [this, isRemote, remotePath](const std::vector<double> &data, const QString &title,
                    const std::vector<double> &bgData, const QString &bgTitle) {
                 loadSpectrumDataToPad(data, title, false);
                 if (!bgData.empty()) {
                     loadSpectrumDataToPad(bgData, bgTitle, true);
+                }
+                if (labelSpectrumFile) {
+                    if (isRemote) {
+                        labelSpectrumFile->setText(QString("[Remote CM] %1").arg(QFileInfo(remotePath).fileName()));
+                    } else {
+                        labelSpectrumFile->setText(QFileInfo(title).fileName());
+                    }
                 }
             });
 
@@ -2359,16 +2373,25 @@ void QMainCanvas::closeIntegralDialog()
 void QMainCanvas::printPlot()
 {
     QString selectedFilter = tr("PDF Files (*.pdf)");
-    QString fileName = QFileDialog::getSaveFileName(
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getSaveFileName(
         this, tr("Save Plot as Postscript/PDF"), QString(),
         tr("PDF Files (*.pdf);;Postscript (*.ps);;PNG Image (*.png)"),
-        &selectedFilter);
+        &selectedFilter, &remotePath, &isRemote);
 
     if (fileName.isEmpty()) return;
     
     if (canvas && canvas->getCanvas()) {
         canvas->getCanvas()->SaveAs(fileName.toStdString().c_str());
-        CommandPrompt::getInstance()->appendPlainText("Plot saved to " + fileName + "\n");
+        if (isRemote && !remotePath.isEmpty()) {
+            QString uploadErr;
+            NuFileDialog::finishRemoteSave(fileName, remotePath, &uploadErr, this);
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("Plot exported & uploaded to remote: %1\n").arg(remotePath));
+        } else {
+            CommandPrompt::getInstance()->appendPlainText("Plot saved to " + fileName + "\n");
+        }
     }
 }
 
@@ -2489,11 +2512,15 @@ void QMainCanvas::setYMin(double yVal)
     }
 }
 
-bool QMainCanvas::startAreaLogging(const QString& fileName) {
+bool QMainCanvas::startAreaLogging(const QString& fileName, const QString& remotePath) {
     if (m_areaLogFile.isOpen()) {
         m_areaLogStream.flush();
         m_areaLogFile.close();
+        if (!m_areaLogRemotePath.isEmpty()) {
+            NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath);
+        }
     }
+    m_areaLogRemotePath = remotePath;
     m_areaLogFile.setFileName(fileName);
     if (m_areaLogFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
         m_areaLogStream.setDevice(&m_areaLogFile);
@@ -2511,6 +2538,10 @@ bool QMainCanvas::stopAreaLogging() {
     if (wasOpen) {
         m_areaLogStream.flush();
         m_areaLogFile.close();
+        if (!m_areaLogRemotePath.isEmpty()) {
+            NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath);
+            m_areaLogRemotePath.clear();
+        }
     }
     m_isAreaLoggingEnabled = false;
     m_lastAreaLogContext = AreaLogContext::None;
@@ -2640,151 +2671,47 @@ double QMainCanvas::evaluateEfficiency(double energyKeV) const {
 void QMainCanvas::onOpenRemoteDataClicked()
 {
     if (!m_remoteSession) {
-        m_remoteSession = std::make_shared<RemoteSession>();
+        m_remoteSession = RemoteSession::globalSession();
     }
 
-    // If not currently connected, prompt for connection profile
-    if (!m_remoteSession->isConnected()) {
-        RemoteConnectDialog connectDlg(m_remoteSession, this);
-        if (connectDlg.exec() != QDialog::Accepted || !m_remoteSession->isConnected()) {
-            if (canvas) canvas->setFocus();
-            return;
-        }
-    }
+    RemoteConnectDialog connectDlg(m_remoteSession, this);
+    connectDlg.exec();
 
-    // Open the Remote File Browser dialog
-    RemoteFileDialog fileDlg(m_remoteSession, this);
-    if (fileDlg.exec() != QDialog::Accepted) {
-        if (canvas) canvas->setFocus();
-        return;
-    }
-
-    QString localPath = fileDlg.getLocalCachedPath();
-    QString remotePath = fileDlg.getSelectedRemotePath();
-    RemoteOpenAction action = fileDlg.getOpenAction();
-
-    if (localPath.isEmpty() || !QFile::exists(localPath)) {
-        if (canvas) canvas->setFocus();
-        return;
-    }
-
-    m_currentRemotePath = remotePath;
-
-    if (action == RemoteOpenAction::OpenMatrix) {
-        if (!m_currentMatrix) {
-            m_currentMatrix = std::make_shared<MatrixReader>();
-        }
-        QString errMsg;
-        if (!m_currentMatrix->open(localPath, &errMsg)) {
-            QMessageBox::critical(this, tr("Matrix Open Error"),
-                tr("Failed to open remote matrix:\n%1").arg(errMsg));
-            if (canvas) canvas->setFocus();
-            return;
-        }
-
-        TracknHistogram *trackHist = getActiveTracknHistogram();
-        bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
-        double a0 = trackHist ? trackHist->GetCalibA0() : 0.0;
-        double a1 = trackHist ? trackHist->GetCalibA1() : 1.0;
-        double a2 = trackHist ? trackHist->GetCalibA2() : 0.0;
-
-        MatrixDialog dlg(m_currentMatrix, isCalib, a0, a1, a2, this);
-        connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
-                [this, remotePath](const std::vector<double> &data, const QString &title,
-                                   const std::vector<double> &bgData, const QString &bgTitle) {
-                    loadSpectrumDataToPad(data, title, false);
-                    if (!bgData.empty()) {
-                        loadSpectrumDataToPad(bgData, bgTitle, true);
-                    }
-                    if (labelSpectrumFile) {
-                        labelSpectrumFile->setText(QString("[Remote] %1").arg(QFileInfo(remotePath).fileName()));
-                    }
-                });
-        dlg.exec();
-    } else if (action == RemoteOpenAction::OpenSpectrum) {
-        SpectrumImportDialog importDlg(localPath, this);
-        if (importDlg.exec() != QDialog::Accepted) {
-            if (canvas) canvas->setFocus();
-            return;
-        }
-
-        std::vector<double> spectrumData = importDlg.getLoadedData();
-        if (spectrumData.empty()) {
-            CommandPrompt::getInstance()->appendPlainText("Error: Remote spectrum data is empty.\n");
-            if (canvas) canvas->setFocus();
-            return;
-        }
-
-        if (HijF[SelectedElement_i][SelectedElement_j]) {
-            delete HijF[SelectedElement_i][SelectedElement_j];
-            HijF[SelectedElement_i][SelectedElement_j] = nullptr;
-        }
-        for (auto *h : HijC[SelectedElement_i][SelectedElement_j]) {
-            delete h;
-        }
-        HijC[SelectedElement_i][SelectedElement_j].clear();
-
-        QString histName = QString("HijF[%1][%2]").arg(SelectedElement_i).arg(SelectedElement_j);
-        HijF[SelectedElement_i][SelectedElement_j] = new TracknHistogram(
-            histName.toUtf8().constData(),
-            remotePath.toUtf8().constData(),
-            spectrumData.size(),
-            0,
-            spectrumData.size()
-        );
-
-        TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
-        if (trackHist) {
-            trackHist->LoadFromData(spectrumData, localPath.toStdString());
-        }
-
-        TH1F *baseClone = (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone();
-        baseClone->SetLineColor(colors_hist[0]);
-        HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
-        HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
-
-        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
-        HijF[SelectedElement_i][SelectedElement_j]->Draw();
-
-        adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
-        maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
-            HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
-
-        selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
-        ColorTheFrameOfTheHistogram();
-        canvas->getCanvas()->Modified();
-        canvas->getCanvas()->Update();
-
-        m_currentSpectrumFile = localPath;
-        m_currentSpectrumIndex = importDlg.getSelectedSpectrumIndex();
-        m_currentSpectrumCount = importDlg.getTotalSpectraCount();
-        m_currentSpectrumLength = importDlg.getSelectedLength();
-        m_currentSpectrumFormat = importDlg.getSelectedFormat();
-
-        if (labelSpectrumFile) {
-            QString disp = QString("[Remote] %1").arg(QFileInfo(remotePath).fileName());
-            if (m_currentSpectrumCount > 1) {
-                disp += QString("#%1").arg(m_currentSpectrumIndex);
-            }
-            labelSpectrumFile->setText(disp);
-        }
-        updateAxisStatusLabels();
-
-        if (m_currentSpectrumCount > 1) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Loaded remote spectrum %1#%2 (%3 of %4, %5 channels)\n")
-                    .arg(QFileInfo(remotePath).fileName())
-                    .arg(m_currentSpectrumIndex)
-                    .arg(m_currentSpectrumIndex + 1)
-                    .arg(m_currentSpectrumCount)
-                    .arg(spectrumData.size()));
-        } else {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Loaded remote spectrum %1 (%2 channels)\n")
-                    .arg(QFileInfo(remotePath).fileName())
-                    .arg(spectrumData.size()));
-        }
-    }
+    updateSSHButtonState();
 
     if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::updateSSHButtonState()
+{
+    if (!btnRemote) return;
+
+    if (!m_remoteSession) {
+        m_remoteSession = RemoteSession::globalSession();
+    }
+
+    if (m_remoteSession && m_remoteSession->isConnected()) {
+        const RemoteProfile &prof = m_remoteSession->getProfile();
+        QString hostName = prof.name.isEmpty() ? prof.host : prof.name;
+        btnRemote->setText(QString("SSH: %1").arg(hostName));
+        btnRemote->setToolTip(tr("Connected to %1@%2:%3\nRemote Working Dir: %4\nClick to manage parameters, verify connection, or disconnect.")
+            .arg(prof.user, prof.host).arg(prof.port)
+            .arg(m_remoteSession->getCurrentRemoteDir()));
+        btnRemote->setStyleSheet(
+            "QPushButton { background-color: #1b5e20; color: #e8f5e9; font-weight: bold; border: 1px solid #4caf50; border-radius: 4px; padding: 4px 8px; }"
+            "QPushButton:hover { background-color: #2e7d32; }");
+
+        QString remoteDir = m_remoteSession->getCurrentRemoteDir();
+        if (labelWorkingPath) {
+            labelWorkingPath->setText(QString("[SSH] %1:%2").arg(prof.host, remoteDir));
+        }
+    } else {
+        btnRemote->setText(tr("SSH Connect"));
+        btnRemote->setToolTip(tr("Configure parameters and connect to Remote DAQ Computer over SSH/SFTP (Ctrl+Shift+R)."));
+        btnRemote->setStyleSheet(Design::getButtonStyleSheet());
+
+        if (labelWorkingPath) {
+            labelWorkingPath->setText(QDir::currentPath());
+        }
+    }
 }

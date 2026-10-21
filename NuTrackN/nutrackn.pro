@@ -78,6 +78,7 @@ HEADERS += \
     Include/RemoteClient.h \
     Include/RemoteConnectDialog.h \
     Include/RemoteFileDialog.h \
+    Include/NuFileDialog.h \
     Include/RunByRunEngine.h \
     Include/RunByRunManager.h
 
@@ -111,6 +112,7 @@ SOURCES += \
     Sources/RemoteClient.cxx \
     Sources/RemoteConnectDialog.cxx \
     Sources/RemoteFileDialog.cxx \
+    Sources/NuFileDialog.cxx \
     Sources/RunByRunEngine.cxx \
     Sources/RunByRunManager.cxx
 

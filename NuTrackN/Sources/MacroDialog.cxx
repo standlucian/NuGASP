@@ -16,6 +16,7 @@
 #include <QMessageBox>
 #include <QFile>
 #include <QTextStream>
+#include "NuFileDialog.h"
 #include <QLabel>
 
 MacroDialog::MacroDialog(QMainCanvas *mainCanvas, QWidget *parent)
@@ -269,9 +270,11 @@ void MacroDialog::onClearClicked(int macroId)
 
 void MacroDialog::onSaveToFile()
 {
-    QString fileName = QFileDialog::getSaveFileName(
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getSaveFileName(
         this, tr("Save Macro Definitions"), "",
-        tr("Macro Files (*.mac *.txt);;All Files (*)"));
+        tr("Macro Files (*.mac *.txt);;All Files (*)"), nullptr, &remotePath, &isRemote);
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);
@@ -294,15 +297,23 @@ void MacroDialog::onSaveToFile()
                 .arg(pair.second.description);
         }
     }
+    file.close();
+
+    if (isRemote && !remotePath.isEmpty()) {
+        NuFileDialog::finishRemoteSave(fileName, remotePath, nullptr, this);
+    }
+
     CommandPrompt::getInstance()->appendPlainText(
-        QString("Macros saved to file: %1\n").arg(fileName));
+        QString("Macros saved to file: %1\n").arg(isRemote ? remotePath : fileName));
 }
 
 void MacroDialog::onLoadFromFile()
 {
-    QString fileName = QFileDialog::getOpenFileName(
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getOpenFileName(
         this, tr("Load Macro Definitions"), "",
-        tr("Macro Files (*.mac *.txt);;All Files (*)"));
+        tr("Macro Files (*.mac *.txt);;All Files (*)"), nullptr, &remotePath, &isRemote);
     if (fileName.isEmpty()) return;
 
     QFile file(fileName);

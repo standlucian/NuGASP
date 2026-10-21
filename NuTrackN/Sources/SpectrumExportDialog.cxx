@@ -12,6 +12,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
+#include "NuFileDialog.h"
 #include <fstream>
 #include <iomanip>
 #include <cmath>
@@ -383,9 +384,13 @@ void SpectrumExportDialog::onBrowseClicked()
         filter = tr("Binary Spectra (*.spe *.dat);;All Files (*)");
     }
 
-    QString sel = QFileDialog::getSaveFileName(this, tr("Export Spectrum File"), initialDir, filter);
+    QString remotePath;
+    bool isRemote = false;
+    QString sel = NuFileDialog::getSaveFileName(this, tr("Export Spectrum File"), initialDir, filter, nullptr, &remotePath, &isRemote);
     if (!sel.isEmpty()) {
         m_pathEdit->setText(sel);
+        m_remoteSavePath = remotePath;
+        m_isRemoteSave = isRemote;
     }
 }
 
@@ -524,6 +529,13 @@ void SpectrumExportDialog::onAcceptClicked()
     if (!ok) {
         QMessageBox::critical(this, tr("Export Failed"), errorMsg);
         return;
+    }
+
+    if (m_isRemoteSave && !m_remoteSavePath.isEmpty()) {
+        QString uploadErr;
+        if (!NuFileDialog::finishRemoteSave(path, m_remoteSavePath, &uploadErr, this)) {
+            return;
+        }
     }
 
     accept();

@@ -22,6 +22,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QInputDialog>
+#include "NuFileDialog.h"
 #include <QTabWidget>
 #include <QSplitter>
 #include <QScrollArea>
@@ -1687,9 +1688,12 @@ void TrackFitDialog::onSaveClicked()
         return;
     }
 
-    QString savePath = QFileDialog::getSaveFileName(
+    QString remotePath;
+    bool isRemote = false;
+    QString savePath = NuFileDialog::getSaveFileName(
         this, "Save Calibration File", "trackfit_calibration.cal",
-        "Calibration Table (*.cal);;GASP Multi-detector (*.mcal);;All Files (*)");
+        "Calibration Table (*.cal);;GASP Multi-detector (*.mcal);;All Files (*)",
+        nullptr, &remotePath, &isRemote);
     if (savePath.isEmpty()) return;
 
     bool isMcal = savePath.endsWith(".mcal", Qt::CaseInsensitive);
@@ -1702,7 +1706,10 @@ void TrackFitDialog::onSaveClicked()
     det.segments.push_back(seg);
 
     if (SaveCalibrationFile(savePath, {det}, isMcal)) {
-        QMessageBox::information(this, "Save Calibration", "Calibration successfully saved to:\n" + savePath);
+        if (isRemote && !remotePath.isEmpty()) {
+            NuFileDialog::finishRemoteSave(savePath, remotePath, nullptr, this);
+        }
+        QMessageBox::information(this, "Save Calibration", "Calibration successfully saved to:\n" + (isRemote ? remotePath : savePath));
     } else {
         QMessageBox::critical(this, "Save Calibration", "Failed to save calibration file.");
     }

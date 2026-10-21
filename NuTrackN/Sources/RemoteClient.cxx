@@ -18,6 +18,7 @@
 #include <QStandardPaths>
 #include <QFile>
 #include <QCollator>
+#include <QElapsedTimer>
 #include <algorithm>
 #include <iostream>
 
@@ -105,6 +106,12 @@ void RemoteProfile::updateLastUsedPath(const QString &profileName, const QString
 //==============================================================================
 // RemoteSession Implementation
 //==============================================================================
+
+std::shared_ptr<RemoteSession> RemoteSession::globalSession()
+{
+    static std::shared_ptr<RemoteSession> s_instance = std::make_shared<RemoteSession>();
+    return s_instance;
+}
 
 RemoteSession::RemoteSession()
 {
@@ -381,6 +388,119 @@ bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteF
     return true;
 }
 
+bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMessage)
+{
+    if (!isConnected()) {
+        if (errorMessage) *errorMessage = "Not connected to remote host.";
+        return false;
+    }
+
+    QString clean = sanitizePath(remotePath);
+    if (clean.isEmpty() || clean == "/") return true;
+
+    // Check if it already exists
+    RemoteFileInfo info;
+    if (fileExists(clean, &info) && info.isDirectory) {
+        return true;
+    }
+
+    // Split components to recursively create parent dirs
+    QStringList parts = clean.split('/', Qt::SkipEmptyParts);
+    QString cur = clean.startsWith('/') ? "" : "";
+
+    for (int i = 0; i < parts.size(); ++i) {
+        cur += "/" + parts[i];
+
+        RemoteFileInfo stepInfo;
+        if (fileExists(cur, &stepInfo)) {
+            if (!stepInfo.isDirectory) {
+                if (errorMessage) *errorMessage = QString("Path '%1' exists but is not a directory.").arg(cur);
+                return false;
+            }
+            continue;
+        }
+
+        int rc = libssh2_sftp_mkdir(m_sftp, cur.toUtf8().constData(),
+                                    LIBSSH2_SFTP_S_IRWXU | LIBSSH2_SFTP_S_IRGRP | LIBSSH2_SFTP_S_IXGRP |
+                                    LIBSSH2_SFTP_S_IROTH | LIBSSH2_SFTP_S_IXOTH);
+        if (rc != 0) {
+            char *errStr = nullptr;
+            libssh2_session_last_error(m_session, &errStr, nullptr, 0);
+            if (errorMessage) *errorMessage = QString("Failed to create remote directory '%1': %2")
+                .arg(cur, errStr ? errStr : "Permission denied");
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool RemoteSession::fileExists(const QString &remotePath, RemoteFileInfo *outInfo)
+{
+    if (!isConnected()) return false;
+
+    QString clean = sanitizePath(remotePath);
+    LIBSSH2_SFTP_ATTRIBUTES attrs;
+    int rc = libssh2_sftp_stat(m_sftp, clean.toUtf8().constData(), &attrs);
+    if (rc != 0) {
+        return false;
+    }
+
+    if (outInfo) {
+        outInfo->name = QFileInfo(clean).fileName();
+        outInfo->fullPath = clean;
+        outInfo->size = (attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) ? static_cast<qint64>(attrs.filesize) : 0;
+        outInfo->isDirectory = (attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) && LIBSSH2_SFTP_S_ISDIR(attrs.permissions);
+        outInfo->permissions = (attrs.flags & LIBSSH2_SFTP_ATTR_PERMISSIONS) ? attrs.permissions : 0;
+        if (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) {
+            outInfo->lastModified = QDateTime::fromSecsSinceEpoch(attrs.mtime);
+        }
+    }
+    return true;
+}
+
+bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage)
+{
+    QElapsedTimer timer;
+    timer.start();
+
+    RemoteSession testSession;
+    QString err;
+    if (!testSession.connectToHost(profile, &err)) {
+        if (errorMessage) *errorMessage = err;
+        return false;
+    }
+
+    qint64 connectMs = timer.elapsed();
+
+    // Check remote working directory
+    QString targetDir = profile.lastUsedPath.trimmed();
+    if (targetDir.isEmpty()) {
+        targetDir = "/home/" + profile.user;
+    }
+
+    std::vector<RemoteFileInfo> entries;
+    QString listErr;
+    bool dirOk = testSession.listDirectory(targetDir, entries, &listErr);
+
+    outDetails = QString("✓ Successfully connected and verified in %1 ms\n"
+                         "• Host: %2@%3:%4\n"
+                         "• SSH/SFTP Session: Handshake & Auth OK\n")
+                     .arg(connectMs)
+                     .arg(profile.user, profile.host).arg(profile.port);
+
+    if (dirOk) {
+        outDetails += QString("• Remote Directory '%1': Verified (%2 items found)")
+                          .arg(targetDir).arg(entries.size());
+    } else {
+        outDetails += QString("• Remote Directory '%1': Note: %2")
+                          .arg(targetDir, listErr);
+    }
+
+    testSession.disconnect();
+    return true;
+}
+
 bool RemoteSession::downloadFile(const QString &remotePath, const QString &localPath,
                                  std::function<void(qint64, qint64)> progressCallback,
                                  QString *errorMessage)
@@ -483,6 +603,13 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
 
     const qint64 totalBytes = localFile.size();
     QString cleanRemote = sanitizePath(remotePath);
+
+    // Ensure remote parent directory exists
+    int lastSlash = cleanRemote.lastIndexOf('/');
+    if (lastSlash > 0) {
+        QString parentDir = cleanRemote.left(lastSlash);
+        createDirectory(parentDir);
+    }
 
     int flags = LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC;
     long mode = LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IRGRP | LIBSSH2_SFTP_S_IROTH;

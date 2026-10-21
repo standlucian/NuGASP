@@ -45,6 +45,8 @@ public:
     ~SpectrumExportDialog() override = default;
 
     QString getSelectedFilePath() const;
+    QString getSelectedRemotePath() const { return m_remoteSavePath; }
+    bool isRemoteSave() const { return m_isRemoteSave; }
     SpectrumFormat getSelectedFormat() const;
     int getSelectedLength() const;
     SpectrumExportMode getExportMode() const;
@@ -74,6 +76,9 @@ private:
     QLabel      *m_previewLabel{nullptr};
     QPushButton *m_exportBtn{nullptr};
     QPushButton *m_cancelBtn{nullptr};
+
+    QString     m_remoteSavePath;
+    bool        m_isRemoteSave{false};
 };
 
 #endif // SPECTRUMEXPORTDIALOG_H
