@@ -463,16 +463,43 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     const Double_t xLeft = hist->GetBinCenter(iFitMin);
     const Double_t xRight = hist->GetBinCenter(iFitMax);
-    const bool useStep = (!mainCanvas->m_bkgFixed && bkgLeft > bkgRight + 0.8 && (hist->GetBinContent(apexBin) - bkgRight) >= 25.0);
-    Double_t estStep = useStep ? (bkgLeft - bkgRight) : 0.0;
+    Double_t apexCounts = hist->GetBinContent(apexBin);
+    Double_t gaussianCenter = hist->GetBinCenter(apexBin);
+    Double_t estBase = (bkgLeft + bkgRight) / 2.0;
+    Double_t rawAmp = std::max(1.0, apexCounts - estBase);
+    Double_t estSigma = std::max(0.4, (fitMax - fitMin) / 6.0);
+
+    Double_t nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmp))), 2.0, 3.5);
+    Int_t pkHalf = std::clamp(static_cast<int>(std::ceil(nSig * estSigma)), 3, static_cast<int>((fitMax - fitMin) * 0.45));
+
+    // Search outward from peak exclusion boundaries for true local background valleys
+    Int_t lValley = std::max(iFitMin, apexBin - pkHalf);
+    for (Int_t b = apexBin - pkHalf; b >= iFitMin; --b) {
+        if (hist->GetBinContent(b) < hist->GetBinContent(lValley)) lValley = b;
+    }
+    Int_t rValley = std::min(iFitMax, apexBin + pkHalf);
+    for (Int_t b = apexBin + pkHalf; b <= iFitMax; ++b) {
+        if (hist->GetBinContent(b) < hist->GetBinContent(rValley)) rValley = b;
+    }
+
+    std::vector<Double_t> lVals, rVals;
+    for (Int_t b = std::max(1, lValley - 1); b <= std::min(hist->GetNbinsX(), lValley + 1); ++b) lVals.push_back(hist->GetBinContent(b));
+    for (Int_t b = std::max(1, rValley - 1); b <= std::min(hist->GetNbinsX(), rValley + 1); ++b) rVals.push_back(hist->GetBinContent(b));
+    std::sort(lVals.begin(), lVals.end());
+    std::sort(rVals.begin(), rVals.end());
+    bkgLeft = !lVals.empty() ? lVals[lVals.size() / 2] : hist->GetBinContent(lValley);
+    bkgRight = !rVals.empty() ? rVals[rVals.size() / 2] : hist->GetBinContent(rValley);
+
+    Double_t rawStep = std::max(0.0, bkgLeft - bkgRight);
+    Double_t maxPhysStep = std::max(0.0, 0.05 * rawAmp);
+    Double_t estStep = std::min(rawStep, maxPhysStep);
+    const bool useStep = (!mainCanvas->m_bkgFixed && estStep >= 1.5 && rawAmp >= 25.0);
     Double_t bkgSlope = useStep ? 0.0 : ((xRight != xLeft) ? ((bkgRight - bkgLeft) / (xRight - xLeft)) : 0.0);
     Double_t bkg0 = useStep ? bkgRight : (bkgLeft - bkgSlope * xLeft);
 
-    Double_t apexCounts = hist->GetBinContent(apexBin);
-    Double_t gaussianCenter = hist->GetBinCenter(apexBin);
     Double_t estBkgAtApex = bkgSlope * gaussianCenter + bkg0 + 0.5 * estStep;
     Double_t gaussianHeight = std::max(1.0, apexCounts - estBkgAtApex);
-    Double_t gaussianSigma = std::max(1.0, (fitMax - fitMin) / 5.0);
+    Double_t gaussianSigma = estSigma;
     Double_t gaussianFWHM = 0.0;
     Double_t gaussianCenterError = 0.0, gaussianIntegral = 0.0;
     Double_t gaussianIntegralError = 0.0, gaussianFWHMError = 0.0;
@@ -558,7 +585,7 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
         mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, estStep);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(3.0, estStep * 1.3 + 3.0));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(2.0, maxPhysStep * 1.2 + 2.0));
     } else {
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
         const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);
@@ -618,7 +645,7 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
             mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
             mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
             mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, bkgStep);
-            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(3.0, bkgStep * 1.3 + 3.0));
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(2.0, maxPhysStep * 1.2 + 2.0));
         } else {
             mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
             const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);

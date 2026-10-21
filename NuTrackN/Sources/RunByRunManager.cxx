@@ -2588,27 +2588,57 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // Estimate background from spectrum edges only if no saved anchor was found
         if (!foundSaved && !specData.empty()) {
-            int lowB = std::max(0, static_cast<int>(initCentroid - initWin));
-            int highB = std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(initCentroid + initWin));
-            if (lowB < highB) {
-                std::vector<double> leftVals, rightVals;
-                for (int b = lowB; b <= std::min(lowB + 2, highB); ++b) leftVals.push_back(specData[b]);
-                for (int b = std::max(lowB, highB - 2); b <= highB; ++b) rightVals.push_back(specData[b]);
-                std::sort(leftVals.begin(), leftVals.end());
-                std::sort(rightVals.begin(), rightVals.end());
-                double lMed = !leftVals.empty() ? leftVals[leftVals.size() / 2] : specData[lowB];
-                double rMed = !rightVals.empty() ? rightVals[rightVals.size() / 2] : specData[highB];
-                if (lMed > rMed + 0.8) {
-                    initStep = lMed - rMed;
-                    initBkg = rMed;
-                    initSlope = 0.0;
-                } else {
-                    initStep = 0.0;
-                    initBkg = (lMed + rMed) / 2.0;
-                    initSlope = (rMed - lMed) / static_cast<double>(highB - lowB);
+            double cCh = initCentroid;
+            double wCh = initWin;
+            int maxB = std::clamp(static_cast<int>(std::round(cCh)), 0, static_cast<int>(specData.size()) - 1);
+            double pkVal = specData[maxB];
+            double estBase = (specData[std::max(0, static_cast<int>(cCh - wCh))] + specData[std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(cCh + wCh))]) / 2.0;
+            double rawAmp = std::max(1.0, pkVal - estBase);
+            double sigCh = std::max(0.4, initFwhm / 2.35482);
+
+            double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmp))), 2.0, 3.5);
+            int pkHalf = std::clamp(static_cast<int>(std::ceil(nSig * sigCh)), 3, static_cast<int>(wCh * 0.8));
+
+            int lMin = std::max(0, maxB - static_cast<int>(wCh));
+            int lMax = std::max(0, maxB - pkHalf);
+            int lValley = lMax;
+            if (lMax > lMin) {
+                for (int ch = lMax; ch >= lMin; --ch) {
+                    if (specData[ch] < specData[lValley]) lValley = ch;
                 }
-                rowWidgets[i].bkgStep = initStep;
             }
+
+            int rMin = std::min(static_cast<int>(specData.size()) - 1, maxB + pkHalf);
+            int rMax = std::min(static_cast<int>(specData.size()) - 1, maxB + static_cast<int>(wCh));
+            int rValley = rMin;
+            if (rMax > rMin) {
+                for (int ch = rMin; ch <= rMax; ++ch) {
+                    if (specData[ch] < specData[rValley]) rValley = ch;
+                }
+            }
+
+            std::vector<double> lVals, rVals;
+            for (int c = std::max(0, lValley - 1); c <= std::min(static_cast<int>(specData.size()) - 1, lValley + 1); ++c) lVals.push_back(specData[c]);
+            for (int c = std::max(0, rValley - 1); c <= std::min(static_cast<int>(specData.size()) - 1, rValley + 1); ++c) rVals.push_back(specData[c]);
+            std::sort(lVals.begin(), lVals.end());
+            std::sort(rVals.begin(), rVals.end());
+            double lMed = !lVals.empty() ? lVals[lVals.size() / 2] : specData[lValley];
+            double rMed = !rVals.empty() ? rVals[rVals.size() / 2] : specData[rValley];
+
+            double rawStp = std::max(0.0, lMed - rMed);
+            double maxStp = std::max(0.0, 0.05 * rawAmp);
+            double finStp = std::min(rawStp, maxStp);
+
+            if (finStp >= 1.5 && rawAmp >= 25.0) {
+                initStep = finStp;
+                initBkg = rMed;
+                initSlope = 0.0;
+            } else {
+                initStep = 0.0;
+                initBkg = (lMed + rMed) / 2.0;
+                initSlope = (rValley > lValley) ? (rMed - lMed) / static_cast<double>(rValley - lValley) : 0.0;
+            }
+            rowWidgets[i].bkgStep = initStep;
         }
 
         // Col 0: Refit Peak button at the start of the row with explicit text and generous width
