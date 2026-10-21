@@ -93,6 +93,12 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
 
     // Baseline estimation from endpoints or fixed baseline
     double baseVal = fixed.fixBaseline ? fixed.fixedBaseline : (spectrum[lowCh] + spectrum[highCh]) / 2.0;
+    if (!fixed.fixBaseline && baseVal >= maxVal) {
+        baseVal = std::min(spectrum[lowCh], spectrum[highCh]);
+    }
+    if (!fixed.fixBaseline && baseVal >= maxVal) {
+        baseVal = std::max(0.0, maxVal * 0.1);
+    }
     double netHeight = maxVal - baseVal;
     if (netHeight < minCounts && !fixed.fixCentroid) {
         return result; // Low counts
@@ -152,8 +158,9 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     }
 
     TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
-    if (fitRes.Get() && fitRes->IsValid()) {
-        const double fittedMean = fGaus.GetParameter(1);
+    const bool fitValid = fitRes.Get() && (fitRes->IsValid() || fitRes->Status() == 0 || (fixed.fixCentroid && (fitRes->Status() % 1000 == 0 || fitRes->Status() == 4)));
+    if (fitValid) {
+        const double fittedMean = fixed.fixCentroid ? fixed.fixedCentroid : fGaus.GetParameter(1);
         const double fittedSigma = std::abs(fGaus.GetParameter(2));
         const double fittedAmpl = fGaus.GetParameter(0);
         const double fwhm = 2.35482 * fittedSigma;
@@ -174,7 +181,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
             fittedMeanErr = std::max(0.01, fGaus.GetParError(1));
         }
 
-        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.4 && fwhm <= 50.0) {
+        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.3 && fwhm <= 50.0 && fittedAmpl > 0.0) {
             result.centroidCh = fittedMean;
             result.centroidErrCh = fittedMeanErr;
             result.fwhmCh = fwhm;

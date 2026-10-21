@@ -2564,7 +2564,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double peakChi2{1.0};
         double amplitude{0.0};
         double lastFittedCentroid{0.0};
-        QTimer *debounceTimer{nullptr};
 
         QDoubleSpinBox *spinCentroid{nullptr};
         QPushButton *btnFixCentroid{nullptr};
@@ -2648,10 +2647,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].peakChi2 = initPeakChi2;
         rowWidgets[i].amplitude = initAmpl;
         rowWidgets[i].lastFittedCentroid = initCentroid;
-
-        QTimer *timer = new QTimer(&dlg);
-        timer->setSingleShot(true);
-        rowWidgets[i].debounceTimer = timer;
 
         // Estimate background from spectrum edges only if no saved anchor was found
         if (!foundSaved && !specData.empty()) {
@@ -2866,10 +2861,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // 4. Gaussian Fit Function TF1: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
         int binC = h->FindBin(cCh);
         double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
-        double ampl = rowWidgets[peakIdx].amplitude;
-        if (ampl <= 0.0 || std::abs(cCh - rowWidgets[peakIdx].lastFittedCentroid) > 0.1) {
-            ampl = std::max(1.0, binCounts - bkgVal);
-        }
+        double ampl = std::max(1.0, binCounts - bkgVal);
+        rowWidgets[peakIdx].amplitude = ampl;
         double sigma = std::max(0.2, fCh / 2.35482);
         double xMin = std::max(0.0, cCh - wCh);
         double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
@@ -3002,8 +2995,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
     };
 
-    // Helper to perform Gaussian refit for a given peak index (manual button click or debounced auto-refit)
-    auto executeRefit = [&](int peakIdx, bool isAuto) {
+    // Helper to perform Gaussian refit for a given peak index when user clicks "🔄 Refit Peak"
+    auto executeRefit = [&](int peakIdx) {
         if (peakIdx < 0 || peakIdx >= nAnchors) return;
         double cCh = rowWidgets[peakIdx].spinCentroid->value();
         double fCh = rowWidgets[peakIdx].spinFwhm->value();
@@ -3026,9 +3019,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fixed.fixSlope = rowWidgets[peakIdx].btnFixSlope && rowWidgets[peakIdx].btnFixSlope->isChecked();
         fixed.fixedSlope = slopeVal;
 
-        // When auto-refitting after the user adjusts the centroid, use a localized window around cCh
-        // so MINUIT converges on the selected peak without wandering away to a distant peak in the spectrum.
-        double fitWindow = (isAuto && !fixed.fixCentroid) ? std::clamp(fCh * 1.5, 4.0, std::max(6.0, wCh * 0.5)) : wCh;
+        // When the user clicks "Refit Peak" to optimize around their chosen centroid:
+        // if centroid is unlocked, search locally around cCh (within ± min(wCh, max(3.5, fCh * 1.5)))
+        // so MINUIT refines the peak the user is pointing to instead of jumping to a distant peak.
+        double fitWindow = fixed.fixCentroid ? wCh : std::clamp(fCh * 1.5, 3.5, std::max(5.0, wCh * 0.5));
 
         FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, fitWindow, 5.0, en, fixed);
         if (fa.isValid) {
@@ -3079,22 +3073,16 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                                    .arg(rowWidgets[peakIdx].spinFwhm->value(), 0, 'f', 2)
                                    .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1)
                                    .arg(rowWidgets[peakIdx].spinSlope->value(), 0, 'f', 3));
-        } else if (!isAuto) {
+        } else {
             QMessageBox::information(&dlg, tr("Refit Notice"),
                                      tr("Could not converge Gaussian fit around channel %1. You can nudge parameters manually or lock specific values.")
                                          .arg(cCh, 0, 'f', 1));
         }
     };
 
-    // Connect spinboxes, checkboxes, and auto-refit timers to live recalc and on-screen canvas feedback
+    // Connect spinboxes, checkboxes, and refit buttons to live recalc and on-screen canvas feedback
     for (int i = 0; i < nAnchors; ++i) {
         int peakIdx = i;
-
-        if (rowWidgets[i].debounceTimer) {
-            connect(rowWidgets[i].debounceTimer, &QTimer::timeout, &dlg, [&, peakIdx]() {
-                executeRefit(peakIdx, true);
-            });
-        }
 
         connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx]() {
             recalcLivePreview();
@@ -3107,9 +3095,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             }
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
-            if (rowWidgets[peakIdx].debounceTimer) {
-                rowWidgets[peakIdx].debounceTimer->start(350);
-            }
         });
 
         connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
@@ -3134,10 +3119,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // Refit button action: manual immediate refit
         connect(rowWidgets[i].btnRefit, &QPushButton::clicked, &dlg, [&, peakIdx]() {
-            if (rowWidgets[peakIdx].debounceTimer && rowWidgets[peakIdx].debounceTimer->isActive()) {
-                rowWidgets[peakIdx].debounceTimer->stop();
-            }
-            executeRefit(peakIdx, false);
+            executeRefit(peakIdx);
         });
     }
 
@@ -3154,6 +3136,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     btnCanvas->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 6px 12px;");
     btnCanvas->setToolTip(tr("Redraw the spectrum histogram and peak fit curves on the main canvas."));
     connect(btnCanvas, &QPushButton::clicked, &dlg, [&]() {
+        for (int i = 0; i < nAnchors; ++i) {
+            rowWidgets[i].guideLine = nullptr;
+            rowWidgets[i].fitFunc = nullptr;
+            rowWidgets[i].bkgFunc = nullptr;
+        }
         inspectSpectrumOnCanvas(row, col);
         for (int i = 0; i < nAnchors; ++i) {
             updateCanvasPeakOverlay(i);
