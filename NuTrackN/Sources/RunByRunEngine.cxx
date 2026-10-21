@@ -246,9 +246,19 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         outResult.numCoeffs = 2;
         double sumW = 0.0, sumWX = 0.0, sumWY = 0.0, sumWXX = 0.0, sumWXY = 0.0;
 
+        // Estimate rough scale factor (keV/ch) for dimensionally sound weighting
+        double estGain = 1.0;
+        if (valid.size() >= 2) {
+            const double dE = std::abs(valid.back().energy - valid.front().energy);
+            const double dCh = std::abs(valid.back().centroidCh - valid.front().centroidCh);
+            if (dCh > 1e-3) estGain = dE / dCh;
+        }
+        if (estGain <= 1e-4 || std::isnan(estGain)) estGain = 1.0;
+
         for (const auto &a : valid) {
-            const double sigTotSq = (a.energyErr > 0.0 ? a.energyErr * a.energyErr : 0.0) +
-                                    (a.centroidErrCh * a.centroidErrCh + 1e-4);
+            const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
+            const double sigTotSq = std::max(0.0025, (a.energyErr * a.energyErr) +
+                                                    (estGain * estGain * centErr * centErr));
             const double w = 1.0 / sigTotSq;
             sumW += w;
             sumWX += w * a.centroidCh;
@@ -273,14 +283,15 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         outResult.sigmaA2 = 0.0;
         outResult.covA0A1 = -sumWX / delta;
 
-        // Residual and Chi2 calculation
+        // Residual and Chi2 calculation (standard error propagation in energy space)
         double sumResSq = 0.0, sumChi2 = 0.0;
         for (const auto &a : valid) {
             const double fitE = outResult.a0 + outResult.a1 * a.centroidCh;
             const double res = a.energy - fitE;
             sumResSq += res * res;
-            const double sigE = std::sqrt(std::max(0.001, (a.energyErr * a.energyErr) +
-                                                          (outResult.a1 * outResult.a1 * a.centroidErrCh * a.centroidErrCh)));
+            const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
+            const double sigE = std::sqrt(std::max(0.0025, (a.energyErr * a.energyErr) +
+                                                          (outResult.a1 * outResult.a1 * centErr * centErr)));
             sumChi2 += (res * res) / (sigE * sigE);
         }
 
@@ -306,9 +317,18 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
     double m[3][3] = {{0.0}};
     double b[3] = {0.0};
 
+    double estGain = 1.0;
+    if (valid.size() >= 2) {
+        const double dE = std::abs(valid.back().energy - valid.front().energy);
+        const double dCh = std::abs(valid.back().centroidCh - valid.front().centroidCh);
+        if (dCh > 1e-3) estGain = dE / dCh;
+    }
+    if (estGain <= 1e-4 || std::isnan(estGain)) estGain = 1.0;
+
     for (const auto &a : valid) {
-        const double sigTotSq = (a.energyErr > 0.0 ? a.energyErr * a.energyErr : 0.0) +
-                                (a.centroidErrCh * a.centroidErrCh + 1e-4);
+        const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
+        const double sigTotSq = std::max(0.0025, (a.energyErr * a.energyErr) +
+                                                (estGain * estGain * centErr * centErr));
         const double w = 1.0 / sigTotSq;
         const double x = a.centroidCh;
         const double x2 = x * x;
@@ -361,7 +381,10 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         const double fitE = outResult.a0 + outResult.a1 * a.centroidCh + outResult.a2 * a.centroidCh * a.centroidCh;
         const double res = a.energy - fitE;
         sumResSq += res * res;
-        const double sigE = std::max(0.05, std::abs(outResult.a1) * a.centroidErrCh);
+        const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
+        const double dEdx = std::abs(outResult.a1 + 2.0 * outResult.a2 * a.centroidCh);
+        const double sigE = std::sqrt(std::max(0.0025, (a.energyErr * a.energyErr) +
+                                                      (dEdx * dEdx * centErr * centErr)));
         sumChi2 += (res * res) / (sigE * sigE);
     }
 

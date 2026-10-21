@@ -2454,7 +2454,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
                                   "<b>Gain (a1):</b> %3 keV/ch &nbsp;|&nbsp; "
                                   "<b>Offset (a0):</b> %4 keV &nbsp;|&nbsp; "
-                                  "<b>\u03c7\u00b2/ndf:</b> %5 &nbsp;|&nbsp; "
+                                  "<b>Calibration Line \u03c7\u00b2/ndf:</b> %5 &nbsp;|&nbsp; "
                                   "<b>Cutoff:</b> \u2264 %6")
                               .arg(statusColor)
                               .arg(statusName)
@@ -2472,6 +2472,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QTableWidget *tbl = new QTableWidget(&dlg);
     tbl->setColumnCount(9);
     tbl->setHorizontalHeaderLabels({
+        tr("Action"),
         tr("Use"),
         tr("Energy (keV)"),
         tr("Centroid (ch) 🔒"),
@@ -2479,8 +2480,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         tr("Window (\u00b1 ch)"),
         tr("FWHM (ch) 🔒"),
         tr("Baseline (cts) 🔒"),
-        tr("Slope (cts/ch) 🔒"),
-        tr("Action")
+        tr("Slope (cts/ch) 🔒")
     });
     tbl->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tbl->horizontalHeader()->setStretchLastSection(true);
@@ -2489,10 +2489,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     tbl->setRowCount(nAnchors);
 
     struct PeakRowWidgets {
+        QPushButton *btnRefit{nullptr};
         QCheckBox *chkUse{nullptr};
         double energy{0.0};
         double energyError{0.05};
         double nominalCentroid{0.0};
+        double centroidErrCh{0.05};
+        double peakChi2{1.0};
 
         QDoubleSpinBox *spinCentroid{nullptr};
         QPushButton *btnFixCentroid{nullptr};
@@ -2509,8 +2512,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         QDoubleSpinBox *spinSlope{nullptr};
         QPushButton *btnFixSlope{nullptr};
-
-        QPushButton *btnRefit{nullptr};
 
         TLine *guideLine{nullptr};
         TF1 *fitFunc{nullptr};
@@ -2544,6 +2545,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].nominalCentroid = nominalCh;
 
         double initCentroid = nominalCh;
+        double initCentroidErr = 0.05;
+        double initPeakChi2 = 1.0;
         double initFwhm = (anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : 3.5;
         double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
         double initBkg = 10.0;
@@ -2559,11 +2562,19 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                         initBkg = fa.background;
                     }
                     initSlope = fa.bkgSlope;
+                    if (fa.centroidErrCh > 0.0) {
+                        initCentroidErr = fa.centroidErrCh;
+                    }
+                    if (fa.chi2 > 0.0) {
+                        initPeakChi2 = fa.chi2;
+                    }
                 }
                 isUsed = fa.isValid;
                 break;
             }
         }
+        rowWidgets[i].centroidErrCh = initCentroidErr;
+        rowWidgets[i].peakChi2 = initPeakChi2;
 
         // Estimate background from spectrum edges if not yet known
         if (initBkg <= 10.0 && !specData.empty()) {
@@ -2575,7 +2586,26 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             }
         }
 
-        // Col 0: Checkbox
+        // Col 0: Refit Peak button at the start of the row with explicit text and generous width
+        QPushButton *btnRefit = new QPushButton(tr("🔄 Refit Peak"), tbl);
+        btnRefit->setMinimumWidth(110);
+        btnRefit->setStyleSheet(
+            "QPushButton {"
+            "  background-color: #0277bd;"
+            "  color: #ffffff;"
+            "  font-weight: bold;"
+            "  border-radius: 3px;"
+            "  padding: 4px 10px;"
+            "  border: 1px solid #0288d1;"
+            "}"
+            "QPushButton:hover { background-color: #039be5; }"
+            "QPushButton:pressed { background-color: #01579b; }"
+        );
+        btnRefit->setToolTip(tr("Refit this anchor peak (respecting any locked parameters 🔒)"));
+        rowWidgets[i].btnRefit = btnRefit;
+        tbl->setCellWidget(i, 0, btnRefit);
+
+        // Col 1: Checkbox
         QWidget *chkWidget = new QWidget(tbl);
         QHBoxLayout *chkLayout = new QHBoxLayout(chkWidget);
         chkLayout->setContentsMargins(0, 0, 0, 0);
@@ -2584,15 +2614,15 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         chk->setChecked(isUsed);
         chkLayout->addWidget(chk);
         rowWidgets[i].chkUse = chk;
-        tbl->setCellWidget(i, 0, chkWidget);
+        tbl->setCellWidget(i, 1, chkWidget);
 
-        // Col 1: Energy label
+        // Col 2: Energy label
         QTableWidgetItem *eItem = new QTableWidgetItem(QString("%1 \u00b1 %2").arg(anc.physicalEnergy, 0, 'f', 2).arg(anc.energyError, 0, 'f', 2));
         eItem->setFlags(Qt::ItemIsEnabled);
         eItem->setTextAlignment(Qt::AlignCenter);
-        tbl->setItem(i, 1, eItem);
+        tbl->setItem(i, 2, eItem);
 
-        // Col 2: Centroid SpinBox + Lock Button
+        // Col 3: Centroid SpinBox + Lock Button
         QWidget *wCentroid = new QWidget(tbl);
         QHBoxLayout *lCentroid = new QHBoxLayout(wCentroid);
         lCentroid->setContentsMargins(2, 2, 2, 2);
@@ -2607,9 +2637,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lCentroid->addWidget(btnFixC);
         rowWidgets[i].spinCentroid = spinC;
         rowWidgets[i].btnFixCentroid = btnFixC;
-        tbl->setCellWidget(i, 2, wCentroid);
+        tbl->setCellWidget(i, 3, wCentroid);
 
-        // Col 3: Shift Indicator Badge
+        // Col 4: Shift Indicator Badge
         QLabel *lblShift = new QLabel(tbl);
         lblShift->setAlignment(Qt::AlignCenter);
         double delta = initCentroid - nominalCh;
@@ -2617,9 +2647,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lblShift->setText(QString("\u0394 %1%2 ch").arg(sign).arg(delta, 0, 'f', 2));
         lblShift->setStyleSheet("color: #90a4ae; font-weight: bold; padding: 2px 6px;");
         rowWidgets[i].lblShift = lblShift;
-        tbl->setCellWidget(i, 3, lblShift);
+        tbl->setCellWidget(i, 4, lblShift);
 
-        // Col 4: Search Window SpinBox
+        // Col 5: Search Window SpinBox
         QDoubleSpinBox *spinW = new QDoubleSpinBox(tbl);
         spinW->setRange(2.0, 200.0);
         spinW->setDecimals(1);
@@ -2627,9 +2657,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         spinW->setValue(initWin);
         spinW->setToolTip(tr("Search and fit half-window in channels (\u00b1 \u0394ch) around centroid."));
         rowWidgets[i].spinWindow = spinW;
-        tbl->setCellWidget(i, 4, spinW);
+        tbl->setCellWidget(i, 5, spinW);
 
-        // Col 5: FWHM SpinBox + Lock Button
+        // Col 6: FWHM SpinBox + Lock Button
         QWidget *wFwhm = new QWidget(tbl);
         QHBoxLayout *lFwhm = new QHBoxLayout(wFwhm);
         lFwhm->setContentsMargins(2, 2, 2, 2);
@@ -2644,9 +2674,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lFwhm->addWidget(btnFixF);
         rowWidgets[i].spinFwhm = spinF;
         rowWidgets[i].btnFixFwhm = btnFixF;
-        tbl->setCellWidget(i, 5, wFwhm);
+        tbl->setCellWidget(i, 6, wFwhm);
 
-        // Col 6: Baseline Background SpinBox + Lock Button
+        // Col 7: Baseline Background SpinBox + Lock Button
         QWidget *wBkg = new QWidget(tbl);
         QHBoxLayout *lBkg = new QHBoxLayout(wBkg);
         lBkg->setContentsMargins(2, 2, 2, 2);
@@ -2662,9 +2692,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lBkg->addWidget(btnFixB);
         rowWidgets[i].spinBkg = spinB;
         rowWidgets[i].btnFixBkg = btnFixB;
-        tbl->setCellWidget(i, 6, wBkg);
+        tbl->setCellWidget(i, 7, wBkg);
 
-        // Col 7: Background Slope SpinBox + Lock Button
+        // Col 8: Background Slope SpinBox + Lock Button
         QWidget *wSlope = new QWidget(tbl);
         QHBoxLayout *lSlope = new QHBoxLayout(wSlope);
         lSlope->setContentsMargins(2, 2, 2, 2);
@@ -2680,24 +2710,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         lSlope->addWidget(btnFixS);
         rowWidgets[i].spinSlope = spinS;
         rowWidgets[i].btnFixSlope = btnFixS;
-        tbl->setCellWidget(i, 7, wSlope);
-
-        // Col 8: Refit button with high-contrast, fully readable theme-compliant styling
-        QPushButton *btnRefit = new QPushButton(tr("🔄 Refit Peak"), tbl);
-        btnRefit->setStyleSheet(
-            "QPushButton {"
-            "  background-color: #0277bd;"
-            "  color: #ffffff;"
-            "  font-weight: bold;"
-            "  border-radius: 3px;"
-            "  padding: 4px 10px;"
-            "  border: 1px solid #0288d1;"
-            "}"
-            "QPushButton:hover { background-color: #039be5; }"
-            "QPushButton:pressed { background-color: #01579b; }"
-        );
-        rowWidgets[i].btnRefit = btnRefit;
-        tbl->setCellWidget(i, 8, btnRefit);
+        tbl->setCellWidget(i, 8, wSlope);
     }
 
     peaksVBox->addWidget(tbl);
@@ -2837,9 +2850,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 fa.energy = rowWidgets[i].energy;
                 fa.energyErr = rowWidgets[i].energyError;
                 fa.centroidCh = rowWidgets[i].spinCentroid->value();
+                fa.centroidErrCh = std::max(0.01, rowWidgets[i].centroidErrCh);
                 fa.fwhmCh = rowWidgets[i].spinFwhm->value();
                 fa.background = rowWidgets[i].spinBkg->value();
                 fa.bkgSlope = rowWidgets[i].spinSlope->value();
+                fa.chi2 = rowWidgets[i].peakChi2;
                 fa.isValid = true;
                 activeAnchors.push_back(fa);
             }
@@ -2868,11 +2883,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QString resStr = QString::number(res.sRes, 'f', 4);
 
         if (ok && res.status == RunCalibStatus::Success) {
-            lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE FIT: a1 = %1 keV/ch | a0 = %2 keV | s_res = %3 keV | <b>\u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>")
-                                          .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1));
+            lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>"
+                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Note: Linear calibration \u03c7\u00b2/ndf measures alignment of all %6 anchors (E vs ch), weighted by energy and centroid uncertainties.</span>")
+                                          .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
         } else {
-            lblPreviewStatus->setText(QString("<span style='color:#ff9800;'>⚠️ HIGH \u03c7\u00b2 FIT: a1 = %1 keV/ch | a0 = %2 keV | s_res = %3 keV | <b>\u03c7\u00b2/ndf = %4</b> (> %5 cutoff)</span>")
-                                          .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1));
+            lblPreviewStatus->setText(QString("<span style='color:#ff9800;'>⚠️ HIGH \u03c7\u00b2 CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (> %5 cutoff)</span>"
+                                              "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Note: Linear calibration \u03c7\u00b2/ndf measures alignment of all %6 anchors (E vs ch), weighted by energy and centroid uncertainties.</span>")
+                                          .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
         }
     };
 
@@ -2880,32 +2897,35 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     for (int i = 0; i < nAnchors; ++i) {
         int peakIdx = i;
 
-        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [=]() {
+        connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx]() {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+        connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
+            if (rowWidgets[peakIdx].centroidErrCh <= 0.005) {
+                rowWidgets[peakIdx].centroidErrCh = std::clamp(rowWidgets[peakIdx].spinFwhm->value() / 20.0, 0.03, 0.5);
+            }
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+        connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+        connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        connect(rowWidgets[i].spinBkg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+        connect(rowWidgets[i].spinBkg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        connect(rowWidgets[i].spinSlope, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [=](double) {
+        connect(rowWidgets[i].spinSlope, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
@@ -2939,6 +2959,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (!fixed.fixBaseline && fa.background > 0.0) rowWidgets[peakIdx].spinBkg->setValue(fa.background);
                 if (!fixed.fixSlope) rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
 
+                rowWidgets[peakIdx].centroidErrCh = (fa.centroidErrCh > 0.0) ? fa.centroidErrCh : 0.05;
+                rowWidgets[peakIdx].peakChi2 = fa.chi2;
+
                 rowWidgets[peakIdx].chkUse->setChecked(true);
                 recalcLivePreview();
                 updateCanvasPeakOverlay(peakIdx);
@@ -2948,9 +2971,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                     lockMsg = tr(" (respecting locked parameters)");
                 }
                 QToolTip::showText(rowWidgets[peakIdx].btnRefit->mapToGlobal(QPoint(0, 0)),
-                                   tr("Fitted successfully%1:\nCentroid = %2 ch, FWHM = %3 ch\nBaseline = %4 cts, Slope = %5 cts/ch")
+                                   tr("Fitted successfully%1:\nCentroid = %2 \u00b1 %3 ch\nPeak Fit \u03c7\u00b2/ndf = %4\nFWHM = %5 ch\nBaseline = %6 cts, Slope = %7 cts/ch")
                                        .arg(lockMsg)
                                        .arg(rowWidgets[peakIdx].spinCentroid->value(), 0, 'f', 2)
+                                       .arg(rowWidgets[peakIdx].centroidErrCh, 0, 'f', 3)
+                                       .arg(rowWidgets[peakIdx].peakChi2 > 0.0 ? QString::number(rowWidgets[peakIdx].peakChi2, 'f', 2) : "-")
                                        .arg(rowWidgets[peakIdx].spinFwhm->value(), 0, 'f', 2)
                                        .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1)
                                        .arg(rowWidgets[peakIdx].spinSlope->value(), 0, 'f', 3));
