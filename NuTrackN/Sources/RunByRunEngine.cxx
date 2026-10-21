@@ -138,29 +138,37 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     const int nFitBins = fitMax - fitMin + 1;
     if (nFitBins < 5) return result;
 
-    // Refined baseline estimation from sidebands of the actual fit window
+    // Refined baseline estimation from sidebands of the actual fit window using median filtering
+    double leftBkg = 0.0;
+    double rightBkg = 0.0;
+    double estStep = 0.0;
     if (!fixed.fixBaseline) {
         const int sbWidth = std::clamp(fitHalfWidth / 4, 2, 6);
-        double leftBkg = 0.0;
-        int nLeft = 0;
+        std::vector<double> leftVals;
         for (int k = 0; k < sbWidth && (fitMin + k) < maxBin; ++k) {
-            leftBkg += spectrum[fitMin + k];
-            nLeft++;
+            leftVals.push_back(spectrum[fitMin + k]);
         }
-        if (nLeft > 0) leftBkg /= nLeft;
-
-        double rightBkg = 0.0;
-        int nRight = 0;
+        std::vector<double> rightVals;
         for (int k = 0; k < sbWidth && (fitMax - k) > maxBin; ++k) {
-            rightBkg += spectrum[fitMax - k];
-            nRight++;
+            rightVals.push_back(spectrum[fitMax - k]);
         }
-        if (nRight > 0) rightBkg /= nRight;
-
+        if (!leftVals.empty()) {
+            std::sort(leftVals.begin(), leftVals.end());
+            leftBkg = leftVals[leftVals.size() / 2];
+        } else {
+            leftBkg = spectrum[fitMin];
+        }
+        if (!rightVals.empty()) {
+            std::sort(rightVals.begin(), rightVals.end());
+            rightBkg = rightVals[rightVals.size() / 2];
+        } else {
+            rightBkg = spectrum[fitMax];
+        }
+        estStep = (leftBkg > rightBkg) ? (leftBkg - rightBkg) : 0.0;
         baseVal = (leftBkg + rightBkg) / 2.0;
     }
 
-    // Use a lightweight ROOT TH1F for standard Gaussian + linear background fit
+    // Use a lightweight ROOT TH1F for standard Gaussian + linear background + Compton step fit
     TH1F hTemp("hAnchorTemp", "Anchor", nFitBins, fitMin - 0.5, fitMax + 0.5);
     hTemp.SetDirectory(nullptr);
     for (int i = 0; i < nFitBins; ++i) {
@@ -169,10 +177,12 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         hTemp.SetBinError(i + 1, std::max(1.0, std::sqrt(std::max(0.0, spectrum[ch]))));
     }
 
-    // Centered formula: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
-    // Parameter 3 is the local baseline AT the centroid, avoiding huge/negative extrapolations to channel 0
-    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
-    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (spectrum[fitMax] - spectrum[fitMin]) / static_cast<double>(nFitBins);
+    // Centered formula with Compton step:
+    // [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
+    // Parameter 3 is the local high-energy baseline AT the centroid
+    // Parameter 5 is the Compton step height
+    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
+    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : 0.0;
     const double estAmpl = std::max(1.0, maxVal - baseVal);
     const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
     const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
@@ -197,13 +207,23 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     if (fixed.fixBaseline) {
         fGaus.FixParameter(3, fixed.fixedBaseline);
     } else {
-        fGaus.SetParameter(3, baseVal);
+        fGaus.SetParameter(3, rightBkg > 0.0 ? rightBkg : baseVal);
+        fGaus.SetParLimits(3, 0.0, std::max(10.0, maxVal * 2.0));
     }
 
     if (fixed.fixSlope) {
         fGaus.FixParameter(4, fixed.fixedSlope);
     } else {
         fGaus.SetParameter(4, bkgSlope);
+    }
+
+    if (fixed.fixStep) {
+        fGaus.FixParameter(5, fixed.fixedStep);
+    } else if (fixed.fixBaseline || estAmpl < 30.0 || estStep < 0.5) {
+        fGaus.FixParameter(5, 0.0);
+    } else {
+        fGaus.SetParameter(5, estStep);
+        fGaus.SetParLimits(5, 0.0, std::max(10.0, estStep * 3.0 + 20.0));
     }
 
     // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
@@ -236,7 +256,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
             // Parameter was fixed in ROOT MINUIT so GetParError(1) returns 0.
             // Compute realistic physical statistical centroid uncertainty from peak width and area:
             const double statErr = (area > 1.0) ? (fittedSigma / std::sqrt(area)) : 0.05;
-            const double bkgVal = std::max(0.0, fGaus.GetParameter(3));
+            const double bkgVal = std::max(0.0, fGaus.GetParameter(3) + 0.5 * fGaus.GetParameter(5));
             const double bkgFactor = (area > 1.0 && bkgVal > 0.0)
                 ? std::sqrt(1.0 + (2.0 * bkgVal * fwhm) / area)
                 : 1.0;
@@ -252,6 +272,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
             result.amplitude = fittedAmpl;
             result.background = fGaus.GetParameter(3);
             result.bkgSlope = fGaus.GetParameter(4);
+            result.bkgStep = fGaus.GetParameter(5);
             result.area = area;
             result.chi2 = chi2;
             result.isValid = true;
@@ -267,8 +288,9 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         result.centroidErrCh = std::clamp(sig / std::sqrt(estArea), 0.03, 0.35);
         result.fwhmCh = fixed.fixFwhm ? fixed.fixedFwhm : 3.5;
         result.amplitude = estAmpl;
-        result.background = fixed.fixBaseline ? fixed.fixedBaseline : baseVal;
-        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : bkgSlope;
+        result.background = fixed.fixBaseline ? fixed.fixedBaseline : (rightBkg > 0.0 ? rightBkg : baseVal);
+        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : 0.0;
+        result.bkgStep = fixed.fixStep ? fixed.fixedStep : estStep;
         result.area = estArea;
         result.chi2 = 1.0;
         result.isValid = true;
@@ -298,6 +320,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         result.amplitude = std::max(1.0, maxVal - momBase);
         result.background = momBase;
         result.bkgSlope = 0.0;
+        result.bkgStep = 0.0;
         result.area = sumW;
         result.chi2 = 1.0;
         result.isValid = (centroid >= lowCh && centroid <= highCh);

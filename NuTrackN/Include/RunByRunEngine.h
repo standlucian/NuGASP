@@ -40,6 +40,7 @@ struct FittedAnchor {
     double amplitude{0.0};
     double background{0.0};
     double bkgSlope{0.0};
+    double bkgStep{0.0};
     double area{0.0};
     double chi2{0.0};
     bool   isValid{false};
@@ -55,6 +56,8 @@ struct FitFixedParams {
     double fixedBaseline{0.0};
     bool fixSlope{false};
     double fixedSlope{0.0};
+    bool fixStep{false};
+    double fixedStep{0.0};
 };
 
 // Result for a specific (Run, Detector)

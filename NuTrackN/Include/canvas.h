@@ -581,6 +581,7 @@ protected:
     bool m_bkgFixed{false};
     double m_bkgSlopeVal{0.0};
     double m_bkgInterceptVal{0.0};
+    double m_bkgStepVal{0.0};
     int m_lastFitType{2}; // 1 = AutoFit, 2 = MultiPeakFit
     int m_lastAutoFitX{0};
     int m_lastAutoFitY{0};

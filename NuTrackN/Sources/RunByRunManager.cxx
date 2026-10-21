@@ -2093,26 +2093,29 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
             if (pad) pad->cd();
 
-            // Fit function (Gaussian + Linear background) in vibrant red (or gray if excluded)
+            // Fit function (Gaussian + Linear background + Compton step) in vibrant red (or gray if excluded)
             TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
+                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
             fFit->SetParameter(0, amplVal);
             fFit->SetParameter(1, meanVal);
             fFit->SetParameter(2, sigmaVal);
             fFit->SetParameter(3, bkgVal);
             fFit->SetParameter(4, slopeVal);
+            fFit->SetParameter(5, savedFa->bkgStep);
             fFit->SetLineColor(savedFa->isValid ? kRed : kGray);
             fFit->SetLineStyle(savedFa->isValid ? 1 : 3);
             fFit->SetLineWidth(savedFa->isValid ? 2 : 1);
             fFit->Draw("same");
             m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
 
-            // Baseline background function in dashed blue: [0] + [1]*(x-[2])
+            // Baseline background function in dashed blue with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
             TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0] + [1]*(x-[2])", fitMin - 0.5, fitMax + 0.5);
+                                "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", fitMin - 0.5, fitMax + 0.5);
             fBkg->SetParameter(0, bkgVal);
             fBkg->SetParameter(1, slopeVal);
             fBkg->SetParameter(2, meanVal);
+            fBkg->SetParameter(3, savedFa->bkgStep);
+            fBkg->SetParameter(4, sigmaVal);
             fBkg->SetLineColor(savedFa->isValid ? kBlue : (kGray + 1));
             fBkg->SetLineWidth(1);
             fBkg->SetLineStyle(savedFa->isValid ? 2 : 3);
@@ -2131,140 +2134,55 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
         const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : 15.0;
         const double minCounts = (a.minCounts > 0.0) ? a.minCounts : 20.0;
-        int lowCh = std::max(1, static_cast<int>(std::floor(centerCh - windowCh)));
-        int highCh = std::min(totalBins - 2, static_cast<int>(std::ceil(centerCh + windowCh)));
-
-        int maxBin = lowCh;
-        double maxVal = (lowCh < totalBins) ? specData[lowCh] : 0.0;
-        if (lowCh < highCh) {
-            for (int ch = lowCh; ch <= highCh; ++ch) {
-                if (specData[ch] > maxVal) {
-                    maxVal = specData[ch];
-                    maxBin = ch;
-                }
-            }
+        FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, a.physicalEnergy);
+        if (!fa.isValid && std::abs(centerCh - ((a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy)) > 0.5) {
+            double baseCentroid = (a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy;
+            fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, a.physicalEnergy);
         }
 
-        // Fallback to base initial channel if peak not distinct around moving centroid
-        double baseCentroid = (a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy;
-        double curBase = (lowCh < highCh) ? (specData[lowCh] + specData[highCh]) / 2.0 : 0.0;
-        if ((maxVal <= 0.0 || (maxVal - curBase) < minCounts) &&
-            std::abs(centerCh - baseCentroid) > 0.5) {
-            int bLow = std::max(1, static_cast<int>(std::floor(baseCentroid - windowCh)));
-            int bHigh = std::min(totalBins - 2, static_cast<int>(std::ceil(baseCentroid + windowCh)));
-            if (bLow < bHigh) {
-                int bMaxBin = bLow;
-                double bMaxVal = specData[bLow];
-                for (int ch = bLow; ch <= bHigh; ++ch) {
-                    if (specData[ch] > bMaxVal) {
-                        bMaxVal = specData[ch];
-                        bMaxBin = ch;
-                    }
-                }
-                double bBaseVal = (specData[bLow] + specData[bHigh]) / 2.0;
-                if ((bMaxVal - bBaseVal) >= minCounts) {
-                    maxBin = bMaxBin;
-                    maxVal = bMaxVal;
-                    centerCh = baseCentroid;
-                    lowCh = bLow;
-                    highCh = bHigh;
-                }
-            }
-        }
-
-        double baseVal = (lowCh < highCh) ? (specData[lowCh] + specData[highCh]) / 2.0 : 0.0;
-        double netHeight = maxVal - baseVal;
-
-        if (netHeight >= 5.0 && maxVal > 0.0) {
+        if (fa.isValid) {
+            fitSuccess = true;
+            fittedCentroid = fa.centroidCh;
+            const double meanVal = fa.centroidCh;
+            const double sigmaVal = std::max(0.1, fa.fwhmCh / 2.35482);
             const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
-            const int fitMin = std::max(1, maxBin - fitHalfWidth);
-            const int fitMax = std::min(totalBins - 1, maxBin + fitHalfWidth);
-            const int nFitBins = fitMax - fitMin + 1;
+            const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
+            const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
 
-            if (nFitBins >= 5) {
-                TH1F hTemp(Form("hAnchorTemp_%d_%d", detId, static_cast<int>(aIdx)), "Anchor",
-                           nFitBins, fitMin - 0.5, fitMax + 0.5);
-                hTemp.SetDirectory(nullptr);
-                for (int i = 0; i < nFitBins; ++i) {
-                    const int ch = fitMin + i;
-                    hTemp.SetBinContent(i + 1, specData[ch]);
-                    hTemp.SetBinError(i + 1, std::max(1.0, std::sqrt(std::max(0.0, specData[ch]))));
-                }
+            if (pad) pad->cd();
 
-                // Centered formula: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
-                // Parameter 3 is the local baseline AT the centroid, avoiding huge/negative extrapolations to channel 0
-                TF1 fGaus(Form("fAnchorGaus_%d_%d", detId, static_cast<int>(aIdx)),
-                          "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
-                const double bkgSlope = (specData[fitMax] - specData[fitMin]) / static_cast<double>(nFitBins);
-                const double estAmpl = std::max(1.0, maxVal - baseVal);
-                const double estMean = static_cast<double>(maxBin);
-                const double estSigma = (a.expectedFwhmCh > 0.0) ? (a.expectedFwhmCh / 2.35482) : 2.0;
+            // Fit function (Gaussian + Linear background + Compton step) in vibrant red
+            TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
+                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
+            fFit->SetParameter(0, fa.amplitude);
+            fFit->SetParameter(1, fa.centroidCh);
+            fFit->SetParameter(2, sigmaVal);
+            fFit->SetParameter(3, fa.background);
+            fFit->SetParameter(4, fa.bkgSlope);
+            fFit->SetParameter(5, fa.bkgStep);
+            fFit->SetLineColor(kRed);
+            fFit->SetLineWidth(2);
+            fFit->Draw("same");
+            m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
 
-                fGaus.SetParameter(0, estAmpl);
-                fGaus.SetParameter(1, estMean);
-                fGaus.SetParameter(2, estSigma);
-                fGaus.SetParameter(3, baseVal);
-                fGaus.SetParameter(4, bkgSlope);
+            // Baseline background function in dashed blue with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
+            TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
+                                "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", fitMin - 0.5, fitMax + 0.5);
+            fBkg->SetParameter(0, fa.background);
+            fBkg->SetParameter(1, fa.bkgSlope);
+            fBkg->SetParameter(2, fa.centroidCh);
+            fBkg->SetParameter(3, fa.bkgStep);
+            fBkg->SetParameter(4, sigmaVal);
+            fBkg->SetLineColor(kBlue);
+            fBkg->SetLineWidth(1);
+            fBkg->SetLineStyle(2);
+            fBkg->Draw("same");
+            m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fBkg);
 
-                fGaus.SetParLimits(1, fitMin, fitMax);
-                fGaus.SetParLimits(2, 0.4, 30.0);
-                fGaus.SetParLimits(0, 0.0, maxVal * 3.0);
-
-                // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
-                TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NSIL", "", fitMin - 0.5, fitMax + 0.5);
-                if (!fitRes.Get() || (!fitRes->IsValid() && fitRes->Status() != 0)) {
-                    fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
-                }
-                if (fitRes.Get() && (fitRes->IsValid() || fitRes->Status() == 0)) {
-                    const double meanVal = fGaus.GetParameter(1);
-                    const double sigmaVal = std::abs(fGaus.GetParameter(2));
-                    const double fwhmVal = 2.35482 * sigmaVal;
-
-                    double calcChi2 = 0.0;
-                    for (int i = 0; i < nFitBins; ++i) {
-                        const double data = hTemp.GetBinContent(i + 1);
-                        const double expected = fGaus.Eval(hTemp.GetBinCenter(i + 1));
-                        const double var = std::max(1.0, data);
-                        calcChi2 += (data - expected) * (data - expected) / var;
-                    }
-                    const int nFree = fGaus.GetNumberFreeParameters();
-                    const int ndf = std::max(1, nFitBins - nFree);
-                    const double fitChi2 = calcChi2 / ndf;
-
-                    if (meanVal >= lowCh && meanVal <= highCh && fwhmVal >= 0.5 && fwhmVal <= 50.0 && fitChi2 <= 50.0) {
-                        fitSuccess = true;
-                        fittedCentroid = meanVal;
-
-                        if (pad) pad->cd();
-
-                        // Fit function (Gaussian + Linear background) in vibrant red
-                        TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
-                                            "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
-                        fFit->SetParameters(fGaus.GetParameters());
-                        fFit->SetLineColor(kRed);
-                        fFit->SetLineWidth(2);
-                        fFit->Draw("same");
-                        m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
-
-                        // Baseline background function in dashed blue: [0] + [1]*(x-[2])
-                        TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
-                                            "[0] + [1]*(x-[2])", fitMin - 0.5, fitMax + 0.5);
-                        fBkg->SetParameter(0, fGaus.GetParameter(3));
-                        fBkg->SetParameter(1, fGaus.GetParameter(4));
-                        fBkg->SetParameter(2, fGaus.GetParameter(1));
-                        fBkg->SetLineColor(kBlue);
-                        fBkg->SetLineWidth(1);
-                        fBkg->SetLineStyle(2);
-                        fBkg->Draw("same");
-                        m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fBkg);
-
-                        const double peakHeight = hist->GetBinContent(hist->FindBin(meanVal));
-                        m_mainCanvas->gaussCenters[sel_i][sel_j].push_back(meanVal);
-                        m_mainCanvas->gaussCentersHeight[sel_i][sel_j].push_back(peakHeight);
-                        fitCount++;
-                    }
-                }
-            }
+            const double peakHeight = hist->GetBinContent(hist->FindBin(meanVal));
+            m_mainCanvas->gaussCenters[sel_i][sel_j].push_back(meanVal);
+            m_mainCanvas->gaussCentersHeight[sel_i][sel_j].push_back(peakHeight);
+            fitCount++;
         }
 
         peakPositions.push_back(fitSuccess ? fittedCentroid : centerCh);
@@ -2579,6 +2497,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double centroidErrCh{0.05};
         double peakChi2{1.0};
         double amplitude{0.0};
+        double bkgStep{0.0};
         double lastFittedCentroid{0.0};
 
         QDoubleSpinBox *spinCentroid{nullptr};
@@ -2635,6 +2554,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
         double initBkg = 10.0;
         double initSlope = 0.0;
+        double initStep = 0.0;
         double initAmpl = 0.0;
         bool isUsed = true;
         bool foundSaved = false;
@@ -2647,6 +2567,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                     if (fa.fwhmCh > 0.2) initFwhm = fa.fwhmCh;
                     initBkg = fa.background;
                     initSlope = fa.bkgSlope;
+                    initStep = fa.bkgStep;
                     initAmpl = fa.amplitude;
                     if (fa.centroidErrCh > 0.0) {
                         initCentroidErr = fa.centroidErrCh;
@@ -2662,6 +2583,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].centroidErrCh = initCentroidErr;
         rowWidgets[i].peakChi2 = initPeakChi2;
         rowWidgets[i].amplitude = initAmpl;
+        rowWidgets[i].bkgStep = initStep;
         rowWidgets[i].lastFittedCentroid = initCentroid;
 
         // Estimate background from spectrum edges only if no saved anchor was found
@@ -2671,6 +2593,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             if (lowB < highB) {
                 initBkg = std::max(0.0, (specData[lowB] + specData[highB]) / 2.0);
                 initSlope = (specData[highB] - specData[lowB]) / static_cast<double>(highB - lowB);
+                initStep = std::max(0.0, specData[lowB] - specData[highB]);
+                rowWidgets[i].bkgStep = initStep;
             }
         }
 
@@ -2893,7 +2817,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         guideLine->SetY1(0.0);
         guideLine->SetY2(yMax * 1.05);
 
-        // 4. Gaussian Fit Function TF1: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
+        // 4. Gaussian Fit Function TF1 with Compton step: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
         int binC = h->FindBin(cCh);
         double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
         double ampl = std::max(1.0, binCounts - bkgVal);
@@ -2901,6 +2825,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double sigma = std::max(0.2, fCh / 2.35482);
         double xMin = std::max(0.0, cCh - wCh);
         double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
+        double stepVal = rowWidgets[peakIdx].bkgStep;
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
         if (!fFit) {
@@ -2908,7 +2833,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
         if (!fFit) {
             fFit = new TF1(Form("rbr_fit_%d_%d", detId, peakIdx),
-                           "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", xMin, xMax);
+                           "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", xMin, xMax);
             fFit->SetLineColor(kRed);
             fFit->SetLineWidth(2);
             fFit->Draw("same");
@@ -2921,15 +2846,16 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fFit->SetParameter(2, sigma);
         fFit->SetParameter(3, bkgVal);
         fFit->SetParameter(4, slopeVal);
+        fFit->SetParameter(5, stepVal);
 
-        // 5. Baseline Background Function TF1: [0] + [1]*(x-[2])
+        // 5. Baseline Background Function TF1 with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
         TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
         if (!fBkg) {
             fBkg = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_background_%d_%d", detId, peakIdx)));
         }
         if (!fBkg) {
             fBkg = new TF1(Form("rbr_background_%d_%d", detId, peakIdx),
-                           "[0] + [1]*(x-[2])", xMin, xMax);
+                           "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", xMin, xMax);
             fBkg->SetLineColor(kBlue);
             fBkg->SetLineWidth(1);
             fBkg->SetLineStyle(2);
@@ -2941,6 +2867,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fBkg->SetParameter(0, bkgVal);
         fBkg->SetParameter(1, slopeVal);
         fBkg->SetParameter(2, cCh);
+        fBkg->SetParameter(3, stepVal);
+        fBkg->SetParameter(4, sigma);
 
         if (!isUsed) {
             guideLine->SetLineColor(kGray);
@@ -2980,6 +2908,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             fa.fwhmCh = rowWidgets[i].spinFwhm->value();
             fa.background = rowWidgets[i].spinBkg->value();
             fa.bkgSlope = rowWidgets[i].spinSlope->value();
+            fa.bkgStep = rowWidgets[i].bkgStep;
             fa.amplitude = rowWidgets[i].amplitude;
             fa.chi2 = rowWidgets[i].peakChi2;
             fa.isValid = (rowWidgets[i].chkUse && rowWidgets[i].chkUse->isChecked());
@@ -3138,6 +3067,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 rowWidgets[peakIdx].spinSlope->blockSignals(false);
             }
             rowWidgets[peakIdx].amplitude = fa.amplitude;
+            rowWidgets[peakIdx].bkgStep = fa.bkgStep;
             rowWidgets[peakIdx].lastFittedCentroid = fa.centroidCh;
 
             if (fixed.fixCentroid && prevCentroidErr >= 0.02) {

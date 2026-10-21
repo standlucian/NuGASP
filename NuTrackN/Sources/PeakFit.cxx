@@ -437,45 +437,56 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     const int iFitMin = hist->FindBin(fitMin);
     const int iFitMax = hist->FindBin(fitMax);
 
-    // Estimate initial linear background from boundary flanks
-    Double_t bkgLeft = 0.0;
-    int nLeft = 0;
-    for (int b = iFitMin; b <= std::min(iFitMin + 2, iFitMax); ++b) {
-        bkgLeft += hist->GetBinContent(b);
-        nLeft++;
+    // Estimate initial background from boundary flanks using robust median sidebands
+    const int sbWidth = std::clamp((iFitMax - iFitMin) / 4, 2, 5);
+    std::vector<Double_t> leftSide;
+    for (int b = iFitMin; b < std::min(iFitMin + sbWidth, iFitMax); ++b) {
+        leftSide.push_back(hist->GetBinContent(b));
     }
-    bkgLeft = (nLeft > 0) ? (bkgLeft / nLeft) : hist->GetBinContent(iFitMin);
-
-    Double_t bkgRight = 0.0;
-    int nRight = 0;
-    for (int b = std::max(iFitMin, iFitMax - 2); b <= iFitMax; ++b) {
-        bkgRight += hist->GetBinContent(b);
-        nRight++;
+    std::vector<Double_t> rightSide;
+    for (int b = std::max(iFitMin, iFitMax - sbWidth + 1); b <= iFitMax; ++b) {
+        rightSide.push_back(hist->GetBinContent(b));
     }
-    bkgRight = (nRight > 0) ? (bkgRight / nRight) : hist->GetBinContent(iFitMax);
+    Double_t bkgLeft = 0.0, bkgRight = 0.0;
+    if (!leftSide.empty()) {
+        std::sort(leftSide.begin(), leftSide.end());
+        bkgLeft = leftSide[leftSide.size() / 2];
+    } else {
+        bkgLeft = hist->GetBinContent(iFitMin);
+    }
+    if (!rightSide.empty()) {
+        std::sort(rightSide.begin(), rightSide.end());
+        bkgRight = rightSide[rightSide.size() / 2];
+    } else {
+        bkgRight = hist->GetBinContent(iFitMax);
+    }
 
     const Double_t xLeft = hist->GetBinCenter(iFitMin);
     const Double_t xRight = hist->GetBinCenter(iFitMax);
-    Double_t bkgSlope = (xRight != xLeft) ? (bkgRight - bkgLeft) / (xRight - xLeft) : 0.0;
+    Double_t estStep = (bkgLeft > bkgRight) ? (bkgLeft - bkgRight) : 0.0;
+    Double_t bkgSlope = (xRight != xLeft) ? ((bkgRight - bkgLeft + estStep) / (xRight - xLeft)) : 0.0;
     Double_t bkg0 = bkgLeft - bkgSlope * xLeft;
 
     Double_t apexCounts = hist->GetBinContent(apexBin);
     Double_t gaussianCenter = hist->GetBinCenter(apexBin);
-    Double_t estBkgAtApex = bkgSlope * gaussianCenter + bkg0;
+    Double_t estBkgAtApex = bkgSlope * gaussianCenter + bkg0 + 0.5 * estStep;
     Double_t gaussianHeight = std::max(1.0, apexCounts - estBkgAtApex);
     Double_t gaussianSigma = std::max(1.0, (fitMax - fitMin) / 5.0);
     Double_t gaussianFWHM = 0.0;
     Double_t gaussianCenterError = 0.0, gaussianIntegral = 0.0;
     Double_t gaussianIntegralError = 0.0, gaussianFWHMError = 0.0;
 
-    // Standard Gaussian + Linear Background model:
-    // [0] = Amplitude, [1] = Centroid, [2] = Sigma, [3] = Background Slope, [4] = Background Intercept
+    // Advanced Gaussian + Linear Background + Compton Step model:
+    // [0] = Amplitude, [1] = Centroid, [2] = Sigma, [3] = Background Slope, [4] = Background Intercept, [5] = Compton Step Height
     mainCanvas->gaussianWithBackground = new TFormula(
-        "gaussianWithBackground", "[0]*exp(-0.5*((x-[1])/[2])^2)+[3]*x+[4]");
+        "gaussianWithBackground",
+        "[0]*exp(-0.5*((x-[1])/[2])^2) + [3]*x + [4] + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))");
     mainCanvas->gaussianWithBackgroundFunction = new TF1(
         "gaussianWithBackgroundFunction", "gaussianWithBackground", fitMin, fitMax);
 
-    mainCanvas->background = new TFormula("background", "[0]*x+[1]");
+    mainCanvas->background = new TFormula(
+        "background",
+        "[0]*x + [1] + [2]*0.5*TMath::Erfc((x-[3])/(sqrt(2.0)*[4]))");
     mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", fitMin, fitMax);
 
     mainCanvas->gaussianCenterMarkerText = new TLatex();
@@ -540,9 +551,16 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         bkg0     = mainCanvas->m_bkgInterceptVal;
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, bkgSlope);
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(4, bkg0);
+        mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, mainCanvas->m_bkgStepVal);
     } else {
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+        if (estStep > 0.5 && gaussianHeight >= 30.0) {
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, estStep);
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(10.0, estStep * 3.0 + 20.0));
+        } else {
+            mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
+        }
     }
 
     // Fit with Poisson Likelihood + Bin Integration ("Q R S I L"), fallback to standard Chi2 ("Q M R S")
@@ -553,18 +571,25 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     bkgSlope = mainCanvas->gaussianWithBackgroundFunction->GetParameter(3);
     bkg0     = mainCanvas->gaussianWithBackgroundFunction->GetParameter(4);
+    Double_t bkgStep = mainCanvas->gaussianWithBackgroundFunction->GetParameter(5);
     mainCanvas->backgroundA1 = bkgSlope;
     mainCanvas->backgroundA0 = bkg0;
+    mainCanvas->m_bkgStepVal = bkgStep;
     if (!mainCanvas->m_bkgFixed) {
         mainCanvas->m_bkgSlopeVal = bkgSlope;
         mainCanvas->m_bkgInterceptVal = bkg0;
     }
 
-    mainCanvas->backgroundFunction->SetRange(fitMin, fitMax);
-    mainCanvas->backgroundFunction->FixParameter(0, bkgSlope);
-    mainCanvas->backgroundFunction->FixParameter(1, bkg0);
-
     gaussianSigma = std::abs(mainCanvas->gaussianWithBackgroundFunction->GetParameter(2));
+    gaussianCenter = mainCanvas->gaussianWithBackgroundFunction->GetParameter(1);
+
+    mainCanvas->backgroundFunction->SetRange(fitMin, fitMax);
+    mainCanvas->backgroundFunction->SetParameter(0, bkgSlope);
+    mainCanvas->backgroundFunction->SetParameter(1, bkg0);
+    mainCanvas->backgroundFunction->SetParameter(2, bkgStep);
+    mainCanvas->backgroundFunction->SetParameter(3, gaussianCenter);
+    mainCanvas->backgroundFunction->SetParameter(4, gaussianSigma);
+
     gaussianFWHM  = gaussianSigma * 2.35482;
     gaussianIntegral = mainCanvas->gaussianWithBackgroundFunction->Integral(fitMin, fitMax)
                      - mainCanvas->backgroundFunction->Integral(fitMin, fitMax);
@@ -583,6 +608,7 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         if (mainCanvas->m_bkgFixed) {
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, bkgSlope);
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(4, bkg0);
+            mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, bkgStep);
         }
         if (fixAmp0) {
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(0, mainCanvas->m_peakFixedStates[0].ampVal);
@@ -617,21 +643,30 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         }
 
         gaussianSigma = std::abs(mainCanvas->gaussianWithBackgroundFunction->GetParameter(2));
+        gaussianCenter = mainCanvas->gaussianWithBackgroundFunction->GetParameter(1);
+        bkgSlope = mainCanvas->gaussianWithBackgroundFunction->GetParameter(3);
+        bkg0     = mainCanvas->gaussianWithBackgroundFunction->GetParameter(4);
+        bkgStep  = mainCanvas->gaussianWithBackgroundFunction->GetParameter(5);
+        mainCanvas->backgroundA1 = bkgSlope;
+        mainCanvas->backgroundA0 = bkg0;
+        mainCanvas->m_bkgStepVal = bkgStep;
+        if (!mainCanvas->m_bkgFixed) {
+            mainCanvas->m_bkgSlopeVal = bkgSlope;
+            mainCanvas->m_bkgInterceptVal = bkg0;
+        }
+
+        mainCanvas->backgroundFunction->SetParameter(0, bkgSlope);
+        mainCanvas->backgroundFunction->SetParameter(1, bkg0);
+        mainCanvas->backgroundFunction->SetParameter(2, bkgStep);
+        mainCanvas->backgroundFunction->SetParameter(3, gaussianCenter);
+        mainCanvas->backgroundFunction->SetParameter(4, gaussianSigma);
+
         gaussianFWHM  = gaussianSigma * 2.35482;
         gaussianIntegral = mainCanvas->gaussianWithBackgroundFunction->Integral(fitMin, fitMax)
                          - mainCanvas->backgroundFunction->Integral(fitMin, fitMax);
         if (fitResult.Get()) {
             gaussianIntegralError = mainCanvas->gaussianWithBackgroundFunction->IntegralError(
                 fitMin, fitMax, fitResult->GetParams(), fitResult->GetCovarianceMatrix().GetMatrixArray());
-        }
-
-        bkgSlope = mainCanvas->gaussianWithBackgroundFunction->GetParameter(3);
-        bkg0     = mainCanvas->gaussianWithBackgroundFunction->GetParameter(4);
-        mainCanvas->backgroundA1 = bkgSlope;
-        mainCanvas->backgroundA0 = bkg0;
-        if (!mainCanvas->m_bkgFixed) {
-            mainCanvas->m_bkgSlopeVal = bkgSlope;
-            mainCanvas->m_bkgInterceptVal = bkg0;
         }
     }
 
@@ -883,11 +918,16 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         mainCanvas->m_bkgInterceptVal = mainCanvas->backgroundA0;
     } else {
         // GASP behavior when no background markers are set:
-        // Estimate initial linear baseline connecting range boundary channels
+        // Estimate initial linear baseline connecting range boundary channels using robust local medians
         const Int_t bin0 = activeHist->FindBin(r0);
         const Int_t bin1 = activeHist->FindBin(r1);
-        const Double_t y0 = activeHist->GetBinContent(bin0);
-        const Double_t y1 = activeHist->GetBinContent(bin1);
+        std::vector<Double_t> v0, v1;
+        for (int b = std::max(1, bin0 - 1); b <= std::min(activeHist->GetNbinsX(), bin0 + 1); ++b) v0.push_back(activeHist->GetBinContent(b));
+        for (int b = std::max(1, bin1 - 1); b <= std::min(activeHist->GetNbinsX(), bin1 + 1); ++b) v1.push_back(activeHist->GetBinContent(b));
+        std::sort(v0.begin(), v0.end());
+        std::sort(v1.begin(), v1.end());
+        const Double_t y0 = !v0.empty() ? v0[v0.size() / 2] : activeHist->GetBinContent(bin0);
+        const Double_t y1 = !v1.empty() ? v1[v1.size() / 2] : activeHist->GetBinContent(bin1);
         const Double_t dx = (r1 != r0) ? (r1 - r0) : 1.0;
         const Double_t estSlope = (y1 - y0) / dx;
         const Double_t estIntercept = y0 - estSlope * r0;
