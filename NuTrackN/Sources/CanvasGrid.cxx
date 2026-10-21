@@ -85,7 +85,7 @@ void QMainCanvas::AddCulomn()
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
-                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0, 10240);
+                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, -0.5, 10240.0 - 0.5);
                     HijF[z][g]->SetLineColor(4);
                 }
                 for (auto *h : HijC[z][g]) {
@@ -181,7 +181,7 @@ void QMainCanvas::AddLine()
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
-                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0, 10240);
+                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, -0.5, 10240.0 - 0.5);
                     HijF[z][g]->SetLineColor(4);
                 }
                 for (auto *h : HijC[z][g]) {
@@ -442,13 +442,15 @@ void QMainCanvas::showXYcoord(Double_t x, Double_t y)
         countsStr = QString::number(binC, 'e', 2);
     }
 
+    const int ch = (binX > 0) ? (binX - 1) : 0;
+
     if (labelChannel) {
-        labelChannel->setText(QString("Channel: %1").arg(binX));
+        labelChannel->setText(QString("Channel: %1").arg(ch));
     }
     if (labelEnergy) {
         TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(hist);
         if (tHist && tHist->IsCalibrated()) {
-            double energy = tHist->ChannelToEnergy(static_cast<Double_t>(binX));
+            double energy = tHist->ChannelToEnergy(static_cast<Double_t>(ch));
             labelEnergy->setText(QString("Energy: %1").arg(QString::number(energy, 'f', 2)));
         } else {
             labelEnergy->setText("Energy: 0.0");
@@ -462,7 +464,7 @@ void QMainCanvas::showXYcoord(Double_t x, Double_t y)
     }
 
     if (labelX && labelX != labelChannel) {
-        labelX->setText(QString::number(binX));
+        labelX->setText(QString::number(ch));
     }
     if (labelY && labelY != labelCounts) {
         labelY->setText(countsStr);

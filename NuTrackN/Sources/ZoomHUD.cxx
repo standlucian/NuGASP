@@ -134,15 +134,16 @@ void QZoomHUD::paintEvent(QPaintEvent *)
     QFont readoutFont = Design::getGraphFont();
     readoutFont.setPointSize(9);
     painter.setFont(readoutFont);
+    const int ch = std::max(0, m_targetBin - 1);
     QString readout;
     if (m_isCalibrated && m_targetEnergy > 0.0) {
         readout = QString("Ch %1 (%2 keV) | %3 cts")
-                      .arg(m_targetBin)
+                      .arg(ch)
                       .arg(m_targetEnergy, 0, 'f', 2)
                       .arg(static_cast<long long>(std::round(m_targetCounts)));
     } else {
         readout = QString("Ch %1 | %2 cts")
-                      .arg(m_targetBin)
+                      .arg(ch)
                       .arg(static_cast<long long>(std::round(m_targetCounts)));
     }
     painter.setPen(QColor(0, 240, 255));
@@ -273,15 +274,15 @@ void QZoomHUD::paintEvent(QPaintEvent *)
         }
     }
 
-    // 8. X-axis channel bounds labels
+    // 8. X-axis channel bounds labels (0-based channels)
     QFont axisFont = Design::getGraphFont();
     axisFont.setPointSize(8);
     painter.setFont(axisFont);
     painter.setPen(QColor(180, 180, 180));
-    painter.drawText(QRectF(plotLeft, plotBottom + 2, 60, 18), Qt::AlignLeft | Qt::AlignVCenter, QString::number(m_startBin));
-    painter.drawText(QRectF(plotRight - 60, plotBottom + 2, 60, 18), Qt::AlignRight | Qt::AlignVCenter, QString::number(m_endBin));
+    painter.drawText(QRectF(plotLeft, plotBottom + 2, 60, 18), Qt::AlignLeft | Qt::AlignVCenter, QString::number(std::max(0, m_startBin - 1)));
+    painter.drawText(QRectF(plotRight - 60, plotBottom + 2, 60, 18), Qt::AlignRight | Qt::AlignVCenter, QString::number(std::max(0, m_endBin - 1)));
 
-    // Center bin label in bright amber
+    // Center channel label in bright amber
     painter.setPen(QColor(255, 200, 80));
-    painter.drawText(QRectF(plotLeft, plotBottom + 2, plotW, 18), Qt::AlignCenter, QString("[%1]").arg(m_targetBin));
+    painter.drawText(QRectF(plotLeft, plotBottom + 2, plotW, 18), Qt::AlignCenter, QString("[%1]").arg(std::max(0, m_targetBin - 1)));
 }

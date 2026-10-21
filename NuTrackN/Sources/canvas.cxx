@@ -572,7 +572,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     gStyle->SetCanvasColor(initialRootBg);
     gStyle->SetPadColor(initialRootBg);
     gStyle->SetFrameFillColor(initialRootBg);
-    HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0, 10240);
+    HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, -0.5, 10240.0 - 0.5);
     HijF[1][1]->GetXaxis()->SetNdivisions(510, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);
     HijF[1][1]->GetXaxis()->SetTickLength(0);
@@ -692,6 +692,18 @@ int QMainCanvas::getBinFromClick(int x, int y)
     } catch (...) {
         return 1;
     }
+}
+
+//==============================================================================
+// QMainCanvas::getChannelFromClick
+//==============================================================================
+// Converts the ROOT 1-based bin returned by getBinFromClick into a 0-based
+// spectrum channel index: channel = max(0, binX - 1).
+//==============================================================================
+int QMainCanvas::getChannelFromClick(int x, int y)
+{
+    int bin = getBinFromClick(x, y);
+    return std::max(0, bin - 1);
 }
 
 //==============================================================================

@@ -35,18 +35,18 @@ static inline Color_t toMarkerColor(const QColor &c) {
 //==============================================================================
 void QMainCanvas::addSpaceBarMarker(Int_t x, Int_t y)
 {
-    int binX = getBinFromClick(x, y);
+    int ch = getChannelFromClick(x, y);
 
     // Record the channel in spacebar, zoom, and calibration marker collections
-    spacebar_markers.push_back(static_cast<Double_t>(binX));
-    zoom_markers.push_back(binX);
-    puncte_calib2p.push_back(static_cast<Float_t>(binX));
+    spacebar_markers.push_back(static_cast<Double_t>(ch));
+    zoom_markers.push_back(static_cast<Double_t>(ch));
+    puncte_calib2p.push_back(static_cast<Float_t>(ch));
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     const Double_t yMax = hist ? (hist->GetMaximum() * 1.05) : 100.0;
 
-    // Create a vertical marker line and draw it over the spectrum
-    TLine *spacebarLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    // Create a vertical marker line and draw it over the spectrum at channel coordinate
+    TLine *spacebarLine = new TLine(ch, 0.0, ch, yMax);
     spacebarLine->SetLineColor(toMarkerColor(Design::getZoomMarkerColor()));
     spacebarLine->SetLineWidth(2);
     spacebarLine->Draw("same");
@@ -154,8 +154,8 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog)
 
     // If background markers exist, draw background baseline
     if (!background_markers.empty() && background_markers.size() >= 2) {
-        const Double_t xStart = background_markers.front() - 0.5;
-        const Double_t xEnd   = background_markers.back() - 0.5;
+        const Double_t xStart = background_markers.front();
+        const Double_t xEnd   = background_markers.back();
         TLine *backgroundLine = new TLine(xStart, slope * xStart + addition,
                                           xEnd,   slope * xEnd   + addition);
         backgroundLine->SetLineColor(toMarkerColor(Design::getBackgroundMarkerColor()));
@@ -249,8 +249,8 @@ Double_t QMainCanvas::findMaxValueInInterval(int intervalStart, int intervalFini
 //==============================================================================
 void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 {
-    int binX = getBinFromClick(x, y);
-    background_markers.push_back(binX);
+    int ch = getChannelFromClick(x, y);
+    background_markers.push_back(ch);
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
@@ -262,8 +262,8 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     // When placing the second marker of a pair, ensure previous boundary is redrawn
     if (background_markers.size() % 2 == 0 && !background_markers.empty()) {
         const std::size_t i = background_markers.size();
-        TLine *backgroundLineSecond = new TLine(background_markers[i - 2] - 0.5, 0.0,
-                                                background_markers[i - 2] - 0.5, yMax);
+        TLine *backgroundLineSecond = new TLine(background_markers[i - 2], 0.0,
+                                                background_markers[i - 2], yMax);
         backgroundLineSecond->SetLineColor(bgCol);
         backgroundLineSecond->SetLineWidth(2);
         canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
@@ -272,7 +272,7 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     }
 
     // Draw vertical boundary line at current clicked position
-    TLine *backgroundLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    TLine *backgroundLine = new TLine(ch, 0.0, ch, yMax);
     backgroundLine->SetLineColor(bgCol);
     backgroundLine->SetLineWidth(2);
     backgroundLine->Draw("same");
@@ -281,13 +281,13 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     // When completing a pair, draw baseline and hatched region
     if (background_markers.size() % 2 == 0) {
         const Int_t leftBin = background_markers[background_markers.size() - 2];
-        TLine *bottomBackgroundLine = new TLine(leftBin - 0.5, 0.0, binX - 0.5, 0.0);
+        TLine *bottomBackgroundLine = new TLine(leftBin, 0.0, ch, 0.0);
         bottomBackgroundLine->SetLineColor(bgCol);
         bottomBackgroundLine->SetLineWidth(2);
         bottomBackgroundLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-        TBox *backgroundArea = new TBox(leftBin - 0.5, 0.0, binX - 0.5, maxValueInHistogram * 1.05);
+        TBox *backgroundArea = new TBox(leftBin, 0.0, ch, maxValueInHistogram * 1.05);
         backgroundArea->SetFillColor(bgCol);
         backgroundArea->SetFillStyle(3545);
         backgroundArea->Draw("same");
@@ -306,8 +306,8 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
 //==============================================================================
 void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
 {
-    int binX = getBinFromClick(x, y);
-    integral_markers.push_back(binX);
+    int ch = getChannelFromClick(x, y);
+    integral_markers.push_back(ch);
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
@@ -319,8 +319,8 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
     // If second marker of pair, ensure the first is properly drawn
     if (integral_markers.size() % 2 == 0 && !integral_markers.empty()) {
         const std::size_t i = integral_markers.size();
-        TLine *integralLineSecond = new TLine(integral_markers[i - 2] - 0.5, 0.0,
-                                              integral_markers[i - 2] - 0.5, yMax);
+        TLine *integralLineSecond = new TLine(integral_markers[i - 2], 0.0,
+                                              integral_markers[i - 2], yMax);
         integralLineSecond->SetLineColor(intCol);
         integralLineSecond->SetLineWidth(2);
         canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
@@ -328,7 +328,7 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
         listOfObjectsDrawnOnScreen.Add(integralLineSecond);
     }
 
-    TLine *integralLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    TLine *integralLine = new TLine(ch, 0.0, ch, yMax);
     integralLine->SetLineColor(intCol);
     integralLine->SetLineWidth(2);
     integralLine->Draw("same");
@@ -450,8 +450,8 @@ void QMainCanvas::showBackgroundMarkers()
 
     Color_t bgCol = toMarkerColor(Design::getBackgroundMarkerColor());
     for (std::size_t i = 0; i < background_markers.size(); ++i) {
-        TLine *backgroundLine = new TLine(background_markers[i] - 0.5, 0.0,
-                                          background_markers[i] - 0.5, yMax);
+        TLine *backgroundLine = new TLine(background_markers[i], 0.0,
+                                          background_markers[i], yMax);
         backgroundLine->SetLineColor(bgCol);
         backgroundLine->SetLineWidth(2);
         backgroundLine->Draw("same");
@@ -459,15 +459,15 @@ void QMainCanvas::showBackgroundMarkers()
 
         // When completing a pair, redraw baseline and hatched box
         if (i % 2 == 1) {
-            TLine *bottomBackgroundLine = new TLine(background_markers[i - 1] - 0.5, 0.0,
-                                                    background_markers[i] - 0.5, 0.0);
+            TLine *bottomBackgroundLine = new TLine(background_markers[i - 1], 0.0,
+                                                    background_markers[i], 0.0);
             bottomBackgroundLine->SetLineColor(bgCol);
             bottomBackgroundLine->SetLineWidth(2);
             bottomBackgroundLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
 
-            TBox *backgroundArea = new TBox(background_markers[i - 1] - 0.5, 0.0,
-                                            background_markers[i] - 0.5, yMax);
+            TBox *backgroundArea = new TBox(background_markers[i - 1], 0.0,
+                                            background_markers[i], yMax);
             backgroundArea->SetFillColor(bgCol);
             backgroundArea->SetFillStyle(3545);
             backgroundArea->Draw("same");
@@ -495,8 +495,8 @@ void QMainCanvas::showIntegralMarkers()
 
     Color_t intCol = toMarkerColor(Design::getIntegralMarkerColor());
     for (std::size_t i = 0; i < integral_markers.size(); ++i) {
-        TLine *integralLine = new TLine(integral_markers[i] - 0.5, 0.0,
-                                        integral_markers[i] - 0.5, yMax);
+        TLine *integralLine = new TLine(integral_markers[i], 0.0,
+                                        integral_markers[i], yMax);
         integralLine->SetLineColor(intCol);
         integralLine->SetLineWidth(2);
         integralLine->Draw("same");
@@ -531,8 +531,8 @@ void QMainCanvas::showAllMarkers()
 void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 {
     if (range_markers.size() < 2) {
-        int binX = getBinFromClick(x, y);
-        range_markers.push_back(binX);
+        int ch = getChannelFromClick(x, y);
+        range_markers.push_back(ch);
 
         TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
         if (!hist) return;
@@ -544,8 +544,8 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
         // When placing the second marker of a pair, ensure the first is drawn
         if (range_markers.size() % 2 == 0 && !range_markers.empty()) {
             const std::size_t i = range_markers.size();
-            TLine *rangeLineSecond = new TLine(range_markers[i - 2] - 0.5, 0.0,
-                                               range_markers[i - 2] - 0.5, yMax);
+            TLine *rangeLineSecond = new TLine(range_markers[i - 2], 0.0,
+                                               range_markers[i - 2], yMax);
             rangeLineSecond->SetLineColor(rangeCol);
             rangeLineSecond->SetLineWidth(2);
             canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
@@ -553,7 +553,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
             listOfObjectsDrawnOnScreen.Add(rangeLineSecond);
         }
 
-        TLine *rangeLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+        TLine *rangeLine = new TLine(ch, 0.0, ch, yMax);
         rangeLine->SetLineColor(rangeCol);
         rangeLine->SetLineWidth(2);
         rangeLine->Draw("same");
@@ -561,14 +561,14 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 
         // If pair is complete, draw baseline and shaded region
         if (range_markers.size() % 2 == 0) {
-            const Int_t leftBin = range_markers[range_markers.size() - 2];
-            TLine *bottomRangeLine = new TLine(leftBin - 0.5, 0.0, binX - 0.5, 0.0);
+            const Int_t leftBin = static_cast<Int_t>(std::round(range_markers[range_markers.size() - 2]));
+            TLine *bottomRangeLine = new TLine(leftBin, 0.0, ch, 0.0);
             bottomRangeLine->SetLineColor(rangeCol);
             bottomRangeLine->SetLineWidth(2);
             bottomRangeLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-            TBox *rangeArea = new TBox(leftBin - 0.5, 0.0, binX - 0.5, maxValueInHistogram * 1.05);
+            TBox *rangeArea = new TBox(leftBin, 0.0, ch, maxValueInHistogram * 1.05);
             rangeArea->SetFillColor(rangeCol);
             rangeArea->SetFillStyle(3545);
             rangeArea->Draw("same");
@@ -611,23 +611,23 @@ void QMainCanvas::showRangeMarkers()
 
     Color_t rangeCol = toMarkerColor(Design::getRangeMarkerColor());
     for (std::size_t i = 0; i < range_markers.size(); ++i) {
-        TLine *rangeLine = new TLine(range_markers[i] - 0.5, 0.0,
-                                     range_markers[i] - 0.5, yMax);
+        TLine *rangeLine = new TLine(range_markers[i], 0.0,
+                                     range_markers[i], yMax);
         rangeLine->SetLineColor(rangeCol);
         rangeLine->SetLineWidth(2);
         rangeLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(rangeLine);
 
         if (i % 2 == 1) {
-            TLine *bottomRangeLine = new TLine(range_markers[i - 1] - 0.5, 0.0,
-                                               range_markers[i] - 0.5, 0.0);
+            TLine *bottomRangeLine = new TLine(range_markers[i - 1], 0.0,
+                                               range_markers[i], 0.0);
             bottomRangeLine->SetLineColor(rangeCol);
             bottomRangeLine->SetLineWidth(2);
             bottomRangeLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
 
-            TBox *rangeArea = new TBox(range_markers[i - 1] - 0.5, 0.0,
-                                       range_markers[i] - 0.5, yMax);
+            TBox *rangeArea = new TBox(range_markers[i - 1], 0.0,
+                                       range_markers[i], yMax);
             rangeArea->SetFillColor(rangeCol);
             rangeArea->SetFillStyle(3545);
             rangeArea->Draw("same");
@@ -647,15 +647,15 @@ void QMainCanvas::showRangeMarkers()
 //==============================================================================
 void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
 {
-    int binX = getBinFromClick(x, y);
-    gauss_markers.push_back(binX);
+    int ch = getChannelFromClick(x, y);
+    gauss_markers.push_back(ch);
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
 
     const Double_t yMax = hist->GetMaximum() * 1.05;
 
-    TLine *gaussLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    TLine *gaussLine = new TLine(ch, 0.0, ch, yMax);
     gaussLine->SetLineColor(toMarkerColor(Design::getGaussMarkerColor()));
     gaussLine->SetLineWidth(2);
     gaussLine->Draw("same");
@@ -692,8 +692,8 @@ void QMainCanvas::showGaussMarkers()
 
     Color_t gaussCol = toMarkerColor(Design::getGaussMarkerColor());
     for (std::size_t i = 0; i < gauss_markers.size(); ++i) {
-        TLine *gaussLine = new TLine(gauss_markers[i] - 0.5, 0.0,
-                                     gauss_markers[i] - 0.5, yMax);
+        TLine *gaussLine = new TLine(gauss_markers[i], 0.0,
+                                     gauss_markers[i], yMax);
         gaussLine->SetLineColor(gaussCol);
         gaussLine->SetLineWidth(2);
         gaussLine->Draw("same");
@@ -713,8 +713,8 @@ void QMainCanvas::showGaussMarkers()
 //==============================================================================
 void QMainCanvas::addGateMarker(Int_t x, Int_t y)
 {
-    int binX = getBinFromClick(x, y);
-    gate_markers.push_back(static_cast<Double_t>(binX));
+    int ch = getChannelFromClick(x, y);
+    gate_markers.push_back(static_cast<Double_t>(ch));
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
@@ -726,8 +726,8 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
     // When placing the second marker of a pair, ensure previous boundary is redrawn
     if (gate_markers.size() % 2 == 0 && !gate_markers.empty()) {
         const std::size_t i = gate_markers.size();
-        TLine *gateLineSecond = new TLine(gate_markers[i - 2] - 0.5, 0.0,
-                                          gate_markers[i - 2] - 0.5, yMax);
+        TLine *gateLineSecond = new TLine(gate_markers[i - 2], 0.0,
+                                          gate_markers[i - 2], yMax);
         gateLineSecond->SetLineColor(gateCol);
         gateLineSecond->SetLineWidth(2);
         canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
@@ -735,7 +735,7 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
         listOfObjectsDrawnOnScreen.Add(gateLineSecond);
     }
 
-    TLine *gateLine = new TLine(binX - 0.5, 0.0, binX - 0.5, yMax);
+    TLine *gateLine = new TLine(ch, 0.0, ch, yMax);
     gateLine->SetLineColor(gateCol);
     gateLine->SetLineWidth(2);
     gateLine->Draw("same");
@@ -744,16 +744,16 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
     // When completing a pair, draw baseline and hatched region
     if (gate_markers.size() % 2 == 0) {
         const Int_t leftBin = static_cast<Int_t>(std::round(gate_markers[gate_markers.size() - 2]));
-        const Int_t minB = std::min(leftBin, binX);
-        const Int_t maxB = std::max(leftBin, binX);
+        const Int_t minB = std::min(leftBin, ch);
+        const Int_t maxB = std::max(leftBin, ch);
 
-        TLine *bottomGateLine = new TLine(minB - 0.5, 0.0, maxB - 0.5, 0.0);
+        TLine *bottomGateLine = new TLine(minB, 0.0, maxB, 0.0);
         bottomGateLine->SetLineColor(gateCol);
         bottomGateLine->SetLineWidth(2);
         bottomGateLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(bottomGateLine);
 
-        TBox *gateArea = new TBox(minB - 0.5, 0.0, maxB - 0.5, yMax);
+        TBox *gateArea = new TBox(minB, 0.0, maxB, yMax);
         gateArea->SetFillColor(gateCol);
         gateArea->SetFillStyle(3354);
         gateArea->Draw("same");
@@ -794,8 +794,8 @@ void QMainCanvas::showGateMarkers()
 
     Color_t gateCol = toMarkerColor(Design::getGateMarkerColor());
     for (std::size_t i = 0; i < gate_markers.size(); ++i) {
-        TLine *gateLine = new TLine(gate_markers[i] - 0.5, 0.0,
-                                    gate_markers[i] - 0.5, yMax);
+        TLine *gateLine = new TLine(gate_markers[i], 0.0,
+                                    gate_markers[i], yMax);
         gateLine->SetLineColor(gateCol);
         gateLine->SetLineWidth(2);
         gateLine->Draw("same");
@@ -805,13 +805,13 @@ void QMainCanvas::showGateMarkers()
             const Int_t minB = static_cast<Int_t>(std::round(std::min(gate_markers[i - 1], gate_markers[i])));
             const Int_t maxB = static_cast<Int_t>(std::round(std::max(gate_markers[i - 1], gate_markers[i])));
 
-            TLine *bottomGateLine = new TLine(minB - 0.5, 0.0, maxB - 0.5, 0.0);
+            TLine *bottomGateLine = new TLine(minB, 0.0, maxB, 0.0);
             bottomGateLine->SetLineColor(gateCol);
             bottomGateLine->SetLineWidth(2);
             bottomGateLine->Draw("same");
             listOfObjectsDrawnOnScreen.Add(bottomGateLine);
 
-            TBox *gateArea = new TBox(minB - 0.5, 0.0, maxB - 0.5, yMax);
+            TBox *gateArea = new TBox(minB, 0.0, maxB, yMax);
             gateArea->SetFillColor(gateCol);
             gateArea->SetFillStyle(3354);
             gateArea->Draw("same");
@@ -907,19 +907,23 @@ void QMainCanvas::autoIntegrationAtCursor(Int_t x, Int_t y)
     integral_markers.clear();
     clearDrawnObjects();
 
+    // Convert ROOT bins (1..N) to channel coordinates (0..N-1)
+    const int leftCh = std::max(0, leftValley - 1);
+    const int rightCh = std::min(hist->GetNbinsX() - 1, rightValley - 1);
+
     // Calculate background width based on peak width (min 2 channels)
-    int peakWidth = rightValley - leftValley + 1;
+    int peakWidth = rightCh - leftCh + 1;
     int bgWidth = std::max(2, peakWidth / 5);
 
     // Set background markers at valleys (two pairs: left region and right region)
-    background_markers.push_back(static_cast<Double_t>(leftValley - bgWidth + 1));
-    background_markers.push_back(static_cast<Double_t>(leftValley));
-    background_markers.push_back(static_cast<Double_t>(rightValley));
-    background_markers.push_back(static_cast<Double_t>(rightValley + bgWidth - 1));
+    background_markers.push_back(static_cast<Int_t>(std::max(0, leftCh - bgWidth + 1)));
+    background_markers.push_back(static_cast<Int_t>(leftCh));
+    background_markers.push_back(static_cast<Int_t>(rightCh));
+    background_markers.push_back(static_cast<Int_t>(std::min(hist->GetNbinsX() - 1, rightCh + bgWidth - 1)));
     
     // Set integral markers inside the valleys
-    integral_markers.push_back(static_cast<Double_t>(leftValley));
-    integral_markers.push_back(static_cast<Double_t>(rightValley));
+    integral_markers.push_back(static_cast<Int_t>(leftCh));
+    integral_markers.push_back(static_cast<Int_t>(rightCh));
 
     // Draw the markers visually
     showBackgroundMarkers();
@@ -1042,19 +1046,19 @@ void QMainCanvas::deleteNearestGaussMarker(Int_t x, Int_t y)
         return;
     }
 
-    int binX = getBinFromClick(x, y);
+    int ch = getChannelFromClick(x, y);
     auto closestIt = gauss_markers.begin();
-    int minDiff = std::abs(*closestIt - binX);
+    double minDiff = std::abs(*closestIt - ch);
 
     for (auto it = gauss_markers.begin(); it != gauss_markers.end(); ++it) {
-        int diff = std::abs(*it - binX);
+        double diff = std::abs(*it - ch);
         if (diff < minDiff) {
             minDiff = diff;
             closestIt = it;
         }
     }
 
-    int deletedBin = *closestIt;
+    double deletedCh = *closestIt;
     gauss_markers.erase(closestIt);
 
     clearDrawnObjects();
@@ -1064,7 +1068,7 @@ void QMainCanvas::deleteNearestGaussMarker(Int_t x, Int_t y)
         canvas->getCanvas()->Update();
     }
 
-    CommandPrompt::getInstance()->appendPlainText(QString("Deleted nearest Gauss marker at channel %1 (-).\n").arg(deletedBin));
+    CommandPrompt::getInstance()->appendPlainText(QString("Deleted nearest Gauss marker at channel %1 (-).\n").arg(deletedCh, 0, 'f', 1));
 }
 
 #include <QInputDialog>

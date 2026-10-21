@@ -330,6 +330,7 @@ public:
    virtual void keyReleaseEvent(QKeyEvent *event);
    bool eventFilter(QObject *watched, QEvent *event) override;
    int getBinFromClick(int x, int y);
+   int getChannelFromClick(int x, int y);
    Double_t findMinValueInInterval(int, int);
    Double_t findMaxValueInInterval(int, int);
 

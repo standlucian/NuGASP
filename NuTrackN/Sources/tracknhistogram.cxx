@@ -279,11 +279,10 @@ bool TracknHistogram::LoadFromFile(const std::string &filename) {
 
   Reset();
 
-  // Adjust binning if incoming spectrum is larger than default
-  if (static_cast<Int_t>(data.size()) > GetNbinsX()) {
-    SetBins(static_cast<Int_t>(data.size()), 0.0,
-            static_cast<Double_t>(data.size()));
-  }
+  // Standard spectroscopy channel binning [-0.5, N - 0.5]
+  // Ensures channel k is centered at exact integer k.0 with bin edges [k - 0.5, k + 0.5]
+  SetBins(static_cast<Int_t>(data.size()), -0.5,
+          static_cast<Double_t>(data.size()) - 0.5);
 
   for (std::size_t i = 0; i < data.size(); ++i) {
     SetBinContent(static_cast<Int_t>(i + 1), data[i]);
@@ -310,8 +309,8 @@ bool TracknHistogram::LoadFromData(const std::vector<double> &data, const std::s
 
   Reset();
 
-  // Resize histogram bins to match incoming spectrum length
-  SetBins(static_cast<Int_t>(data.size()), 0.0, static_cast<Double_t>(data.size()));
+  // Resize histogram bins to match incoming spectrum length with [-0.5, N - 0.5]
+  SetBins(static_cast<Int_t>(data.size()), -0.5, static_cast<Double_t>(data.size()) - 0.5);
 
   for (std::size_t i = 0; i < data.size(); ++i) {
     SetBinContent(static_cast<Int_t>(i + 1), data[i]);

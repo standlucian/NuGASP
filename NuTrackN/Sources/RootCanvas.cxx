@@ -250,7 +250,8 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
 
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
     bool isCalibrated = (trackHist && trackHist->IsCalibrated());
-    double energy = isCalibrated ? trackHist->ChannelToEnergy(binX) : -1.0;
+    const int targetChannel = std::max(0, binX - 1);
+    double energy = isCalibrated ? trackHist->ChannelToEnergy(targetChannel) : -1.0;
 
     // Window bin range
     const int halfRange = 25;

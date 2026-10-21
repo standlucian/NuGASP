@@ -230,13 +230,14 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     // Analytical Least Squares Fit (avoids TH1::Fit artifacts with zero bins)
     Double_t S1 = 0.0, SX = 0.0, SXX = 0.0, SY = 0.0, SXY = 0.0;
     for (std::size_t i = 0; i < mainCanvas->background_markers.size() / 2; ++i) {
-        const Int_t start  = mainCanvas->background_markers[2 * i];
-        const Int_t finish = mainCanvas->background_markers[2 * i + 1];
-        for (Int_t j = start; j <= finish; ++j) {
-            Double_t xx = j; // Use exact bin
-            Double_t yy = activeHist->GetBinContent(j);
-            Double_t ei = 1.0; // In trackn.F: 1./ERR2(jj). We use uniform weighting for simplicity, or 1/max(yy,1)
-            if (yy > 0) ei = 1.0 / yy; // Poisson weighting
+        const Double_t startCh  = mainCanvas->background_markers[2 * i];
+        const Double_t finishCh = mainCanvas->background_markers[2 * i + 1];
+        const Int_t startBin  = activeHist->FindBin(std::min(startCh, finishCh));
+        const Int_t finishBin = activeHist->FindBin(std::max(startCh, finishCh));
+        for (Int_t b = startBin; b <= finishBin; ++b) {
+            Double_t xx = activeHist->GetBinCenter(b); // Exact channel coordinate
+            Double_t yy = activeHist->GetBinContent(b);
+            Double_t ei = (yy > 0.0) ? (1.0 / yy) : 1.0; // Poisson weighting
             S1 += ei;
             SX += xx * ei;
             SXX += xx * xx * ei;
@@ -262,7 +263,7 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     }
 
     mainCanvas->background = new TFormula("background", "[0]*x+[1]");
-    mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", 0, 10240);
+    mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", -0.5, activeHist->GetNbinsX() - 0.5);
     mainCanvas->backgroundFunction->SetParameter(0, mainCanvas->backgroundA1);
     mainCanvas->backgroundFunction->SetParameter(1, mainCanvas->backgroundA0);
 
@@ -276,21 +277,21 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     }
 
     if (mainCanvas->range_markers.size() >= 2) {
-        const Double_t r0 = mainCanvas->range_markers[0];
-        const Double_t r1 = mainCanvas->range_markers[1];
-        mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0, r1);
+        const Double_t r0 = std::min(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
+        const Double_t r1 = std::max(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
+        mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0 - 0.5, r1 + 0.5);
         
         Double_t params[2] = {mainCanvas->backgroundA1, mainCanvas->backgroundA0};
         mainCanvas->backgroundIntegralError = mainCanvas->backgroundFunction->IntegralError(
-            r0, r1, params, mainCanvas->backgroundCovarianceMatrix->GetMatrixArray());
+            r0 - 0.5, r1 + 0.5, params, mainCanvas->backgroundCovarianceMatrix->GetMatrixArray());
     } else {
         mainCanvas->backgroundIntegral = 0.0;
         mainCanvas->backgroundIntegralError = 0.0;
     }
 
     // Draw background line on canvas
-    const Double_t xStart = mainCanvas->background_markers[0] - 0.5;
-    const Double_t xEnd   = mainCanvas->background_markers.back() - 0.5;
+    const Double_t xStart = std::min(mainCanvas->background_markers.front(), mainCanvas->background_markers.back());
+    const Double_t xEnd   = std::max(mainCanvas->background_markers.front(), mainCanvas->background_markers.back());
     const Double_t yStart = mainCanvas->backgroundA1 * xStart + mainCanvas->backgroundA0;
     const Double_t yEnd   = mainCanvas->backgroundA1 * xEnd   + mainCanvas->backgroundA0;
 
@@ -403,8 +404,9 @@ void findPeakBoundariesWithSmoothing(TH1F *hist, int clickedBin, int &outApex, D
         rightBoundary = std::min(nBins, rightBoundary + padRight);
     }
 
-    outXMin = static_cast<Double_t>(leftBoundary);
-    outXMax = static_cast<Double_t>(rightBoundary);
+    // Fit range spanning from low edge of leftBoundary bin to high edge of rightBoundary bin
+    outXMin = hist->GetXaxis()->GetBinLowEdge(leftBoundary);
+    outXMax = hist->GetXaxis()->GetBinUpEdge(rightBoundary);
 }
 
 //==============================================================================
@@ -432,8 +434,8 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     Double_t fitMin = 0.0, fitMax = 0.0;
     findPeakBoundariesWithSmoothing(hist, binX, apexBin, fitMin, fitMax);
 
-    const int iFitMin = static_cast<int>(fitMin);
-    const int iFitMax = static_cast<int>(fitMax);
+    const int iFitMin = hist->FindBin(fitMin);
+    const int iFitMax = hist->FindBin(fitMax);
 
     // Estimate initial linear background from boundary flanks
     Double_t bkgLeft = 0.0;
@@ -452,15 +454,16 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     }
     bkgRight = (nRight > 0) ? (bkgRight / nRight) : hist->GetBinContent(iFitMax);
 
-    Double_t bkgSlope = (bkgRight - bkgLeft) / std::max(1.0, fitMax - fitMin);
-    Double_t bkg0 = bkgLeft - bkgSlope * fitMin;
+    const Double_t xLeft = hist->GetBinCenter(iFitMin);
+    const Double_t xRight = hist->GetBinCenter(iFitMax);
+    Double_t bkgSlope = (xRight != xLeft) ? (bkgRight - bkgLeft) / (xRight - xLeft) : 0.0;
+    Double_t bkg0 = bkgLeft - bkgSlope * xLeft;
 
     Double_t apexCounts = hist->GetBinContent(apexBin);
-    Double_t estBkgAtApex = bkgSlope * apexBin + bkg0;
+    Double_t gaussianCenter = hist->GetBinCenter(apexBin);
+    Double_t estBkgAtApex = bkgSlope * gaussianCenter + bkg0;
     Double_t gaussianHeight = std::max(1.0, apexCounts - estBkgAtApex);
     Double_t gaussianSigma = std::max(1.0, (fitMax - fitMin) / 5.0);
-
-    Double_t gaussianCenter = apexBin;
     Double_t gaussianFWHM = 0.0;
     Double_t gaussianCenterError = 0.0, gaussianIntegral = 0.0;
     Double_t gaussianIntegralError = 0.0, gaussianFWHMError = 0.0;
@@ -572,8 +575,8 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     // Adaptive refit if fitted peak is broader than the detected boundaries
     if (gaussianFWHM * 2.5 > (fitMax - fitMin)) {
-        fitMin = std::max(1.0, gaussianCenter - gaussianFWHM * 3.0);
-        fitMax = std::min(static_cast<Double_t>(hist->GetNbinsX()), gaussianCenter + gaussianFWHM * 3.0);
+        fitMin = std::max(-0.5, gaussianCenter - gaussianFWHM * 3.0);
+        fitMax = std::min(static_cast<Double_t>(hist->GetNbinsX()) - 0.5, gaussianCenter + gaussianFWHM * 3.0);
         mainCanvas->gaussianWithBackgroundFunction->SetRange(fitMin, fitMax);
         mainCanvas->backgroundFunction->SetRange(fitMin, fitMax);
 
@@ -863,9 +866,9 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(activeHist);
     const bool isCalib = (trackHist && trackHist->IsCalibrated());
 
-    const Double_t r0 = mainCanvas->range_markers[0];
-    const Double_t r1 = mainCanvas->range_markers[1];
-    const Double_t maxValue = findMaxValueInInterval(activeHist, r0, r1);
+    const Double_t r0 = std::min(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
+    const Double_t r1 = std::max(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
+    const Double_t maxValue = findMaxValueInInterval(activeHist, activeHist->FindBin(r0), activeHist->FindBin(r1));
     const std::size_t nPeaks = mainCanvas->gauss_markers.size();
 
     if (!mainCanvas->m_isRefitting) {
@@ -887,9 +890,8 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     } else {
         // GASP behavior when no background markers are set:
         // Estimate initial linear baseline connecting range boundary channels
-        const int nBinsX = activeHist->GetNbinsX();
-        const Int_t bin0 = std::max(1, std::min(nBinsX, static_cast<int>(std::round(r0))));
-        const Int_t bin1 = std::max(1, std::min(nBinsX, static_cast<int>(std::round(r1))));
+        const Int_t bin0 = activeHist->FindBin(r0);
+        const Int_t bin1 = activeHist->FindBin(r1);
         const Double_t y0 = activeHist->GetBinContent(bin0);
         const Double_t y1 = activeHist->GetBinContent(bin1);
         const Double_t dx = (r1 != r0) ? (r1 - r0) : 1.0;
@@ -898,7 +900,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
         mainCanvas->backgroundA0 = estIntercept;
         mainCanvas->backgroundA1 = estSlope;
-        mainCanvas->backgroundIntegral = 0.5 * (y0 + y1) * std::abs(r1 - r0);
+        mainCanvas->backgroundIntegral = 0.5 * (y0 + y1) * (std::abs(r1 - r0) + 1.0);
         mainCanvas->backgroundIntegralError = 0.0;
         mainCanvas->m_bkgSlopeVal = mainCanvas->backgroundA1;
         mainCanvas->m_bkgInterceptVal = mainCanvas->backgroundA0;
@@ -935,7 +937,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         }
     }
 
-    TF1 *fullFunction = new TF1("fullFunction", formulaStr.c_str(), r0, r1);
+    TF1 *fullFunction = new TF1("fullFunction", formulaStr.c_str(), r0 - 0.5, r1 + 0.5);
     fullFunction->SetParName(0, "BkgSlope");
     fullFunction->SetParName(1, "BkgConst");
 
@@ -993,8 +995,9 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
     // Initialize individual peak amplitudes, centroids, and widths
     for (std::size_t i = 0; i < nPeaks; ++i) {
-        const Int_t peakChannel = static_cast<Int_t>(mainCanvas->gauss_markers[i] - 1);
-        const Double_t rawCounts = activeHist->GetBinContent(peakChannel);
+        const Double_t peakChannel = mainCanvas->gauss_markers[i];
+        const Int_t peakBin = activeHist->FindBin(peakChannel);
+        const Double_t rawCounts = activeHist->GetBinContent(peakBin);
         const Double_t estBkg = mainCanvas->backgroundA1 * peakChannel + mainCanvas->backgroundA0;
         const Double_t initAmp = std::max(1.0, rawCounts - estBkg);
         const int ampIdx  = decoupleWidths ? (2 + 3 * static_cast<int>(i)) : (3 + 2 * static_cast<int>(i));
@@ -1017,7 +1020,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
             fullFunction->FixParameter(meanIdx, fixedCenterCh);
         } else {
             fullFunction->SetParameter(meanIdx, peakChannel);
-            fullFunction->SetParLimits(meanIdx, r0, r1);
+            fullFunction->SetParLimits(meanIdx, r0 - 0.5, r1 + 0.5);
         }
 
         // Decoupled width
@@ -1089,10 +1092,10 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         mainCanvas->m_bkgInterceptVal = mainCanvas->backgroundA0;
     }
 
-    TF1 bkgTF1("bkgTF1", "[0]*x + [1]", r0, r1);
+    TF1 bkgTF1("bkgTF1", "[0]*x + [1]", r0 - 0.5, r1 + 0.5);
     bkgTF1.SetParameter(0, mainCanvas->backgroundA1);
     bkgTF1.SetParameter(1, mainCanvas->backgroundA0);
-    mainCanvas->backgroundIntegral = bkgTF1.Integral(r0, r1);
+    mainCanvas->backgroundIntegral = bkgTF1.Integral(r0 - 0.5, r1 + 0.5);
 
     if (fitResult.Get() && fitResult->IsValid() && !hasExplicitBkg && !mainCanvas->m_bkgFixed) {
         TMatrixDSym bkgCov(2);
@@ -1101,7 +1104,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         bkgCov(1, 0) = fitResult->GetCovarianceMatrix()(1, 0);
         bkgCov(1, 1) = fitResult->GetCovarianceMatrix()(1, 1);
         mainCanvas->backgroundIntegralError = bkgTF1.IntegralError(
-            r0, r1, bkgTF1.GetParameters(), bkgCov.GetMatrixArray());
+            r0 - 0.5, r1 + 0.5, bkgTF1.GetParameters(), bkgCov.GetMatrixArray());
     } else if (mainCanvas->m_bkgFixed) {
         mainCanvas->backgroundIntegralError = 0.0;
     }
@@ -1110,13 +1113,13 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     if (!mainCanvas->backgroundFunction) {
         mainCanvas->backgroundFunction = new TF1("backgroundFunction", "[0]*x+[1]", 0, 10240);
     }
-    mainCanvas->backgroundFunction->SetRange(r0, r1);
+    mainCanvas->backgroundFunction->SetRange(r0 - 0.5, r1 + 0.5);
     mainCanvas->backgroundFunction->SetParameter(0, mainCanvas->backgroundA1);
     mainCanvas->backgroundFunction->SetParameter(1, mainCanvas->backgroundA0);
 
     // Draw fitted or fixed baseline line on canvas
-    const Double_t xStart = r0 - 0.5;
-    const Double_t xEnd   = r1 - 0.5;
+    const Double_t xStart = r0;
+    const Double_t xEnd   = r1;
     const Double_t yStart = mainCanvas->backgroundA1 * xStart + mainCanvas->backgroundA0;
     const Double_t yEnd   = mainCanvas->backgroundA1 * xEnd   + mainCanvas->backgroundA0;
 
@@ -1139,8 +1142,8 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     Double_t sumRelDiff = 0.0;
     Double_t pearsonChi2 = 0.0;
     Int_t nBinsFit = 0;
-    const Int_t bMin = std::max(1, static_cast<int>(std::round(r0)));
-    const Int_t bMax = std::min(activeHist->GetNbinsX(), static_cast<int>(std::round(r1)));
+    const Int_t bMin = activeHist->FindBin(r0);
+    const Int_t bMax = activeHist->FindBin(r1);
     for (Int_t b = bMin; b <= bMax; ++b) {
         Double_t x = activeHist->GetBinCenter(b);
         Double_t y = activeHist->GetBinContent(b);
@@ -1228,7 +1231,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         const Double_t curFWHM     = curSigma * 2.35482;
         const Double_t curFwhmErr  = curSigmaErr * 2.35482;
 
-        TF1 tempGaussFunction("tempGaussFunction", "gaus", r0, r1);
+        TF1 tempGaussFunction("tempGaussFunction", "gaus", r0 - 0.5, r1 + 0.5);
         tempGaussFunction.SetParameter(0, fullFunction->GetParameter(ampIdx));
         tempGaussFunction.SetParError(0, fullFunction->GetParError(ampIdx));
         tempGaussFunction.SetParameter(1, fullFunction->GetParameter(meanIdx));
@@ -1246,7 +1249,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
                 }
             }
             fitIntegralError = tempGaussFunction.IntegralError(
-                r0, r1, tempGaussFunction.GetParameters(), peakCov.GetMatrixArray());
+                r0 - 0.5, r1 + 0.5, tempGaussFunction.GetParameters(), peakCov.GetMatrixArray());
         }
 
         // Combined uncertainty: Gaussian peak integral error + background uncertainty
@@ -1256,7 +1259,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
         const Double_t peakCenter = fullFunction->GetParameter(meanIdx);
         const Double_t centerErr  = fullFunction->GetParError(meanIdx);
-        const Double_t peakArea   = tempGaussFunction.Integral(r0, r1);
+        const Double_t peakArea   = tempGaussFunction.Integral(r0 - 0.5, r1 + 0.5);
         peakCenters[i] = peakCenter;
 
         Double_t dispEnergy = peakCenter;

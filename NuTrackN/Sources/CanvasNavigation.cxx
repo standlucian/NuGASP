@@ -502,8 +502,8 @@ void QMainCanvas::updateAxisStatusLabels()
     if (!hist) return;
 
     TAxis *xAxis = hist->GetXaxis();
-    double xMin = xAxis ? xAxis->GetBinLowEdge(xAxis->GetFirst()) : 0.0;
-    double xMax = xAxis ? xAxis->GetBinUpEdge(xAxis->GetLast()) : 0.0;
+    double xMin = xAxis ? xAxis->GetBinCenter(xAxis->GetFirst()) : 0.0;
+    double xMax = xAxis ? xAxis->GetBinCenter(xAxis->GetLast()) : 0.0;
     double yMin = hist->GetMinimum();
     double yMax = hist->GetMaximum();
 

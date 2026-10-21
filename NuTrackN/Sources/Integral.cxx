@@ -25,19 +25,10 @@ Double_t integral_no_background(TH1F *histogram,
         return 0.0;
     }
 
-    const Int_t nBins = histogram->GetNbinsX();
-    Int_t left = static_cast<Int_t>(std::min(position_marker_left, position_marker_right));
-    Int_t right = static_cast<Int_t>(std::max(position_marker_left, position_marker_right));
+    const Int_t leftBin  = histogram->FindBin(std::min(position_marker_left, position_marker_right));
+    const Int_t rightBin = histogram->FindBin(std::max(position_marker_left, position_marker_right));
 
-    // Clamp bounds to valid histogram bins [1, nBins]
-    left = std::max(1, std::min(nBins, left));
-    right = std::max(1, std::min(nBins, right));
-
-    if (left > right) {
-        std::swap(left, right);
-    }
-
-    return histogram->IntegralAndError(left, right, error);
+    return histogram->IntegralAndError(leftBin, rightBin, error);
 }
 
 // -----------------------------------------------------------------------------
@@ -80,18 +71,20 @@ void get_best_fitted_line(TH1F* histogram,
         return;
     }
 
-    const Int_t nBins = histogram->GetNbinsX();
     Double_t xMean = 0.0;
     Double_t yMean = 0.0;
     std::size_t numberOfPoints = 0;
 
     // First pass: compute the mean channel (x) and mean count (y) over all background regions
     for (std::size_t i = 0; i + 1 < background_markers.size(); i += 2) {
-        const Int_t startBin = std::max(1, std::min(nBins, std::min(background_markers[i], background_markers[i + 1])));
-        const Int_t endBin   = std::max(1, std::min(nBins, std::max(background_markers[i], background_markers[i + 1])));
+        const Int_t startCh = std::min(background_markers[i], background_markers[i + 1]);
+        const Int_t endCh   = std::max(background_markers[i], background_markers[i + 1]);
+        const Int_t startBin = histogram->FindBin(startCh);
+        const Int_t endBin   = histogram->FindBin(endCh);
 
         for (Int_t bin = startBin; bin <= endBin; ++bin) {
-            xMean += bin;
+            Double_t ch = histogram->GetBinCenter(bin);
+            xMean += ch;
             yMean += histogram->GetBinContent(bin);
             ++numberOfPoints;
         }
@@ -111,11 +104,14 @@ void get_best_fitted_line(TH1F* histogram,
     Double_t denominator = 0.0;
 
     for (std::size_t i = 0; i + 1 < background_markers.size(); i += 2) {
-        const Int_t startBin = std::max(1, std::min(nBins, std::min(background_markers[i], background_markers[i + 1])));
-        const Int_t endBin   = std::max(1, std::min(nBins, std::max(background_markers[i], background_markers[i + 1])));
+        const Int_t startCh = std::min(background_markers[i], background_markers[i + 1]);
+        const Int_t endCh   = std::max(background_markers[i], background_markers[i + 1]);
+        const Int_t startBin = histogram->FindBin(startCh);
+        const Int_t endBin   = histogram->FindBin(endCh);
 
         for (Int_t bin = startBin; bin <= endBin; ++bin) {
-            const Double_t dx = bin - xMean;
+            const Double_t ch = histogram->GetBinCenter(bin);
+            const Double_t dx = ch - xMean;
             numerator += dx * (histogram->GetBinContent(bin) - yMean);
             denominator += dx * dx;
         }
@@ -209,15 +205,16 @@ void integral_function(TH1F* histogram,
         .arg("Width",     -10, QChar(' '));
     CommandPrompt::getInstance()->appendPlainText(headerRow);
 
-    const Int_t nBins = histogram->GetNbinsX();
     const bool hasBackground = !background_markers.empty();
 
     // Loop through each pair of integral markers
     for (std::size_t i = 0; i + 1 < integral_markers.size(); i += 2) {
-        const Int_t leftBin  = std::max(1, std::min(nBins, std::min(integral_markers[i], integral_markers[i + 1])));
-        const Int_t rightBin = std::max(1, std::min(nBins, std::max(integral_markers[i], integral_markers[i + 1])));
+        const Int_t leftCh  = std::min(integral_markers[i], integral_markers[i + 1]);
+        const Int_t rightCh = std::max(integral_markers[i], integral_markers[i + 1]);
+        const Int_t leftBin  = histogram->FindBin(leftCh);
+        const Int_t rightBin = histogram->FindBin(rightCh);
 
-        const Double_t midBin = 0.5 * (leftBin + rightBin);
+        const Double_t midCh = 0.5 * (leftCh + rightCh);
 
         Double_t xc0 = 0.0; // 0th moment: Net Area
         Double_t xc1 = 0.0; // 1st moment: Centroid offset
@@ -233,7 +230,8 @@ void integral_function(TH1F* histogram,
         Double_t xdBg0 = 0.0;
 
         for (Int_t bin = leftBin; bin <= rightBin; ++bin) {
-            const Double_t w = bin - midBin;
+            const Double_t ch = histogram->GetBinCenter(bin);
+            const Double_t w = ch - midCh;
             const Double_t y = histogram->GetBinContent(bin);
             const Double_t varY = std::max(y, 1.0); // Poisson variance of gross counts
 
@@ -243,7 +241,7 @@ void integral_function(TH1F* histogram,
             xdGross0 += varY;
 
             if (hasBackground) {
-                const Double_t bg = slope * bin + addition;
+                const Double_t bg = slope * ch + addition;
                 yNet -= bg;
                 const Double_t varBg = std::max(bg, 0.0);
                 varNet += varBg; // Net variance = Var(Gross) + Var(Background)
@@ -265,7 +263,7 @@ void integral_function(TH1F* histogram,
         const Double_t area = xc0;
         const Double_t areaError = std::sqrt(std::max(xd0, 0.0));
 
-        Double_t centroid = midBin;
+        Double_t centroid = midCh;
         Double_t centroidError = 0.0;
         Double_t fwhm = 0.0;
         Double_t fwhmError = 0.0;
@@ -273,7 +271,7 @@ void integral_function(TH1F* histogram,
         // Compute centroid and FWHM using statistical moments (Xtrackn algorithm)
         if (xc0 > 0.0) {
             const Double_t xPos = xc1 / xc0;
-            centroid = midBin + xPos;
+            centroid = midCh + xPos;
 
             const Double_t varPos = (xd2 - 2.0 * xPos * xd1 + xPos * xPos * xd0) / (xc0 * xc0);
             if (varPos > 0.0) {
@@ -295,9 +293,9 @@ void integral_function(TH1F* histogram,
             }
         } else {
             // Fallback for flat or negative ROI
-            centroid = midBin;
+            centroid = midCh;
             centroidError = 0.0;
-            fwhm = static_cast<Double_t>(rightBin - leftBin);
+            fwhm = static_cast<Double_t>(rightCh - leftCh);
             fwhmError = 0.0;
         }
 
