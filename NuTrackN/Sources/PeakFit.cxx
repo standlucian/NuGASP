@@ -542,8 +542,11 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
     }
 
-    // Fit with Minuit on the raw, unsmoothed histogram
-    TFitResultPtr fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "QMRS", "same");
+    // Fit with Poisson Likelihood + Bin Integration ("Q R S I L"), fallback to standard Chi2 ("Q M R S")
+    TFitResultPtr fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "Q R S I L", "same");
+    if (!fitResult.Get() || (!fitResult->IsValid() && fitResult->Status() != 0)) {
+        fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "Q M R S", "same");
+    }
 
     bkgSlope = mainCanvas->gaussianWithBackgroundFunction->GetParameter(3);
     bkg0     = mainCanvas->gaussianWithBackgroundFunction->GetParameter(4);
@@ -605,7 +608,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(2, fixedSigmaCh);
         }
 
-        fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "QMRS", "");
+        fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "Q R S I L", "");
+        if (!fitResult.Get() || (!fitResult->IsValid() && fitResult->Status() != 0)) {
+            fitResult = hist->Fit(mainCanvas->gaussianWithBackgroundFunction, "Q M R S", "");
+        }
 
         gaussianSigma = std::abs(mainCanvas->gaussianWithBackgroundFunction->GetParameter(2));
         gaussianFWHM  = gaussianSigma * 2.35482;
@@ -668,9 +674,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     }
     mainCanvas->renderPeakLabels(mainCanvas->SelectedElement_i, mainCanvas->SelectedElement_j);
 
-    // Calculate fit quality metrics: RMS residual and Mean Relative Residual (%)
+    // Calculate fit quality metrics: RMS residual, Mean Relative Residual (%), and Pearson chi2
     Double_t sumSqDiff = 0.0;
     Double_t sumRelDiff = 0.0;
+    Double_t pearsonChi2 = 0.0;
     Int_t nBinsFit = 0;
     const Int_t bMin = std::max(1, static_cast<int>(std::round(fitMin)));
     const Int_t bMax = std::min(hist->GetNbinsX(), static_cast<int>(std::round(fitMax)));
@@ -679,6 +686,8 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         Double_t y = hist->GetBinContent(b);
         Double_t fy = mainCanvas->gaussianWithBackgroundFunction->Eval(x);
         Double_t diff = y - fy;
+        Double_t var = std::max(1.0, y);
+        pearsonChi2 += (diff * diff) / var;
         sumSqDiff += diff * diff;
         if (y > 0.0) {
             sumRelDiff += std::abs(diff) / y;
@@ -753,8 +762,9 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     }
 
     // Show unfocused dialog with parameters in top right corner
-    Double_t totalChi2 = fitResult.Get() ? fitResult->Chi2() : mainCanvas->gaussianWithBackgroundFunction->GetChisquare();
-    Int_t ndf = fitResult.Get() ? fitResult->Ndf() : mainCanvas->gaussianWithBackgroundFunction->GetNDF();
+    Int_t nFreeParams = mainCanvas->gaussianWithBackgroundFunction->GetNumberFreeParameters();
+    Int_t ndf = std::max(1, nBinsFit - nFreeParams);
+    Double_t totalChi2 = pearsonChi2;
     Double_t redChi2 = (ndf > 0) ? (totalChi2 / ndf) : 0.0;
 
     QString redChi2Str = (redChi2 >= 1e4) ? QString::number(redChi2, 'g', 4) : QString::number(redChi2, 'f', 2);
@@ -781,6 +791,12 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     peaks[0].isCalibrated = isCalib;
 
     showFitParametersDialog(mainCanvas, "AutoFit Parameters", autoHtml, peaks);
+
+    // Update fit residuals strip on canvas
+    QString autoTitle = isCalib ? QString("Peak @ %1 keV").arg(dispEnergy, 0, 'f', 1)
+                                : QString("Peak @ ch %1").arg(gaussianCenter, 0, 'f', 1);
+    mainCanvas->updateFitResiduals(hist, mainCanvas->gaussianWithBackgroundFunction, fitMin, fitMax,
+                                   autoTitle, totalChi2, ndf);
 
     if (mainCanvas->m_isAreaLoggingEnabled) {
         mainCanvas->writeAreaLogHeader(true);
@@ -1029,8 +1045,11 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         }
     }
 
-    // Run Minuit fit
-    TFitResultPtr fitResult = activeHist->Fit(fullFunction, "Q M R S", "same");
+    // Run Minuit fit with Poisson Likelihood + Bin Integration ("Q R S I L"), fallback to ("Q M R S")
+    TFitResultPtr fitResult = activeHist->Fit(fullFunction, "Q R S I L", "same");
+    if (!fitResult.Get() || (!fitResult->IsValid() && fitResult->Status() != 0)) {
+        fitResult = activeHist->Fit(fullFunction, "Q M R S", "same");
+    }
 
     // Adaptive retry logic if fit failed to converge (status code 4)
     if (static_cast<int>(fitResult) == 4) {
@@ -1115,9 +1134,10 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     mainCanvas->multiPeakBkgLine->Draw("same");
     mainCanvas->listOfObjectsDrawnOnScreen.Add(mainCanvas->multiPeakBkgLine);
 
-    // Calculate fit quality metrics: RMS residual and Mean Relative Residual (%) over [r0, r1]
+    // Calculate fit quality metrics: RMS residual, Mean Relative Residual (%), and Pearson chi2 over [r0, r1]
     Double_t sumSqDiff = 0.0;
     Double_t sumRelDiff = 0.0;
+    Double_t pearsonChi2 = 0.0;
     Int_t nBinsFit = 0;
     const Int_t bMin = std::max(1, static_cast<int>(std::round(r0)));
     const Int_t bMax = std::min(activeHist->GetNbinsX(), static_cast<int>(std::round(r1)));
@@ -1126,6 +1146,8 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         Double_t y = activeHist->GetBinContent(b);
         Double_t fy = fullFunction->Eval(x);
         Double_t diff = y - fy;
+        Double_t var = std::max(1.0, y);
+        pearsonChi2 += (diff * diff) / var;
         sumSqDiff += diff * diff;
         if (y > 0.0) {
             sumRelDiff += std::abs(diff) / y;
@@ -1165,8 +1187,9 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     }
 
     // Prepare HTML report for the unfocused parameters dialog
-    Double_t totalChi2 = fitResult.Get() ? fitResult->Chi2() : fullFunction->GetChisquare();
-    Int_t ndf = fitResult.Get() ? fitResult->Ndf() : fullFunction->GetNDF();
+    Int_t nFreeParams = fullFunction->GetNumberFreeParameters();
+    Int_t ndf = std::max(1, nBinsFit - nFreeParams);
+    Double_t totalChi2 = pearsonChi2;
     Double_t redChi2 = (ndf > 0) ? (totalChi2 / ndf) : 0.0;
 
     QString redChi2Str = (redChi2 >= 1e4) ? QString::number(redChi2, 'g', 4) : QString::number(redChi2, 'f', 2);
@@ -1348,6 +1371,16 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
     // Display unfocused floating dialog with all parameters docked in top right corner
     showFitParametersDialog(mainCanvas, "Multi-Peak Fit Parameters", html, peaks);
+
+    // Update fit residuals strip on canvas
+    QString fitTitle = (nPeaks > 1)
+        ? QString("%1-Peak Fit (%2 - %3)")
+            .arg(nPeaks)
+            .arg(isCalib ? trackHist->ChannelToEnergy(r0) : r0, 0, 'f', 0)
+            .arg(isCalib ? trackHist->ChannelToEnergy(r1) : r1, 0, 'f', 0)
+        : (isCalib ? QString("Peak @ %1 keV").arg(peaks[0].centroid, 0, 'f', 1)
+                   : QString("Peak @ ch %1").arg(peakCenters[0], 0, 'f', 1));
+    mainCanvas->updateFitResiduals(activeHist, fullFunction, r0, r1, fitTitle, totalChi2, ndf);
 }
 
 // Helper to ensure crisp spinbox arrow icons are available on disk

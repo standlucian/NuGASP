@@ -106,6 +106,7 @@ class QMainCanvas;
 class DisplayParamsDialog;
 class AutoCalibDialog;
 class RunByRunManager;
+class QFitResidualsWidget;
 
 class QZoomHUD : public QWidget
 {
@@ -501,13 +502,19 @@ public slots:
     int getCurrentSpectrumCount() const { return m_currentSpectrumCount; }
     int getCurrentSpectrumLength() const { return m_currentSpectrumLength; }
     QRootCanvas* getRootCanvas() const { return canvas; }
+    QFitResidualsWidget* getResidualsWidget() const { return m_residualsWidget; }
+
+    void updateFitResiduals(TH1F *hist, TF1 *fitFunc, double xMin, double xMax, const QString &title = QString(), double chi2 = 0.0, int ndf = 1);
+    void toggleFitResiduals();
 
 protected:
     //virtual void paintEvent(QPaintEvent *event);
     void clearDrawnObjects();
 
     QSplitter      *mainSplitter = nullptr;
+    QSplitter      *canvasSplitter = nullptr;
     QRootCanvas    *canvas = nullptr;
+    QFitResidualsWidget *m_residualsWidget = nullptr;
     QPushButton    *b;
     QTimer         *fRootTimer;
     TList listOfObjectsDrawnOnScreen;

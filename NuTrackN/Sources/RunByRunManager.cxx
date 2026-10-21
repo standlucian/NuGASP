@@ -2210,12 +2210,26 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
                 fGaus.SetParLimits(2, 0.4, 30.0);
                 fGaus.SetParLimits(0, 0.0, maxVal * 3.0);
 
-                TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
-                if (fitRes.Get() && fitRes->IsValid()) {
+                // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
+                TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NSIL", "", fitMin - 0.5, fitMax + 0.5);
+                if (!fitRes.Get() || (!fitRes->IsValid() && fitRes->Status() != 0)) {
+                    fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
+                }
+                if (fitRes.Get() && (fitRes->IsValid() || fitRes->Status() == 0)) {
                     const double meanVal = fGaus.GetParameter(1);
                     const double sigmaVal = std::abs(fGaus.GetParameter(2));
                     const double fwhmVal = 2.35482 * sigmaVal;
-                    const double fitChi2 = fitRes->Chi2() / std::max(1, static_cast<int>(fitRes->Ndf()));
+
+                    double calcChi2 = 0.0;
+                    for (int i = 0; i < nFitBins; ++i) {
+                        const double data = hTemp.GetBinContent(i + 1);
+                        const double expected = fGaus.Eval(hTemp.GetBinCenter(i + 1));
+                        const double var = std::max(1.0, data);
+                        calcChi2 += (data - expected) * (data - expected) / var;
+                    }
+                    const int nFree = fGaus.GetNumberFreeParameters();
+                    const int ndf = std::max(1, nFitBins - nFree);
+                    const double fitChi2 = calcChi2 / ndf;
 
                     if (meanVal >= lowCh && meanVal <= highCh && fwhmVal >= 0.5 && fwhmVal <= 50.0 && fitChi2 <= 50.0) {
                         fitSuccess = true;
@@ -2298,6 +2312,22 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
         m_mainCanvas->canvas->getCanvas()->Modified();
         m_mainCanvas->canvas->getCanvas()->Update();
+    }
+
+    // 8. Update fit residuals strip on canvas with the first fitted peak if available
+    TF1 *firstFit = nullptr;
+    for (auto *obj : m_mainCanvas->autoFitMarkers[sel_i][sel_j]) {
+        TF1 *f = dynamic_cast<TF1*>(obj);
+        if (f && TString(f->GetName()).BeginsWith("rbr_fit_")) {
+            firstFit = f;
+            break;
+        }
+    }
+    if (firstFit) {
+        double rMin = 0.0, rMax = 0.0;
+        firstFit->GetRange(rMin, rMax);
+        m_mainCanvas->updateFitResiduals(hist, firstFit, rMin, rMax,
+                                        QString("Run %1 Det %2 Peak").arg(row + 1).arg(detId));
     }
 
     CommandPrompt::getInstance()->appendPlainText(
@@ -2931,6 +2961,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
             m_mainCanvas->canvas->getCanvas()->Modified();
             m_mainCanvas->canvas->getCanvas()->Update();
+        }
+
+        if (isUsed && fFit) {
+            m_mainCanvas->updateFitResiduals(h, fFit, xMin, xMax,
+                QString("Run %1 Det %2 Peak @ %3 keV").arg(row + 1).arg(detId).arg(rowWidgets[peakIdx].energy, 0, 'f', 1),
+                rowWidgets[peakIdx].peakChi2, 1);
         }
     };
 

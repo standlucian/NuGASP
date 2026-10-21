@@ -104,12 +104,61 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         return result; // Low counts
     }
 
-    // 2. Define local fitting window around detected maximum
-    const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.75), 5, 30);
+    // 2. Estimate empirical FWHM via half-maximum walk from maxBin
+    double halfMax = baseVal + 0.5 * (maxVal - baseVal);
+    double leftHM = static_cast<double>(lowCh);
+    for (int ch = maxBin; ch >= lowCh; --ch) {
+        if (spectrum[ch] <= halfMax) {
+            double y1 = spectrum[ch];
+            double y2 = (ch + 1 <= maxBin) ? spectrum[ch + 1] : halfMax;
+            double frac = (std::abs(y2 - y1) > 1e-6) ? (halfMax - y1) / (y2 - y1) : 0.0;
+            leftHM = ch + frac;
+            break;
+        }
+    }
+    double rightHM = static_cast<double>(highCh);
+    for (int ch = maxBin; ch <= highCh; ++ch) {
+        if (spectrum[ch] <= halfMax) {
+            double y1 = (ch - 1 >= maxBin) ? spectrum[ch - 1] : halfMax;
+            double y2 = spectrum[ch];
+            double frac = (std::abs(y1 - y2) > 1e-6) ? (halfMax - y2) / (y1 - y2) : 0.0;
+            rightHM = ch - frac;
+            break;
+        }
+    }
+    double obsFwhm = rightHM - leftHM;
+    double estFwhm = (obsFwhm >= 0.8 && obsFwhm <= windowCh * 1.5)
+        ? obsFwhm
+        : (fixed.fixFwhm ? fixed.fixedFwhm : std::clamp(windowCh * 0.25, 2.0, 10.0));
+
+    // Adaptive fitting window based on FWHM (~2.2 * FWHM half-width)
+    const int fitHalfWidth = std::clamp(static_cast<int>(std::round(estFwhm * 2.2)), 5, static_cast<int>(windowCh));
     const int fitMin = std::max(1, maxBin - fitHalfWidth);
     const int fitMax = std::min(totalBins - 1, maxBin + fitHalfWidth);
     const int nFitBins = fitMax - fitMin + 1;
     if (nFitBins < 5) return result;
+
+    // Refined baseline estimation from sidebands of the actual fit window
+    if (!fixed.fixBaseline) {
+        const int sbWidth = std::clamp(fitHalfWidth / 4, 2, 6);
+        double leftBkg = 0.0;
+        int nLeft = 0;
+        for (int k = 0; k < sbWidth && (fitMin + k) < maxBin; ++k) {
+            leftBkg += spectrum[fitMin + k];
+            nLeft++;
+        }
+        if (nLeft > 0) leftBkg /= nLeft;
+
+        double rightBkg = 0.0;
+        int nRight = 0;
+        for (int k = 0; k < sbWidth && (fitMax - k) > maxBin; ++k) {
+            rightBkg += spectrum[fitMax - k];
+            nRight++;
+        }
+        if (nRight > 0) rightBkg /= nRight;
+
+        baseVal = (leftBkg + rightBkg) / 2.0;
+    }
 
     // Use a lightweight ROOT TH1F for standard Gaussian + linear background fit
     TH1F hTemp("hAnchorTemp", "Anchor", nFitBins, fitMin - 0.5, fitMax + 0.5);
@@ -126,7 +175,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (spectrum[fitMax] - spectrum[fitMin]) / static_cast<double>(nFitBins);
     const double estAmpl = std::max(1.0, maxVal - baseVal);
     const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
-    const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : 2.0;
+    const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
 
     fGaus.SetParameter(0, estAmpl);
     fGaus.SetParLimits(0, 0.0, std::max(10.0, maxVal * 4.0));
@@ -157,7 +206,11 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         fGaus.SetParameter(4, bkgSlope);
     }
 
-    TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
+    // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
+    TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NSIL", "", fitMin - 0.5, fitMax + 0.5);
+    if (!fitRes.Get() || (!fitRes->IsValid() && fitRes->Status() != 0 && !(fixed.fixCentroid && (fitRes->Status() % 1000 == 0 || fitRes->Status() == 4)))) {
+        fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
+    }
     const bool fitValid = fitRes.Get() && (fitRes->IsValid() || fitRes->Status() == 0 || (fixed.fixCentroid && (fitRes->Status() % 1000 == 0 || fitRes->Status() == 4)));
     if (fitValid) {
         const double fittedMean = fixed.fixCentroid ? fixed.fixedCentroid : fGaus.GetParameter(1);
@@ -165,7 +218,18 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         const double fittedAmpl = fGaus.GetParameter(0);
         const double fwhm = 2.35482 * fittedSigma;
         const double area = fittedAmpl * fittedSigma * std::sqrt(2.0 * M_PI);
-        const double chi2 = fitRes->Chi2() / std::max(1, static_cast<int>(fitRes->Ndf()));
+
+        // Explicit Pearson chi2 across fit bins
+        double calcChi2 = 0.0;
+        for (int i = 0; i < nFitBins; ++i) {
+            const double data = hTemp.GetBinContent(i + 1);
+            const double expected = fGaus.Eval(hTemp.GetBinCenter(i + 1));
+            const double var = std::max(1.0, data);
+            calcChi2 += (data - expected) * (data - expected) / var;
+        }
+        const int nFree = fGaus.GetNumberFreeParameters();
+        const int ndf = std::max(1, nFitBins - nFree);
+        const double chi2 = calcChi2 / ndf;
 
         double fittedMeanErr = 0.05;
         if (fixed.fixCentroid) {

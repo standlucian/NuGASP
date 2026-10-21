@@ -38,6 +38,7 @@ NuTrackN/Legacy/xtrack/xtrackn
 NuTrackN/check
 NuTrackN/log.txt
 *.ps
+*.dat
 log.txt
 
 # Packaging & Distribution Artifacts
