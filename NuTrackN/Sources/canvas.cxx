@@ -405,20 +405,20 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     iconButton->setIcon(themeBtnIcon);
     iconButton->setIconSize(QSize(22, 22));
     iconButton->setToolTip(tr("Color & Theme Settings"));
-    iconButton->setFixedSize(33, 33);
+    iconButton->setFixedSize(66, 33);
     iconButton->setStyleSheet(Design::getButtonStyleSheet());
     connect(iconButton, &QPushButton::clicked, this, &QMainCanvas::OpenColorSelectionDialog);
     outBox->addWidget(iconButton);
 
     QPushButton *btnMacro = makeButton(tr("MAC"), topContainer, true);
     btnMacro->setToolTip(tr("Macros & Command Strings (Block 4) [Shortcut: D+M]"));
-    btnMacro->setFixedSize(38, 33);
+    btnMacro->setFixedSize(76, 33);
     connect(btnMacro, &QPushButton::clicked, this, &QMainCanvas::openMacroDialog);
     outBox->addWidget(btnMacro);
 
     QPushButton *btnHelp = makeButton(tr("?"), topContainer, true);
     btnHelp->setToolTip(tr("Help & Command Reference Guide (Shortcut: H, ?, or F1)"));
-    btnHelp->setFixedSize(33, 33);
+    btnHelp->setFixedSize(66, 33);
     connect(btnHelp, &QPushButton::clicked, this, &QMainCanvas::offerHelp);
     outBox->addWidget(btnHelp);
 
