@@ -28,6 +28,7 @@
 #include <QMessageBox>
 #include "NuFileDialog.h"
 #include <QThread>
+#include <QTimer>
 #include <QDir>
 #include <QFileInfo>
 #include <QApplication>
@@ -2562,6 +2563,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double centroidErrCh{0.05};
         double peakChi2{1.0};
         double amplitude{0.0};
+        double lastFittedCentroid{0.0};
+        QTimer *debounceTimer{nullptr};
 
         QDoubleSpinBox *spinCentroid{nullptr};
         QPushButton *btnFixCentroid{nullptr};
@@ -2644,6 +2647,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].centroidErrCh = initCentroidErr;
         rowWidgets[i].peakChi2 = initPeakChi2;
         rowWidgets[i].amplitude = initAmpl;
+        rowWidgets[i].lastFittedCentroid = initCentroid;
+
+        QTimer *timer = new QTimer(&dlg);
+        timer->setSingleShot(true);
+        rowWidgets[i].debounceTimer = timer;
 
         // Estimate background from spectrum edges only if no saved anchor was found
         if (!foundSaved && !specData.empty()) {
@@ -2858,7 +2866,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // 4. Gaussian Fit Function TF1: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
         int binC = h->FindBin(cCh);
         double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
-        double ampl = (rowWidgets[peakIdx].amplitude > 0.0) ? rowWidgets[peakIdx].amplitude : std::max(1.0, binCounts - bkgVal);
+        double ampl = rowWidgets[peakIdx].amplitude;
+        if (ampl <= 0.0 || std::abs(cCh - rowWidgets[peakIdx].lastFittedCentroid) > 0.1) {
+            ampl = std::max(1.0, binCounts - bkgVal);
+        }
         double sigma = std::max(0.2, fCh / 2.35482);
         double xMin = std::max(0.0, cCh - wCh);
         double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
@@ -2991,9 +3002,99 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
     };
 
-    // Connect spinboxes and checkboxes to live recalc and on-screen canvas feedback
+    // Helper to perform Gaussian refit for a given peak index (manual button click or debounced auto-refit)
+    auto executeRefit = [&](int peakIdx, bool isAuto) {
+        if (peakIdx < 0 || peakIdx >= nAnchors) return;
+        double cCh = rowWidgets[peakIdx].spinCentroid->value();
+        double fCh = rowWidgets[peakIdx].spinFwhm->value();
+        double bkgVal = rowWidgets[peakIdx].spinBkg->value();
+        double slopeVal = rowWidgets[peakIdx].spinSlope->value();
+        double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
+        double en = rowWidgets[peakIdx].energy;
+        const double prevCentroidErr = rowWidgets[peakIdx].centroidErrCh;
+
+        FitFixedParams fixed;
+        fixed.fixCentroid = rowWidgets[peakIdx].btnFixCentroid && rowWidgets[peakIdx].btnFixCentroid->isChecked();
+        fixed.fixedCentroid = cCh;
+
+        fixed.fixFwhm = rowWidgets[peakIdx].btnFixFwhm && rowWidgets[peakIdx].btnFixFwhm->isChecked();
+        fixed.fixedFwhm = fCh;
+
+        fixed.fixBaseline = rowWidgets[peakIdx].btnFixBkg && rowWidgets[peakIdx].btnFixBkg->isChecked();
+        fixed.fixedBaseline = bkgVal;
+
+        fixed.fixSlope = rowWidgets[peakIdx].btnFixSlope && rowWidgets[peakIdx].btnFixSlope->isChecked();
+        fixed.fixedSlope = slopeVal;
+
+        // When auto-refitting after the user adjusts the centroid, use a localized window around cCh
+        // so MINUIT converges on the selected peak without wandering away to a distant peak in the spectrum.
+        double fitWindow = (isAuto && !fixed.fixCentroid) ? std::clamp(fCh * 1.5, 4.0, std::max(6.0, wCh * 0.5)) : wCh;
+
+        FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, fitWindow, 5.0, en, fixed);
+        if (fa.isValid) {
+            if (!fixed.fixCentroid) {
+                rowWidgets[peakIdx].spinCentroid->blockSignals(true);
+                rowWidgets[peakIdx].spinCentroid->setValue(fa.centroidCh);
+                rowWidgets[peakIdx].spinCentroid->blockSignals(false);
+            }
+            if (!fixed.fixFwhm) {
+                rowWidgets[peakIdx].spinFwhm->blockSignals(true);
+                rowWidgets[peakIdx].spinFwhm->setValue(std::max(0.4, fa.fwhmCh));
+                rowWidgets[peakIdx].spinFwhm->blockSignals(false);
+            }
+            if (!fixed.fixBaseline && fa.background > 0.0) {
+                rowWidgets[peakIdx].spinBkg->blockSignals(true);
+                rowWidgets[peakIdx].spinBkg->setValue(fa.background);
+                rowWidgets[peakIdx].spinBkg->blockSignals(false);
+            }
+            if (!fixed.fixSlope) {
+                rowWidgets[peakIdx].spinSlope->blockSignals(true);
+                rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
+                rowWidgets[peakIdx].spinSlope->blockSignals(false);
+            }
+            rowWidgets[peakIdx].amplitude = fa.amplitude;
+            rowWidgets[peakIdx].lastFittedCentroid = fa.centroidCh;
+
+            if (fixed.fixCentroid && prevCentroidErr >= 0.02) {
+                rowWidgets[peakIdx].centroidErrCh = prevCentroidErr;
+            } else {
+                rowWidgets[peakIdx].centroidErrCh = std::max(0.02, fa.centroidErrCh);
+            }
+            rowWidgets[peakIdx].peakChi2 = fa.chi2;
+
+            rowWidgets[peakIdx].chkUse->setChecked(true);
+            recalcLivePreview();
+            updateCanvasPeakOverlay(peakIdx);
+
+            QString lockMsg;
+            if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline || fixed.fixSlope) {
+                lockMsg = tr(" (respecting locked parameters)");
+            }
+            QToolTip::showText(rowWidgets[peakIdx].btnRefit->mapToGlobal(QPoint(0, 0)),
+                               tr("Fitted successfully%1:\nCentroid = %2 \u00b1 %3 ch\nPeak Fit \u03c7\u00b2/ndf = %4\nFWHM = %5 ch\nBaseline = %6 cts, Slope = %7 cts/ch")
+                                   .arg(lockMsg)
+                                   .arg(rowWidgets[peakIdx].spinCentroid->value(), 0, 'f', 2)
+                                   .arg(rowWidgets[peakIdx].centroidErrCh, 0, 'f', 3)
+                                   .arg(rowWidgets[peakIdx].peakChi2 > 0.0 ? QString::number(rowWidgets[peakIdx].peakChi2, 'f', 2) : "-")
+                                   .arg(rowWidgets[peakIdx].spinFwhm->value(), 0, 'f', 2)
+                                   .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1)
+                                   .arg(rowWidgets[peakIdx].spinSlope->value(), 0, 'f', 3));
+        } else if (!isAuto) {
+            QMessageBox::information(&dlg, tr("Refit Notice"),
+                                     tr("Could not converge Gaussian fit around channel %1. You can nudge parameters manually or lock specific values.")
+                                         .arg(cCh, 0, 'f', 1));
+        }
+    };
+
+    // Connect spinboxes, checkboxes, and auto-refit timers to live recalc and on-screen canvas feedback
     for (int i = 0; i < nAnchors; ++i) {
         int peakIdx = i;
+
+        if (rowWidgets[i].debounceTimer) {
+            connect(rowWidgets[i].debounceTimer, &QTimer::timeout, &dlg, [&, peakIdx]() {
+                executeRefit(peakIdx, true);
+            });
+        }
 
         connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx]() {
             recalcLivePreview();
@@ -3006,6 +3107,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             }
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
+            if (rowWidgets[peakIdx].debounceTimer) {
+                rowWidgets[peakIdx].debounceTimer->start(350);
+            }
         });
 
         connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
@@ -3028,66 +3132,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             updateCanvasPeakOverlay(peakIdx);
         });
 
-        // Refit button action
+        // Refit button action: manual immediate refit
         connect(rowWidgets[i].btnRefit, &QPushButton::clicked, &dlg, [&, peakIdx]() {
-            double cCh = rowWidgets[peakIdx].spinCentroid->value();
-            double fCh = rowWidgets[peakIdx].spinFwhm->value();
-            double bkgVal = rowWidgets[peakIdx].spinBkg->value();
-            double slopeVal = rowWidgets[peakIdx].spinSlope->value();
-            double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
-            double en = rowWidgets[peakIdx].energy;
-            const double prevCentroidErr = rowWidgets[peakIdx].centroidErrCh;
-
-            FitFixedParams fixed;
-            fixed.fixCentroid = rowWidgets[peakIdx].btnFixCentroid && rowWidgets[peakIdx].btnFixCentroid->isChecked();
-            fixed.fixedCentroid = cCh;
-
-            fixed.fixFwhm = rowWidgets[peakIdx].btnFixFwhm && rowWidgets[peakIdx].btnFixFwhm->isChecked();
-            fixed.fixedFwhm = fCh;
-
-            fixed.fixBaseline = rowWidgets[peakIdx].btnFixBkg && rowWidgets[peakIdx].btnFixBkg->isChecked();
-            fixed.fixedBaseline = bkgVal;
-
-            fixed.fixSlope = rowWidgets[peakIdx].btnFixSlope && rowWidgets[peakIdx].btnFixSlope->isChecked();
-            fixed.fixedSlope = slopeVal;
-
-            FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, wCh, 5.0, en, fixed);
-            if (fa.isValid) {
-                if (!fixed.fixCentroid) rowWidgets[peakIdx].spinCentroid->setValue(fa.centroidCh);
-                if (!fixed.fixFwhm) rowWidgets[peakIdx].spinFwhm->setValue(std::max(0.4, fa.fwhmCh));
-                if (!fixed.fixBaseline && fa.background > 0.0) rowWidgets[peakIdx].spinBkg->setValue(fa.background);
-                if (!fixed.fixSlope) rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
-                rowWidgets[peakIdx].amplitude = fa.amplitude;
-
-                if (fixed.fixCentroid && prevCentroidErr >= 0.02) {
-                    rowWidgets[peakIdx].centroidErrCh = prevCentroidErr;
-                } else {
-                    rowWidgets[peakIdx].centroidErrCh = std::max(0.02, fa.centroidErrCh);
-                }
-                rowWidgets[peakIdx].peakChi2 = fa.chi2;
-
-                rowWidgets[peakIdx].chkUse->setChecked(true);
-                recalcLivePreview();
-                updateCanvasPeakOverlay(peakIdx);
-
-                QString lockMsg;
-                if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline || fixed.fixSlope) {
-                    lockMsg = tr(" (respecting locked parameters)");
-                }
-                QToolTip::showText(rowWidgets[peakIdx].btnRefit->mapToGlobal(QPoint(0, 0)),
-                                   tr("Fitted successfully%1:\nCentroid = %2 \u00b1 %3 ch\nPeak Fit \u03c7\u00b2/ndf = %4\nFWHM = %5 ch\nBaseline = %6 cts, Slope = %7 cts/ch")
-                                       .arg(lockMsg)
-                                       .arg(rowWidgets[peakIdx].spinCentroid->value(), 0, 'f', 2)
-                                       .arg(rowWidgets[peakIdx].centroidErrCh, 0, 'f', 3)
-                                       .arg(rowWidgets[peakIdx].peakChi2 > 0.0 ? QString::number(rowWidgets[peakIdx].peakChi2, 'f', 2) : "-")
-                                       .arg(rowWidgets[peakIdx].spinFwhm->value(), 0, 'f', 2)
-                                       .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1)
-                                       .arg(rowWidgets[peakIdx].spinSlope->value(), 0, 'f', 3));
-            } else {
-                QMessageBox::information(&dlg, tr("Refit Notice"),
-                                         tr("Could not converge Gaussian fit around channel %1. You can nudge parameters manually or lock specific values.")
-                                             .arg(cCh, 0, 'f', 1));
+            if (rowWidgets[peakIdx].debounceTimer && rowWidgets[peakIdx].debounceTimer->isActive()) {
+                rowWidgets[peakIdx].debounceTimer->stop();
             }
+            executeRefit(peakIdx, false);
         });
     }
 
