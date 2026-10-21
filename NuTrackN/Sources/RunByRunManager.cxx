@@ -1779,6 +1779,19 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
                 if (QFileInfo(m_runFilePaths[rowIdx]).fileName() == runName) {
                     int colIdx = detId - (m_spinDetStart ? m_spinDetStart->value() : 0);
                     openInterventionDialog(rowIdx, colIdx);
+                    // Check if issue was successfully resolved and update report row
+                    for (const auto &traj : m_completedTrajectories) {
+                        if (traj.detectorId == detId && rowIdx < static_cast<int>(traj.runResults.size())) {
+                            if (traj.runResults[rowIdx].status == RunCalibStatus::Success) {
+                                QTableWidgetItem *itemDiag = tableIssues->item(r, 3);
+                                if (itemDiag) {
+                                    itemDiag->setText(tr("RESOLVED / ACCEPTED (Gain = %1)").arg(traj.runResults[rowIdx].a1, 0, 'f', 6));
+                                    itemDiag->setForeground(QBrush(QColor("#4caf50")));
+                                }
+                            }
+                            break;
+                        }
+                    }
                     break;
                 }
             }
@@ -2035,19 +2048,84 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
         // Determine best search center: check if this run already has trajectory calibration
         double centerCh = (a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy;
+        const FittedAnchor *savedFa = nullptr;
         for (const auto &traj : m_completedTrajectories) {
             if (traj.detectorId == detId) {
                 if (row >= 0 && row < static_cast<int>(traj.runResults.size())) {
                     const auto &runRes = traj.runResults[row];
                     for (const auto &fa : runRes.fittedAnchors) {
-                        if (std::abs(fa.energy - a.physicalEnergy) < 1.0 && fa.isValid && fa.centroidCh > 0.0) {
-                            centerCh = fa.centroidCh;
+                        if (std::abs(fa.energy - a.physicalEnergy) < 1.0) {
+                            if (fa.centroidCh > 0.0) {
+                                centerCh = fa.centroidCh;
+                                savedFa = &fa;
+                            }
                             break;
                         }
                     }
                 }
                 break;
             }
+        }
+
+        bool fitSuccess = false;
+        double fittedCentroid = centerCh;
+
+        // If this run already has a saved/accepted fit from intervention or calibration,
+        // faithfully draw the accepted fit curve and baseline directly on canvas!
+        if (savedFa && savedFa->centroidCh > 0.0) {
+            fitSuccess = savedFa->isValid;
+            fittedCentroid = savedFa->centroidCh;
+            const double meanVal = savedFa->centroidCh;
+            const double fwhmVal = (savedFa->fwhmCh > 0.2) ? savedFa->fwhmCh : ((a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : 3.5);
+            const double sigmaVal = fwhmVal / 2.35482;
+            const double bkgVal = savedFa->background;
+            const double slopeVal = savedFa->bkgSlope;
+
+            const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : std::clamp(fwhmVal * 3.5, 12.0, 45.0);
+            const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
+            const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
+            const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
+
+            int binC = hist->FindBin(meanVal);
+            double binCounts = (binC >= 1 && binC <= hist->GetNbinsX()) ? hist->GetBinContent(binC) : 0.0;
+            double amplVal = (savedFa->amplitude > 0.0) ? savedFa->amplitude : std::max(1.0, binCounts - bkgVal);
+
+            if (pad) pad->cd();
+
+            // Fit function (Gaussian + Linear background) in vibrant red (or gray if excluded)
+            TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
+                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", fitMin - 0.5, fitMax + 0.5);
+            fFit->SetParameter(0, amplVal);
+            fFit->SetParameter(1, meanVal);
+            fFit->SetParameter(2, sigmaVal);
+            fFit->SetParameter(3, bkgVal);
+            fFit->SetParameter(4, slopeVal);
+            fFit->SetLineColor(savedFa->isValid ? kRed : kGray);
+            fFit->SetLineStyle(savedFa->isValid ? 1 : 3);
+            fFit->SetLineWidth(savedFa->isValid ? 2 : 1);
+            fFit->Draw("same");
+            m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
+
+            // Baseline background function in dashed blue: [0] + [1]*(x-[2])
+            TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
+                                "[0] + [1]*(x-[2])", fitMin - 0.5, fitMax + 0.5);
+            fBkg->SetParameter(0, bkgVal);
+            fBkg->SetParameter(1, slopeVal);
+            fBkg->SetParameter(2, meanVal);
+            fBkg->SetLineColor(savedFa->isValid ? kBlue : (kGray + 1));
+            fBkg->SetLineWidth(1);
+            fBkg->SetLineStyle(savedFa->isValid ? 2 : 3);
+            fBkg->Draw("same");
+            m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fBkg);
+
+            if (savedFa->isValid) {
+                const double peakHeight = hist->GetBinContent(hist->FindBin(meanVal));
+                m_mainCanvas->gaussCenters[sel_i][sel_j].push_back(meanVal);
+                m_mainCanvas->gaussCentersHeight[sel_i][sel_j].push_back(peakHeight);
+                fitCount++;
+            }
+            peakPositions.push_back(fittedCentroid);
+            continue;
         }
 
         const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : 15.0;
@@ -2095,9 +2173,6 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
         double baseVal = (lowCh < highCh) ? (specData[lowCh] + specData[highCh]) / 2.0 : 0.0;
         double netHeight = maxVal - baseVal;
-
-        bool fitSuccess = false;
-        double fittedCentroid = centerCh;
 
         if (netHeight >= 5.0 && maxVal > 0.0) {
             const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
@@ -2486,6 +2561,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double nominalCentroid{0.0};
         double centroidErrCh{0.05};
         double peakChi2{1.0};
+        double amplitude{0.0};
 
         QDoubleSpinBox *spinCentroid{nullptr};
         QPushButton *btnFixCentroid{nullptr};
@@ -2541,17 +2617,19 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
         double initBkg = 10.0;
         double initSlope = 0.0;
+        double initAmpl = 0.0;
         bool isUsed = true;
+        bool foundSaved = false;
 
         for (const auto &fa : curRes.fittedAnchors) {
             if (std::abs(fa.energy - anc.physicalEnergy) < 1.0) {
-                if (fa.isValid && fa.centroidCh > 0.0) {
+                foundSaved = true;
+                if (fa.centroidCh > 0.0) {
                     initCentroid = fa.centroidCh;
-                    initFwhm = fa.fwhmCh;
-                    if (fa.background > 0.0) {
-                        initBkg = fa.background;
-                    }
+                    if (fa.fwhmCh > 0.2) initFwhm = fa.fwhmCh;
+                    initBkg = fa.background;
                     initSlope = fa.bkgSlope;
+                    initAmpl = fa.amplitude;
                     if (fa.centroidErrCh > 0.0) {
                         initCentroidErr = fa.centroidErrCh;
                     }
@@ -2565,9 +2643,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
         rowWidgets[i].centroidErrCh = initCentroidErr;
         rowWidgets[i].peakChi2 = initPeakChi2;
+        rowWidgets[i].amplitude = initAmpl;
 
-        // Estimate background from spectrum edges if not yet known
-        if (initBkg <= 10.0 && !specData.empty()) {
+        // Estimate background from spectrum edges only if no saved anchor was found
+        if (!foundSaved && !specData.empty()) {
             int lowB = std::max(0, static_cast<int>(initCentroid - initWin));
             int highB = std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(initCentroid + initWin));
             if (lowB < highB) {
@@ -2779,7 +2858,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // 4. Gaussian Fit Function TF1: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
         int binC = h->FindBin(cCh);
         double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
-        double ampl = std::max(1.0, binCounts - bkgVal);
+        double ampl = (rowWidgets[peakIdx].amplitude > 0.0) ? rowWidgets[peakIdx].amplitude : std::max(1.0, binCounts - bkgVal);
         double sigma = std::max(0.2, fCh / 2.35482);
         double xMin = std::max(0.0, cCh - wCh);
         double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
@@ -2824,6 +2903,25 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fBkg->SetParameter(1, slopeVal);
         fBkg->SetParameter(2, cCh);
 
+        bool isUsed = rowWidgets[peakIdx].chkUse ? rowWidgets[peakIdx].chkUse->isChecked() : true;
+        if (!isUsed) {
+            guideLine->SetLineColor(kGray);
+            guideLine->SetLineStyle(3);
+            fFit->SetLineColor(kGray);
+            fFit->SetLineStyle(3);
+            fFit->SetLineWidth(1);
+            fBkg->SetLineColor(kGray + 1);
+            fBkg->SetLineStyle(3);
+        } else {
+            guideLine->SetLineColor(kYellow + 1);
+            guideLine->SetLineStyle(7);
+            fFit->SetLineColor(kRed);
+            fFit->SetLineStyle(1);
+            fFit->SetLineWidth(2);
+            fBkg->SetLineColor(kBlue);
+            fBkg->SetLineStyle(2);
+        }
+
         activePad->Modified();
         activePad->Update();
         if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
@@ -2833,19 +2931,22 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     };
 
     auto recalcLivePreview = [&]() {
+        std::vector<FittedAnchor> allAnchors;
         std::vector<FittedAnchor> activeAnchors;
         for (int i = 0; i < nAnchors; ++i) {
-            if (rowWidgets[i].chkUse && rowWidgets[i].chkUse->isChecked()) {
-                FittedAnchor fa;
-                fa.energy = rowWidgets[i].energy;
-                fa.energyErr = rowWidgets[i].energyError;
-                fa.centroidCh = rowWidgets[i].spinCentroid->value();
-                fa.centroidErrCh = std::max(0.01, rowWidgets[i].centroidErrCh);
-                fa.fwhmCh = rowWidgets[i].spinFwhm->value();
-                fa.background = rowWidgets[i].spinBkg->value();
-                fa.bkgSlope = rowWidgets[i].spinSlope->value();
-                fa.chi2 = rowWidgets[i].peakChi2;
-                fa.isValid = true;
+            FittedAnchor fa;
+            fa.energy = rowWidgets[i].energy;
+            fa.energyErr = rowWidgets[i].energyError;
+            fa.centroidCh = rowWidgets[i].spinCentroid->value();
+            fa.centroidErrCh = std::max(0.01, rowWidgets[i].centroidErrCh);
+            fa.fwhmCh = rowWidgets[i].spinFwhm->value();
+            fa.background = rowWidgets[i].spinBkg->value();
+            fa.bkgSlope = rowWidgets[i].spinSlope->value();
+            fa.amplitude = rowWidgets[i].amplitude;
+            fa.chi2 = rowWidgets[i].peakChi2;
+            fa.isValid = (rowWidgets[i].chkUse && rowWidgets[i].chkUse->isChecked());
+            allAnchors.push_back(fa);
+            if (fa.isValid) {
                 activeAnchors.push_back(fa);
             }
         }
@@ -2853,6 +2954,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         if (activeAnchors.size() < 2) {
             lblPreviewStatus->setText(tr("<span style='color:#f44336;'>⚠️ Insufficient peaks selected (%1). At least 2 required.</span>").arg(activeAnchors.size()));
             liveCalibResult = RunCalibResult();
+            liveCalibResult.detectorId = detId;
+            liveCalibResult.runNumber = row + 1;
+            liveCalibResult.runFileName = runName;
+            liveCalibResult.fullFilePath = filePath;
+            liveCalibResult.fittedAnchors = allAnchors;
             liveCalibResult.status = RunCalibStatus::BadChi2;
             return;
         }
@@ -2862,9 +2968,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         res.runNumber = row + 1;
         res.runFileName = runName;
         res.fullFilePath = filePath;
-        res.fittedAnchors = activeAnchors;
 
         bool ok = RunByRunEngine::computeCalibration(activeAnchors, useQuadratic, res, maxChi2);
+        // computeCalibration populates outResult.fittedAnchors with valid only;
+        // preserve all anchors including isValid flags for accurate state persistence
+        res.fittedAnchors = allAnchors;
         liveCalibResult = res;
 
         QString chi2Str = QString::number(res.chi2NDF, 'f', 2);
@@ -2949,6 +3057,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (!fixed.fixFwhm) rowWidgets[peakIdx].spinFwhm->setValue(std::max(0.4, fa.fwhmCh));
                 if (!fixed.fixBaseline && fa.background > 0.0) rowWidgets[peakIdx].spinBkg->setValue(fa.background);
                 if (!fixed.fixSlope) rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
+                rowWidgets[peakIdx].amplitude = fa.amplitude;
 
                 if (fixed.fixCentroid && prevCentroidErr >= 0.02) {
                     rowWidgets[peakIdx].centroidErrCh = prevCentroidErr;
@@ -2983,6 +3092,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     }
 
     recalcLivePreview();
+    // Synchronize canvas peak overlays with current table values immediately upon opening
+    for (int i = 0; i < nAnchors; ++i) {
+        updateCanvasPeakOverlay(i);
+    }
 
     // 4. Action Buttons (Option A, Option B, Option C, Inspect on Canvas, Cancel)
     QHBoxLayout *actionLayout = new QHBoxLayout();
@@ -2992,6 +3105,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     btnCanvas->setToolTip(tr("Redraw the spectrum histogram and peak fit curves on the main canvas."));
     connect(btnCanvas, &QPushButton::clicked, &dlg, [&]() {
         inspectSpectrumOnCanvas(row, col);
+        for (int i = 0; i < nAnchors; ++i) {
+            updateCanvasPeakOverlay(i);
+        }
     });
     actionLayout->addWidget(btnCanvas);
 
@@ -3025,10 +3141,14 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
     connect(btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject);
 
-    // Apply Option B
+    // Apply Option B: Apply Adjusted Fit
     connect(btnOptionB, &QPushButton::clicked, &dlg, [&]() {
         recalcLivePreview();
-        if (liveCalibResult.fittedAnchors.size() < 2 || liveCalibResult.a1 <= 0.0) {
+        int validCount = 0;
+        for (const auto &fa : liveCalibResult.fittedAnchors) {
+            if (fa.isValid) validCount++;
+        }
+        if (validCount < 2 || liveCalibResult.a1 <= 0.0) {
             QMessageBox::warning(&dlg, tr("Invalid Calibration"),
                                  tr("Cannot apply calibration: at least 2 valid peak fits with positive slope are required."));
             return;
@@ -3055,13 +3175,20 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
 
         if (row < static_cast<int>(targetTraj->runResults.size())) {
+            const bool wasFailure = (targetTraj->runResults[row].status != RunCalibStatus::Success);
             targetTraj->runResults[row] = liveCalibResult;
+            if (wasFailure) {
+                targetTraj->successCount++;
+                if (targetTraj->failureCount > 0) targetTraj->failureCount--;
+            }
         }
 
         // Update last valid centroids
         targetTraj->lastValidCentroids.clear();
         for (const auto &fa : liveCalibResult.fittedAnchors) {
-            targetTraj->lastValidCentroids.push_back(fa.centroidCh);
+            if (fa.isValid) {
+                targetTraj->lastValidCentroids.push_back(fa.centroidCh);
+            }
         }
 
         // Update Matrix Cell
@@ -3094,33 +3221,71 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Apply Option A: Force accept
     connect(btnOptionA, &QPushButton::clicked, &dlg, [&]() {
         if (!targetTraj) {
-            QMessageBox::warning(&dlg, tr("No Data"), tr("No existing fit parameters found to accept."));
-            return;
+            DetectorTrajectory newTraj;
+            newTraj.detectorId = detId;
+            newTraj.runResults.resize(m_runFilePaths.size());
+            for (size_t rIdx = 0; rIdx < m_runFilePaths.size(); ++rIdx) {
+                newTraj.runResults[rIdx].runNumber = static_cast<int>(rIdx + 1);
+                newTraj.runResults[rIdx].runFileName = QFileInfo(m_runFilePaths[rIdx]).fileName();
+                newTraj.runResults[rIdx].fullFilePath = m_runFilePaths[rIdx];
+                newTraj.runResults[rIdx].detectorId = detId;
+                newTraj.runResults[rIdx].status = RunCalibStatus::BadChi2;
+            }
+            m_completedTrajectories.push_back(newTraj);
+            targetTraj = &m_completedTrajectories.back();
         }
-        if (row < static_cast<int>(targetTraj->runResults.size())) {
+
+        recalcLivePreview();
+
+        int validCount = 0;
+        for (const auto &fa : liveCalibResult.fittedAnchors) {
+            if (fa.isValid) validCount++;
+        }
+
+        if (validCount >= 2 && liveCalibResult.a1 > 0.0) {
+            liveCalibResult.status = RunCalibStatus::Success;
+            liveCalibResult.isFallbackFromPrevious = false;
+            liveCalibResult.failureReason = "Force accepted by user";
+            if (row < static_cast<int>(targetTraj->runResults.size())) {
+                const bool wasFailure = (targetTraj->runResults[row].status != RunCalibStatus::Success);
+                targetTraj->runResults[row] = liveCalibResult;
+                if (wasFailure) {
+                    targetTraj->successCount++;
+                    if (targetTraj->failureCount > 0) targetTraj->failureCount--;
+                }
+            }
+            targetTraj->lastValidCentroids.clear();
+            for (const auto &fa : liveCalibResult.fittedAnchors) {
+                if (fa.isValid) targetTraj->lastValidCentroids.push_back(fa.centroidCh);
+            }
+        } else if (row < static_cast<int>(targetTraj->runResults.size())) {
             targetTraj->runResults[row].status = RunCalibStatus::Success;
             targetTraj->runResults[row].isFallbackFromPrevious = false;
             targetTraj->runResults[row].failureReason = "Force accepted by user";
-
-            QTableWidgetItem *item = m_gridMatrix->item(row, col);
-            if (!item) {
-                item = new QTableWidgetItem();
-                m_gridMatrix->setItem(row, col, item);
-            }
-            item->setText("GOOD");
-            item->setBackground(QBrush(QColor("#2e7d32")));
-            item->setForeground(QBrush(Qt::white));
-            item->setToolTip(QString("Run: %1 | Det: %2 [FORCE ACCEPTED]\na0: %3 keV\na1: %4 keV/ch\ns_res: %5 keV\nchi2/ndf: %6")
-                                 .arg(runName).arg(detId)
-                                 .arg(targetTraj->runResults[row].a0, 0, 'f', 4)
-                                 .arg(targetTraj->runResults[row].a1, 0, 'f', 6)
-                                 .arg(targetTraj->runResults[row].sRes, 0, 'f', 4)
-                                 .arg(targetTraj->runResults[row].chi2NDF, 0, 'f', 2));
-
-            if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {
-                updatePlot(detId);
-            }
         }
+
+        QTableWidgetItem *item = m_gridMatrix->item(row, col);
+        if (!item) {
+            item = new QTableWidgetItem();
+            m_gridMatrix->setItem(row, col, item);
+        }
+        item->setText("GOOD");
+        item->setBackground(QBrush(QColor("#2e7d32")));
+        item->setForeground(QBrush(Qt::white));
+        item->setToolTip(QString("Run: %1 | Det: %2 [FORCE ACCEPTED]\na0: %3 keV\na1: %4 keV/ch\ns_res: %5 keV\nchi2/ndf: %6")
+                             .arg(runName).arg(detId)
+                             .arg(targetTraj->runResults[row].a0, 0, 'f', 4)
+                             .arg(targetTraj->runResults[row].a1, 0, 'f', 6)
+                             .arg(targetTraj->runResults[row].sRes, 0, 'f', 4)
+                             .arg(targetTraj->runResults[row].chi2NDF, 0, 'f', 2));
+
+        // Refresh canvas with updated calibration & peak fits
+        inspectSpectrumOnCanvas(row, col);
+
+        if (m_comboPlotDet && m_comboPlotDet->currentData().toInt() == detId) {
+            updatePlot(detId);
+        }
+
         dlg.accept();
     });
 
@@ -3152,5 +3317,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     });
 
     dlg.exec();
+
+    // Ensure canvas displays the saved trajectory fit state when the intervention dialog closes
+    inspectSpectrumOnCanvas(row, col);
 }
 
