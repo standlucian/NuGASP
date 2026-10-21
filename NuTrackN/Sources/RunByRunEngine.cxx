@@ -181,12 +181,14 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     // [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
     // Parameter 3 is the local high-energy baseline AT the centroid
     // Parameter 5 is the Compton step height
-    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
-    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : 0.0;
-    const double estAmpl = std::max(1.0, maxVal - baseVal);
+    const double rawAmpl = std::max(1.0, maxVal - baseVal);
+    const bool useStep = fixed.fixStep ? (fixed.fixedStep > 0.0) : (!fixed.fixBaseline && estStep > 0.8 && rawAmpl >= 25.0);
+    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (useStep ? 0.0 : ((fitMax > fitMin) ? (rightBkg - leftBkg) / static_cast<double>(fitMax - fitMin) : 0.0));
+    const double estAmpl = std::max(1.0, maxVal - (useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal));
     const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
     const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
 
+    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
     fGaus.SetParameter(0, estAmpl);
     fGaus.SetParLimits(0, 0.0, std::max(10.0, maxVal * 4.0));
 
@@ -207,23 +209,28 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     if (fixed.fixBaseline) {
         fGaus.FixParameter(3, fixed.fixedBaseline);
     } else {
-        fGaus.SetParameter(3, rightBkg > 0.0 ? rightBkg : baseVal);
+        fGaus.SetParameter(3, useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal);
         fGaus.SetParLimits(3, 0.0, std::max(10.0, maxVal * 2.0));
     }
 
     if (fixed.fixSlope) {
         fGaus.FixParameter(4, fixed.fixedSlope);
+    } else if (useStep) {
+        // Critical: Lock slope to 0 when Compton step is active to eliminate collinearity and prevent sawtooth artifacts!
+        fGaus.FixParameter(4, 0.0);
     } else {
         fGaus.SetParameter(4, bkgSlope);
+        const double maxSlopeMag = std::max(0.5, maxVal * 0.02);
+        fGaus.SetParLimits(4, -maxSlopeMag, maxSlopeMag);
     }
 
     if (fixed.fixStep) {
         fGaus.FixParameter(5, fixed.fixedStep);
-    } else if (fixed.fixBaseline || estAmpl < 30.0 || estStep < 0.5) {
-        fGaus.FixParameter(5, 0.0);
-    } else {
+    } else if (useStep) {
         fGaus.SetParameter(5, estStep);
-        fGaus.SetParLimits(5, 0.0, std::max(10.0, estStep * 3.0 + 20.0));
+        fGaus.SetParLimits(5, 0.0, std::max(3.0, estStep * 1.3 + 3.0));
+    } else {
+        fGaus.FixParameter(5, 0.0);
     }
 
     // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
@@ -288,9 +295,9 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         result.centroidErrCh = std::clamp(sig / std::sqrt(estArea), 0.03, 0.35);
         result.fwhmCh = fixed.fixFwhm ? fixed.fixedFwhm : 3.5;
         result.amplitude = estAmpl;
-        result.background = fixed.fixBaseline ? fixed.fixedBaseline : (rightBkg > 0.0 ? rightBkg : baseVal);
-        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : 0.0;
-        result.bkgStep = fixed.fixStep ? fixed.fixedStep : estStep;
+        result.background = fixed.fixBaseline ? fixed.fixedBaseline : (useStep && rightBkg > 0.0 ? rightBkg : baseVal);
+        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (useStep ? 0.0 : bkgSlope);
+        result.bkgStep = fixed.fixStep ? fixed.fixedStep : (useStep ? estStep : 0.0);
         result.area = estArea;
         result.chi2 = 1.0;
         result.isValid = true;

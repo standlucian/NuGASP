@@ -463,9 +463,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     const Double_t xLeft = hist->GetBinCenter(iFitMin);
     const Double_t xRight = hist->GetBinCenter(iFitMax);
-    Double_t estStep = (bkgLeft > bkgRight) ? (bkgLeft - bkgRight) : 0.0;
-    Double_t bkgSlope = (xRight != xLeft) ? ((bkgRight - bkgLeft + estStep) / (xRight - xLeft)) : 0.0;
-    Double_t bkg0 = bkgLeft - bkgSlope * xLeft;
+    const bool useStep = (!mainCanvas->m_bkgFixed && bkgLeft > bkgRight + 0.8 && (hist->GetBinContent(apexBin) - bkgRight) >= 25.0);
+    Double_t estStep = useStep ? (bkgLeft - bkgRight) : 0.0;
+    Double_t bkgSlope = useStep ? 0.0 : ((xRight != xLeft) ? ((bkgRight - bkgLeft) / (xRight - xLeft)) : 0.0);
+    Double_t bkg0 = useStep ? bkgRight : (bkgLeft - bkgSlope * xLeft);
 
     Double_t apexCounts = hist->GetBinContent(apexBin);
     Double_t gaussianCenter = hist->GetBinCenter(apexBin);
@@ -552,15 +553,18 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, bkgSlope);
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(4, bkg0);
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, mainCanvas->m_bkgStepVal);
+    } else if (useStep) {
+        mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, 0.0);
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, estStep);
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(3.0, estStep * 1.3 + 3.0));
     } else {
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
+        const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(3, -maxSlopeMag, maxSlopeMag);
         mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
-        if (estStep > 0.5 && gaussianHeight >= 30.0) {
-            mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, estStep);
-            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(10.0, estStep * 3.0 + 20.0));
-        } else {
-            mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
-        }
+        mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
     }
 
     // Fit with Poisson Likelihood + Bin Integration ("Q R S I L"), fallback to standard Chi2 ("Q M R S")
@@ -609,6 +613,18 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, bkgSlope);
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(4, bkg0);
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, bkgStep);
+        } else if (useStep) {
+            mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, 0.0);
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, bkgStep);
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(3.0, bkgStep * 1.3 + 3.0));
+        } else {
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
+            const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(3, -maxSlopeMag, maxSlopeMag);
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+            mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
         }
         if (fixAmp0) {
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(0, mainCanvas->m_peakFixedStates[0].ampVal);

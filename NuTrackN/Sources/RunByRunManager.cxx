@@ -2591,9 +2591,22 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             int lowB = std::max(0, static_cast<int>(initCentroid - initWin));
             int highB = std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(initCentroid + initWin));
             if (lowB < highB) {
-                initBkg = std::max(0.0, (specData[lowB] + specData[highB]) / 2.0);
-                initSlope = (specData[highB] - specData[lowB]) / static_cast<double>(highB - lowB);
-                initStep = std::max(0.0, specData[lowB] - specData[highB]);
+                std::vector<double> leftVals, rightVals;
+                for (int b = lowB; b <= std::min(lowB + 2, highB); ++b) leftVals.push_back(specData[b]);
+                for (int b = std::max(lowB, highB - 2); b <= highB; ++b) rightVals.push_back(specData[b]);
+                std::sort(leftVals.begin(), leftVals.end());
+                std::sort(rightVals.begin(), rightVals.end());
+                double lMed = !leftVals.empty() ? leftVals[leftVals.size() / 2] : specData[lowB];
+                double rMed = !rightVals.empty() ? rightVals[rightVals.size() / 2] : specData[highB];
+                if (lMed > rMed + 0.8) {
+                    initStep = lMed - rMed;
+                    initBkg = rMed;
+                    initSlope = 0.0;
+                } else {
+                    initStep = 0.0;
+                    initBkg = (lMed + rMed) / 2.0;
+                    initSlope = (rMed - lMed) / static_cast<double>(highB - lowB);
+                }
                 rowWidgets[i].bkgStep = initStep;
             }
         }
