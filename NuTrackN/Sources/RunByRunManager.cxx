@@ -2230,39 +2230,12 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 }
 
 //==============================================================================
-// onCellDoubleClicked: Inspects spectrum on canvas, and if cell needs intervention,
-// immediately opens the intervention dialog
+// onCellDoubleClicked: Inspects spectrum on canvas and opens intervention dialog
 //==============================================================================
 void RunByRunManager::onCellDoubleClicked(int row, int col)
 {
     if (row < 0 || row >= static_cast<int>(m_runFilePaths.size())) return;
-    const int detStart = m_spinDetStart ? m_spinDetStart->value() : 0;
-    const int detId = col + detStart;
-
-    // 1. Automatically load spectrum and auto-zoom to peak area on canvas
-    inspectSpectrumOnCanvas(row, col);
-
-    // 2. If flagged or needs intervention, immediately open intervention dialog
-    bool needsIntervention = false;
-    QTableWidgetItem *item = m_gridMatrix->item(row, col);
-    if (item && (item->text() == tr("INTERVENE") || item->text() == "INTERVENE")) {
-        needsIntervention = true;
-    } else {
-        for (const auto &traj : m_completedTrajectories) {
-            if (traj.detectorId == detId) {
-                if (row >= 0 && row < static_cast<int>(traj.runResults.size())) {
-                    if (traj.runResults[row].status != RunCalibStatus::Success) {
-                        needsIntervention = true;
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    if (needsIntervention) {
-        openInterventionDialog(row, col);
-    }
+    openInterventionDialog(row, col);
 }
 
 //==============================================================================
@@ -2431,9 +2404,26 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     const double maxChi2 = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
     const bool useQuadratic = m_chkQuadratic ? m_chkQuadratic->isChecked() : false;
 
-    // Create Modal Dialog
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Intervene & Discriminate Fits — Run: %1, Detector #%2").arg(runName).arg(detId));
+    // Make the big calibration manager bugger off so the user has an unobstructed view of the spectrum on the main canvas!
+    // RAII Restorer ensures the calibration manager reliably restores to normal and raises to front when inspection ends.
+    struct ManagerRestorer {
+        QWidget *manager;
+        ~ManagerRestorer() {
+            if (manager) {
+                manager->showNormal();
+                manager->raise();
+                manager->activateWindow();
+            }
+        }
+    } restorer{this};
+
+    this->showMinimized();
+
+    // Create Modal Intervention Dialog with the main canvas window as parent
+    QWidget *parentWnd = m_mainCanvas ? static_cast<QWidget*>(m_mainCanvas) : this->parentWidget();
+    QDialog dlg(parentWnd);
+    dlg.setWindowTitle(tr("Inspect & Tune Fit — Run: %1, Detector #%2").arg(runName).arg(detId));
+    dlg.setWindowFlags(dlg.windowFlags() | Qt::WindowMinMaxButtonsHint);
     dlg.resize(1020, 620);
     dlg.setFont(Design::getDialogFont());
     dlg.setStyleSheet(Design::getDialogStyleSheet());
@@ -2992,12 +2982,22 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // 4. Action Buttons (Option A, Option B, Option C, Inspect on Canvas, Cancel)
     QHBoxLayout *actionLayout = new QHBoxLayout();
 
-    QPushButton *btnCanvas = new QPushButton(tr("🔍 Inspect Spectrum on Canvas"), &dlg);
+    QPushButton *btnCanvas = new QPushButton(tr("🔄 Redraw Canvas"), &dlg);
     btnCanvas->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 6px 12px;");
+    btnCanvas->setToolTip(tr("Redraw the spectrum histogram and peak fit curves on the main canvas."));
     connect(btnCanvas, &QPushButton::clicked, &dlg, [&]() {
         inspectSpectrumOnCanvas(row, col);
     });
     actionLayout->addWidget(btnCanvas);
+
+    QPushButton *btnPeek = new QPushButton(tr("👁️ Minimize to View Canvas"), &dlg);
+    btnPeek->setStyleSheet("font-weight: bold; background-color: #37474f; color: white; padding: 6px 12px;");
+    btnPeek->setToolTip(tr("Temporarily minimize this dialog to the taskbar to inspect the full ROOT canvas without obstruction. Click its taskbar icon to restore."));
+    connect(btnPeek, &QPushButton::clicked, &dlg, [&dlg]() {
+        dlg.showMinimized();
+    });
+    actionLayout->addWidget(btnPeek);
+
     actionLayout->addStretch(1);
 
     QPushButton *btnOptionB = new QPushButton(tr("✅ Apply Adjusted Fit (Mark GOOD)"), &dlg);
@@ -3009,7 +3009,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QPushButton *btnOptionC = new QPushButton(tr("❌ Reject (Make it FAIL)"), &dlg);
     btnOptionC->setStyleSheet("font-weight: bold; background-color: #c62828; color: white; padding: 6px 12px;");
 
-    QPushButton *btnCancel = new QPushButton(tr("Cancel"), &dlg);
+    QPushButton *btnCancel = new QPushButton(tr("Done / Cancel"), &dlg);
     btnCancel->setStyleSheet("font-weight: bold; background-color: #455a64; color: white; padding: 6px 12px;");
 
     actionLayout->addWidget(btnOptionB);
