@@ -2893,7 +2893,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         });
 
         connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
-            if (rowWidgets[peakIdx].centroidErrCh <= 0.005) {
+            if (rowWidgets[peakIdx].centroidErrCh <= 0.02) {
                 rowWidgets[peakIdx].centroidErrCh = std::clamp(rowWidgets[peakIdx].spinFwhm->value() / 20.0, 0.03, 0.5);
             }
             recalcLivePreview();
@@ -2928,6 +2928,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             double slopeVal = rowWidgets[peakIdx].spinSlope->value();
             double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
             double en = rowWidgets[peakIdx].energy;
+            const double prevCentroidErr = rowWidgets[peakIdx].centroidErrCh;
 
             FitFixedParams fixed;
             fixed.fixCentroid = rowWidgets[peakIdx].btnFixCentroid && rowWidgets[peakIdx].btnFixCentroid->isChecked();
@@ -2949,7 +2950,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (!fixed.fixBaseline && fa.background > 0.0) rowWidgets[peakIdx].spinBkg->setValue(fa.background);
                 if (!fixed.fixSlope) rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
 
-                rowWidgets[peakIdx].centroidErrCh = (fa.centroidErrCh > 0.0) ? fa.centroidErrCh : 0.05;
+                if (fixed.fixCentroid && prevCentroidErr >= 0.02) {
+                    rowWidgets[peakIdx].centroidErrCh = prevCentroidErr;
+                } else {
+                    rowWidgets[peakIdx].centroidErrCh = std::max(0.02, fa.centroidErrCh);
+                }
                 rowWidgets[peakIdx].peakChi2 = fa.chi2;
 
                 rowWidgets[peakIdx].chkUse->setChecked(true);

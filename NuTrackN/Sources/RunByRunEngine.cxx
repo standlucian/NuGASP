@@ -154,12 +154,25 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
     if (fitRes.Get() && fitRes->IsValid()) {
         const double fittedMean = fGaus.GetParameter(1);
-        const double fittedMeanErr = fixed.fixCentroid ? 0.005 : std::max(0.005, fGaus.GetParError(1));
         const double fittedSigma = std::abs(fGaus.GetParameter(2));
         const double fittedAmpl = fGaus.GetParameter(0);
         const double fwhm = 2.35482 * fittedSigma;
         const double area = fittedAmpl * fittedSigma * std::sqrt(2.0 * M_PI);
         const double chi2 = fitRes->Chi2() / std::max(1, static_cast<int>(fitRes->Ndf()));
+
+        double fittedMeanErr = 0.05;
+        if (fixed.fixCentroid) {
+            // Parameter was fixed in ROOT MINUIT so GetParError(1) returns 0.
+            // Compute realistic physical statistical centroid uncertainty from peak width and area:
+            const double statErr = (area > 1.0) ? (fittedSigma / std::sqrt(area)) : 0.05;
+            const double bkgVal = std::max(0.0, fGaus.GetParameter(3));
+            const double bkgFactor = (area > 1.0 && bkgVal > 0.0)
+                ? std::sqrt(1.0 + (2.0 * bkgVal * fwhm) / area)
+                : 1.0;
+            fittedMeanErr = std::clamp(statErr * bkgFactor, 0.03, 0.35);
+        } else {
+            fittedMeanErr = std::max(0.01, fGaus.GetParError(1));
+        }
 
         if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.4 && fwhm <= 50.0) {
             result.centroidCh = fittedMean;
@@ -178,12 +191,14 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     // Fallback: If parameters were manually fixed, return exact user values
     if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline) {
         result.centroidCh = fixed.fixCentroid ? fixed.fixedCentroid : estMean;
-        result.centroidErrCh = 0.02;
+        const double sig = (fixed.fixFwhm ? fixed.fixedFwhm : 3.5) / 2.35482;
+        const double estArea = std::max(10.0, estAmpl * sig * std::sqrt(2.0 * M_PI));
+        result.centroidErrCh = std::clamp(sig / std::sqrt(estArea), 0.03, 0.35);
         result.fwhmCh = fixed.fixFwhm ? fixed.fixedFwhm : 3.5;
         result.amplitude = estAmpl;
         result.background = fixed.fixBaseline ? fixed.fixedBaseline : baseVal;
         result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : bkgSlope;
-        result.area = estAmpl * (result.fwhmCh / 2.35482) * std::sqrt(2.0 * M_PI);
+        result.area = estArea;
         result.chi2 = 1.0;
         result.isValid = true;
         return result;
