@@ -727,8 +727,9 @@ void NuFileDialog::onAcceptActionClicked()
 
         if (m_isRemoteMode) {
             m_selectedRemotePaths = chosenPaths;
-            if (!downloadRemoteFiles(chosenPaths, m_selectedPaths)) {
-                return;
+            m_selectedPaths.clear();
+            for (const auto &rp : chosenPaths) {
+                m_selectedPaths.push_back(m_session->getLocalCachePath(rp));
             }
         } else {
             m_selectedPaths = chosenPaths;

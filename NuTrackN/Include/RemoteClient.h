@@ -4,6 +4,7 @@
 #include <QString>
 #include <QDateTime>
 #include <QSettings>
+#include <QMutex>
 #include <vector>
 #include <functional>
 #include <memory>
@@ -75,7 +76,9 @@ public:
     bool fileExists(const QString &remotePath, RemoteFileInfo *outInfo = nullptr);
     bool downloadFile(const QString &remotePath, const QString &localPath,
                       std::function<void(qint64 bytesDone, qint64 bytesTotal)> progressCallback = nullptr,
-                      QString *errorMessage = nullptr);
+                      QString *errorMessage = nullptr,
+                      std::function<bool()> cancelCheck = nullptr,
+                      bool forceReDownload = false);
     bool uploadFile(const QString &localPath, const QString &remotePath,
                     std::function<void(qint64 bytesDone, qint64 bytesTotal)> progressCallback = nullptr,
                     QString *errorMessage = nullptr);
@@ -84,7 +87,9 @@ public:
     QString getLocalCachePath(const QString &remotePath) const;
     bool syncRemoteFileToCache(const QString &remotePath, QString &outLocalPath,
                               std::function<void(qint64, qint64)> progressCallback = nullptr,
-                              QString *errorMessage = nullptr);
+                              QString *errorMessage = nullptr,
+                              std::function<bool()> cancelCheck = nullptr,
+                              bool forceReDownload = false);
 
     // Query remote files in same directory matching run pattern (for next/prev run cycling)
     bool listRunFiles(const QString &remoteDirPath, const QString &currentFileName,
@@ -94,6 +99,7 @@ private:
     void cleanupSocketsAndSession();
     static QString sanitizePath(const QString &path);
 
+    mutable QMutex    m_sessionMutex{QMutex::Recursive};
     RemoteProfile     m_profile;
     int               m_socket{-1};
     LIBSSH2_SESSION  *m_session{nullptr};

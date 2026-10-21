@@ -63,6 +63,31 @@ private:
     QPoint m_mousePos;
 };
 
+class RunDownloadWorker : public QObject {
+    Q_OBJECT
+public:
+    RunDownloadWorker(const std::vector<QString> &remotePaths,
+                      const std::vector<QString> &localPaths,
+                      QObject *parent = nullptr);
+
+    void requestStop() { m_stopRequested.store(true); }
+    bool isStopRequested() const { return m_stopRequested.load(); }
+
+public slots:
+    void start();
+
+signals:
+    void runStarted(int runIndex, int totalRuns, const QString &fileName);
+    void runProgress(int runIndex, int totalRuns, qint64 bytesDone, qint64 bytesTotal);
+    void runFinished(int runIndex, int totalRuns, const QString &fileName, bool success, const QString &errorMsg);
+    void allFinished(int successCount, int failCount, bool wasCancelled);
+
+private:
+    std::vector<QString> m_remotePaths;
+    std::vector<QString> m_localPaths;
+    std::atomic<bool> m_stopRequested{false};
+};
+
 /**
  * @brief RunByRunManager provides the complete interactive UI dashboard
  * for in-beam run-by-run detector drift alignment, quality monitoring,
@@ -89,6 +114,12 @@ private slots:
     void onCellDoubleClicked(int row, int col);
     void onDetectorPlotSelectionChanged(int detIdx);
 
+    // Download worker slots
+    void onDownloadRunStarted(int runIndex, int totalRuns, const QString &fileName);
+    void onDownloadRunProgress(int runIndex, int totalRuns, qint64 bytesDone, qint64 bytesTotal);
+    void onDownloadRunFinished(int runIndex, int totalRuns, const QString &fileName, bool success, const QString &errorMsg);
+    void onDownloadAllFinished(int successCount, int failCount, bool wasCancelled);
+
     // Engine worker slots
     void onDetectorStarted(int detId, int totalDetectors);
     void onRunProcessed(int detId, int runIndex, int totalRuns, const RunCalibResult &result);
@@ -105,14 +136,25 @@ private:
     void showIssueReportModal(int totalSuccess, int totalFailures);
     void inspectSpectrumOnCanvas(int row, int col);
     void openInterventionDialog(int row, int col);
+    void startAsyncDownload();
+    void cancelAsyncDownload();
+    void cleanupDownloadThread();
 
     QMainCanvas            *m_mainCanvas{nullptr};
     std::unique_ptr<RunByRunEngine> m_engine;
     QThread                *m_workerThread{nullptr};
 
-    // Run discovery
+    // Run discovery & asynchronous download
     std::vector<QString>    m_runFilePaths;
+    std::vector<QString>    m_remoteRunPaths;
     QString                 m_commonPrefix;
+    bool                    m_isRemoteRuns{false};
+    bool                    m_isDownloading{false};
+    bool                    m_startCalibrationPending{false};
+    int                     m_downloadedSuccessCount{0};
+    int                     m_downloadedFailureCount{0};
+    std::unique_ptr<RunDownloadWorker> m_downloadWorker;
+    QThread                *m_downloadThread{nullptr};
 
     // UI Widgets - Configuration
     QLabel                 *m_lblRunsSummary{nullptr};

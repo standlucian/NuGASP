@@ -324,6 +324,7 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
 
 bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteFileInfo> &outList, QString *errorMessage)
 {
+    QMutexLocker locker(&m_sessionMutex);
     outList.clear();
     if (!isConnected()) {
         if (errorMessage) *errorMessage = "Not connected to remote host.";
@@ -390,6 +391,7 @@ bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteF
 
 bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMessage)
 {
+    QMutexLocker locker(&m_sessionMutex);
     if (!isConnected()) {
         if (errorMessage) *errorMessage = "Not connected to remote host.";
         return false;
@@ -437,6 +439,7 @@ bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMes
 
 bool RemoteSession::fileExists(const QString &remotePath, RemoteFileInfo *outInfo)
 {
+    QMutexLocker locker(&m_sessionMutex);
     if (!isConnected()) return false;
 
     QString clean = sanitizePath(remotePath);
@@ -503,8 +506,12 @@ bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDet
 
 bool RemoteSession::downloadFile(const QString &remotePath, const QString &localPath,
                                  std::function<void(qint64, qint64)> progressCallback,
-                                 QString *errorMessage)
+                                 QString *errorMessage,
+                                 std::function<bool()> cancelCheck,
+                                 bool forceReDownload)
 {
+    QMutexLocker locker(&m_sessionMutex);
+
     if (!isConnected()) {
         if (errorMessage) *errorMessage = "Not connected to remote host.";
         return false;
@@ -527,6 +534,18 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
         totalBytes = static_cast<qint64>(attrs.filesize);
     }
 
+    // Fast-path: Check if already cached with matching file size
+    if (!forceReDownload && QFile::exists(localPath)) {
+        QFileInfo localExisting(localPath);
+        if (totalBytes > 0 && localExisting.size() == totalBytes) {
+            libssh2_sftp_close(handle);
+            if (progressCallback) {
+                progressCallback(totalBytes, totalBytes);
+            }
+            return true;
+        }
+    }
+
     // Ensure parent directory exists locally
     QFileInfo localInfo(localPath);
     QDir().mkpath(localInfo.absolutePath());
@@ -544,6 +563,14 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
     qint64 bytesDone = 0;
 
     while (true) {
+        if (cancelCheck && cancelCheck()) {
+            localFile.close();
+            QFile::remove(tempLocalPath);
+            libssh2_sftp_close(handle);
+            if (errorMessage) *errorMessage = "Download cancelled by user.";
+            return false;
+        }
+
         ssize_t rc = libssh2_sftp_read(handle, buffer.data(), buffer.size());
         if (rc < 0) {
             localFile.close();
@@ -590,6 +617,7 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
                                std::function<void(qint64, qint64)> progressCallback,
                                QString *errorMessage)
 {
+    QMutexLocker locker(&m_sessionMutex);
     if (!isConnected()) {
         if (errorMessage) *errorMessage = "Not connected to remote host.";
         return false;
@@ -676,10 +704,12 @@ QString RemoteSession::getLocalCachePath(const QString &remotePath) const
 
 bool RemoteSession::syncRemoteFileToCache(const QString &remotePath, QString &outLocalPath,
                                          std::function<void(qint64, qint64)> progressCallback,
-                                         QString *errorMessage)
+                                         QString *errorMessage,
+                                         std::function<bool()> cancelCheck,
+                                         bool forceReDownload)
 {
     outLocalPath = getLocalCachePath(remotePath);
-    return downloadFile(remotePath, outLocalPath, progressCallback, errorMessage);
+    return downloadFile(remotePath, outLocalPath, progressCallback, errorMessage, cancelCheck, forceReDownload);
 }
 
 bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &currentFileName,

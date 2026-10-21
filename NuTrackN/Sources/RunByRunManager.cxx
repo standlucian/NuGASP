@@ -44,6 +44,64 @@
 #include <cmath>
 
 //==============================================================================
+// RunDownloadWorker Implementation
+//==============================================================================
+RunDownloadWorker::RunDownloadWorker(const std::vector<QString> &remotePaths,
+                                     const std::vector<QString> &localPaths,
+                                     QObject *parent)
+    : QObject(parent), m_remotePaths(remotePaths), m_localPaths(localPaths)
+{
+}
+
+void RunDownloadWorker::start()
+{
+    m_stopRequested.store(false);
+    auto session = RemoteSession::globalSession();
+    if (!session || !session->isConnected()) {
+        emit allFinished(0, static_cast<int>(m_remotePaths.size()), false);
+        return;
+    }
+
+    const int total = static_cast<int>(m_remotePaths.size());
+    int success = 0;
+    int fails = 0;
+
+    for (int i = 0; i < total; ++i) {
+        if (m_stopRequested.load()) {
+            emit allFinished(success, fails, true);
+            return;
+        }
+
+        const QString &remote = m_remotePaths[i];
+        QString fName = QFileInfo(remote).fileName();
+
+        emit runStarted(i, total, fName);
+
+        QString cachedPath;
+        QString err;
+        bool ok = session->syncRemoteFileToCache(
+            remote, cachedPath,
+            [this, i, total](qint64 done, qint64 totalBytes) {
+                emit runProgress(i, total, done, totalBytes);
+            },
+            &err,
+            [this]() { return m_stopRequested.load(); }
+        );
+
+        if (ok) {
+            m_localPaths[i] = cachedPath;
+            success++;
+        } else {
+            fails++;
+        }
+
+        emit runFinished(i, total, fName, ok, err);
+    }
+
+    emit allFinished(success, fails, m_stopRequested.load());
+}
+
+//==============================================================================
 // DetectorDriftPlotWidget Implementation
 //==============================================================================
 DetectorDriftPlotWidget::DetectorDriftPlotWidget(QWidget *parent)
@@ -434,10 +492,12 @@ RunByRunManager::RunByRunManager(QMainCanvas *mainCanvas, QWidget *parent)
 
 RunByRunManager::~RunByRunManager()
 {
+    cleanupDownloadThread();
     if (m_workerThread && m_workerThread->isRunning()) {
         if (m_engine) m_engine->requestStop();
         m_workerThread->quit();
         m_workerThread->wait(3000);
+        m_workerThread->deleteLater();
     }
 }
 
@@ -873,6 +933,10 @@ void RunByRunManager::populateAnchorTable()
 
 void RunByRunManager::onBrowseRunsClicked()
 {
+    if (m_isDownloading) {
+        cancelAsyncDownload();
+    }
+
     QStringList remotePaths;
     bool isRemote = false;
     QStringList selectedFiles = NuFileDialog::getOpenFileNames(this, tr("Select Sequence Run Files"),
@@ -882,6 +946,8 @@ void RunByRunManager::onBrowseRunsClicked()
     if (selectedFiles.isEmpty()) return;
 
     m_runFilePaths.clear();
+    m_remoteRunPaths.clear();
+    m_isRemoteRuns = isRemote;
 
     if (selectedFiles.size() == 1 && !isRemote) {
         // Single local file selected: check if it belongs to a sequence prefix in that folder
@@ -919,14 +985,27 @@ void RunByRunManager::onBrowseRunsClicked()
         }
     } else {
         // Multiple files selected (or remote runs): sort naturally by numeric file order
+        struct RunSortItem {
+            QString localPath;
+            QString remotePath;
+        };
+        std::vector<RunSortItem> sortItems;
+        for (int i = 0; i < selectedFiles.size(); ++i) {
+            QString rPath = (isRemote && i < remotePaths.size()) ? remotePaths[i] : QString();
+            sortItems.push_back({selectedFiles[i], rPath});
+        }
+
         QCollator collator;
         collator.setNumericMode(true);
-        std::sort(selectedFiles.begin(), selectedFiles.end(), [&collator](const QString &a, const QString &b) {
-            return collator.compare(QFileInfo(a).fileName(), QFileInfo(b).fileName()) < 0;
+        std::sort(sortItems.begin(), sortItems.end(), [&collator](const RunSortItem &a, const RunSortItem &b) {
+            return collator.compare(QFileInfo(a.localPath).fileName(), QFileInfo(b.localPath).fileName()) < 0;
         });
 
-        for (const auto &p : selectedFiles) {
-            m_runFilePaths.push_back(p);
+        for (const auto &item : sortItems) {
+            m_runFilePaths.push_back(item.localPath);
+            if (isRemote) {
+                m_remoteRunPaths.push_back(item.remotePath);
+            }
         }
 
         QFileInfo fi(m_runFilePaths.front());
@@ -935,8 +1014,8 @@ void RunByRunManager::onBrowseRunsClicked()
     }
 
     if (!m_runFilePaths.empty()) {
-        QString dirName = isRemote && !remotePaths.isEmpty()
-            ? tr("Remote [%1]").arg(QFileInfo(remotePaths.front()).dir().dirName())
+        QString dirName = isRemote && !m_remoteRunPaths.empty()
+            ? tr("Remote [%1]").arg(QFileInfo(m_remoteRunPaths.front()).dir().dirName())
             : QFileInfo(m_runFilePaths.front()).dir().dirName();
         m_lblRunsSummary->setText(tr("Loaded <b>%1</b> runs from %2 (%3 to %4)")
                                       .arg(m_runFilePaths.size())
@@ -945,19 +1024,202 @@ void RunByRunManager::onBrowseRunsClicked()
                                       .arg(QFileInfo(m_runFilePaths.back()).fileName()));
 
         qint64 fSize = QFileInfo(m_runFilePaths.front()).size();
-        if (fSize % (65536 * 4) == 0) {
+        if (fSize == 0 && isRemote && !m_remoteRunPaths.empty()) {
+            RemoteFileInfo rInfo;
+            auto sess = RemoteSession::globalSession();
+            if (sess && sess->fileExists(m_remoteRunPaths.front(), &rInfo)) {
+                fSize = rInfo.size;
+            }
+        }
+
+        if (fSize % (65536 * 4) == 0 && fSize > 0) {
             m_spinDetEnd->setValue(std::max(0, static_cast<int>(fSize / (65536 * 4)) - 1));
             m_comboChannelLength->setCurrentIndex(0); // 65536
-        } else if (fSize % (4096 * 4) == 0) {
+        } else if (fSize % (4096 * 4) == 0 && fSize > 0) {
             m_spinDetEnd->setValue(std::max(0, static_cast<int>(fSize / (4096 * 4)) - 1));
             m_comboChannelLength->setCurrentIndex(3); // 4096
+        }
+
+        // Initialize 2D grid matrix immediately so user sees all runs & detectors
+        const int dStart = m_spinDetStart->value();
+        const int dEnd = m_spinDetEnd->value();
+        const int numDets = std::max(1, dEnd - dStart + 1);
+        const int numRuns = static_cast<int>(m_runFilePaths.size());
+
+        m_gridMatrix->clear();
+        m_gridMatrix->setRowCount(numRuns);
+        m_gridMatrix->setColumnCount(numDets);
+
+        QStringList colHeaders;
+        for (int d = dStart; d <= dEnd; ++d) {
+            colHeaders << QString("Det #%1").arg(d);
+        }
+        m_gridMatrix->setHorizontalHeaderLabels(colHeaders);
+
+        QStringList rowHeaders;
+        for (int r = 0; r < numRuns; ++r) {
+            rowHeaders << QFileInfo(m_runFilePaths[r]).fileName();
+        }
+        m_gridMatrix->setVerticalHeaderLabels(rowHeaders);
+
+        for (int r = 0; r < numRuns; ++r) {
+            for (int c = 0; c < numDets; ++c) {
+                QTableWidgetItem *item = new QTableWidgetItem(isRemote ? "Pending (Remote)" : "Pending");
+                item->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+                item->setTextAlignment(Qt::AlignCenter);
+                item->setBackground(QBrush(QColor("#37474f")));
+                m_gridMatrix->setItem(r, c, item);
+            }
+        }
+
+        // Populate detector inspector combobox
+        m_comboPlotDet->clear();
+        for (int d = dStart; d <= dEnd; ++d) {
+            m_comboPlotDet->addItem(QString("Detector #%1").arg(d), d);
         }
 
         if (m_comboPlotDet && m_comboPlotDet->count() > 0) {
             updatePlot(m_comboPlotDet->currentData().toInt());
         }
+
+        // If runs are remote, begin asynchronous background download!
+        if (isRemote && !m_remoteRunPaths.empty()) {
+            startAsyncDownload();
+        }
     } else {
         m_lblRunsSummary->setText(tr("<font color='red'>No files selected.</font>"));
+    }
+}
+
+//==============================================================================
+// Asynchronous Background Run Downloading
+//==============================================================================
+void RunByRunManager::cleanupDownloadThread()
+{
+    if (m_downloadThread) {
+        if (m_downloadWorker) {
+            m_downloadWorker->requestStop();
+        }
+        m_downloadThread->quit();
+        m_downloadThread->wait(3000);
+        m_downloadThread->deleteLater();
+        m_downloadThread = nullptr;
+    }
+    m_downloadWorker.reset();
+}
+
+void RunByRunManager::cancelAsyncDownload()
+{
+    if (m_downloadWorker) {
+        m_downloadWorker->requestStop();
+    }
+    cleanupDownloadThread();
+    m_isDownloading = false;
+    m_startCalibrationPending = false;
+    m_btnCancel->setText(tr("🛑 Cancel"));
+    m_lblStatusText->setText(tr("Download stopped."));
+}
+
+void RunByRunManager::startAsyncDownload()
+{
+    if (m_remoteRunPaths.empty() || !m_isRemoteRuns) return;
+
+    cleanupDownloadThread();
+
+    m_isDownloading = true;
+    m_downloadedSuccessCount = 0;
+    m_downloadedFailureCount = 0;
+    m_startCalibrationPending = false;
+
+    m_progressBar->setValue(0);
+    m_lblStatusText->setText(tr("⬇️ Downloading %1 remote runs in background...").arg(m_remoteRunPaths.size()));
+    m_btnCancel->setEnabled(true);
+    m_btnCancel->setText(tr("🛑 Cancel Download"));
+
+    m_downloadWorker = std::make_unique<RunDownloadWorker>(m_remoteRunPaths, m_runFilePaths);
+    m_downloadThread = new QThread(this);
+    m_downloadWorker->moveToThread(m_downloadThread);
+
+    connect(m_downloadThread, &QThread::started, m_downloadWorker.get(), &RunDownloadWorker::start);
+    connect(m_downloadWorker.get(), &RunDownloadWorker::runStarted, this, &RunByRunManager::onDownloadRunStarted);
+    connect(m_downloadWorker.get(), &RunDownloadWorker::runProgress, this, &RunByRunManager::onDownloadRunProgress);
+    connect(m_downloadWorker.get(), &RunDownloadWorker::runFinished, this, &RunByRunManager::onDownloadRunFinished);
+    connect(m_downloadWorker.get(), &RunDownloadWorker::allFinished, this, &RunByRunManager::onDownloadAllFinished);
+    connect(m_downloadWorker.get(), &RunDownloadWorker::allFinished, m_downloadThread, &QThread::quit);
+
+    m_downloadThread->start();
+}
+
+void RunByRunManager::onDownloadRunStarted(int runIndex, int totalRuns, const QString &fileName)
+{
+    m_lblStatusText->setText(tr("⬇️ Downloading run (%1/%2): %3 ...")
+                                 .arg(runIndex + 1).arg(totalRuns).arg(fileName));
+}
+
+void RunByRunManager::onDownloadRunProgress(int runIndex, int totalRuns, qint64 bytesDone, qint64 bytesTotal)
+{
+    if (totalRuns > 0) {
+        int filePct = (bytesTotal > 0) ? static_cast<int>((bytesDone * 100) / bytesTotal) : 0;
+        int overallPct = (runIndex * 100 + filePct) / totalRuns;
+        m_progressBar->setValue(overallPct);
+    }
+}
+
+void RunByRunManager::onDownloadRunFinished(int runIndex, int totalRuns, const QString &fileName, bool success, const QString &errorMsg)
+{
+    Q_UNUSED(totalRuns);
+    if (success) {
+        m_downloadedSuccessCount++;
+        if (m_gridMatrix && runIndex >= 0 && runIndex < m_gridMatrix->rowCount()) {
+            for (int col = 0; col < m_gridMatrix->columnCount(); ++col) {
+                QTableWidgetItem *item = m_gridMatrix->item(runIndex, col);
+                if (item && item->text() == "Pending (Remote)") {
+                    item->setText("Ready");
+                    item->setBackground(QBrush(QColor("#263238")));
+                }
+            }
+        }
+    } else {
+        m_downloadedFailureCount++;
+        if (!m_downloadWorker || !m_downloadWorker->isStopRequested()) {
+            CommandPrompt::getInstance()->appendPlainText(
+                QString("⚠️ Remote run download error (%1): %2\n").arg(fileName, errorMsg));
+        }
+    }
+}
+
+void RunByRunManager::onDownloadAllFinished(int successCount, int failCount, bool wasCancelled)
+{
+    m_isDownloading = false;
+    m_btnCancel->setText(tr("🛑 Cancel"));
+    if (!m_isRunning) {
+        m_btnCancel->setEnabled(false);
+    }
+    cleanupDownloadThread();
+
+    if (wasCancelled) {
+        m_lblStatusText->setText(tr("Download cancelled by user (%1 of %2 runs cached).")
+                                     .arg(successCount).arg(m_remoteRunPaths.size()));
+        m_startCalibrationPending = false;
+        m_btnStart->setEnabled(true);
+        return;
+    }
+
+    if (failCount > 0) {
+        m_lblStatusText->setText(tr("Download complete: %1 runs cached, %2 failed.")
+                                     .arg(successCount).arg(failCount));
+    } else {
+        m_lblStatusText->setText(tr("✅ All %1 remote runs cached and ready for calibration.")
+                                     .arg(successCount));
+        m_progressBar->setValue(100);
+    }
+
+    m_btnStart->setEnabled(true);
+
+    if (m_startCalibrationPending) {
+        m_startCalibrationPending = false;
+        m_lblStatusText->setText(tr("Starting queued calibration..."));
+        onStartCalibrationClicked();
     }
 }
 
@@ -1168,6 +1430,22 @@ void RunByRunManager::onGrabParametersClicked()
         return;
     }
 
+    // Ensure reference file is cached if remote
+    if (m_isRemoteRuns && !QFile::exists(refPath)) {
+        for (size_t i = 0; i < m_runFilePaths.size(); ++i) {
+            if (m_runFilePaths[i] == refPath && i < m_remoteRunPaths.size()) {
+                m_lblStatusText->setText(tr("Downloading reference run %1...").arg(QFileInfo(refPath).fileName()));
+                qApp->processEvents();
+                auto sess = RemoteSession::globalSession();
+                QString syncErr;
+                if (sess) {
+                    sess->syncRemoteFileToCache(m_remoteRunPaths[i], refPath, nullptr, &syncErr);
+                }
+                break;
+            }
+        }
+    }
+
     std::vector<double> refSpectrum;
     QString err;
     int channels = m_comboChannelLength ? m_comboChannelLength->currentData().toInt() : 65536;
@@ -1273,6 +1551,15 @@ void RunByRunManager::onStartCalibrationClicked()
     cfg.maxAllowedDriftCh = m_spinDriftTolerance->value();
     cfg.maxAllowedChi2NDF = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
 
+    // If runs are currently downloading in background, queue auto-calibration!
+    if (m_isDownloading) {
+        m_startCalibrationPending = true;
+        m_btnStart->setEnabled(false);
+        m_lblStatusText->setText(tr("⏳ Calibration queued: will automatically begin once runs finish downloading (%1/%2 ready)...")
+                                     .arg(m_downloadedSuccessCount).arg(m_remoteRunPaths.size()));
+        return;
+    }
+
     m_completedTrajectories.clear();
     m_isRunning = true;
     m_btnStart->setEnabled(false);
@@ -1307,6 +1594,14 @@ void RunByRunManager::onStartCalibrationClicked()
 
 void RunByRunManager::onCancelCalibrationClicked()
 {
+    if (m_isDownloading) {
+        if (m_downloadWorker) {
+            m_downloadWorker->requestStop();
+            m_lblStatusText->setText(tr("Cancelling background run download..."));
+        }
+        return;
+    }
+
     if (m_engine) {
         m_engine->requestStop();
         m_lblStatusText->setText(tr("Cancelling calibration run..."));
@@ -1673,6 +1968,16 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     const int detId = col + detStart;
     const QString filePath = m_runFilePaths[row];
     if (!m_mainCanvas) return;
+
+    // Ensure file is cached locally if remote
+    if (m_isRemoteRuns && !QFile::exists(filePath) && row < static_cast<int>(m_remoteRunPaths.size())) {
+        auto sess = RemoteSession::globalSession();
+        QString syncErr;
+        QString syncPath = filePath;
+        if (sess) {
+            sess->syncRemoteFileToCache(m_remoteRunPaths[row], syncPath, nullptr, &syncErr);
+        }
+    }
 
     syncAnchorsFromTable();
 
