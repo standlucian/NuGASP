@@ -9,6 +9,8 @@
 #include "TLine.h"
 #include "TFitResult.h"
 #include "TVirtualPad.h"
+#include "TLatex.h"
+#include "TColor.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -2015,6 +2017,11 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     TH1F *hist = m_mainCanvas->HijF[sel_i][sel_j];
     if (!hist) return;
 
+    TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(hist);
+    if (tHist) {
+        tHist->ClearCalibration();
+    }
+
     TVirtualPad *pad = nullptr;
     if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
         pad = (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1)
@@ -2205,21 +2212,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
         }
     }
 
-    // 6. If calibration was already completed for this run & detector, apply it for energy readouts
-    TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(hist);
-    for (const auto &traj : m_completedTrajectories) {
-        if (traj.detectorId == detId) {
-            if (row >= 0 && row < static_cast<int>(traj.runResults.size())) {
-                const auto &runRes = traj.runResults[row];
-                if (tHist && (runRes.status == RunCalibStatus::Success || runRes.isFallbackFromPrevious)) {
-                    tHist->SetCalibration(runRes.a0, runRes.a1, runRes.a2);
-                }
-            }
-            break;
-        }
-    }
-
-    // 7. Render peak centroid labels and update canvas
+    // 6. Render peak centroid labels (in raw channels) and update canvas
     m_mainCanvas->renderPeakLabels(sel_i, sel_j);
     m_mainCanvas->updateAxisStatusLabels();
 
@@ -2519,6 +2512,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         TLine *guideLine{nullptr};
         TF1 *fitFunc{nullptr};
         TF1 *bkgFunc{nullptr};
+        TLatex *peakLabel{nullptr};
     };
     std::vector<PeakRowWidgets> rowWidgets(nAnchors);
 
@@ -2578,6 +2572,29 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 }
                 isUsed = fa.isValid;
                 break;
+            }
+        }
+
+        if (!foundSaved && !specData.empty()) {
+            double centerCh = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
+            double windowCh = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
+            double minCounts = (anc.minCounts > 0.0) ? anc.minCounts : 20.0;
+            FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, anc.physicalEnergy);
+            if (!fa.isValid && std::abs(centerCh - ((anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy)) > 0.5) {
+                double baseCentroid = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
+                fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, anc.physicalEnergy);
+            }
+            if (fa.isValid && fa.centroidCh > 0.0) {
+                initCentroid = fa.centroidCh;
+                if (fa.fwhmCh > 0.2) initFwhm = fa.fwhmCh;
+                initBkg = fa.background;
+                initSlope = fa.bkgSlope;
+                initStep = fa.bkgStep;
+                initAmpl = fa.amplitude;
+                if (fa.centroidErrCh > 0.0) initCentroidErr = fa.centroidErrCh;
+                if (fa.chi2 > 0.0) initPeakChi2 = fa.chi2;
+                isUsed = true;
+                foundSaved = true;
             }
         }
         rowWidgets[i].centroidErrCh = initCentroidErr;
@@ -2793,7 +2810,35 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
     RunCalibResult liveCalibResult;
 
-    // Helper to update on-screen visual ROOT canvas marker guideline, fit curve, and baseline
+    const int s_i = m_mainCanvas ? m_mainCanvas->SelectedElement_i : 1;
+    const int s_j = m_mainCanvas ? m_mainCanvas->SelectedElement_j : 1;
+    TVirtualPad *activePad = nullptr;
+    if (m_mainCanvas && m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+        activePad = (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1)
+            ? m_mainCanvas->canvas->getCanvas()->GetPad((s_i - 1) * m_mainCanvas->maxElement_j + s_j)
+            : m_mainCanvas->canvas->getCanvas();
+    }
+    if (!activePad) activePad = gPad;
+
+    // Clean up generic PeakLabels from inspectSpectrumOnCanvas so dedicated rbr_peak_label annotations take over
+    if (activePad && activePad->GetListOfPrimitives()) {
+        std::vector<TObject*> toRemove;
+        TIter next(activePad->GetListOfPrimitives());
+        while (TObject *obj = next()) {
+            if (obj && obj->InheritsFrom(TLatex::Class())) {
+                TNamed *named = dynamic_cast<TNamed*>(obj);
+                if (named && strcmp(named->GetName(), "PeakLabel") == 0) {
+                    toRemove.push_back(obj);
+                }
+            }
+        }
+        for (TObject *obj : toRemove) {
+            activePad->GetListOfPrimitives()->Remove(obj);
+            delete obj;
+        }
+    }
+
+    // Helper to update on-screen visual ROOT canvas marker guideline, fit curve, baseline, and centroid label
     auto updateCanvasPeakOverlay = [&](int peakIdx) {
         if (peakIdx < 0 || peakIdx >= nAnchors) return;
         if (!m_mainCanvas) return;
@@ -2827,21 +2872,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
 
         // 2. Active ROOT pad & spectrum histogram
-        const int s_i = m_mainCanvas->SelectedElement_i;
-        const int s_j = m_mainCanvas->SelectedElement_j;
         TH1F *h = m_mainCanvas->HijF[s_i][s_j];
         if (!h) return;
 
-        TVirtualPad *activePad = nullptr;
-        if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
-            activePad = (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1)
-                ? m_mainCanvas->canvas->getCanvas()->GetPad((s_i - 1) * m_mainCanvas->maxElement_j + s_j)
-                : m_mainCanvas->canvas->getCanvas();
-        }
-        if (!activePad) activePad = gPad;
-        if (!activePad) return;
-
-        activePad->cd();
+        if (activePad) activePad->cd();
 
         // 3. Visual Guideline TLine at current centroid
         TLine *guideLine = rowWidgets[peakIdx].guideLine;
@@ -2871,7 +2905,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double stepVal = rowWidgets[peakIdx].bkgStep;
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
-        if (!fFit) {
+        if (!fFit && activePad) {
             fFit = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_fit_%d_%d", detId, peakIdx)));
         }
         if (!fFit) {
@@ -2893,7 +2927,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 5. Baseline Background Function TF1 with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
         TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
-        if (!fBkg) {
+        if (!fBkg && activePad) {
             fBkg = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_background_%d_%d", detId, peakIdx)));
         }
         if (!fBkg) {
@@ -2913,6 +2947,46 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fBkg->SetParameter(3, stepVal);
         fBkg->SetParameter(4, sigma);
 
+        // 6. Centroid Text Label TLatex directly over peak
+        TLatex *peakLabel = rowWidgets[peakIdx].peakLabel;
+        if (!peakLabel && activePad) {
+            peakLabel = dynamic_cast<TLatex*>(activePad->GetPrimitive(Form("rbr_peak_label_%d_%d", detId, peakIdx)));
+        }
+        if (!peakLabel) {
+            peakLabel = new TLatex();
+            peakLabel->SetName(Form("rbr_peak_label_%d_%d", detId, peakIdx));
+            peakLabel->SetTextFont(Design::getRootGraphFont(3));
+            peakLabel->SetTextSize(20);
+            peakLabel->SetTextAlign(21); // Centered horizontally at peak center, bottom-aligned
+            peakLabel->Draw();
+            rowWidgets[peakIdx].peakLabel = peakLabel;
+            m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(peakLabel);
+        }
+        const double peakHeight = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
+        peakLabel->SetX(cCh);
+        peakLabel->SetY(peakHeight);
+        if (isUsed) {
+            const Color_t textCol = (Design::getGraphBackgroundColor().lightness() > 130) ? kBlack : kWhite;
+            peakLabel->SetTextColor(textCol);
+            peakLabel->SetTitle(Form("%.2f", cCh));
+        } else {
+            peakLabel->SetTextColor(kGray);
+            peakLabel->SetTitle(Form("(%.2f)", cCh));
+        }
+
+        // 7. Keep mainCanvas gaussCenters in sync with active peak centroids
+        m_mainCanvas->gaussCenters[s_i][s_j].clear();
+        m_mainCanvas->gaussCentersHeight[s_i][s_j].clear();
+        for (int k = 0; k < nAnchors; ++k) {
+            if (rowWidgets[k].chkUse && rowWidgets[k].chkUse->isChecked()) {
+                double cent = rowWidgets[k].spinCentroid ? rowWidgets[k].spinCentroid->value() : rowWidgets[k].nominalCentroid;
+                int b = h->FindBin(cent);
+                double ht = (b >= 1 && b <= h->GetNbinsX()) ? h->GetBinContent(b) : 0.0;
+                m_mainCanvas->gaussCenters[s_i][s_j].push_back(cent);
+                m_mainCanvas->gaussCentersHeight[s_i][s_j].push_back(ht);
+            }
+        }
+
         if (!isUsed) {
             guideLine->SetLineColor(kGray);
             guideLine->SetLineStyle(3);
@@ -2931,8 +3005,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             fBkg->SetLineStyle(2);
         }
 
-        activePad->Modified();
-        activePad->Update();
+        if (activePad) {
+            activePad->Modified();
+            activePad->Update();
+        }
         if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
             m_mainCanvas->canvas->getCanvas()->Modified();
             m_mainCanvas->canvas->getCanvas()->Update();
@@ -3041,20 +3117,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             }
         }
 
-        // Live update active canvas histogram calibration so peak labels and cursor readouts match live fit!
-        if (m_mainCanvas) {
-            const int s_i = m_mainCanvas->SelectedElement_i;
-            const int s_j = m_mainCanvas->SelectedElement_j;
-            TH1F *activeHist = m_mainCanvas->HijF[s_i][s_j];
-            TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(activeHist);
-            if (tHist && res.a1 > 0.0) {
-                tHist->SetCalibration(res.a0, res.a1, res.a2);
-                m_mainCanvas->renderPeakLabels(s_i, s_j);
-                if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
-                    m_mainCanvas->canvas->getCanvas()->Modified();
-                    m_mainCanvas->canvas->getCanvas()->Update();
-                }
-            }
+        if (activePad) {
+            activePad->Modified();
+            activePad->Update();
+        }
+        if (m_mainCanvas && m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+            m_mainCanvas->canvas->getCanvas()->Modified();
+            m_mainCanvas->canvas->getCanvas()->Update();
         }
     };
 
@@ -3208,8 +3277,25 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             rowWidgets[i].guideLine = nullptr;
             rowWidgets[i].fitFunc = nullptr;
             rowWidgets[i].bkgFunc = nullptr;
+            rowWidgets[i].peakLabel = nullptr;
         }
         inspectSpectrumOnCanvas(row, col);
+        if (activePad && activePad->GetListOfPrimitives()) {
+            std::vector<TObject*> toRemove;
+            TIter next(activePad->GetListOfPrimitives());
+            while (TObject *obj = next()) {
+                if (obj && obj->InheritsFrom(TLatex::Class())) {
+                    TNamed *named = dynamic_cast<TNamed*>(obj);
+                    if (named && strcmp(named->GetName(), "PeakLabel") == 0) {
+                        toRemove.push_back(obj);
+                    }
+                }
+            }
+            for (TObject *obj : toRemove) {
+                activePad->GetListOfPrimitives()->Remove(obj);
+                delete obj;
+            }
+        }
         for (int i = 0; i < nAnchors; ++i) {
             updateCanvasPeakOverlay(i);
         }
