@@ -2090,7 +2090,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             const double slopeVal = savedFa->bkgSlope;
 
             const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : std::clamp(fwhmVal * 3.5, 12.0, 45.0);
-            const int fitHalfWidth = std::clamp(static_cast<int>(std::ceil(sigmaVal * 3.5)), 3, static_cast<int>(windowCh * 0.85));
+            const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
             const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
             const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
 
@@ -2141,10 +2141,10 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
         const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : 15.0;
         const double minCounts = (a.minCounts > 0.0) ? a.minCounts : 20.0;
-        FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, a.physicalEnergy, a.expectedFwhmCh);
+        FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, a.physicalEnergy);
         if (!fa.isValid && std::abs(centerCh - ((a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy)) > 0.5) {
             double baseCentroid = (a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy;
-            fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, a.physicalEnergy, a.expectedFwhmCh);
+            fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, a.physicalEnergy);
         }
 
         if (fa.isValid) {
@@ -2152,7 +2152,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             fittedCentroid = fa.centroidCh;
             const double meanVal = fa.centroidCh;
             const double sigmaVal = std::max(0.1, fa.fwhmCh / 2.35482);
-            const int fitHalfWidth = std::clamp(static_cast<int>(std::ceil(sigmaVal * 3.5)), 3, static_cast<int>(windowCh * 0.85));
+            const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
             const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
             const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
 
@@ -2579,10 +2579,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             double centerCh = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
             double windowCh = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
             double minCounts = (anc.minCounts > 0.0) ? anc.minCounts : 20.0;
-            FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, anc.physicalEnergy, anc.expectedFwhmCh);
+            FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, anc.physicalEnergy);
             if (!fa.isValid && std::abs(centerCh - ((anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy)) > 0.5) {
                 double baseCentroid = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
-                fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, anc.physicalEnergy, anc.expectedFwhmCh);
+                fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, anc.physicalEnergy);
             }
             if (fa.isValid && fa.centroidCh > 0.0) {
                 initCentroid = fa.centroidCh;
@@ -2900,9 +2900,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double ampl = std::max(1.0, binCounts - bkgVal);
         rowWidgets[peakIdx].amplitude = ampl;
         double sigma = std::max(0.2, fCh / 2.35482);
-        const double fitSpan = std::min(wCh, std::max(3.5, sigma * 3.5));
-        double xMin = std::max(0.0, cCh - fitSpan);
-        double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + fitSpan);
+        double xMin = std::max(0.0, cCh - wCh);
+        double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
         double stepVal = rowWidgets[peakIdx].bkgStep;
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
@@ -3157,7 +3156,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // so MINUIT refines the peak the user is pointing to instead of jumping to a distant peak.
         double fitWindow = fixed.fixCentroid ? wCh : std::clamp(fCh * 1.5, 3.5, std::max(5.0, wCh * 0.5));
 
-        FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, fitWindow, 5.0, en, fixed, fCh);
+        FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, fitWindow, 5.0, en, fixed);
         if (fa.isValid) {
             if (!fixed.fixCentroid) {
                 rowWidgets[peakIdx].spinCentroid->blockSignals(true);

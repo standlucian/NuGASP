@@ -50,18 +50,16 @@ std::vector<RunCalibResult> RunByRunEngine::getAllFailures() const
 //==============================================================================
 FittedAnchor RunByRunEngine::fitAnchorPeak(const std::vector<double> &spectrum,
                                           double centerCh, double windowCh,
-                                          double minCounts, double energy,
-                                          double expectedFwhm)
+                                          double minCounts, double energy)
 {
     FitFixedParams fixed;
-    return fitAnchorPeakWithFixed(spectrum, centerCh, windowCh, minCounts, energy, fixed, expectedFwhm);
+    return fitAnchorPeakWithFixed(spectrum, centerCh, windowCh, minCounts, energy, fixed);
 }
 
 FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &spectrum,
                                                   double centerCh, double windowCh,
                                                   double minCounts, double energy,
-                                                  const FitFixedParams &fixed,
-                                                  double expectedFwhm)
+                                                  const FitFixedParams &fixed)
 {
     FittedAnchor result;
     result.energy = energy;
@@ -106,7 +104,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         return result; // Low counts
     }
 
-    // 2. Estimate empirical FWHM via half-maximum walk with shoulder/multiplet asymmetry protection
+    // 2. Estimate empirical FWHM via half-maximum walk from maxBin
     double halfMax = baseVal + 0.5 * (maxVal - baseVal);
     double leftHM = static_cast<double>(lowCh);
     for (int ch = maxBin; ch >= lowCh; --ch) {
@@ -128,49 +126,33 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
             break;
         }
     }
-    double leftDist = std::max(0.3, static_cast<double>(maxBin) - leftHM);
-    double rightDist = std::max(0.3, rightHM - static_cast<double>(maxBin));
     double obsFwhm = rightHM - leftHM;
+    double estFwhm = (obsFwhm >= 0.8 && obsFwhm <= windowCh * 1.5)
+        ? obsFwhm
+        : (fixed.fixFwhm ? fixed.fixedFwhm : std::clamp(windowCh * 0.25, 2.0, 10.0));
 
-    // If one side has an adjacent shoulder/doublet, use the clean side to estimate physical width
-    if (leftDist > 1.8 * rightDist && rightDist >= 0.5) {
-        obsFwhm = 2.0 * rightDist;
-    } else if (rightDist > 1.8 * leftDist && leftDist >= 0.5) {
-        obsFwhm = 2.0 * leftDist;
-    }
+    // 2. Dynamic peak extent & adaptive background windowing:
+    // Look at how big the peak is (amplitude & FWHM) to set peak exclusion boundaries
+    const double rawAmpl = std::max(1.0, maxVal - baseVal);
+    const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
+    const double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmpl))), 2.0, 3.5);
+    const int peakHalfWidth = std::clamp(static_cast<int>(std::ceil(nSig * estSigma)), 3, static_cast<int>(windowCh * 0.8));
 
-    double estFwhm = fixed.fixFwhm 
-        ? fixed.fixedFwhm 
-        : ((expectedFwhm > 0.5) 
-            ? expectedFwhm 
-            : ((obsFwhm >= 0.8 && obsFwhm <= windowCh * 1.5) ? obsFwhm : std::clamp(windowCh * 0.25, 1.5, 5.0)));
-    double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::clamp(estFwhm / 2.35482, 0.2, 3.0);
-
-    // 3. Maximum fit half-width bounded by ~3.2 sigma so fit isolates the peak without swallowing neighboring lines
-    const int maxHalfW = std::clamp(static_cast<int>(std::round(estSigma * 3.2)), 3, static_cast<int>(windowCh));
-
-    // 4. Search outward step-by-step from maxBin for the first local minimum, valley, or saddle point
-    int leftValley = std::max(lowCh, maxBin - maxHalfW);
-    for (int ch = maxBin - 1; ch >= lowCh; --ch) {
-        if (ch > 0 && spectrum[ch] <= spectrum[ch + 1] && spectrum[ch] < spectrum[ch - 1]) {
-            leftValley = ch;
-            break;
-        }
-        if (maxBin - ch >= maxHalfW) {
-            leftValley = ch;
-            break;
+    // Search outward from peak exclusion boundaries for true local background valleys (saddle points)
+    // to avoid sampling inside peak wings or climbing adjacent neighbor lines
+    int leftValley = std::max(0, maxBin - peakHalfWidth);
+    const int lSearchMin = std::max(0, maxBin - static_cast<int>(windowCh));
+    if (leftValley > lSearchMin) {
+        for (int ch = leftValley; ch >= lSearchMin; --ch) {
+            if (spectrum[ch] < spectrum[leftValley]) leftValley = ch;
         }
     }
 
-    int rightValley = std::min(highCh, maxBin + maxHalfW);
-    for (int ch = maxBin + 1; ch <= highCh; ++ch) {
-        if (ch < totalBins - 1 && spectrum[ch] <= spectrum[ch - 1] && spectrum[ch] < spectrum[ch + 1]) {
-            rightValley = ch;
-            break;
-        }
-        if (ch - maxBin >= maxHalfW) {
-            rightValley = ch;
-            break;
+    int rightValley = std::min(totalBins - 1, maxBin + peakHalfWidth);
+    const int rSearchMax = std::min(totalBins - 1, maxBin + static_cast<int>(windowCh));
+    if (rSearchMax > rightValley) {
+        for (int ch = rightValley; ch <= rSearchMax; ++ch) {
+            if (spectrum[ch] < spectrum[rightValley]) rightValley = ch;
         }
     }
 
@@ -188,25 +170,24 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         baseVal = (leftBkg + rightBkg) / 2.0;
     }
 
-    const double rawAmpl = std::max(1.0, maxVal - baseVal);
+    // Physical Compton step capping: in physical HPGe detectors, Compton step is at most ~5% of peak amplitude
     const double rawStep = std::max(0.0, leftBkg - rightBkg);
     const double maxPhysStep = std::max(0.0, 0.05 * rawAmpl);
     const double estStep = std::min(rawStep, maxPhysStep);
-    // Only activate Compton step if explicitly requested/fixed by user
-    const bool useStep = fixed.fixStep ? (fixed.fixedStep > 0.0) : false;
+    const bool useStep = fixed.fixStep ? (fixed.fixedStep > 0.0) : (!fixed.fixBaseline && estStep >= 1.5 && rawAmpl >= 25.0);
 
     // Adaptive fit window spanning from left valley to right valley
-    int fitMin = std::max(lowCh, std::min(maxBin - 2, leftValley));
-    int fitMax = std::min(highCh, std::max(maxBin + 2, rightValley));
+    int fitMin = std::max(1, std::max(maxBin - static_cast<int>(windowCh), leftValley));
+    int fitMax = std::min(totalBins - 1, std::min(maxBin + static_cast<int>(windowCh), rightValley));
     int nFitBins = fitMax - fitMin + 1;
     if (nFitBins < 5) {
-        fitMin = std::max(lowCh, maxBin - 2);
-        fitMax = std::min(highCh, maxBin + 2);
+        fitMin = std::max(1, maxBin - peakHalfWidth - 2);
+        fitMax = std::min(totalBins - 1, maxBin + peakHalfWidth + 2);
         nFitBins = fitMax - fitMin + 1;
     }
     if (nFitBins < 5) return result;
 
-    // Use a lightweight ROOT TH1F for standard Gaussian + linear background fit
+    // Use a lightweight ROOT TH1F for standard Gaussian + linear background + Compton step fit
     TH1F hTemp("hAnchorTemp", "Anchor", nFitBins, fitMin - 0.5, fitMax + 0.5);
     hTemp.SetDirectory(nullptr);
     for (int i = 0; i < nFitBins; ++i) {
@@ -217,7 +198,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
 
     // Centered formula with Compton step:
     // [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
-    // Parameter 3 is the local baseline AT the centroid
+    // Parameter 3 is the local high-energy baseline AT the centroid
     // Parameter 5 is the Compton step height
     const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (useStep ? 0.0 : ((fitMax > fitMin) ? (rightBkg - leftBkg) / static_cast<double>(fitMax - fitMin) : 0.0));
     const double estAmpl = std::max(1.0, maxVal - (useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal));
@@ -238,7 +219,7 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         fGaus.FixParameter(2, std::max(0.1, fixed.fixedFwhm / 2.35482));
     } else {
         fGaus.SetParameter(2, estSigma);
-        fGaus.SetParLimits(2, 0.35, std::max(3.0, estSigma * 2.2));
+        fGaus.SetParLimits(2, 0.4, 25.0); // HPGe physical peak width boundaries
     }
 
     if (fixed.fixBaseline) {
@@ -647,8 +628,7 @@ void RunByRunEngine::run()
                                                centerCh,
                                                anchorDef.searchWindowCh,
                                                anchorDef.minCounts,
-                                               anchorDef.physicalEnergy,
-                                               anchorDef.expectedFwhmCh);
+                                               anchorDef.physicalEnergy);
                 fa.energyErr = anchorDef.energyError;
 
                 // If not found around previous good centroid, try searching around initial base channel as fallback
@@ -657,8 +637,7 @@ void RunByRunEngine::run()
                                        baseCentroids[aIdx],
                                        anchorDef.searchWindowCh,
                                        anchorDef.minCounts,
-                                       anchorDef.physicalEnergy,
-                                       anchorDef.expectedFwhmCh);
+                                       anchorDef.physicalEnergy);
                     fa.energyErr = anchorDef.energyError;
                 }
 

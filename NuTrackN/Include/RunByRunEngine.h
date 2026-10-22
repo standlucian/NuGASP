@@ -139,15 +139,13 @@ public:
     // Helper to fit a single anchor peak within a window
     static FittedAnchor fitAnchorPeak(const std::vector<double> &spectrum,
                                      double centerCh, double windowCh,
-                                     double minCounts, double energy,
-                                     double expectedFwhm = 0.0);
+                                     double minCounts, double energy);
 
     // Helper to fit a single anchor peak with optional fixed/locked parameters
     static FittedAnchor fitAnchorPeakWithFixed(const std::vector<double> &spectrum,
                                                double centerCh, double windowCh,
                                                double minCounts, double energy,
-                                               const FitFixedParams &fixed,
-                                               double expectedFwhm = 0.0);
+                                               const FitFixedParams &fixed);
 
     // Helper to compute polynomial calibration coefficients and uncertainties
     static bool computeCalibration(const std::vector<FittedAnchor> &anchors,
