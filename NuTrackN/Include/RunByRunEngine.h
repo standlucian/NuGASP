@@ -25,7 +25,7 @@ struct AnchorPeakDef {
     double physicalEnergy{0.0};    // Known physical energy in keV (e.g. 1460.8)
     double energyError{0.0};       // Known energy error in keV
     double initialChannel{0.0};    // Approximate reference channel (0 = auto-find around energy / gain)
-    double searchWindowCh{15.0};   // +- delta channel window
+    double searchWindowCh{5.0};    // +- delta channel window
     double minCounts{25.0};        // Minimum peak area or amplitude
     double expectedFwhmCh{5.0};    // Expected FWHM in channels
 };

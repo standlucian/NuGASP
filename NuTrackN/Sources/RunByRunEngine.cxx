@@ -129,14 +129,14 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     double obsFwhm = rightHM - leftHM;
     double estFwhm = (obsFwhm >= 0.8 && obsFwhm <= windowCh * 1.5)
         ? obsFwhm
-        : (fixed.fixFwhm ? fixed.fixedFwhm : std::clamp(windowCh * 0.25, 2.0, 10.0));
+        : (fixed.fixFwhm ? fixed.fixedFwhm : std::clamp(windowCh * 0.25, 1.5, 6.0));
 
     // 2. Dynamic peak extent & adaptive background windowing:
     // Look at how big the peak is (amplitude & FWHM) to set peak exclusion boundaries
     const double rawAmpl = std::max(1.0, maxVal - baseVal);
     const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
     const double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmpl))), 2.0, 3.5);
-    const int peakHalfWidth = std::clamp(static_cast<int>(std::ceil(nSig * estSigma)), 3, static_cast<int>(windowCh * 0.8));
+    const int peakHalfWidth = std::clamp(static_cast<int>(std::ceil(nSig * estSigma)), 2, std::max(2, static_cast<int>(windowCh * 0.8)));
 
     // Search outward from peak exclusion boundaries for true local background valleys (saddle points)
     // to avoid sampling inside peak wings or climbing adjacent neighbor lines

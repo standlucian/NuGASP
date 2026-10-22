@@ -479,9 +479,9 @@ RunByRunManager::RunByRunManager(QMainCanvas *mainCanvas, QWidget *parent)
 
     // Default reference anchors for in-beam HPGe arrays
     m_anchors = {
-        { 238.97,  0.05, 239.0, 15.0, 25.0, 2.5 },
-        { 511.00,  0.05, 511.0, 15.0, 20.0, 3.5 },
-        { 1055.00, 0.10, 1055.0, 15.0, 20.0, 2.5 }
+        { 238.97,  0.05, 239.0, 5.0, 25.0, 2.5 },
+        { 511.00,  0.05, 511.0, 5.0, 20.0, 3.5 },
+        { 1055.00, 0.10, 1055.0, 5.0, 20.0, 2.5 }
     };
 
     // Register custom types for Qt cross-thread queued signal delivery
@@ -685,7 +685,7 @@ void RunByRunManager::setupUI()
         tr("Physical Energy (keV) [Edit]"),
         tr("Energy Error (keV) [Edit]"),
         tr("Initial Channel (ch)"),
-        tr("Search Window (± ch)"),
+        tr("Search Window (± ch) [Edit]"),
         tr("Min Peak Counts"),
         tr("Expected FWHM (ch)")
     });
@@ -879,7 +879,7 @@ void RunByRunManager::syncAnchorsFromTable()
         a.physicalEnergy = m_tableAnchors->item(r, 0) ? m_tableAnchors->item(r, 0)->text().toDouble() : 0.0;
         a.energyError    = m_tableAnchors->item(r, 1) ? m_tableAnchors->item(r, 1)->text().toDouble() : 0.05;
         a.initialChannel = m_tableAnchors->item(r, 2) ? m_tableAnchors->item(r, 2)->text().toDouble() : 0.0;
-        a.searchWindowCh = m_tableAnchors->item(r, 3) ? m_tableAnchors->item(r, 3)->text().toDouble() : 15.0;
+        a.searchWindowCh = m_tableAnchors->item(r, 3) ? m_tableAnchors->item(r, 3)->text().toDouble() : 5.0;
         a.minCounts      = m_tableAnchors->item(r, 4) ? m_tableAnchors->item(r, 4)->text().toDouble() : 15.0;
         a.expectedFwhmCh = m_tableAnchors->item(r, 5) ? m_tableAnchors->item(r, 5)->text().toDouble() : 5.0;
         if (a.physicalEnergy > 0.0) {
@@ -914,9 +914,9 @@ void RunByRunManager::populateAnchorTable()
         itemCh->setForeground(QBrush(QColor("#64b5f6"))); // Cyan/Blue hint
         m_tableAnchors->setItem(i, 2, itemCh);
 
-        // Column 3: Search Window (± ch) - Non-editable
+        // Column 3: Search Window (± ch) - User-editable
         QTableWidgetItem *itemWin = new QTableWidgetItem(QString::number(a.searchWindowCh, 'f', 1));
-        itemWin->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
+        itemWin->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsEditable);
         itemWin->setTextAlignment(Qt::AlignCenter);
         m_tableAnchors->setItem(i, 3, itemWin);
 
@@ -1229,7 +1229,7 @@ void RunByRunManager::onDownloadAllFinished(int successCount, int failCount, boo
 void RunByRunManager::onAddAnchorClicked()
 {
     syncAnchorsFromTable();
-    m_anchors.push_back({ 1000.0, 0.05, 0.0, 15.0, 15.0, 3.5 });
+    m_anchors.push_back({ 1000.0, 0.05, 0.0, 5.0, 15.0, 3.5 });
     populateAnchorTable();
     if (m_tableAnchors->rowCount() > 0) {
         int lastRow = m_tableAnchors->rowCount() - 1;
@@ -1286,7 +1286,7 @@ void RunByRunManager::onReadPeaksFromFileClicked()
         a.physicalEnergy = energy;
         a.energyError    = energyErr;
         a.initialChannel = 0.0;
-        a.searchWindowCh = 15.0;
+        a.searchWindowCh = 5.0;
         a.minCounts      = 20.0;
         a.expectedFwhmCh = 3.5;
         parsedPeaks.push_back(a);
@@ -1467,7 +1467,7 @@ void RunByRunManager::onGrabParametersClicked()
         if (fa.isValid) {
             anchor.initialChannel = std::round(fa.centroidCh * 10.0) / 10.0;
             anchor.expectedFwhmCh = std::max(0.8, std::round(fa.fwhmCh * 10.0) / 10.0);
-            anchor.searchWindowCh = std::max(10.0, std::round(fa.fwhmCh * winMult * 10.0) / 10.0);
+            anchor.searchWindowCh = std::max(5.0, std::round(fa.fwhmCh * winMult * 10.0) / 10.0);
             anchor.minCounts = std::max(5.0, std::round(fa.area * countFrac));
             updatedCount++;
         }
@@ -2139,7 +2139,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             continue;
         }
 
-        const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : 15.0;
+        const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : 5.0;
         const double minCounts = (a.minCounts > 0.0) ? a.minCounts : 20.0;
         FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, a.physicalEnergy);
         if (!fa.isValid && std::abs(centerCh - ((a.initialChannel > 0.0) ? a.initialChannel : a.physicalEnergy)) > 0.5) {
@@ -2545,7 +2545,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double initCentroidErr = 0.05;
         double initPeakChi2 = 1.0;
         double initFwhm = (anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : 3.5;
-        double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
+        double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 5.0;
         double initBkg = 10.0;
         double initSlope = 0.0;
         double initStep = 0.0;
@@ -2577,7 +2577,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         if (!foundSaved && !specData.empty()) {
             double centerCh = (anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy;
-            double windowCh = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 15.0;
+            double windowCh = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 5.0;
             double minCounts = (anc.minCounts > 0.0) ? anc.minCounts : 20.0;
             FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, anc.physicalEnergy);
             if (!fa.isValid && std::abs(centerCh - ((anc.initialChannel > 0.0) ? anc.initialChannel : anc.physicalEnergy)) > 0.5) {
@@ -2614,7 +2614,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             double sigCh = std::max(0.4, initFwhm / 2.35482);
 
             double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmp))), 2.0, 3.5);
-            int pkHalf = std::clamp(static_cast<int>(std::ceil(nSig * sigCh)), 3, static_cast<int>(wCh * 0.8));
+            int pkHalf = std::clamp(static_cast<int>(std::ceil(nSig * sigCh)), 2, std::max(2, static_cast<int>(wCh * 0.8)));
 
             int lMin = std::max(0, maxB - static_cast<int>(wCh));
             int lMax = std::max(0, maxB - pkHalf);
