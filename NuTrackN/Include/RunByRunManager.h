@@ -133,7 +133,7 @@ private:
     void populateAnchorTable();
     void syncAnchorsFromTable();
     void updatePlot(int detId);
-    void showIssueReportModal(int totalSuccess, int totalFailures);
+    void showIssueReportModal(int totalSuccess, int totalIntervene, int totalFailures);
     void inspectSpectrumOnCanvas(int row, int col);
     void openInterventionDialog(int row, int col);
     void startAsyncDownload();

@@ -178,6 +178,8 @@ void DetectorDriftPlotWidget::mouseMoveEvent(QMouseEvent *event)
             statusHtml = QString("<font color='#ffa726'><b>Fallback from Run %1</b></font>").arg(pt.fallbackSourceRun);
         } else if (pt.isValid) {
             statusHtml = "<font color='#4caf50'><b>Fit Success</b></font>";
+        } else if (pt.status == RunCalibStatus::BadChi2) {
+            statusHtml = "<font color='#f57c00'><b>Requires Intervention (High &chi;&sup2;)</b></font>";
         } else {
             statusHtml = "<font color='#ef5350'><b>Failed / Uncalibrated</b></font>";
         }
@@ -1683,6 +1685,8 @@ void RunByRunManager::onProgressUpdated(int percent, const QString &statusText)
 
 void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int totalFailures)
 {
+    Q_UNUSED(totalSuccess);
+    Q_UNUSED(totalFailures);
     m_isRunning = false;
     m_btnStart->setEnabled(true);
     m_btnCancel->setEnabled(false);
@@ -1703,8 +1707,29 @@ void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int tota
     if (cancelled) {
         m_lblStatusText->setText(tr("Calibration cancelled by user. Partial results saved."));
     } else {
-        m_lblStatusText->setText(tr("Batch complete! Successfully calibrated: %1. Flagged issues: %2.")
-                                     .arg(totalSuccess).arg(totalFailures));
+        int totalSuccess = 0;
+        int totalIntervene = 0;
+        int totalFailures = 0;
+        for (const auto &traj : m_completedTrajectories) {
+            for (const auto &r : traj.runResults) {
+                if (r.status == RunCalibStatus::Success) {
+                    totalSuccess++;
+                } else if (r.status == RunCalibStatus::BadChi2) {
+                    totalIntervene++;
+                } else {
+                    totalFailures++;
+                }
+            }
+        }
+
+        QString summaryMsg;
+        if (totalIntervene == 0 && totalFailures == 0) {
+            summaryMsg = tr("Batch completed! Successfully calibrated: %1 (All OK)").arg(totalSuccess);
+        } else {
+            summaryMsg = tr("Batch completed! Successfully calibrated: %1, Requiring intervention: %2, Failed fits: %3.")
+                             .arg(totalSuccess).arg(totalIntervene).arg(totalFailures);
+        }
+        m_lblStatusText->setText(summaryMsg);
         m_progressBar->setValue(100);
 
         // Update plot for currently selected detector
@@ -1713,8 +1738,8 @@ void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int tota
         }
 
         // PROMPT USER AT THE END IF ANY ISSUES OCCURRED
-        if (totalFailures > 0) {
-            showIssueReportModal(totalSuccess, totalFailures);
+        if (totalIntervene > 0 || totalFailures > 0) {
+            showIssueReportModal(totalSuccess, totalIntervene, totalFailures);
         }
     }
 }
@@ -1722,11 +1747,11 @@ void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int tota
 //==============================================================================
 // showIssueReportModal: Prompts the user when runs/detectors have issues
 //==============================================================================
-void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
+void RunByRunManager::showIssueReportModal(int totalSuccess, int totalIntervene, int totalFailures)
 {
     QDialog dlg(this);
     dlg.setWindowTitle(tr("Run-by-Run Calibration Issues Report"));
-    dlg.resize(750, 480);
+    dlg.resize(800, 500);
     dlg.setFont(Design::getDialogFont());
     dlg.setStyleSheet(Design::getDialogStyleSheet());
 
@@ -1734,14 +1759,26 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
     vbox->setSpacing(8);
 
     QLabel *lblHeader = new QLabel(&dlg);
-    lblHeader->setText(QString("<h3>⚠️ Calibration Completed with %1 Flagged Issues (%2 Successful)</h3>"
-                               "<p>The following run/detector spectra encountered issues (no silent interpolation was performed):</p>")
-                           .arg(totalFailures).arg(totalSuccess));
+    QString headerText;
+    if (totalIntervene > 0 && totalFailures > 0) {
+        headerText = QString("<h3>⚠️ Calibration Completed: %1 Successful, %2 Requiring Intervention, %3 Failed Fits</h3>"
+                             "<p>The following run/detector spectra require attention (no silent interpolation was performed):</p>")
+                         .arg(totalSuccess).arg(totalIntervene).arg(totalFailures);
+    } else if (totalIntervene > 0) {
+        headerText = QString("<h3>⚠️ Calibration Completed: %1 Successful, %2 Requiring Intervention</h3>"
+                             "<p>The following run/detector spectra exceeded the &chi;&sup2;/ndf cutoff and require inspection/intervention:</p>")
+                         .arg(totalSuccess).arg(totalIntervene);
+    } else {
+        headerText = QString("<h3>⚠️ Calibration Completed: %1 Successful, %2 Failed Fits</h3>"
+                             "<p>The following run/detector spectra encountered fit failures:</p>")
+                         .arg(totalSuccess).arg(totalFailures);
+    }
+    lblHeader->setText(headerText);
     vbox->addWidget(lblHeader);
 
     QTableWidget *tableIssues = new QTableWidget(&dlg);
-    tableIssues->setColumnCount(4);
-    tableIssues->setHorizontalHeaderLabels({ tr("Detector"), tr("Run #"), tr("Run File"), tr("Diagnostic Reason") });
+    tableIssues->setColumnCount(5);
+    tableIssues->setHorizontalHeaderLabels({ tr("Detector"), tr("Run #"), tr("Run File"), tr("Status"), tr("Diagnostic Reason") });
     tableIssues->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tableIssues->horizontalHeader()->setStretchLastSection(true);
 
@@ -1753,9 +1790,23 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
                 tableIssues->setItem(row, 0, new QTableWidgetItem(QString::number(r.detectorId)));
                 tableIssues->setItem(row, 1, new QTableWidgetItem(QString::number(r.runNumber)));
                 tableIssues->setItem(row, 2, new QTableWidgetItem(r.runFileName));
+
+                QTableWidgetItem *statusItem = new QTableWidgetItem();
+                statusItem->setTextAlignment(Qt::AlignCenter);
+                if (r.status == RunCalibStatus::BadChi2) {
+                    statusItem->setText(tr("INTERVENE"));
+                    statusItem->setBackground(QBrush(QColor("#f57c00"))); // Orange
+                    statusItem->setForeground(QBrush(Qt::white));
+                } else {
+                    statusItem->setText(tr("FAIL"));
+                    statusItem->setBackground(QBrush(QColor("#c62828"))); // Red
+                    statusItem->setForeground(QBrush(Qt::white));
+                }
+                tableIssues->setItem(row, 3, statusItem);
+
                 QTableWidgetItem *rItem = new QTableWidgetItem(r.failureReason);
-                rItem->setForeground(QBrush(QColor("#ff5252")));
-                tableIssues->setItem(row, 3, rItem);
+                rItem->setForeground(QBrush(r.status == RunCalibStatus::BadChi2 ? QColor("#ffb74d") : QColor("#ff5252")));
+                tableIssues->setItem(row, 4, rItem);
                 row++;
             }
         }
@@ -1786,7 +1837,12 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
                     for (const auto &traj : m_completedTrajectories) {
                         if (traj.detectorId == detId && rowIdx < static_cast<int>(traj.runResults.size())) {
                             if (traj.runResults[rowIdx].status == RunCalibStatus::Success) {
-                                QTableWidgetItem *itemDiag = tableIssues->item(r, 3);
+                                QTableWidgetItem *itemStatus = tableIssues->item(r, 3);
+                                if (itemStatus) {
+                                    itemStatus->setText(tr("ACCEPTED"));
+                                    itemStatus->setBackground(QBrush(QColor("#2e7d32")));
+                                }
+                                QTableWidgetItem *itemDiag = tableIssues->item(r, 4);
                                 if (itemDiag) {
                                     itemDiag->setText(tr("RESOLVED / ACCEPTED (Gain = %1)").arg(traj.runResults[rowIdx].a1, 0, 'f', 6));
                                     itemDiag->setForeground(QBrush(QColor("#4caf50")));
@@ -1822,6 +1878,23 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalFailures)
             }
         }
         dlg.accept();
+    });
+
+    connect(&dlg, &QDialog::finished, this, [&]() {
+        int sCount = 0, iCount = 0, fCount = 0;
+        for (const auto &traj : m_completedTrajectories) {
+            for (const auto &r : traj.runResults) {
+                if (r.status == RunCalibStatus::Success) sCount++;
+                else if (r.status == RunCalibStatus::BadChi2) iCount++;
+                else fCount++;
+            }
+        }
+        if (iCount == 0 && fCount == 0) {
+            m_lblStatusText->setText(tr("Batch completed! Successfully calibrated: %1 (All OK)").arg(sCount));
+        } else {
+            m_lblStatusText->setText(tr("Batch completed! Successfully calibrated: %1, Requiring intervention: %2, Failed fits: %3.")
+                                         .arg(sCount).arg(iCount).arg(fCount));
+        }
     });
 
     dlg.exec();
