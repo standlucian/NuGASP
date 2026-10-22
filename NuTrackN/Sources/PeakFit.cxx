@@ -539,8 +539,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
     if (fixAmp0) {
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(0, mainCanvas->m_peakFixedStates[0].ampVal);
     } else {
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(0, gaussianHeight);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(0, 0.0, hist->GetMaximum() * 2.0);
+        const double ampLow = 0.0;
+        const double ampHigh = std::max(10.0, hist->GetMaximum() * 2.0);
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(0, std::clamp(gaussianHeight, ampLow, ampHigh));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(0, ampLow, ampHigh);
     }
 
     if (fixCent0) {
@@ -550,8 +552,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         }
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(1, fixedCenterCh);
     } else {
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(1, gaussianCenter);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(1, fitMin, fitMax);
+        const double centLow = fitMin;
+        const double centHigh = fitMax;
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(1, std::clamp(gaussianCenter, centLow, centHigh));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(1, centLow, centHigh);
     }
 
     if (fixW0) {
@@ -570,8 +574,10 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         }
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(2, fixedSigmaCh);
     } else {
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(2, gaussianSigma);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(2, 0.3, (fitMax - fitMin));
+        const double sigLow = 0.2;
+        const double sigHigh = std::max(sigLow + 0.5, fitMax - fitMin);
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(2, std::clamp(gaussianSigma, sigLow, sigHigh));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(2, sigLow, sigHigh);
     }
 
     if (mainCanvas->m_bkgFixed) {
@@ -582,15 +588,21 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, mainCanvas->m_bkgStepVal);
     } else if (useStep) {
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, 0.0);
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, estStep);
-        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(2.0, maxPhysStep * 1.2 + 2.0));
+        const double bkgLow = 0.0;
+        const double bkgHigh = std::max(10.0, std::max(hist->GetMaximum() * 2.0, bkg0 * 2.0));
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, std::clamp(bkg0, bkgLow, bkgHigh));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, bkgLow, bkgHigh);
+        const double stepLow = 0.0;
+        const double stepHigh = std::max(2.0, maxPhysStep * 1.5 + 2.0);
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, std::clamp(estStep, stepLow, stepHigh));
+        mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, stepLow, stepHigh);
     } else {
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
-        const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);
+        const double maxSlopeMag = std::max({ 2.0, hist->GetMaximum() * 0.02, std::abs(bkgSlope) * 1.5 });
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, std::clamp(bkgSlope, -maxSlopeMag, maxSlopeMag));
         mainCanvas->gaussianWithBackgroundFunction->SetParLimits(3, -maxSlopeMag, maxSlopeMag);
-        mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+        const double bkgLow = 0.0;
+        const double bkgHigh = std::max(10.0, std::max(hist->GetMaximum() * 2.0, bkg0 * 2.0));
+        mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, std::clamp(bkg0, bkgLow, bkgHigh));
         mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
     }
 
@@ -642,15 +654,21 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, bkgStep);
         } else if (useStep) {
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(3, 0.0);
-            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
-            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, 0.0, hist->GetMaximum() * 2.0);
-            mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, bkgStep);
-            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, 0.0, std::max(2.0, maxPhysStep * 1.2 + 2.0));
+            const double bkgLow = 0.0;
+            const double bkgHigh = std::max(10.0, std::max(hist->GetMaximum() * 2.0, bkg0 * 2.0));
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, std::clamp(bkg0, bkgLow, bkgHigh));
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(4, bkgLow, bkgHigh);
+            const double stepLow = 0.0;
+            const double stepHigh = std::max(2.0, maxPhysStep * 1.5 + 2.0);
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(5, std::clamp(bkgStep, stepLow, stepHigh));
+            mainCanvas->gaussianWithBackgroundFunction->SetParLimits(5, stepLow, stepHigh);
         } else {
-            mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, bkgSlope);
-            const double maxSlopeMag = std::max(0.5, hist->GetMaximum() * 0.02);
+            const double maxSlopeMag = std::max({ 2.0, hist->GetMaximum() * 0.02, std::abs(bkgSlope) * 1.5 });
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(3, std::clamp(bkgSlope, -maxSlopeMag, maxSlopeMag));
             mainCanvas->gaussianWithBackgroundFunction->SetParLimits(3, -maxSlopeMag, maxSlopeMag);
-            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, bkg0);
+            const double bkgLow = 0.0;
+            const double bkgHigh = std::max(10.0, std::max(hist->GetMaximum() * 2.0, bkg0 * 2.0));
+            mainCanvas->gaussianWithBackgroundFunction->SetParameter(4, std::clamp(bkg0, bkgLow, bkgHigh));
             mainCanvas->gaussianWithBackgroundFunction->FixParameter(5, 0.0);
         }
         if (fixAmp0) {

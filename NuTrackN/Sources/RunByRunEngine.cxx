@@ -205,28 +205,38 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
 
     TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
-    fGaus.SetParameter(0, estAmpl);
-    fGaus.SetParLimits(0, 0.0, std::max(10.0, maxVal * 4.0));
+
+    const double ampLow = 0.0;
+    const double ampHigh = std::max(10.0, maxVal * 4.0);
+    fGaus.SetParameter(0, std::clamp(estAmpl, ampLow, ampHigh));
+    fGaus.SetParLimits(0, ampLow, ampHigh);
 
     if (fixed.fixCentroid) {
         fGaus.FixParameter(1, fixed.fixedCentroid);
     } else {
-        fGaus.SetParameter(1, estMean);
-        fGaus.SetParLimits(1, fitMin, fitMax);
+        const double meanLow = fitMin - 0.5;
+        const double meanHigh = fitMax + 0.5;
+        fGaus.SetParameter(1, std::clamp(estMean, meanLow, meanHigh));
+        fGaus.SetParLimits(1, meanLow, meanHigh);
     }
 
     if (fixed.fixFwhm) {
         fGaus.FixParameter(2, std::max(0.1, fixed.fixedFwhm / 2.35482));
     } else {
-        fGaus.SetParameter(2, estSigma);
-        fGaus.SetParLimits(2, 0.4, 25.0); // HPGe physical peak width boundaries
+        const double sigLow = 0.2;
+        const double sigHigh = 25.0;
+        fGaus.SetParameter(2, std::clamp(estSigma, sigLow, sigHigh));
+        fGaus.SetParLimits(2, sigLow, sigHigh); // HPGe physical peak width boundaries
     }
 
     if (fixed.fixBaseline) {
         fGaus.FixParameter(3, fixed.fixedBaseline);
     } else {
-        fGaus.SetParameter(3, useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal);
-        fGaus.SetParLimits(3, 0.0, std::max(10.0, maxVal * 2.0));
+        const double rawBkg = useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal;
+        const double bkgLow = 0.0;
+        const double bkgHigh = std::max(10.0, std::max(maxVal * 2.0, rawBkg * 2.0));
+        fGaus.SetParameter(3, std::clamp(rawBkg, bkgLow, bkgHigh));
+        fGaus.SetParLimits(3, bkgLow, bkgHigh);
     }
 
     if (fixed.fixSlope) {
@@ -235,16 +245,18 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         // Critical: Lock slope to 0 when Compton step is active to eliminate collinearity and prevent sawtooth artifacts!
         fGaus.FixParameter(4, 0.0);
     } else {
-        fGaus.SetParameter(4, bkgSlope);
-        const double maxSlopeMag = std::max(0.5, maxVal * 0.02);
+        const double maxSlopeMag = std::max({ 2.0, maxVal * 0.05, std::abs(bkgSlope) * 1.5 });
+        fGaus.SetParameter(4, std::clamp(bkgSlope, -maxSlopeMag, maxSlopeMag));
         fGaus.SetParLimits(4, -maxSlopeMag, maxSlopeMag);
     }
 
     if (fixed.fixStep) {
         fGaus.FixParameter(5, fixed.fixedStep);
     } else if (useStep) {
-        fGaus.SetParameter(5, estStep);
-        fGaus.SetParLimits(5, 0.0, std::max(2.0, maxPhysStep * 1.2 + 2.0));
+        const double stepLow = 0.0;
+        const double stepHigh = std::max(2.0, maxPhysStep * 1.5 + 2.0);
+        fGaus.SetParameter(5, std::clamp(estStep, stepLow, stepHigh));
+        fGaus.SetParLimits(5, stepLow, stepHigh);
     } else {
         fGaus.FixParameter(5, 0.0);
     }

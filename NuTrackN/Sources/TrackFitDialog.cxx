@@ -1362,26 +1362,39 @@ bool TrackFitDialog::fitPeakAtChannel(double expectedCh, double searchTolCh, dou
     // Formula: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])
     // Parameter [3] is the baseline level directly AT centroid [1].
     TF1 gfit("trackfit_gaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1])", xLow, xHigh);
-    gfit.SetParameter(0, amplitude);
-    gfit.SetParameter(1, static_cast<double>(peakBin));
-    gfit.SetParameter(2, initialSigma);
-    gfit.SetParameter(3, baseline);
-    double initSlope = (rightVal - leftVal) / std::max(1, maxScan - minScan);
-    gfit.SetParameter(4, initSlope);
+    const double ampLow = 0.0;
+    const double ampHigh = std::max(10.0, maxVal * 2.5);
+    gfit.SetParameter(0, std::clamp(amplitude, ampLow, ampHigh));
+    gfit.SetParLimits(0, ampLow, ampHigh);
 
-    gfit.SetParLimits(0, 0.0, maxVal * 2.5);
-    gfit.SetParLimits(1, xLow, xHigh);
-    gfit.SetParLimits(2, 0.6, 25.0);
-    gfit.SetParLimits(3, 0.0, maxVal);
+    const double meanLow = static_cast<double>(xLow);
+    const double meanHigh = static_cast<double>(xHigh);
+    gfit.SetParameter(1, std::clamp(static_cast<double>(peakBin), meanLow, meanHigh));
+    gfit.SetParLimits(1, meanLow, meanHigh);
+
+    const double sigLow = 0.2;
+    const double sigHigh = 25.0;
+    gfit.SetParameter(2, std::clamp(initialSigma, sigLow, sigHigh));
+    gfit.SetParLimits(2, sigLow, sigHigh);
+
+    const double bkgLow = 0.0;
+    const double bkgHigh = std::max(10.0, std::max(maxVal, baseline * 2.0));
+    gfit.SetParameter(3, std::clamp(baseline, bkgLow, bkgHigh));
+    gfit.SetParLimits(3, bkgLow, bkgHigh);
+
+    double initSlope = (rightVal - leftVal) / static_cast<double>(std::max(1, maxScan - minScan));
+    const double maxSlopeMag = std::max<double>({ 2.0, maxVal * 0.05, std::abs(initSlope) * 1.5 });
+    gfit.SetParameter(4, std::clamp(initSlope, -maxSlopeMag, maxSlopeMag));
+    gfit.SetParLimits(4, -maxSlopeMag, maxSlopeMag);
 
     int fitStatus = m_activeHist->Fit(&gfit, "QRN0");
     if (fitStatus != 0) {
         // Fallback to pure Gaussian
         TF1 pureGaus("trackfit_pure_gaus", "gaus", xLow, xHigh);
-        pureGaus.SetParameter(0, amplitude);
-        pureGaus.SetParameter(1, static_cast<double>(peakBin));
-        pureGaus.SetParameter(2, initialSigma);
-        pureGaus.SetParLimits(2, 0.6, 25.0);
+        pureGaus.SetParameter(0, std::clamp(amplitude, ampLow, ampHigh));
+        pureGaus.SetParameter(1, std::clamp(static_cast<double>(peakBin), meanLow, meanHigh));
+        pureGaus.SetParameter(2, std::clamp(initialSigma, sigLow, sigHigh));
+        pureGaus.SetParLimits(2, sigLow, sigHigh);
         if (m_activeHist->Fit(&pureGaus, "QRN0") != 0) {
             return false;
         }
