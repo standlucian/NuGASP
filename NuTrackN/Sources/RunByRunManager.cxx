@@ -692,7 +692,6 @@ void RunByRunManager::setupUI()
     setupGrid->addWidget(lblDispInfo, 3, 2, 1, 2);
 
     mainLayout->addWidget(grpSetup);
-    populateAnchorTable();
 
     // MIDDLE: Anchors Table & Configuration
     QGroupBox *grpAnchors = new QGroupBox(tr("2. In-Beam Anchor Lines (Centroid Trajectory Tracking)"), this);
@@ -930,6 +929,7 @@ void RunByRunManager::syncAnchorsFromTable()
 
 void RunByRunManager::populateAnchorTable()
 {
+    if (!m_tableAnchors) return;
     m_tableAnchors->setRowCount(static_cast<int>(m_anchors.size()));
     for (int i = 0; i < static_cast<int>(m_anchors.size()); ++i) {
         const auto &a = m_anchors[i];
