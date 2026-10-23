@@ -187,7 +187,7 @@ void DetectorDriftPlotWidget::mouseMoveEvent(QMouseEvent *event)
         QString tip = QString("<b>Run #%1:</b> %2<br/>"
                              "<b>Detector:</b> #%3<br/>"
                              "<b>Nominal Dispersion:</b> %4 keV/ch<br/>"
-                             "<b>Fitted Gain a1:</b> %5 keV/ch<br/>"
+                             "<b>Fitted Gain a1:</b> %5<br/>"
                              "<b>Reduced &chi;&sup2;/ndf:</b> %6<br/>"
                              "<b>Status:</b> %7<br/>"
                              "<span style='color:#90caf9;'><i>Double-click to inspect spectrum and peak fits</i></span>")
@@ -345,7 +345,7 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
     p.setFont(titleFont);
     p.setPen(QColor("#81c784")); // Light green
     p.drawText(rGain.left() + 4, rGain.top() - 6,
-               QString("Gain a1 (keV/ch) — Detector #%1").arg(m_detectorId >= 0 ? QString::number(m_detectorId) : "-"));
+               QString("Gain a1 — Detector #%1").arg(m_detectorId >= 0 ? QString::number(m_detectorId) : "-"));
 
     // Title for Chi2 Plot
     p.setPen(QColor("#4fc3f7")); // Light cyan
@@ -834,7 +834,7 @@ void RunByRunManager::setupUI()
     m_tablePlotData->setContextMenuPolicy(Qt::CustomContextMenu);
     m_tablePlotData->setColumnCount(8);
     m_tablePlotData->setHorizontalHeaderLabels({
-        tr("Run #"), tr("Run File"), tr("Nominal (keV/ch)"), tr("Gain a1 (keV/ch)"), tr("Offset a0 (keV)"),
+        tr("Run #"), tr("Run File"), tr("Nominal (keV/ch)"), tr("Gain a1"), tr("Offset a0 (ch)"),
         tr("Residual (keV)"), tr("Chi2/ndf"), tr("Status")
     });
     m_tablePlotData->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
@@ -1713,7 +1713,7 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
         item->setText("GOOD");
         item->setBackground(QBrush(QColor("#2e7d32"))); // Green
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2\nNominal: %3 keV/ch\na0: %4 keV\na1: %5 keV/ch\ns_res: %6 keV\nchi2/ndf: %7")
+        item->setToolTip(QString("Run: %1 | Det: %2\nNominal: %3 keV/ch\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
                              .arg(result.runFileName).arg(detId)
                              .arg(nomG, 0, 'f', 2)
                              .arg(result.a0, 0, 'f', 4)
@@ -1724,7 +1724,7 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
         item->setText(QString("~%1 (R%2)").arg(result.a1, 0, 'f', 4).arg(result.fallbackSourceRun));
         item->setBackground(QBrush(QColor("#e65100"))); // Amber / Orange
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2 [FALLBACK: Adopted Run %3]\nNominal: %4 keV/ch\na0: %5 keV\na1: %6 keV/ch\nNote: %7")
+        item->setToolTip(QString("Run: %1 | Det: %2 [FALLBACK: Adopted Run %3]\nNominal: %4 keV/ch\na0: %5 ch\na1: %6\nNote: %7")
                              .arg(result.runFileName).arg(detId).arg(result.fallbackSourceRun)
                              .arg(nomG, 0, 'f', 2)
                              .arg(result.a0, 0, 'f', 4)
@@ -2205,7 +2205,9 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
         }
 
         if (savedRunRes) {
-            tHist->SetCalibration(savedRunRes->a0, savedRunRes->a1, savedRunRes->a2);
+            tHist->SetCalibration(savedRunRes->a0 * dispersion,
+                                  savedRunRes->a1 * dispersion,
+                                  savedRunRes->a2 * dispersion);
         } else {
             // Apply nominal dispersion as initial calibration: E(ch) = 0.0 + dispersion * ch
             tHist->SetCalibration(0.0, dispersion, 0.0);
@@ -2640,8 +2642,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                         : (curRes.status == RunCalibStatus::BadChi2 ? "INTERVENE (High \u03c7\u00b2)" : "FAILED (No Peak / Stats)"));
     lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
                                   "<b>Nominal:</b> %3 keV/ch &nbsp;|&nbsp; "
-                                  "<b>Gain (a1):</b> %4 keV/ch &nbsp;|&nbsp; "
-                                  "<b>Offset (a0):</b> %5 keV &nbsp;|&nbsp; "
+                                  "<b>Gain (a1):</b> %4 &nbsp;|&nbsp; "
+                                  "<b>Offset (a0):</b> %5 ch &nbsp;|&nbsp; "
                                   "<b>Calibration Line \u03c7\u00b2/ndf:</b> %6 &nbsp;|&nbsp; "
                                   "<b>Cutoff:</b> \u2264 %7")
                               .arg(statusColor)
@@ -3287,7 +3289,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         res.fullFilePath = filePath;
         res.nominalGain = runNomGain;
 
-        bool ok = RunByRunEngine::computeCalibration(activeAnchors, useQuadratic, res, maxChi2);
+        bool ok = RunByRunEngine::computeCalibration(activeAnchors, useQuadratic, res, maxChi2, runNomGain);
         // computeCalibration populates outResult.fittedAnchors with valid only;
         // preserve all anchors including isValid flags for accurate state persistence
         res.fittedAnchors = allAnchors;
@@ -3302,8 +3304,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QString statusName = (ok && res.status == RunCalibStatus::Success) ? "GOOD (Acceptable \u03c7\u00b2)" : "INTERVENE (High \u03c7\u00b2)";
 
         lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
-                                      "<b>Gain (a1):</b> %3 keV/ch &nbsp;|&nbsp; "
-                                      "<b>Offset (a0):</b> %4 keV &nbsp;|&nbsp; "
+                                      "<b>Gain (a1):</b> %3 &nbsp;|&nbsp; "
+                                      "<b>Offset (a0):</b> %4 ch &nbsp;|&nbsp; "
                                       "<b>Residual (s_res):</b> %5 keV &nbsp;|&nbsp; "
                                       "<b>Calibration Line \u03c7\u00b2/ndf:</b> <span style='color:%1; font-weight:bold;'>%6</span> &nbsp;|&nbsp; "
                                       "<b>Cutoff:</b> \u2264 %7")
@@ -3316,7 +3318,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                                   .arg(QString::number(maxChi2, 'f', 1)));
 
         if (ok && res.status == RunCalibStatus::Success) {
-            lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>"
+            lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE CALIBRATION: Gain (a1) = %1 | Offset (a0) = %2 ch | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>"
                                               "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Calibration successfully recomputed using %6 anchor(s).</span>")
                                           .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
             if (btnOptionB) {
@@ -3324,7 +3326,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 btnOptionB->setStyleSheet("font-weight: bold; background-color: #2e7d32; color: white; padding: 6px 14px;");
             }
         } else {
-            lblPreviewStatus->setText(QString("<span style='color:#ff9800;'>⚠️ HIGH \u03c7\u00b2 CALIBRATION: Gain (a1) = %1 keV/ch | Offset (a0) = %2 keV | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (> %5 cutoff)</span>"
+            lblPreviewStatus->setText(QString("<span style='color:#ff9800;'>⚠️ HIGH \u03c7\u00b2 CALIBRATION: Gain (a1) = %1 | Offset (a0) = %2 ch | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (> %5 cutoff)</span>"
                                               "<br><span style='color:#90a4ae; font-size:9pt; font-weight:normal;'>Calibration recomputed with %6 anchor(s), but \u03c7\u00b2/ndf exceeds threshold.</span>")
                                           .arg(gainStr).arg(offStr).arg(resStr).arg(chi2Str).arg(maxChi2, 0, 'f', 1).arg(activeAnchors.size()));
             if (btnOptionB) {
@@ -3337,7 +3339,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             ? dynamic_cast<TracknHistogram*>(m_mainCanvas->HijF[s_i][s_j]) : nullptr;
         if (tHist) {
             if (ok && res.a1 > 0.0) {
-                tHist->SetCalibration(res.a0, res.a1, res.a2);
+                tHist->SetCalibration(res.a0 * dispersion, res.a1 * dispersion, res.a2 * dispersion);
             } else {
                 tHist->SetCalibration(0.0, dispersion, 0.0);
             }
@@ -3636,7 +3638,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             item->setBackground(QBrush(QColor("#ffa726")));
         }
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2 [MANUALLY ADJUSTED]\na0: %3 keV\na1: %4 keV/ch\ns_res: %5 keV\nchi2/ndf: %6")
+        item->setToolTip(QString("Run: %1 | Det: %2 [MANUALLY ADJUSTED]\na0: %3 ch\na1: %4\ns_res: %5 keV\nchi2/ndf: %6")
                              .arg(runName).arg(detId)
                              .arg(liveCalibResult.a0, 0, 'f', 4)
                              .arg(liveCalibResult.a1, 0, 'f', 6)
@@ -3714,7 +3716,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         item->setText("GOOD");
         item->setBackground(QBrush(QColor("#2e7d32")));
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2 [FORCE ACCEPTED]\na0: %3 keV\na1: %4 keV/ch\ns_res: %5 keV\nchi2/ndf: %6")
+        item->setToolTip(QString("Run: %1 | Det: %2 [FORCE ACCEPTED]\na0: %3 ch\na1: %4\ns_res: %5 keV\nchi2/ndf: %6")
                              .arg(runName).arg(detId)
                              .arg(targetTraj->runResults[row].a0, 0, 'f', 4)
                              .arg(targetTraj->runResults[row].a1, 0, 'f', 6)

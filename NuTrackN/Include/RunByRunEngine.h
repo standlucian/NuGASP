@@ -156,7 +156,8 @@ public:
     static bool computeCalibration(const std::vector<FittedAnchor> &anchors,
                                    bool useQuadratic,
                                    RunCalibResult &outResult,
-                                   double maxAllowedChi2NDF = 5.0);
+                                   double maxAllowedChi2NDF = 5.0,
+                                   double nominalDispersion = 1.0);
 
 signals:
     void detectorStarted(int detectorId, int totalDetectors);

@@ -370,7 +370,8 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
 bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors,
                                        bool useQuadratic,
                                        RunCalibResult &outResult,
-                                       double maxAllowedChi2NDF)
+                                       double maxAllowedChi2NDF,
+                                       double nominalDispersion)
 {
     std::vector<FittedAnchor> valid;
     for (const auto &a : anchors) {
@@ -385,30 +386,27 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 
     outResult.fittedAnchors = valid;
 
-    // Standard Linear Calibration: E(ch) = a0 + a1 * ch
+    const double disp = (nominalDispersion > 0.0) ? nominalDispersion
+                      : ((outResult.nominalGain > 0.0) ? outResult.nominalGain : 1.0);
+    outResult.nominalGain = disp;
+
+    // Standard Linear Calibration: targetCh = a0 + a1 * ch (where targetCh = energy / disp)
+    // Gains a1 are dimensionless relative gain correction factors (~1.0), maintaining the nominal dispersion.
     if (!useQuadratic || valid.size() < 3) {
         outResult.numCoeffs = 2;
         double sumW = 0.0, sumWX = 0.0, sumWY = 0.0, sumWXX = 0.0, sumWXY = 0.0;
 
-        // Estimate rough scale factor (keV/ch) for dimensionally sound weighting
-        double estGain = 1.0;
-        if (valid.size() >= 2) {
-            const double dE = std::abs(valid.back().energy - valid.front().energy);
-            const double dCh = std::abs(valid.back().centroidCh - valid.front().centroidCh);
-            if (dCh > 1e-3) estGain = dE / dCh;
-        }
-        if (estGain <= 1e-4 || std::isnan(estGain)) estGain = 1.0;
-
         for (const auto &a : valid) {
+            const double targetCh = a.energy / disp;
+            const double targetErrCh = (a.energyErr > 0.0 ? a.energyErr : 0.05) / disp;
             const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
-            const double sigTotSq = std::max(0.0025, (a.energyErr * a.energyErr) +
-                                                    (estGain * estGain * centErr * centErr));
+            const double sigTotSq = std::max(0.0025, (targetErrCh * targetErrCh) + (centErr * centErr));
             const double w = 1.0 / sigTotSq;
             sumW += w;
             sumWX += w * a.centroidCh;
-            sumWY += w * a.energy;
+            sumWY += w * targetCh;
             sumWXX += w * a.centroidCh * a.centroidCh;
-            sumWXY += w * a.centroidCh * a.energy;
+            sumWXY += w * a.centroidCh * targetCh;
         }
 
         const double delta = sumW * sumWXX - sumWX * sumWX;
@@ -427,16 +425,20 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         outResult.sigmaA2 = 0.0;
         outResult.covA0A1 = -sumWX / delta;
 
-        // Residual and Chi2 calculation (standard error propagation in energy space)
+        // Residual (in keV) and dimensionless Chi2 calculation
         double sumResSq = 0.0, sumChi2 = 0.0;
         for (const auto &a : valid) {
-            const double fitE = outResult.a0 + outResult.a1 * a.centroidCh;
-            const double res = a.energy - fitE;
-            sumResSq += res * res;
+            const double targetCh = a.energy / disp;
+            const double fitCh = outResult.a0 + outResult.a1 * a.centroidCh;
+            const double resCh = targetCh - fitCh;
+            const double resE = resCh * disp;
+            sumResSq += resE * resE;
+
+            const double targetErrCh = (a.energyErr > 0.0 ? a.energyErr : 0.05) / disp;
             const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
-            const double sigE = std::sqrt(std::max(0.0025, (a.energyErr * a.energyErr) +
+            const double sigCh = std::sqrt(std::max(0.0025, (targetErrCh * targetErrCh) +
                                                           (outResult.a1 * outResult.a1 * centErr * centErr)));
-            sumChi2 += (res * res) / (sigE * sigE);
+            sumChi2 += (resCh * resCh) / (sigCh * sigCh);
         }
 
         const int ndf = std::max(1, static_cast<int>(valid.size()) - 2);
@@ -456,29 +458,22 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
         return true;
     }
 
-    // Quadratic Calibration: E(ch) = a0 + a1 * ch + a2 * ch^2
+    // Quadratic Calibration: targetCh = a0 + a1 * ch + a2 * ch^2
     outResult.numCoeffs = 3;
     double m[3][3] = {{0.0}};
     double b[3] = {0.0};
 
-    double estGain = 1.0;
-    if (valid.size() >= 2) {
-        const double dE = std::abs(valid.back().energy - valid.front().energy);
-        const double dCh = std::abs(valid.back().centroidCh - valid.front().centroidCh);
-        if (dCh > 1e-3) estGain = dE / dCh;
-    }
-    if (estGain <= 1e-4 || std::isnan(estGain)) estGain = 1.0;
-
     for (const auto &a : valid) {
+        const double targetCh = a.energy / disp;
+        const double targetErrCh = (a.energyErr > 0.0 ? a.energyErr : 0.05) / disp;
         const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
-        const double sigTotSq = std::max(0.0025, (a.energyErr * a.energyErr) +
-                                                (estGain * estGain * centErr * centErr));
+        const double sigTotSq = std::max(0.0025, (targetErrCh * targetErrCh) + (centErr * centErr));
         const double w = 1.0 / sigTotSq;
         const double x = a.centroidCh;
         const double x2 = x * x;
         const double x3 = x2 * x;
         const double x4 = x2 * x2;
-        const double y = a.energy;
+        const double y = targetCh;
 
         m[0][0] += w;       m[0][1] += w * x;    m[0][2] += w * x2;
         m[1][0] += w * x;   m[1][1] += w * x2;   m[1][2] += w * x3;
@@ -496,7 +491,7 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 
     if (std::abs(det) < 1e-15) {
         // Fallback to linear
-        return computeCalibration(anchors, false, outResult);
+        return computeCalibration(anchors, false, outResult, maxAllowedChi2NDF, disp);
     }
 
     const double invDet = 1.0 / det;
@@ -522,14 +517,18 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 
     double sumResSq = 0.0, sumChi2 = 0.0;
     for (const auto &a : valid) {
-        const double fitE = outResult.a0 + outResult.a1 * a.centroidCh + outResult.a2 * a.centroidCh * a.centroidCh;
-        const double res = a.energy - fitE;
-        sumResSq += res * res;
+        const double targetCh = a.energy / disp;
+        const double fitCh = outResult.a0 + outResult.a1 * a.centroidCh + outResult.a2 * a.centroidCh * a.centroidCh;
+        const double resCh = targetCh - fitCh;
+        const double resE = resCh * disp;
+        sumResSq += resE * resE;
+
+        const double targetErrCh = (a.energyErr > 0.0 ? a.energyErr : 0.05) / disp;
         const double centErr = (a.centroidErrCh > 0.0) ? a.centroidErrCh : 0.05;
         const double dEdx = std::abs(outResult.a1 + 2.0 * outResult.a2 * a.centroidCh);
-        const double sigE = std::sqrt(std::max(0.0025, (a.energyErr * a.energyErr) +
+        const double sigCh = std::sqrt(std::max(0.0025, (targetErrCh * targetErrCh) +
                                                       (dEdx * dEdx * centErr * centErr)));
-        sumChi2 += (res * res) / (sigE * sigE);
+        sumChi2 += (resCh * resCh) / (sigCh * sigCh);
     }
 
     const int ndf = std::max(1, static_cast<int>(valid.size()) - 3);
@@ -681,7 +680,7 @@ void RunByRunEngine::run()
 
             bool calibSuccess = false;
             if (validAnchorCount >= minRequiredAnchors) {
-                calibSuccess = computeCalibration(fittedRunAnchors, m_config.useQuadratic, res, m_config.maxAllowedChi2NDF);
+                calibSuccess = computeCalibration(fittedRunAnchors, m_config.useQuadratic, res, m_config.maxAllowedChi2NDF, dispersion);
             } else {
                 res.status = RunCalibStatus::NoPeakInWindow;
                 res.failureReason = QString("Only %1 of %2 valid anchor peaks found (minimum %3 required).")
