@@ -550,6 +550,100 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 }
 
 //==============================================================================
+// detectSpectrumGain: checks whether peaks match 1.0 keV/ch or 0.5 keV/ch
+//==============================================================================
+double RunByRunEngine::detectSpectrumGain(const std::vector<double> &spectrum,
+                                         const std::vector<AnchorPeakDef> &anchors)
+{
+    const int totalBins = static_cast<int>(spectrum.size());
+    if (totalBins < 100) return 1.0;
+
+    double score10 = 0.0;
+    double score05 = 0.0;
+
+    for (const auto &anc : anchors) {
+        if (anc.physicalEnergy < 50.0) continue;
+
+        // Candidate 1: 1.0 keV/ch -> centroid ~ energy
+        const int c10 = static_cast<int>(std::round(anc.physicalEnergy / 1.0));
+        if (c10 >= 15 && c10 + 15 < totalBins) {
+            double maxV = spectrum[c10];
+            for (int ch = c10 - 6; ch <= c10 + 6; ++ch) {
+                if (spectrum[ch] > maxV) maxV = spectrum[ch];
+            }
+            double baseV = (spectrum[c10 - 15] + spectrum[c10 + 15]) / 2.0;
+            double net = maxV - baseV;
+            if (net > 15.0) score10 += net;
+        }
+
+        // Candidate 2: 0.5 keV/ch -> centroid ~ energy * 2.0
+        const int c05 = static_cast<int>(std::round(anc.physicalEnergy / 0.5));
+        if (c05 >= 25 && c05 + 25 < totalBins) {
+            double maxV = spectrum[c05];
+            for (int ch = c05 - 12; ch <= c05 + 12; ++ch) {
+                if (spectrum[ch] > maxV) maxV = spectrum[ch];
+            }
+            double baseV = (spectrum[c05 - 25] + spectrum[c05 + 25]) / 2.0;
+            double net = maxV - baseV;
+            if (net > 15.0) score05 += net;
+        }
+    }
+
+    if (score05 > score10 * 1.4 && score05 > 25.0) {
+        return 0.5;
+    }
+    return 1.0;
+}
+
+//==============================================================================
+// autoDetectBatches: scans sequence runs to detect dispersion transitions (1.0 vs 0.5 keV/ch)
+//==============================================================================
+std::vector<RunBatchSegment> RunByRunEngine::autoDetectBatches(
+    const std::vector<QString> &runFilePaths,
+    const std::vector<AnchorPeakDef> &anchors,
+    int detectorId,
+    int channels,
+    SpectrumFormat format)
+{
+    std::vector<RunBatchSegment> segments;
+    if (runFilePaths.empty()) return segments;
+
+    std::vector<double> gains(runFilePaths.size(), 1.0);
+    double lastKnownGain = 1.0;
+
+    for (size_t i = 0; i < runFilePaths.size(); ++i) {
+        std::vector<double> spec;
+        QString err;
+        if (ReadSpectrumData(runFilePaths[i].toStdString(), format, channels, detectorId, spec, &err) && !spec.empty()) {
+            double g = detectSpectrumGain(spec, anchors);
+            gains[i] = g;
+            lastKnownGain = g;
+        } else {
+            gains[i] = lastKnownGain;
+        }
+    }
+
+    int batchIdx = 1;
+    size_t startIdx = 0;
+    while (startIdx < gains.size()) {
+        double currentGain = gains[startIdx];
+        size_t endIdx = startIdx;
+        while (endIdx + 1 < gains.size() && std::abs(gains[endIdx + 1] - currentGain) < 1e-4) {
+            endIdx++;
+        }
+        RunBatchSegment seg;
+        seg.startRunIndex = static_cast<int>(startIdx);
+        seg.endRunIndex = static_cast<int>(endIdx);
+        seg.nominalGain = currentGain;
+        seg.label = QString("Batch %1 (%2 keV/ch)").arg(batchIdx++).arg(currentGain, 0, 'f', 1);
+        segments.push_back(seg);
+        startIdx = endIdx + 1;
+    }
+
+    return segments;
+}
+
+//==============================================================================
 // run: Detector-by-Detector Trajectory Tracking Loop
 //==============================================================================
 void RunByRunEngine::run()
@@ -563,6 +657,8 @@ void RunByRunEngine::run()
         emit batchFinished(false, 0, 0);
         return;
     }
+
+    const double refGain = (m_config.referenceGain > 0.0) ? m_config.referenceGain : 1.0;
 
     int overallSuccessCount = 0;
     int overallFailureCount = 0;
@@ -578,10 +674,15 @@ void RunByRunEngine::run()
         DetectorTrajectory traj;
         traj.detectorId = detId;
 
-        // Initialize base centroids directly from anchor definitions (initialChannel or physicalEnergy)
+        double currentNominalGain = m_config.getRunNominalGain(0);
+        double prevGain = currentNominalGain;
+
+        // Initialize base centroids scaled for starting run nominal gain
         std::vector<double> baseCentroids;
         for (const auto &anchorDef : m_config.anchors) {
-            double guessCh = (anchorDef.initialChannel > 0.0) ? anchorDef.initialChannel : anchorDef.physicalEnergy;
+            double guessCh = (anchorDef.initialChannel > 0.0)
+                ? (anchorDef.initialChannel * (refGain / currentNominalGain))
+                : (anchorDef.physicalEnergy / currentNominalGain);
             baseCentroids.push_back(guessCh);
         }
         traj.lastValidCentroids = baseCentroids;
@@ -608,6 +709,25 @@ void RunByRunEngine::run()
             res.fullFilePath = runPath;
             res.detectorId = detId;
 
+            currentNominalGain = m_config.getRunNominalGain(rIdx);
+            res.nominalGain = currentNominalGain;
+
+            // Handle configured nominal dispersion change between batches (e.g. 1.0 keV/ch -> 0.5 keV/ch)
+            if (rIdx > 0 && std::abs(currentNominalGain - prevGain) > 1e-4) {
+                const double gainStepScale = prevGain / currentNominalGain;
+                for (size_t aIdx = 0; aIdx < traj.lastValidCentroids.size(); ++aIdx) {
+                    traj.lastValidCentroids[aIdx] *= gainStepScale;
+                }
+                baseCentroids.clear();
+                for (const auto &anchorDef : m_config.anchors) {
+                    double guessCh = (anchorDef.initialChannel > 0.0)
+                        ? (anchorDef.initialChannel * (refGain / currentNominalGain))
+                        : (anchorDef.physicalEnergy / currentNominalGain);
+                    baseCentroids.push_back(guessCh);
+                }
+                prevGain = currentNominalGain;
+            }
+
             // Load detector d spectrum for run r
             std::vector<double> runSpectrum;
             QString err;
@@ -627,6 +747,10 @@ void RunByRunEngine::run()
                 continue;
             }
 
+            // Scale search window, expected FWHM, and max drift by dispersion ratio
+            const double gainRelScale = refGain / currentNominalGain;
+            const double curMaxDrift = std::max(5.0, m_config.maxAllowedDriftCh * gainRelScale);
+
             // Fit each anchor peak within bounded search window around detector's moving centroid
             std::vector<FittedAnchor> fittedRunAnchors;
 
@@ -635,31 +759,33 @@ void RunByRunEngine::run()
                 const double centerCh = (aIdx < traj.lastValidCentroids.size())
                                             ? traj.lastValidCentroids[aIdx]
                                             : baseCentroids[aIdx];
+                const double winCh = std::max(2.0, anchorDef.searchWindowCh * gainRelScale);
+                const double expFwhm = std::max(0.5, anchorDef.expectedFwhmCh * gainRelScale);
 
                 FittedAnchor fa = fitAnchorPeak(runSpectrum,
                                                centerCh,
-                                               anchorDef.searchWindowCh,
+                                               winCh,
                                                anchorDef.minCounts,
                                                anchorDef.physicalEnergy);
                 fa.energyErr = anchorDef.energyError;
 
-                // If not found around previous good centroid, try searching around initial base channel as fallback
+                // Fallback search around base centroid
                 if (!fa.isValid && std::abs(centerCh - baseCentroids[aIdx]) > 0.5) {
                     fa = fitAnchorPeak(runSpectrum,
                                        baseCentroids[aIdx],
-                                       anchorDef.searchWindowCh,
+                                       winCh,
                                        anchorDef.minCounts,
                                        anchorDef.physicalEnergy);
                     fa.energyErr = anchorDef.energyError;
                 }
 
-                // Verify FWHM and drift from base centroid does not exceed max tolerance
+                // Verify FWHM and drift from base centroid
                 if (fa.isValid) {
-                    if (anchorDef.expectedFwhmCh > 0.0 && fa.fwhmCh > anchorDef.expectedFwhmCh * 2.5) {
+                    if (expFwhm > 0.0 && fa.fwhmCh > expFwhm * 2.5) {
                         fa.isValid = false;
                     }
                     const double drift = std::abs(fa.centroidCh - baseCentroids[aIdx]);
-                    if (drift > m_config.maxAllowedDriftCh) {
+                    if (drift > curMaxDrift) {
                         fa.isValid = false;
                     }
                 }
@@ -673,13 +799,82 @@ void RunByRunEngine::run()
             }
             const int minRequiredAnchors = m_config.useQuadratic ? 3 : 2;
 
+            // SMART DYNAMIC RECOVERY:
+            // If peaks were not found at the configured nominal gain, check candidate gain scale ratios
+            // (e.g. 2.0 for 1.0 -> 0.5 keV/ch or 0.5 for 0.5 -> 1.0 keV/ch transition)
+            if (validAnchorCount < minRequiredAnchors) {
+                const std::vector<double> candidateScales = { 2.0, 0.5 };
+                for (double candScale : candidateScales) {
+                    const double testNominalGain = currentNominalGain / candScale;
+                    const double testRelScale = refGain / testNominalGain;
+                    const double testMaxDrift = std::max(5.0, m_config.maxAllowedDriftCh * testRelScale);
+
+                    std::vector<FittedAnchor> candFittedAnchors;
+                    int candValidCount = 0;
+
+                    for (size_t aIdx = 0; aIdx < m_config.anchors.size(); ++aIdx) {
+                        const auto &anchorDef = m_config.anchors[aIdx];
+                        const double testCenterCh = (anchorDef.initialChannel > 0.0)
+                            ? (anchorDef.initialChannel * (refGain / testNominalGain))
+                            : (anchorDef.physicalEnergy / testNominalGain);
+                        const double testWinCh = std::max(3.0, anchorDef.searchWindowCh * testRelScale);
+                        const double testExpFwhm = std::max(0.5, anchorDef.expectedFwhmCh * testRelScale);
+
+                        FittedAnchor fa = fitAnchorPeak(runSpectrum,
+                                                       testCenterCh,
+                                                       testWinCh,
+                                                       anchorDef.minCounts,
+                                                       anchorDef.physicalEnergy);
+                        fa.energyErr = anchorDef.energyError;
+
+                        if (fa.isValid) {
+                            if (testExpFwhm > 0.0 && fa.fwhmCh > testExpFwhm * 2.5) {
+                                fa.isValid = false;
+                            }
+                            const double drift = std::abs(fa.centroidCh - testCenterCh);
+                            if (drift > testMaxDrift) {
+                                fa.isValid = false;
+                            }
+                        }
+
+                        if (fa.isValid) candValidCount++;
+                        candFittedAnchors.push_back(fa);
+                    }
+
+                    if (candValidCount >= minRequiredAnchors) {
+                        fittedRunAnchors = candFittedAnchors;
+                        validAnchorCount = candValidCount;
+                        currentNominalGain = testNominalGain;
+                        res.nominalGain = currentNominalGain;
+
+                        baseCentroids.clear();
+                        for (const auto &anchorDef : m_config.anchors) {
+                            double guessCh = (anchorDef.initialChannel > 0.0)
+                                ? (anchorDef.initialChannel * (refGain / currentNominalGain))
+                                : (anchorDef.physicalEnergy / currentNominalGain);
+                            baseCentroids.push_back(guessCh);
+                        }
+                        for (size_t aIdx = 0; aIdx < fittedRunAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
+                            if (fittedRunAnchors[aIdx].isValid) {
+                                traj.lastValidCentroids[aIdx] = fittedRunAnchors[aIdx].centroidCh;
+                            } else {
+                                traj.lastValidCentroids[aIdx] = baseCentroids[aIdx];
+                            }
+                        }
+                        prevGain = currentNominalGain;
+                        break;
+                    }
+                }
+            }
+
             bool calibSuccess = false;
             if (validAnchorCount >= minRequiredAnchors) {
                 calibSuccess = computeCalibration(fittedRunAnchors, m_config.useQuadratic, res, m_config.maxAllowedChi2NDF);
             } else {
                 res.status = RunCalibStatus::NoPeakInWindow;
-                res.failureReason = QString("Only %1 of %2 valid anchor peaks found (minimum %3 required).")
-                                        .arg(validAnchorCount).arg(m_config.anchors.size()).arg(minRequiredAnchors);
+                res.failureReason = QString("Only %1 of %2 valid anchor peaks found (minimum %3 required; nominal %4 keV/ch).")
+                                        .arg(validAnchorCount).arg(m_config.anchors.size()).arg(minRequiredAnchors)
+                                        .arg(currentNominalGain, 0, 'f', 2);
             }
 
             if (calibSuccess) {
@@ -695,11 +890,7 @@ void RunByRunEngine::run()
                 traj.successCount++;
                 overallSuccessCount++;
             } else {
-                // Calibration for this run failed. In no way should run n copy parameters from n-1!
-                // Keep res recorded as failed with its actual failure status and reason.
                 res.isFallbackFromPrevious = false;
-                // traj.lastValidCentroids remains as the centroids from the last good run (n-1),
-                // allowing run n+1 to resume tracking from the last good parameters.
                 traj.runResults.push_back(res);
                 traj.failureCount++;
                 overallFailureCount++;
@@ -708,8 +899,9 @@ void RunByRunEngine::run()
             processedSteps++;
             const int overallPct = (processedSteps * 100) / std::max(1, totalSteps);
             emit runProcessed(detId, rIdx, nRuns, res);
-            emit progressUpdated(overallPct, QString("Aligning Detector #%1: Run %2 of %3 (%4)")
-                                                 .arg(detId).arg(rIdx + 1).arg(nRuns).arg(runInfo.fileName()));
+            emit progressUpdated(overallPct, QString("Aligning Detector #%1: Run %2 of %3 (%4, %5 keV/ch)")
+                                                 .arg(detId).arg(rIdx + 1).arg(nRuns).arg(runInfo.fileName())
+                                                 .arg(currentNominalGain, 0, 'f', 1));
         }
 
         emit detectorFinished(detId, traj.successCount, traj.failureCount);

@@ -20,6 +20,14 @@ enum class RunCalibStatus {
     RefAnchorFailed
 };
 
+// Segment defining a batch of runs with a specific nominal dispersion (gain) in keV/channel
+struct RunBatchSegment {
+    int startRunIndex{0};       // 0-based start run index in runFilePaths (inclusive)
+    int endRunIndex{0};         // 0-based end run index in runFilePaths (inclusive)
+    double nominalGain{1.0};    // Nominal dispersion in keV/ch (e.g. 1.0 or 0.5)
+    QString label;              // Descriptive label (e.g. "Batch 1 (1.0 keV/ch)")
+};
+
 // Configuration for a single anchor line
 struct AnchorPeakDef {
     double physicalEnergy{0.0};    // Known physical energy in keV (e.g. 1460.8)
@@ -70,6 +78,7 @@ struct RunCalibResult {
     QString failureReason;
     bool isFallbackFromPrevious{false};
     int fallbackSourceRun{0};
+    double nominalGain{1.0};   // Expected nominal dispersion (keV/ch) for this run
 
     // Calibration coefficients: E = a0 + a1*ch (+ a2*ch^2)
     int numCoeffs{2};
@@ -108,6 +117,23 @@ struct RunByRunConfig {
     bool useQuadratic{false};          // true = quadratic (a0, a1, a2); false = linear (a0, a1)
     double maxAllowedDriftCh{25.0};    // Max allowed drift from last valid centroid before failure
     double maxAllowedChi2NDF{5.0};     // Max allowed reduced Chi2/ndf before flagging/rejection
+
+    // Run batch dispersion (keV/channel) configuration
+    double referenceGain{1.0};               // Nominal dispersion (keV/ch) for anchor definitions
+    std::vector<RunBatchSegment> batchSegments;
+    std::vector<double> runNominalGains;    // Per-run nominal gain in keV/ch (size == runFilePaths.size())
+
+    double getRunNominalGain(int runIndex) const {
+        if (runIndex >= 0 && runIndex < static_cast<int>(runNominalGains.size()) && runNominalGains[runIndex] > 0.0) {
+            return runNominalGains[runIndex];
+        }
+        for (const auto &seg : batchSegments) {
+            if (runIndex >= seg.startRunIndex && runIndex <= seg.endRunIndex && seg.nominalGain > 0.0) {
+                return seg.nominalGain;
+            }
+        }
+        return (referenceGain > 0.0) ? referenceGain : 1.0;
+    }
 };
 
 /**
@@ -152,6 +178,17 @@ public:
                                    bool useQuadratic,
                                    RunCalibResult &outResult,
                                    double maxAllowedChi2NDF = 5.0);
+
+    // Helper to auto-detect batch segments across runs based on candidate dispersion (1.0 vs 0.5 keV/ch)
+    static std::vector<RunBatchSegment> autoDetectBatches(const std::vector<QString> &runFilePaths,
+                                                         const std::vector<AnchorPeakDef> &anchors,
+                                                         int detectorId,
+                                                         int channels,
+                                                         SpectrumFormat format);
+
+    // Helper to detect nominal dispersion (1.0 or 0.5 keV/ch) in a single run spectrum
+    static double detectSpectrumGain(const std::vector<double> &spectrum,
+                                     const std::vector<AnchorPeakDef> &anchors);
 
 signals:
     void detectorStarted(int detectorId, int totalDetectors);
