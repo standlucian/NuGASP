@@ -46,7 +46,6 @@ public:
     explicit DetectorDriftPlotWidget(QWidget *parent = nullptr);
 
     void setData(int detectorId, const std::vector<DriftPlotPoint> &points);
-    void setBatchSegments(const std::vector<RunBatchSegment> &batches);
     void clearData();
 
 signals:
@@ -61,7 +60,6 @@ protected:
 private:
     int m_detectorId{-1};
     std::vector<DriftPlotPoint> m_points;
-    std::vector<RunBatchSegment> m_batchSegments;
     int m_hoveredIndex{-1};
     QPoint m_mousePos;
 };
@@ -116,11 +114,7 @@ private slots:
     void onExportUcalClicked();
     void onCellDoubleClicked(int row, int col);
     void onDetectorPlotSelectionChanged(int detIdx);
-
-    // Batch dispersion configuration slots
-    void onAddBatchClicked();
-    void onAutoDetectBatchesClicked();
-    void onResetBatchesClicked(double gain);
+    void onDispersionChanged(double value);
 
     // Download worker slots
     void onDownloadRunStarted(int runIndex, int totalRuns, const QString &fileName);
@@ -140,9 +134,6 @@ private:
     void discoverRuns();
     void populateAnchorTable();
     void syncAnchorsFromTable();
-    void populateBatchTable();
-    void syncBatchesFromTable();
-    double getRunNominalGain(int runIndex) const;
     void updatePlot(int detId);
     void showIssueReportModal(int totalSuccess, int totalIntervene, int totalFailures);
     void inspectSpectrumOnCanvas(int row, int col);
@@ -172,15 +163,10 @@ private:
     QSpinBox               *m_spinDetStart{nullptr};
     QSpinBox               *m_spinDetEnd{nullptr};
     QComboBox              *m_comboChannelLength{nullptr};
+    QDoubleSpinBox         *m_spinDispersion{nullptr};
     QCheckBox              *m_chkQuadratic{nullptr};
     QDoubleSpinBox         *m_spinDriftTolerance{nullptr};
     QDoubleSpinBox         *m_spinMaxChi2{nullptr};
-
-    // Run Batches & Dispersion Management
-    QTableWidget           *m_tableBatches{nullptr};
-    std::vector<RunBatchSegment> m_batches;
-    std::vector<double>    m_runNominalGains;
-    double                 m_referenceGain{1.0};
 
     // Anchors Table
     QTableWidget           *m_tableAnchors{nullptr};

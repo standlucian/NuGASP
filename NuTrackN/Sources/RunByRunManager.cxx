@@ -123,17 +123,10 @@ void DetectorDriftPlotWidget::setData(int detectorId, const std::vector<DriftPlo
     update();
 }
 
-void DetectorDriftPlotWidget::setBatchSegments(const std::vector<RunBatchSegment> &batches)
-{
-    m_batchSegments = batches;
-    update();
-}
-
 void DetectorDriftPlotWidget::clearData()
 {
     m_detectorId = -1;
     m_points.clear();
-    m_batchSegments.clear();
     m_hoveredIndex = -1;
     update();
 }
@@ -383,30 +376,6 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
         return rChi.bottom() - norm * rChi.height();
     };
 
-    // Draw batch division lines & badges if multiple batches are present
-    if (m_batchSegments.size() > 1 && nPts > 1) {
-        for (size_t bIdx = 0; bIdx < m_batchSegments.size(); ++bIdx) {
-            const auto &seg = m_batchSegments[bIdx];
-            double xS = getX(seg.startRunIndex);
-            double xE = getX(seg.endRunIndex);
-
-            if (seg.startRunIndex > 0) {
-                p.setPen(QPen(QColor("#ffb74d"), 1, Qt::DashLine));
-                p.drawLine(QPointF(xS, rGain.top()), QPointF(xS, rChi.bottom()));
-            }
-
-            // Draw small batch label pill
-            double pillW = std::max(45.0, std::min(85.0, (xE - xS) * 0.8));
-            QRectF bPill(xS + 2, rGain.top() + 2, pillW, 14);
-            p.fillRect(bPill, QColor(38, 50, 56, 210));
-            p.setPen(QPen(QColor("#455a64"), 1));
-            p.drawRect(bPill);
-            p.setPen(QColor("#64b5f6"));
-            QFont pillFont("Arial", 7, QFont::Bold);
-            p.setFont(pillFont);
-            p.drawText(bPill, Qt::AlignCenter, QString("%1 keV/ch").arg(seg.nominalGain, 0, 'f', 1));
-        }
-    }
 
     // Draw connecting lines for Gain
     if (validCount > 1) {
@@ -689,50 +658,41 @@ void RunByRunManager::setupUI()
     m_spinMaxChi2->setToolTip(tr("Maximum allowed reduced chi-square (\u03c7\u00b2/ndf) for automatic calibration acceptance. Fits exceeding this value will be flagged for review."));
     setupGrid->addWidget(m_spinMaxChi2, 2, 3);
 
-    // Row 3: Run Batches & Dispersion Management (1.0 keV/ch <-> 0.5 keV/ch)
-    QGroupBox *grpBatches = new QGroupBox(tr("Run Batches & Dispersion Configuration (1.0 keV/ch ↔ 0.5 keV/ch)"), this);
-    QHBoxLayout *batchHBox = new QHBoxLayout(grpBatches);
-    batchHBox->setSpacing(8);
-    batchHBox->setContentsMargins(6, 6, 6, 6);
+    // Row 3: Nominal Dispersion (keV/ch)
+    setupGrid->addWidget(new QLabel(tr("Nominal Dispersion:"), this), 3, 0);
+    QHBoxLayout *dispLayout = new QHBoxLayout();
+    m_spinDispersion = new QDoubleSpinBox(this);
+    m_spinDispersion->setRange(0.0001, 100.0);
+    m_spinDispersion->setDecimals(4);
+    m_spinDispersion->setSingleStep(0.1);
+    m_spinDispersion->setValue(1.0);
+    m_spinDispersion->setSuffix(" keV/ch");
+    m_spinDispersion->setToolTip(tr("Nominal dispersion of the run spectrum (e.g. 1.0 keV/ch or 0.5 keV/ch). Initial peak channels scale uniformly with this value."));
+    connect(m_spinDispersion, QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &RunByRunManager::onDispersionChanged);
 
-    m_tableBatches = new QTableWidget(this);
-    m_tableBatches->setColumnCount(4);
-    m_tableBatches->setHorizontalHeaderLabels({
-        tr("Batch Name"),
-        tr("Run Range"),
-        tr("Nominal Dispersion (keV/ch)"),
-        tr("Runs Count")
+    QPushButton *btnDisp10 = new QPushButton(tr("1.0 keV/ch"), this);
+    btnDisp10->setToolTip(tr("Set nominal dispersion to standard 1.0 keV/ch"));
+    connect(btnDisp10, &QPushButton::clicked, this, [this]() {
+        if (m_spinDispersion) m_spinDispersion->setValue(1.0);
     });
-    m_tableBatches->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
-    m_tableBatches->setMaximumHeight(90);
-    batchHBox->addWidget(m_tableBatches, 1);
 
-    QVBoxLayout *batchBtnBox = new QVBoxLayout();
-    batchBtnBox->setSpacing(4);
-    QPushButton *btnSplitBatch = new QPushButton(tr("✂️ Split Batch..."), this);
-    QPushButton *btnAutoDetectBatches = new QPushButton(tr("⚡ Auto-Detect (1.0 ↔ 0.5)"), this);
-    btnAutoDetectBatches->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white;");
-    QPushButton *btnReset10 = new QPushButton(tr("1.0 keV/ch All"), this);
-    QPushButton *btnReset05 = new QPushButton(tr("0.5 keV/ch All"), this);
+    QPushButton *btnDisp05 = new QPushButton(tr("0.5 keV/ch"), this);
+    btnDisp05->setToolTip(tr("Set nominal dispersion to 0.5 keV/ch (doubled channel numbers)"));
+    connect(btnDisp05, &QPushButton::clicked, this, [this]() {
+        if (m_spinDispersion) m_spinDispersion->setValue(0.5);
+    });
 
-    connect(btnSplitBatch, &QPushButton::clicked, this, &RunByRunManager::onAddBatchClicked);
-    connect(btnAutoDetectBatches, &QPushButton::clicked, this, &RunByRunManager::onAutoDetectBatchesClicked);
-    connect(btnReset10, &QPushButton::clicked, this, [this]() { onResetBatchesClicked(1.0); });
-    connect(btnReset05, &QPushButton::clicked, this, [this]() { onResetBatchesClicked(0.5); });
+    dispLayout->addWidget(m_spinDispersion);
+    dispLayout->addWidget(btnDisp10);
+    dispLayout->addWidget(btnDisp05);
+    setupGrid->addLayout(dispLayout, 3, 1);
 
-    QHBoxLayout *batchResetRow = new QHBoxLayout();
-    batchResetRow->addWidget(btnReset10);
-    batchResetRow->addWidget(btnReset05);
-
-    batchBtnBox->addWidget(btnSplitBatch);
-    batchBtnBox->addWidget(btnAutoDetectBatches);
-    batchBtnBox->addLayout(batchResetRow);
-    batchHBox->addLayout(batchBtnBox);
-
-    setupGrid->addWidget(grpBatches, 3, 0, 1, 4);
+    QLabel *lblDispInfo = new QLabel(tr("<i>Initial search centroids scale as E / dispersion for all anchor lines</i>"), this);
+    lblDispInfo->setStyleSheet("color: #78909c;");
+    setupGrid->addWidget(lblDispInfo, 3, 2, 1, 2);
 
     mainLayout->addWidget(grpSetup);
-    populateBatchTable();
+    populateAnchorTable();
 
     // MIDDLE: Anchors Table & Configuration
     QGroupBox *grpAnchors = new QGroupBox(tr("2. In-Beam Anchor Lines (Centroid Trajectory Tracking)"), this);
@@ -1014,267 +974,17 @@ void RunByRunManager::populateAnchorTable()
 }
 
 //==============================================================================
-// populateBatchTable & syncBatchesFromTable
+// onDispersionChanged
 //==============================================================================
-void RunByRunManager::populateBatchTable()
+void RunByRunManager::onDispersionChanged(double val)
 {
-    if (!m_tableBatches) return;
-    m_tableBatches->blockSignals(true);
-
-    if (m_batches.empty() && !m_runFilePaths.empty()) {
-        RunBatchSegment b{ 0, static_cast<int>(m_runFilePaths.size()) - 1, 1.0, "Batch 1 (1.0 keV/ch)" };
-        m_batches.push_back(b);
+    if (val <= 0.0) return;
+    for (auto &anc : m_anchors) {
+        anc.initialChannel = anc.physicalEnergy / val;
+        anc.expectedFwhmCh = 3.5 / val;
+        anc.searchWindowCh = 5.0 / val;
     }
-
-    m_tableBatches->setRowCount(static_cast<int>(m_batches.size()));
-
-    for (int i = 0; i < static_cast<int>(m_batches.size()); ++i) {
-        const auto &b = m_batches[i];
-
-        // Column 0: Batch Name
-        QTableWidgetItem *itemLabel = new QTableWidgetItem(b.label.isEmpty() ? QString("Batch %1").arg(i + 1) : b.label);
-        itemLabel->setTextAlignment(Qt::AlignCenter);
-        m_tableBatches->setItem(i, 0, itemLabel);
-
-        // Column 1: Range
-        QString rText;
-        if (!m_runFilePaths.empty() && b.startRunIndex < static_cast<int>(m_runFilePaths.size()) && b.endRunIndex < static_cast<int>(m_runFilePaths.size())) {
-            rText = QString("Runs %1..%2 (%3 to %4)")
-                .arg(b.startRunIndex + 1).arg(b.endRunIndex + 1)
-                .arg(QFileInfo(m_runFilePaths[b.startRunIndex]).fileName())
-                .arg(QFileInfo(m_runFilePaths[b.endRunIndex]).fileName());
-        } else {
-            rText = QString("Runs %1..%2").arg(b.startRunIndex + 1).arg(b.endRunIndex + 1);
-        }
-        QTableWidgetItem *itemRange = new QTableWidgetItem(rText);
-        itemRange->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-        itemRange->setTextAlignment(Qt::AlignCenter);
-        m_tableBatches->setItem(i, 1, itemRange);
-
-        // Column 2: Nominal Dispersion (keV/ch)
-        QComboBox *comboGain = new QComboBox(m_tableBatches);
-        comboGain->addItem("1.000000 keV/ch (1.0 keV/ch standard)", 1.0);
-        comboGain->addItem("0.500000 keV/ch (0.5 keV/ch doubled channels)", 0.5);
-        comboGain->addItem("0.250000 keV/ch", 0.25);
-        comboGain->addItem("2.000000 keV/ch", 2.0);
-
-        int idx = comboGain->findData(b.nominalGain);
-        if (idx >= 0) {
-            comboGain->setCurrentIndex(idx);
-        } else {
-            comboGain->addItem(QString("%1 keV/ch").arg(b.nominalGain, 0, 'f', 6), b.nominalGain);
-            comboGain->setCurrentIndex(comboGain->count() - 1);
-        }
-        connect(comboGain, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
-            syncBatchesFromTable();
-        });
-        m_tableBatches->setCellWidget(i, 2, comboGain);
-
-        // Column 3: Run Count
-        int count = std::max(0, b.endRunIndex - b.startRunIndex + 1);
-        QTableWidgetItem *itemCount = new QTableWidgetItem(tr("%1 runs").arg(count));
-        itemCount->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
-        itemCount->setTextAlignment(Qt::AlignCenter);
-        m_tableBatches->setItem(i, 3, itemCount);
-    }
-
-    m_tableBatches->blockSignals(false);
-    syncBatchesFromTable();
-}
-
-void RunByRunManager::syncBatchesFromTable()
-{
-    if (!m_tableBatches) return;
-    for (int i = 0; i < m_tableBatches->rowCount() && i < static_cast<int>(m_batches.size()); ++i) {
-        if (m_tableBatches->item(i, 0)) {
-            m_batches[i].label = m_tableBatches->item(i, 0)->text();
-        }
-        QComboBox *cb = dynamic_cast<QComboBox*>(m_tableBatches->cellWidget(i, 2));
-        if (cb) {
-            m_batches[i].nominalGain = cb->currentData().toDouble();
-        }
-    }
-
-    // Build per-run nominal gains vector
-    const int nRuns = static_cast<int>(m_runFilePaths.size());
-    m_runNominalGains.assign(nRuns, 1.0);
-    for (const auto &b : m_batches) {
-        for (int r = b.startRunIndex; r <= b.endRunIndex && r < nRuns; ++r) {
-            if (r >= 0) {
-                m_runNominalGains[r] = b.nominalGain;
-            }
-        }
-    }
-
-    // Update 2D matrix row headers with gain indicator
-    if (m_gridMatrix && m_gridMatrix->rowCount() == nRuns) {
-        QStringList rowHeaders;
-        for (int r = 0; r < nRuns; ++r) {
-            double g = m_runNominalGains[r];
-            QString gStr = (std::abs(g - 0.5) < 0.01) ? "0.5k" : ((std::abs(g - 1.0) < 0.01) ? "1.0k" : QString::number(g, 'f', 2) + "k");
-            rowHeaders << QString("%1 [%2]").arg(QFileInfo(m_runFilePaths[r]).fileName()).arg(gStr);
-        }
-        m_gridMatrix->setVerticalHeaderLabels(rowHeaders);
-    }
-
-    if (m_plotWidget) {
-        m_plotWidget->setBatchSegments(m_batches);
-    }
-}
-
-double RunByRunManager::getRunNominalGain(int runIndex) const
-{
-    if (runIndex >= 0 && runIndex < static_cast<int>(m_runNominalGains.size()) && m_runNominalGains[runIndex] > 0.0) {
-        return m_runNominalGains[runIndex];
-    }
-    for (const auto &seg : m_batches) {
-        if (runIndex >= seg.startRunIndex && runIndex <= seg.endRunIndex && seg.nominalGain > 0.0) {
-            return seg.nominalGain;
-        }
-    }
-    return (m_referenceGain > 0.0) ? m_referenceGain : 1.0;
-}
-
-void RunByRunManager::onAddBatchClicked()
-{
-    if (m_runFilePaths.size() < 2) {
-        QMessageBox::information(this, tr("Insufficient Runs"), tr("Need at least 2 sequence runs to split into batches."));
-        return;
-    }
-
-    QDialog dlg(this);
-    dlg.setWindowTitle(tr("Split Sequence into New Run Batch"));
-    dlg.setFont(Design::getDialogFont());
-    dlg.setStyleSheet(Design::getDialogStyleSheet());
-    dlg.resize(440, 190);
-
-    QVBoxLayout *layout = new QVBoxLayout(&dlg);
-    layout->setSpacing(8);
-
-    QGridLayout *grid = new QGridLayout();
-    grid->addWidget(new QLabel(tr("Start New Batch at Run #:"), &dlg), 0, 0);
-
-    QSpinBox *spinRun = new QSpinBox(&dlg);
-    spinRun->setRange(2, static_cast<int>(m_runFilePaths.size()));
-    spinRun->setValue(std::min(static_cast<int>(m_runFilePaths.size()), static_cast<int>(m_runFilePaths.size()) / 2 + 1));
-    grid->addWidget(spinRun, 0, 1);
-
-    grid->addWidget(new QLabel(tr("New Batch Dispersion:"), &dlg), 1, 0);
-    QComboBox *comboDisp = new QComboBox(&dlg);
-    comboDisp->addItem(tr("0.500000 keV/ch (0.5 keV/ch doubled channels)"), 0.5);
-    comboDisp->addItem(tr("1.000000 keV/ch (1.0 keV/ch standard)"), 1.0);
-    comboDisp->addItem(tr("0.250000 keV/ch"), 0.25);
-    comboDisp->addItem(tr("2.000000 keV/ch"), 2.0);
-    grid->addWidget(comboDisp, 1, 1);
-
-    layout->addLayout(grid);
-
-    QLabel *lblHint = new QLabel(tr("<i>Adapts moving peak centroid search channels, FWHM windows, and drift tracking for the new batch.</i>"), &dlg);
-    lblHint->setWordWrap(true);
-    layout->addWidget(lblHint);
-
-    QHBoxLayout *btnBox = new QHBoxLayout();
-    QPushButton *btnOk = new QPushButton(tr("✂️ Split Batch"), &dlg);
-    btnOk->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 4px 12px;");
-    QPushButton *btnCancel = new QPushButton(tr("Cancel"), &dlg);
-    btnBox->addStretch(1);
-    btnBox->addWidget(btnOk);
-    btnBox->addWidget(btnCancel);
-    layout->addLayout(btnBox);
-
-    connect(btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject);
-    connect(btnOk, &QPushButton::clicked, &dlg, &QDialog::accept);
-
-    if (dlg.exec() != QDialog::Accepted) return;
-
-    int split1Based = spinRun->value();
-    int splitIdx = split1Based - 1; // 0-based
-    double newGain = comboDisp->currentData().toDouble();
-
-    int targetBatch = -1;
-    for (size_t i = 0; i < m_batches.size(); ++i) {
-        if (splitIdx > m_batches[i].startRunIndex && splitIdx <= m_batches[i].endRunIndex) {
-            targetBatch = static_cast<int>(i);
-            break;
-        }
-    }
-
-    if (targetBatch >= 0) {
-        RunBatchSegment orig = m_batches[targetBatch];
-        m_batches[targetBatch].endRunIndex = splitIdx - 1;
-
-        RunBatchSegment newSeg;
-        newSeg.startRunIndex = splitIdx;
-        newSeg.endRunIndex = orig.endRunIndex;
-        newSeg.nominalGain = newGain;
-        newSeg.label = QString("Batch %1 (%2 keV/ch)").arg(m_batches.size() + 1).arg(newGain, 0, 'f', 1);
-
-        m_batches.insert(m_batches.begin() + targetBatch + 1, newSeg);
-    } else {
-        m_batches.clear();
-        RunBatchSegment b1{ 0, splitIdx - 1, 1.0, "Batch 1 (1.0 keV/ch)" };
-        RunBatchSegment b2{ splitIdx, static_cast<int>(m_runFilePaths.size()) - 1, newGain, QString("Batch 2 (%1 keV/ch)").arg(newGain, 0, 'f', 1) };
-        m_batches.push_back(b1);
-        m_batches.push_back(b2);
-    }
-
-    populateBatchTable();
-}
-
-void RunByRunManager::onAutoDetectBatchesClicked()
-{
-    if (m_runFilePaths.empty()) {
-        QMessageBox::warning(this, tr("No Runs"), tr("Please load sequence run files first."));
-        return;
-    }
-    syncAnchorsFromTable();
-    if (m_anchors.empty()) {
-        QMessageBox::warning(this, tr("No Anchors"), tr("Please configure at least one anchor peak line first."));
-        return;
-    }
-
-    m_lblStatusText->setText(tr("⚡ Analyzing anchor peak positions across runs to detect dispersion batches (1.0 vs 0.5 keV/ch)..."));
-    qApp->processEvents();
-
-    int detId = m_spinDetStart ? m_spinDetStart->value() : 0;
-    int chLen = m_comboChannelLength ? m_comboChannelLength->currentData().toInt() : 65536;
-
-    std::vector<RunBatchSegment> detected = RunByRunEngine::autoDetectBatches(
-        m_runFilePaths, m_anchors, detId, chLen, SpectrumFormat::LongInt32);
-
-    if (detected.empty()) {
-        m_lblStatusText->setText(tr("Auto-detection found no distinct batches; keeping current configuration."));
-        return;
-    }
-
-    m_batches = detected;
-    populateBatchTable();
-
-    QString summary = tr("Auto-detection identified %1 batch(es):\n\n").arg(m_batches.size());
-    for (size_t i = 0; i < m_batches.size(); ++i) {
-        summary += tr("• %1: Runs %2 to %3 (%4 runs) → %5 keV/ch\n")
-            .arg(m_batches[i].label)
-            .arg(m_batches[i].startRunIndex + 1)
-            .arg(m_batches[i].endRunIndex + 1)
-            .arg(m_batches[i].endRunIndex - m_batches[i].startRunIndex + 1)
-            .arg(m_batches[i].nominalGain, 0, 'f', 2);
-    }
-
-    m_lblStatusText->setText(tr("✅ Auto-detected %1 run batches.").arg(m_batches.size()));
-    QMessageBox::information(this, tr("Batches Auto-Detected"), summary);
-}
-
-void RunByRunManager::onResetBatchesClicked(double gain)
-{
-    if (m_runFilePaths.empty()) return;
-    m_batches.clear();
-    RunBatchSegment b;
-    b.startRunIndex = 0;
-    b.endRunIndex = static_cast<int>(m_runFilePaths.size()) - 1;
-    b.nominalGain = gain;
-    b.label = QString("Batch 1 (%1 keV/ch)").arg(gain, 0, 'f', 1);
-    m_batches.push_back(b);
-    populateBatchTable();
+    populateAnchorTable();
 }
 
 void RunByRunManager::onBrowseRunsClicked()
@@ -1412,11 +1122,12 @@ void RunByRunManager::onBrowseRunsClicked()
             }
         }
 
-        // Initialize batches and sync row headers with nominal gain badges
-        m_batches.clear();
-        RunBatchSegment b{ 0, numRuns - 1, 1.0, "Batch 1 (1.0 keV/ch)" };
-        m_batches.push_back(b);
-        populateBatchTable();
+        // Initialize matrix vertical row headers
+        QStringList rowHeaders;
+        for (int r = 0; r < numRuns; ++r) {
+            rowHeaders << QString("%1").arg(QFileInfo(m_runFilePaths[r]).fileName());
+        }
+        m_gridMatrix->setVerticalHeaderLabels(rowHeaders);
 
         // Populate detector inspector combobox
         m_comboPlotDet->clear();
@@ -1572,7 +1283,8 @@ void RunByRunManager::onDownloadAllFinished(int successCount, int failCount, boo
 void RunByRunManager::onAddAnchorClicked()
 {
     syncAnchorsFromTable();
-    m_anchors.push_back({ 1000.0, 0.05, 0.0, 5.0, 15.0, 3.5 });
+    double disp = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
+    m_anchors.push_back({ 1000.0, 0.05, 1000.0 / disp, 5.0 / disp, 15.0, 3.5 / disp });
     populateAnchorTable();
     if (m_tableAnchors->rowCount() > 0) {
         int lastRow = m_tableAnchors->rowCount() - 1;
@@ -1625,13 +1337,14 @@ void RunByRunManager::onReadPeaksFromFileClicked()
             }
         }
 
+        double disp = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
         AnchorPeakDef a;
         a.physicalEnergy = energy;
         a.energyError    = energyErr;
-        a.initialChannel = 0.0;
-        a.searchWindowCh = 5.0;
+        a.initialChannel = energy / disp;
+        a.searchWindowCh = 5.0 / disp;
         a.minCounts      = 20.0;
-        a.expectedFwhmCh = 3.5;
+        a.expectedFwhmCh = 3.5 / disp;
         parsedPeaks.push_back(a);
     }
 
@@ -1802,18 +1515,11 @@ void RunByRunManager::onGrabParametersClicked()
         return;
     }
 
-    int refRunIndex = 0;
-    for (size_t i = 0; i < m_runFilePaths.size(); ++i) {
-        if (m_runFilePaths[i] == refPath) {
-            refRunIndex = static_cast<int>(i);
-            break;
-        }
-    }
-    m_referenceGain = getRunNominalGain(refRunIndex);
+    const double dispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
 
     int updatedCount = 0;
     for (auto &anchor : m_anchors) {
-        double searchCenter = (anchor.initialChannel > 0.0) ? anchor.initialChannel : anchor.physicalEnergy;
+        double searchCenter = (anchor.initialChannel > 0.0) ? anchor.initialChannel : (anchor.physicalEnergy / dispersion);
         double searchWin = std::max(25.0, anchor.searchWindowCh);
         FittedAnchor fa = RunByRunEngine::fitAnchorPeak(refSpectrum, searchCenter, searchWin, 5.0, anchor.physicalEnergy);
         if (fa.isValid) {
@@ -1829,7 +1535,7 @@ void RunByRunManager::onGrabParametersClicked()
 
     QMessageBox::information(this, tr("Parameters Updated"),
                              tr("Successfully grabbed and updated parameters for %1 of %2 anchor lines using %3 (Detector #%4, %5 keV/ch nominal).")
-                                 .arg(updatedCount).arg(m_anchors.size()).arg(QFileInfo(refPath).fileName()).arg(refDet).arg(m_referenceGain, 0, 'f', 2));
+                                 .arg(updatedCount).arg(m_anchors.size()).arg(QFileInfo(refPath).fileName()).arg(refDet).arg(dispersion, 0, 'f', 2));
 }
 
 //==============================================================================
@@ -1872,8 +1578,11 @@ void RunByRunManager::onStartCalibrationClicked()
     }
     m_gridMatrix->setHorizontalHeaderLabels(colHeaders);
 
-    // Sync batches and format row headers with gain indicator
-    syncBatchesFromTable();
+    QStringList rowHeaders;
+    for (int r = 0; r < numRuns; ++r) {
+        rowHeaders << QString("%1").arg(QFileInfo(m_runFilePaths[r]).fileName());
+    }
+    m_gridMatrix->setVerticalHeaderLabels(rowHeaders);
 
     for (int r = 0; r < numRuns; ++r) {
         for (int c = 0; c < numDets; ++c) {
@@ -1903,12 +1612,7 @@ void RunByRunManager::onStartCalibrationClicked()
     cfg.maxAllowedDriftCh = m_spinDriftTolerance->value();
     cfg.maxAllowedChi2NDF = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
 
-    if (m_referenceGain <= 0.0) {
-        m_referenceGain = getRunNominalGain(0);
-    }
-    cfg.referenceGain = m_referenceGain;
-    cfg.batchSegments = m_batches;
-    cfg.runNominalGains = m_runNominalGains;
+    cfg.nominalDispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
 
     // If runs are currently downloading in background, queue auto-calibration!
     if (m_isDownloading) {
@@ -1985,7 +1689,7 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
         m_gridMatrix->setItem(row, col, item);
     }
 
-    double nomG = (result.nominalGain > 0.0) ? result.nominalGain : getRunNominalGain(row);
+    double nomG = (result.nominalGain > 0.0) ? result.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
 
     if (result.status == RunCalibStatus::Success && !result.isFallbackFromPrevious) {
         item->setText("GOOD");
@@ -2292,7 +1996,7 @@ void RunByRunManager::updatePlot(int detId)
             QTableWidgetItem *itemFile = new QTableWidgetItem(fi.fileName());
             m_tablePlotData->setItem(r, 1, itemFile);
 
-            double nomG = getRunNominalGain(r);
+            double nomG = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
             QTableWidgetItem *itemNom = new QTableWidgetItem(QString("%1").arg(nomG, 0, 'f', (std::abs(nomG - 0.5) < 0.001 || std::abs(nomG - 1.0) < 0.001) ? 1 : 2));
             itemNom->setTextAlignment(Qt::AlignCenter);
             itemNom->setForeground(QBrush(QColor("#64b5f6")));
@@ -2343,7 +2047,7 @@ void RunByRunManager::updatePlot(int detId)
 
         m_tablePlotData->setItem(r, 1, new QTableWidgetItem(res.runFileName));
 
-        double runNomGain = (res.nominalGain > 0.0) ? res.nominalGain : getRunNominalGain(r);
+        double runNomGain = (res.nominalGain > 0.0) ? res.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
         QTableWidgetItem *itemNom = new QTableWidgetItem(QString("%1").arg(runNomGain, 0, 'f', (std::abs(runNomGain - 0.5) < 0.001 || std::abs(runNomGain - 1.0) < 0.001) ? 1 : 2));
         itemNom->setTextAlignment(Qt::AlignCenter);
         itemNom->setForeground(QBrush(QColor("#64b5f6")));
@@ -2497,15 +2201,13 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     std::vector<double> peakPositions;
     int fitCount = 0;
     const int totalBins = static_cast<int>(specData.size());
-    const double refGain = (m_referenceGain > 0.0) ? m_referenceGain : 1.0;
-    const double runNomGain = getRunNominalGain(row);
-    const double gainScale = refGain / runNomGain;
+    const double dispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
 
     for (size_t aIdx = 0; aIdx < m_anchors.size(); ++aIdx) {
         const auto &a = m_anchors[aIdx];
 
         // Determine best search center: check if this run already has trajectory calibration
-        double centerCh = (a.initialChannel > 0.0) ? (a.initialChannel * gainScale) : (a.physicalEnergy / runNomGain);
+        double centerCh = (a.initialChannel > 0.0) ? a.initialChannel : (a.physicalEnergy / dispersion);
         const FittedAnchor *savedFa = nullptr;
         for (const auto &traj : m_completedTrajectories) {
             if (traj.detectorId == detId) {
@@ -2534,12 +2236,12 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             fitSuccess = savedFa->isValid;
             fittedCentroid = savedFa->centroidCh;
             const double meanVal = savedFa->centroidCh;
-            const double fwhmVal = (savedFa->fwhmCh > 0.2) ? savedFa->fwhmCh : (((a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : 3.5) * gainScale);
+            const double fwhmVal = (savedFa->fwhmCh > 0.2) ? savedFa->fwhmCh : (((a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : 3.5) / dispersion);
             const double sigmaVal = fwhmVal / 2.35482;
             const double bkgVal = savedFa->background;
             const double slopeVal = savedFa->bkgSlope;
 
-            const double windowCh = (a.searchWindowCh > 0.0) ? (a.searchWindowCh * gainScale) : std::clamp(fwhmVal * 3.5, 12.0, 45.0);
+            const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : std::clamp(fwhmVal * 3.5, 12.0, 45.0);
             const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
             const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
             const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
@@ -2589,10 +2291,10 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             continue;
         }
 
-        const double windowCh = ((a.searchWindowCh > 0.0) ? a.searchWindowCh : 5.0) * gainScale;
+        const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : (5.0 / dispersion);
         const double minCounts = (a.minCounts > 0.0) ? a.minCounts : 20.0;
         FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, a.physicalEnergy);
-        double baseCentroid = (a.initialChannel > 0.0) ? (a.initialChannel * gainScale) : (a.physicalEnergy / runNomGain);
+        double baseCentroid = (a.initialChannel > 0.0) ? a.initialChannel : (a.physicalEnergy / dispersion);
         if (!fa.isValid && std::abs(centerCh - baseCentroid) > 0.5) {
             fa = RunByRunEngine::fitAnchorPeak(specData, baseCentroid, windowCh, minCounts, a.physicalEnergy);
         }
@@ -2854,10 +2556,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         curRes.status = RunCalibStatus::BadChi2;
     }
 
-    const double refGain = (m_referenceGain > 0.0) ? m_referenceGain : 1.0;
-    const double runNomGain = (curRes.nominalGain > 0.0) ? curRes.nominalGain : getRunNominalGain(row);
-    curRes.nominalGain = runNomGain;
-    const double gainScale = refGain / runNomGain;
+    const double dispersion = (curRes.nominalGain > 0.0) ? curRes.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
+    curRes.nominalGain = dispersion;
+    const double runNomGain = dispersion;
 
     const double maxChi2 = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
     const bool useQuadratic = m_chkQuadratic ? m_chkQuadratic->isChecked() : false;
@@ -2995,14 +2696,14 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].energy = anc.physicalEnergy;
         rowWidgets[i].energyError = anc.energyError;
 
-        double nominalCh = (anc.initialChannel > 0.0) ? (anc.initialChannel * gainScale) : (anc.physicalEnergy / runNomGain);
+        double nominalCh = (anc.initialChannel > 0.0) ? anc.initialChannel : (anc.physicalEnergy / dispersion);
         rowWidgets[i].nominalCentroid = nominalCh;
 
         double initCentroid = nominalCh;
         double initCentroidErr = 0.05;
         double initPeakChi2 = 1.0;
-        double initFwhm = ((anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : 3.5) * gainScale;
-        double initWin = ((anc.searchWindowCh > 0.0) ? anc.searchWindowCh : 5.0) * gainScale;
+        double initFwhm = (anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : (3.5 / dispersion);
+        double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : (5.0 / dispersion);
         double initBkg = 10.0;
         double initSlope = 0.0;
         double initStep = 0.0;
