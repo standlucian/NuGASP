@@ -3074,6 +3074,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 3. Visual Guideline TLine at current centroid
         TLine *guideLine = rowWidgets[peakIdx].guideLine;
+        if (guideLine && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(guideLine)) {
+            guideLine = nullptr;
+            rowWidgets[peakIdx].guideLine = nullptr;
+        }
         if (!guideLine) {
             guideLine = new TLine();
             guideLine->SetLineColor(kYellow + 1);
@@ -3100,6 +3104,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double stepVal = rowWidgets[peakIdx].bkgStep;
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
+        if (fFit && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fFit)) {
+            fFit = nullptr;
+            rowWidgets[peakIdx].fitFunc = nullptr;
+        }
         if (!fFit && activePad) {
             fFit = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_fit_%d_%d", detId, peakIdx)));
         }
@@ -3122,6 +3130,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 5. Baseline Background Function TF1 with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
         TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
+        if (fBkg && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fBkg)) {
+            fBkg = nullptr;
+            rowWidgets[peakIdx].bkgFunc = nullptr;
+        }
         if (!fBkg && activePad) {
             fBkg = dynamic_cast<TF1*>(activePad->GetPrimitive(Form("rbr_background_%d_%d", detId, peakIdx)));
         }
@@ -3144,6 +3156,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 6. Centroid Text Label TLatex directly over peak
         TLatex *peakLabel = rowWidgets[peakIdx].peakLabel;
+        if (peakLabel && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(peakLabel)) {
+            peakLabel = nullptr;
+            rowWidgets[peakIdx].peakLabel = nullptr;
+        }
         if (!peakLabel && activePad) {
             peakLabel = dynamic_cast<TLatex*>(activePad->GetPrimitive(Form("rbr_peak_label_%d_%d", detId, peakIdx)));
         }
@@ -3157,6 +3173,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             rowWidgets[peakIdx].peakLabel = peakLabel;
             m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(peakLabel);
         }
+        rowWidgets[peakIdx].peakLabel = peakLabel;
         const double peakHeight = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
         peakLabel->SetX(cCh);
         peakLabel->SetY(peakHeight);
@@ -3324,8 +3341,25 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             } else {
                 tHist->SetCalibration(0.0, dispersion, 0.0);
             }
-            m_mainCanvas->renderPeakLabels(s_i, s_j);
             m_mainCanvas->updateAxisStatusLabels();
+        }
+
+        // Live update the displayed energy text on existing peak labels for all anchors
+        for (int k = 0; k < nAnchors; ++k) {
+            TLatex *lbl = rowWidgets[k].peakLabel;
+            if (lbl && activePad && activePad->GetListOfPrimitives() && activePad->GetListOfPrimitives()->FindObject(lbl)) {
+                double cent = rowWidgets[k].spinCentroid ? rowWidgets[k].spinCentroid->value() : rowWidgets[k].nominalCentroid;
+                double dispEnergy = (tHist && tHist->IsCalibrated()) ? tHist->ChannelToEnergy(cent) : (cent * dispersion);
+                bool isUsed = rowWidgets[k].chkUse ? rowWidgets[k].chkUse->isChecked() : true;
+                if (isUsed) {
+                    const Color_t textCol = (Design::getGraphBackgroundColor().lightness() > 130) ? kBlack : kWhite;
+                    lbl->SetTextColor(textCol);
+                    lbl->SetTitle(Form("%.2f", dispEnergy));
+                } else {
+                    lbl->SetTextColor(kGray);
+                    lbl->SetTitle(Form("(%.2f)", dispEnergy));
+                }
+            }
         }
 
         if (activePad) {

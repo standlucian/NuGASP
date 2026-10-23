@@ -451,8 +451,7 @@ void QMainCanvas::renderPeakLabels(int z, int g)
         while (TObject *obj = next()) {
             if (obj && obj->InheritsFrom(TLatex::Class())) {
                 TNamed *named = dynamic_cast<TNamed*>(obj);
-                if (named && (strcmp(named->GetName(), "PeakLabel") == 0 ||
-                              strncmp(named->GetName(), "rbr_peak_label_", 15) == 0)) {
+                if (named && strcmp(named->GetName(), "PeakLabel") == 0) {
                     toRemove.push_back(obj);
                 }
             }
