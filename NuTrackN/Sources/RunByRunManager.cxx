@@ -798,7 +798,7 @@ void RunByRunManager::setupUI()
         QAction *actIntervene = menu.addAction(tr("🛠️ Intervene & Discriminate Fits..."));
         QAction *chosen = menu.exec(m_gridMatrix->viewport()->mapToGlobal(pos));
         if (chosen == actInspect) {
-            onCellDoubleClicked(r, c);
+            inspectSpectrumOnCanvas(r, c);
         } else if (chosen == actIntervene) {
             openInterventionDialog(r, c);
         }
@@ -859,7 +859,7 @@ void RunByRunManager::setupUI()
         QAction *actIntervene = menu.addAction(tr("🛠️ Intervene & Discriminate Fits..."));
         QAction *chosen = menu.exec(m_tablePlotData->viewport()->mapToGlobal(pos));
         if (chosen == actInspect) {
-            onCellDoubleClicked(runIdx, detCol);
+            inspectSpectrumOnCanvas(runIdx, detCol);
         } else if (chosen == actIntervene) {
             openInterventionDialog(runIdx, detCol);
         }
@@ -985,6 +985,24 @@ void RunByRunManager::onDispersionChanged(double val)
         anc.searchWindowCh = 5.0 / val;
     }
     populateAnchorTable();
+
+    // Ponk dispersion into active histogram calibration if currently displaying a spectrum on canvas
+    if (m_mainCanvas) {
+        const int sel_i = m_mainCanvas->SelectedElement_i;
+        const int sel_j = m_mainCanvas->SelectedElement_j;
+        if (sel_i >= 1 && sel_i < 12 && sel_j >= 1 && sel_j < 12) {
+            TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(m_mainCanvas->HijF[sel_i][sel_j]);
+            if (tHist) {
+                tHist->SetCalibration(0.0, val, 0.0);
+                m_mainCanvas->renderPeakLabels(sel_i, sel_j);
+                m_mainCanvas->updateAxisStatusLabels();
+                if (m_mainCanvas->canvas && m_mainCanvas->canvas->getCanvas()) {
+                    m_mainCanvas->canvas->getCanvas()->Modified();
+                    m_mainCanvas->canvas->getCanvas()->Update();
+                }
+            }
+        }
+    }
 }
 
 void RunByRunManager::onBrowseRunsClicked()
@@ -2168,9 +2186,30 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     TH1F *hist = m_mainCanvas->HijF[sel_i][sel_j];
     if (!hist) return;
 
+    const double dispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
+
     TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(hist);
     if (tHist) {
-        tHist->ClearCalibration();
+        // If this run/detector already has an accepted calibration, apply it
+        const RunCalibResult *savedRunRes = nullptr;
+        for (const auto &traj : m_completedTrajectories) {
+            if (traj.detectorId == detId) {
+                if (row >= 0 && row < static_cast<int>(traj.runResults.size())) {
+                    const auto &res = traj.runResults[row];
+                    if (res.status == RunCalibStatus::Success && res.a1 > 0.0) {
+                        savedRunRes = &res;
+                    }
+                }
+                break;
+            }
+        }
+
+        if (savedRunRes) {
+            tHist->SetCalibration(savedRunRes->a0, savedRunRes->a1, savedRunRes->a2);
+        } else {
+            // Apply nominal dispersion as initial calibration: E(ch) = 0.0 + dispersion * ch
+            tHist->SetCalibration(0.0, dispersion, 0.0);
+        }
     }
 
     TVirtualPad *pad = nullptr;
@@ -2201,7 +2240,6 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     std::vector<double> peakPositions;
     int fitCount = 0;
     const int totalBins = static_cast<int>(specData.size());
-    const double dispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
 
     for (size_t aIdx = 0; aIdx < m_anchors.size(); ++aIdx) {
         const auto &a = m_anchors[aIdx];
@@ -3122,13 +3160,15 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         const double peakHeight = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
         peakLabel->SetX(cCh);
         peakLabel->SetY(peakHeight);
+        TracknHistogram *tHist = dynamic_cast<TracknHistogram*>(h);
+        double dispEnergy = (tHist && tHist->IsCalibrated()) ? tHist->ChannelToEnergy(cCh) : (cCh * dispersion);
         if (isUsed) {
             const Color_t textCol = (Design::getGraphBackgroundColor().lightness() > 130) ? kBlack : kWhite;
             peakLabel->SetTextColor(textCol);
-            peakLabel->SetTitle(Form("%.2f", cCh));
+            peakLabel->SetTitle(Form("%.2f", dispEnergy));
         } else {
             peakLabel->SetTextColor(kGray);
-            peakLabel->SetTitle(Form("(%.2f)", cCh));
+            peakLabel->SetTitle(Form("(%.2f)", dispEnergy));
         }
 
         // 7. Keep mainCanvas gaussCenters in sync with active peak centroids
@@ -3274,6 +3314,18 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 btnOptionB->setText(tr("⚠️ Apply Fit (High \u03c7\u00b2)"));
                 btnOptionB->setStyleSheet("font-weight: bold; background-color: #f57c00; color: white; padding: 6px 14px;");
             }
+        }
+
+        TracknHistogram *tHist = (s_i >= 1 && s_i < 12 && s_j >= 1 && s_j < 12)
+            ? dynamic_cast<TracknHistogram*>(m_mainCanvas->HijF[s_i][s_j]) : nullptr;
+        if (tHist) {
+            if (ok && res.a1 > 0.0) {
+                tHist->SetCalibration(res.a0, res.a1, res.a2);
+            } else {
+                tHist->SetCalibration(0.0, dispersion, 0.0);
+            }
+            m_mainCanvas->renderPeakLabels(s_i, s_j);
+            m_mainCanvas->updateAxisStatusLabels();
         }
 
         if (activePad) {
