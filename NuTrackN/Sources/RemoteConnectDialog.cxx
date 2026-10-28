@@ -127,7 +127,11 @@ void RemoteConnectDialog::setupUI()
     QButtonGroup *authGroup = new QButtonGroup(this);
     authGroup->addButton(m_radioKeyAuth, 0);
     authGroup->addButton(m_radioPassAuth, 1);
+#if QT_VERSION >= QT_VERSION_CHECK(5, 15, 0)
+    connect(authGroup, &QButtonGroup::idClicked, this, &RemoteConnectDialog::onAuthTypeChanged);
+#else
     connect(authGroup, QOverload<int>::of(&QButtonGroup::buttonClicked), this, &RemoteConnectDialog::onAuthTypeChanged);
+#endif
 
     authRadioLayout->addWidget(m_radioKeyAuth);
     authRadioLayout->addWidget(m_radioPassAuth);

@@ -80,20 +80,37 @@ echo "    ✓ Found CERN ROOT at: ${ROOTSYS}"
 echo "==> [2/6] Compiling NuTrackN binary (${ARCH})..."
 cd "${NUTRACKN_DIR}"
 ROOT_CFLAGS="$(root-config --cflags 2>/dev/null || echo '-std=c++20')"
-"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=sdk_no_version_check" "CONFIG+=c++17" "CONFIG+=c++20" "QMAKE_CXXFLAGS_CXX17=-std=c++20" "QMAKE_CXXFLAGS_CXX1Z=-std=c++20" "QMAKE_CXXFLAGS+=-std=c++20 ${ROOT_CFLAGS}"
+MACOS_MAJOR="$(sw_vers -productVersion 2>/dev/null | cut -d. -f1 || echo '14')"
+"${QMAKE_BIN}" nutrackn.pro -spec macx-clang \
+    "CONFIG+=sdk_no_version_check" \
+    "CONFIG-=app_bundle" \
+    "CONFIG+=c++17" \
+    "CONFIG+=c++20" \
+    "QMAKE_MACOSX_DEPLOYMENT_TARGET=${MACOS_MAJOR}.0" \
+    "QMAKE_CXXFLAGS_CXX17=-std=c++20" \
+    "QMAKE_CXXFLAGS_CXX1Z=-std=c++20" \
+    "QMAKE_CXXFLAGS+=-std=c++20 ${ROOT_CFLAGS}"
 
 # Enforce -std=c++20 across the generated Makefile, replacing any old C++17/C++14/C++11/C++98 defaults injected by Qt mkspecs
 if [ -f Makefile ]; then
     sed -i.bak -E 's/-std=(c\+\+11|gnu\+\+11|c\+\+14|gnu\+\+14|c\+\+1y|gnu\+\+1y|c\+\+17|gnu\+\+17|c\+\+1z|gnu\+\+1z|gnu\+\+98|c\+\+98)/-std=c++20/g' Makefile
+    sed -i.bak2 -E "s/-mmacosx-version-min=[0-9.]+/-mmacosx-version-min=${MACOS_MAJOR}.0/g" Makefile
 fi
 
 make clean && make -j"$(sysctl -n hw.ncpu || echo 4)"
 
-if [ ! -f "${NUTRACKN_DIR}/nutrackn" ]; then
+COMPILED_BIN=""
+if [ -f "${NUTRACKN_DIR}/nutrackn" ]; then
+    COMPILED_BIN="${NUTRACKN_DIR}/nutrackn"
+elif [ -f "${NUTRACKN_DIR}/nutrackn.app/Contents/MacOS/nutrackn" ]; then
+    COMPILED_BIN="${NUTRACKN_DIR}/nutrackn.app/Contents/MacOS/nutrackn"
+fi
+
+if [ -z "${COMPILED_BIN}" ]; then
     echo "[-] Error: Compilation failed. Binary not found." >&2
     exit 1
 fi
-echo "    ✓ Native compilation successful."
+echo "    ✓ Native compilation successful (${COMPILED_BIN})."
 
 # ------------------------------------------------------------------------------
 # 3. Assemble NuTrackN.app Bundle Structure
@@ -106,10 +123,9 @@ mkdir -p "${APP_BUNDLE}/Contents/Frameworks"
 mkdir -p "${APP_BUNDLE}/Contents/PlugIns"
 mkdir -p "${DIST_DIR}"
 
-# Copy binary and launcher
-cp -a "${NUTRACKN_DIR}/nutrackn" "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin"
-cp -a "${SCRIPT_DIR}/nutrackn_launcher" "${APP_BUNDLE}/Contents/MacOS/nutrackn"
-chmod +x "${APP_BUNDLE}/Contents/MacOS/nutrackn" "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin"
+# Place compiled Mach-O binary at Contents/MacOS/nutrackn first so macdeployqt can inspect it
+cp -a "${COMPILED_BIN}" "${APP_BUNDLE}/Contents/MacOS/nutrackn"
+chmod +x "${APP_BUNDLE}/Contents/MacOS/nutrackn"
 
 # Copy Info.plist
 cp -a "${SCRIPT_DIR}/Info.plist" "${APP_BUNDLE}/Contents/Info.plist"
@@ -176,11 +192,16 @@ fi
 # ------------------------------------------------------------------------------
 echo "==> [4/6] Deploying Qt5 frameworks & slimmed CERN ROOT dynamic libraries..."
 
-# Run macdeployqt targeting the actual Mach-O binary (nutrackn_bin)
+# Run macdeployqt while Contents/MacOS/nutrackn is the real Mach-O binary
 if [ -x "${MACDEPLOYQT_BIN}" ]; then
     echo "    Running macdeployqt..."
-    "${MACDEPLOYQT_BIN}" "${APP_BUNDLE}" -executable="${APP_BUNDLE}/Contents/MacOS/nutrackn_bin" -always-overwrite 2>&1 || true
+    "${MACDEPLOYQT_BIN}" "${APP_BUNDLE}" -always-overwrite 2>&1 || true
 fi
+
+# Move deployed Mach-O binary to nutrackn_bin and install wrapper launcher at nutrackn
+mv -f "${APP_BUNDLE}/Contents/MacOS/nutrackn" "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin"
+cp -a "${SCRIPT_DIR}/nutrackn_launcher" "${APP_BUNDLE}/Contents/MacOS/nutrackn"
+chmod +x "${APP_BUNDLE}/Contents/MacOS/nutrackn" "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin"
 
 # Copy essential CERN ROOT dynamic libraries & PCMs
 if [ -d "${ROOT_LIBDIR}" ]; then
@@ -220,8 +241,8 @@ fi
 echo "    Configuring Mach-O @rpath library references..."
 install_name_tool -add_rpath "@executable_path/../Frameworks" "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin" 2>/dev/null || true
 
-# Point all bundled ROOT dylibs to @rpath
-for dylib in "${APP_BUNDLE}/Contents/Frameworks/"*.dylib; do
+# Point all bundled ROOT dylibs/so files to @rpath
+for dylib in "${APP_BUNDLE}/Contents/Frameworks/"*.dylib "${APP_BUNDLE}/Contents/Frameworks/"*.so; do
     if [ -f "$dylib" ]; then
         install_name_tool -id "@rpath/$(basename "$dylib")" "$dylib" 2>/dev/null || true
     fi

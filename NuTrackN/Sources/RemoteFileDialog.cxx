@@ -49,7 +49,6 @@ RemoteFileDialog::RemoteFileDialog(std::shared_ptr<RemoteSession> session, QWidg
 void RemoteFileDialog::setupUI()
 {
     const QFont dlgFont = Design::getDialogFont();
-    const int pt = dlgFont.pointSize() > 0 ? dlgFont.pointSize() : 11;
 
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setSpacing(8);
