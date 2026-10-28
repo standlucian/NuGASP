@@ -158,18 +158,18 @@ protected:
    QZoomHUD       *m_zoomHUD;
    QMainCanvas    *m_mainCanvas;
 
-   virtual void    mouseMoveEvent( QMouseEvent *e );
-   virtual void    mousePressEvent( QMouseEvent *e );
-   virtual void    mouseReleaseEvent( QMouseEvent *e );
-   virtual void    paintEvent( QPaintEvent *e );
-   virtual void    resizeEvent( QResizeEvent *e );
-   virtual void    wheelEvent(QWheelEvent *e);
+   virtual void    mouseMoveEvent( QMouseEvent *e ) override;
+   virtual void    mousePressEvent( QMouseEvent *e ) override;
+   virtual void    mouseReleaseEvent( QMouseEvent *e ) override;
+   virtual void    paintEvent( QPaintEvent *e ) override;
+   virtual void    resizeEvent( QResizeEvent *e ) override;
+   virtual void    wheelEvent(QWheelEvent *e) override;
    virtual void    showContextMenu(QMouseEvent *e);
-   virtual void    keyPressEvent(QKeyEvent *event);
-   virtual void    keyReleaseEvent(QKeyEvent *event);
-   virtual void    focusOutEvent(QFocusEvent *event);
-   virtual void    enterEvent(QEvent *event);
-   virtual void    leaveEvent(QEvent *event);
+   virtual void    keyPressEvent(QKeyEvent *event) override;
+   virtual void    keyReleaseEvent(QKeyEvent *event) override;
+   virtual void    focusOutEvent(QFocusEvent *event) override;
+   virtual void    enterEvent(QEvent *event) override;
+   virtual void    leaveEvent(QEvent *event) override;
 
 signals:
    void requestEnCalDialog();
@@ -323,10 +323,10 @@ public:
 
    QMainCanvas( QWidget *parent = 0);
    virtual ~QMainCanvas();
-   virtual void changeEvent(QEvent * e);
-   virtual void closeEvent(QCloseEvent *e);
-   virtual void keyPressEvent(QKeyEvent *event);
-   virtual void keyReleaseEvent(QKeyEvent *event);
+   virtual void changeEvent(QEvent * e) override;
+   virtual void closeEvent(QCloseEvent *e) override;
+   virtual void keyPressEvent(QKeyEvent *event) override;
+   virtual void keyReleaseEvent(QKeyEvent *event) override;
    bool eventFilter(QObject *watched, QEvent *event) override;
    int getBinFromClick(int x, int y);
    int getChannelFromClick(int x, int y);

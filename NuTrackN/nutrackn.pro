@@ -18,7 +18,27 @@ exists(/usr/bin/g++-14) {
 QMAKE_CXXFLAGS += -fPIC -O3
 QMAKE_CXXFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_CXX17 = -std=c++17
-QMAKE_LFLAGS += -Wl,--as-needed
+
+linux {
+    QMAKE_LFLAGS += -Wl,--as-needed
+}
+macx {
+    QMAKE_LFLAGS += -Wl,-dead_strip_dylibs
+    BREW_PREFIX = $$system(brew --prefix 2>/dev/null)
+    !isEmpty(BREW_PREFIX) {
+        INCLUDEPATH += $$BREW_PREFIX/include
+        LIBS += -L$$BREW_PREFIX/lib
+    }
+    LIBSSH2_PREFIX = $$system(brew --prefix libssh2 2>/dev/null)
+    !isEmpty(LIBSSH2_PREFIX) {
+        INCLUDEPATH += $$LIBSSH2_PREFIX/include
+        LIBS += -L$$LIBSSH2_PREFIX/lib
+    }
+    exists(/opt/homebrew/include): INCLUDEPATH += /opt/homebrew/include
+    exists(/opt/homebrew/lib): LIBS += -L/opt/homebrew/lib
+    exists(/usr/local/include): INCLUDEPATH += /usr/local/include
+    exists(/usr/local/lib): LIBS += -L/usr/local/lib
+}
 
 # Project and ROOT header directories
 # Automatically detect ROOT via root-config or ROOTSYS environment variable.

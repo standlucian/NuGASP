@@ -80,11 +80,11 @@ echo "    ✓ Found CERN ROOT at: ${ROOTSYS}"
 echo "==> [2/6] Compiling NuTrackN binary (${ARCH})..."
 cd "${NUTRACKN_DIR}"
 ROOT_CFLAGS="$(root-config --cflags 2>/dev/null || echo '-std=c++20')"
-"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=c++17" "CONFIG+=c++20" "QMAKE_CXXFLAGS+=-std=c++20 ${ROOT_CFLAGS}"
+"${QMAKE_BIN}" nutrackn.pro -spec macx-clang "CONFIG+=sdk_no_version_check" "CONFIG+=c++17" "CONFIG+=c++20" "QMAKE_CXXFLAGS_CXX17=-std=c++20" "QMAKE_CXXFLAGS_CXX1Z=-std=c++20" "QMAKE_CXXFLAGS+=-std=c++20 ${ROOT_CFLAGS}"
 
-# Enforce -std=c++20 across the generated Makefile, replacing any old C++11/C++14/C++98 defaults injected by Qt mkspecs
+# Enforce -std=c++20 across the generated Makefile, replacing any old C++17/C++14/C++11/C++98 defaults injected by Qt mkspecs
 if [ -f Makefile ]; then
-    sed -i.bak -E 's/-std=(c\+\+11|gnu\+\+11|c\+\+14|gnu\+\+14|c\+\+1y|gnu\+\+1y|gnu\+\+98|c\+\+98)/-std=c++20/g' Makefile
+    sed -i.bak -E 's/-std=(c\+\+11|gnu\+\+11|c\+\+14|gnu\+\+14|c\+\+1y|gnu\+\+1y|c\+\+17|gnu\+\+17|c\+\+1z|gnu\+\+1z|gnu\+\+98|c\+\+98)/-std=c++20/g' Makefile
 fi
 
 make clean && make -j"$(sysctl -n hw.ncpu || echo 4)"
@@ -208,6 +208,12 @@ if [ -d "${ROOT_LIBDIR}" ]; then
     for pcm in "${ROOT_CORE_PCMS[@]}"; do
         cp -a "${ROOT_LIBDIR}/${pcm}.pcm" "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
     done
+fi
+
+# Ensure libssh2 is bundled in Frameworks if not already copied by macdeployqt
+LIBSSH2_PREFIX="$(brew --prefix libssh2 2>/dev/null || echo '/opt/homebrew/opt/libssh2')"
+if [ -d "${LIBSSH2_PREFIX}/lib" ]; then
+    cp -a "${LIBSSH2_PREFIX}/lib/libssh2"*.dylib "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
 fi
 
 # Fix dynamic linker load paths (@rpath)
