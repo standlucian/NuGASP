@@ -8,6 +8,13 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: package-macos-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
 jobs:
   build-macos:
     name: Build macOS DMG (Apple Silicon ARM64)
@@ -16,6 +23,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Cache Homebrew Downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: ${{ runner.os }}-brew-qt5-root-libssh2
 
       - name: Install Homebrew dependencies (Qt5, CERN ROOT, libssh2)
         run: |
@@ -27,6 +40,11 @@ jobs:
         run: |
           chmod +x packaging/macos/build_dmg.sh packaging/macos/nutrackn_launcher packaging/macos/generate_icns.py
           ./packaging/macos/build_dmg.sh
+
+      - name: Verify Packaged macOS Bundle & DMG
+        run: |
+          ls -lh dist/
+          ./packaging/macos/build/NuTrackN.app/Contents/MacOS/nutrackn --help
 
       - name: Upload DMG Artifact
         uses: actions/upload-artifact@v4

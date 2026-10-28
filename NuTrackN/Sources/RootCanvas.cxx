@@ -419,18 +419,16 @@ void QRootCanvas::mouseMoveEvent(QMouseEvent *e)
     // Notify main canvas of cursor position to update coordinates and hover tracking
     emit mousePilgrimCoordRequest(e->x(), e->y());
     if (fCanvas) {
-        fCanvas->Modified();
-        fCanvas->Update();
         if (e->buttons() & Qt::MiddleButton) {
             fCanvas->HandleInput(kButton2Motion, e->x(), e->y());
+            fCanvas->Modified();
+            fCanvas->Update();
         } else if (e->buttons() & Qt::RightButton) {
             fCanvas->HandleInput(kButton3Motion, e->x(), e->y());
-        } else {
-            fCanvas->HandleInput(kMouseMotion, e->x(), e->y());
-        }
-
-        // Live coordinate update while dragging with mouse button held
-        if (e->buttons() & Qt::LeftButton) {
+            fCanvas->Modified();
+            fCanvas->Update();
+        } else if (e->buttons() & Qt::LeftButton) {
+            // Live coordinate update while dragging with mouse button held
             emit mouseLeftClickCoordRequest(e->x(), e->y());
             emit showXY(xMousePosition, yMousePosition);
         }

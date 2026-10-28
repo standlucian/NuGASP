@@ -5,8 +5,8 @@ QT += core gui
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 
 # Compiler configuration (matches installed CERN ROOT C++17 configuration)
-CONFIG += qt warn_on thread c++17
-CONFIG -= c++11 c++14
+CONFIG += qt warn_on thread c++17 release
+CONFIG -= c++11 c++14 debug
 
 # Use GCC 14 if installed, otherwise use system default compiler
 exists(/usr/bin/g++-14) {
@@ -15,8 +15,10 @@ exists(/usr/bin/g++-14) {
     QMAKE_LINK = g++-14
 }
 
-QMAKE_CXXFLAGS += -fPIC
+QMAKE_CXXFLAGS += -fPIC -O3
+QMAKE_CXXFLAGS_RELEASE += -O3
 QMAKE_CXXFLAGS_CXX17 = -std=c++17
+QMAKE_LFLAGS += -Wl,--as-needed
 
 # Project and ROOT header directories
 # Automatically detect ROOT via root-config or ROOTSYS environment variable.
@@ -35,21 +37,17 @@ isEmpty(ROOT_LIBDIR) {
     ROOT_LIBDIR = $(ROOTSYS)/lib
 }
 
-# ROOT libraries
+# ROOT libraries (only modules directly used by NuTrackN)
 LIBS += \
     -L$$ROOT_LIBDIR \
     -lCore \
     -lRIO \
-    -lNet \
     -lHist \
     -lGraf \
-    -lGraf3d \
     -lGpad \
-    -lTree \
     -lRint \
     -lPostscript \
     -lMatrix \
-    -lPhysics \
     -lGui \
     -lMathCore \
     -lSpectrum \

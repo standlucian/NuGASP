@@ -12,10 +12,14 @@ BUNDLE_DIR="$(cd "${BIN_DIR}/.." && pwd)"
 # Configure embedded ROOT and Qt runtime environments
 export ROOTSYS="${BUNDLE_DIR}/Resources/root"
 export DYLD_LIBRARY_PATH="${BUNDLE_DIR}/Frameworks:${DYLD_LIBRARY_PATH}"
-export ROOT_CONFIG_SEARCH_PATH="${BUNDLE_DIR}/Resources/root/etc/root"
 export ROOT_INCLUDE_PATH="${BUNDLE_DIR}/Resources/root/include"
+export CLING_STANDARD_PCH=none
 
-if [ -d "${BUNDLE_DIR}/Resources/root/etc/root" ]; then
+if [ -f "${BUNDLE_DIR}/Resources/root/etc/system.rootrc" ]; then
+    export ROOT_CONFIG_SEARCH_PATH="${BUNDLE_DIR}/Resources/root/etc"
+    export ROOTRC="${BUNDLE_DIR}/Resources/root/etc/system.rootrc"
+elif [ -f "${BUNDLE_DIR}/Resources/root/etc/root/system.rootrc" ]; then
+    export ROOT_CONFIG_SEARCH_PATH="${BUNDLE_DIR}/Resources/root/etc/root"
     export ROOTRC="${BUNDLE_DIR}/Resources/root/etc/root/system.rootrc"
 fi
 if [ -d "${BUNDLE_DIR}/Resources/root/fonts" ]; then

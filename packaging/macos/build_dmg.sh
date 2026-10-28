@@ -122,37 +122,92 @@ if [ -f "${SCRIPT_DIR}/NuTrackN.icns" ]; then
     cp -a "${SCRIPT_DIR}/NuTrackN.icns" "${APP_BUNDLE}/Contents/Resources/NuTrackN.icns"
 fi
 
-# Copy ROOT runtime data (etc/, fonts/, include/)
-if [ -d "${ROOTSYS}/etc" ]; then
+# Resolve CERN ROOT subdirectories (supports both Homebrew lib/root layout and standard binary tarballs)
+ROOT_LIBDIR="$(root-config --libdir 2>/dev/null || echo "${ROOTSYS}/lib")"
+[ ! -d "${ROOT_LIBDIR}" ] && [ -d "${ROOTSYS}/lib/root" ] && ROOT_LIBDIR="${ROOTSYS}/lib/root"
+ROOT_ETCDIR="$(root-config --etcdir 2>/dev/null || echo "${ROOTSYS}/etc")"
+[ ! -d "${ROOT_ETCDIR}" ] && [ -d "${ROOTSYS}/etc/root" ] && ROOT_ETCDIR="${ROOTSYS}/etc/root"
+ROOT_INCDIR="$(root-config --incdir 2>/dev/null || echo "${ROOTSYS}/include")"
+[ ! -d "${ROOT_INCDIR}" ] && [ -d "${ROOTSYS}/include/root" ] && ROOT_INCDIR="${ROOTSYS}/include/root"
+ROOT_FONTSDIR="${ROOTSYS}/fonts"
+[ ! -d "${ROOT_FONTSDIR}" ] && [ -d "${ROOTSYS}/share/root/fonts" ] && ROOT_FONTSDIR="${ROOTSYS}/share/root/fonts"
+
+# Copy ROOT runtime data (etc/, fonts/, include/) and prune unused subsystems
+if [ -d "${ROOT_ETCDIR}" ]; then
     mkdir -p "${APP_BUNDLE}/Contents/Resources/root/etc"
-    cp -a "${ROOTSYS}/etc" "${APP_BUNDLE}/Contents/Resources/root/"
+    cp -a "${ROOT_ETCDIR}/"* "${APP_BUNDLE}/Contents/Resources/root/etc/" 2>/dev/null || true
+    rm -rf "${APP_BUNDLE}/Contents/Resources/root/etc/notebook" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/proof" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/html" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/http" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/daemons" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/vmc" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/pdg_table.txt" \
+           "${APP_BUNDLE}/Contents/Resources/root/etc/RadioNuclides.txt" 2>/dev/null || true
 fi
-if [ -d "${ROOTSYS}/fonts" ]; then
+if [ -d "${ROOT_FONTSDIR}" ]; then
     mkdir -p "${APP_BUNDLE}/Contents/Resources/root/fonts"
-    cp -a "${ROOTSYS}/fonts" "${APP_BUNDLE}/Contents/Resources/root/"
+    cp -a "${ROOT_FONTSDIR}/"* "${APP_BUNDLE}/Contents/Resources/root/fonts/" 2>/dev/null || true
+    rm -f "${APP_BUNDLE}/Contents/Resources/root/fonts/DroidSansFallback.ttf" \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/FreeSerif"*.otf \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/FreeMono"*.otf \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/BlackChancery.ttf" \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/comic"*.ttf \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/impact.ttf" \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/webdings.ttf" \
+          "${APP_BUNDLE}/Contents/Resources/root/fonts/wingding.ttf" 2>/dev/null || true
 fi
-if [ -d "${ROOTSYS}/include" ]; then
+if [ -d "${ROOT_INCDIR}" ]; then
     mkdir -p "${APP_BUNDLE}/Contents/Resources/root/include"
-    cp -a "${ROOTSYS}/include" "${APP_BUNDLE}/Contents/Resources/root/"
+    cp -a "${ROOT_INCDIR}/"* "${APP_BUNDLE}/Contents/Resources/root/include/" 2>/dev/null || true
+    rm -rf "${APP_BUNDLE}/Contents/Resources/root/include/TMVA" \
+           "${APP_BUNDLE}/Contents/Resources/root/include/RooFit"* \
+           "${APP_BUNDLE}/Contents/Resources/root/include/RooStats" \
+           "${APP_BUNDLE}/Contents/Resources/root/include/Minuit2" \
+           "${APP_BUNDLE}/Contents/Resources/root/include/bvh" \
+           "${APP_BUNDLE}/Contents/Resources/root/include/ROOT/RDataFrame"* \
+           "${APP_BUNDLE}/Contents/Resources/root/include/ROOT/RNTuple"* \
+           "${APP_BUNDLE}/Contents/Resources/root/include/ROOT/REve"* \
+           "${APP_BUNDLE}/Contents/Resources/root/include/ROOT.modulemap" 2>/dev/null || true
 fi
 
 # ------------------------------------------------------------------------------
 # 4. Deploy Qt Frameworks & ROOT Dynamic Libraries
 # ------------------------------------------------------------------------------
-echo "==> [4/6] Deploying Qt5 frameworks & CERN ROOT dynamic libraries..."
+echo "==> [4/6] Deploying Qt5 frameworks & slimmed CERN ROOT dynamic libraries..."
 
-# Run macdeployqt
+# Run macdeployqt targeting the actual Mach-O binary (nutrackn_bin)
 if [ -x "${MACDEPLOYQT_BIN}" ]; then
     echo "    Running macdeployqt..."
-    "${MACDEPLOYQT_BIN}" "${APP_BUNDLE}" -always-overwrite 2>&1 || true
+    "${MACDEPLOYQT_BIN}" "${APP_BUNDLE}" -executable="${APP_BUNDLE}/Contents/MacOS/nutrackn_bin" -always-overwrite 2>&1 || true
 fi
 
-# Copy all CERN ROOT dynamic libraries & PCMs
-if [ -d "${ROOTSYS}/lib" ]; then
-    echo "    Bundling ROOT dylibs and Cling dictionaries..."
-    cp -a "${ROOTSYS}/lib/"lib*.dylib "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
-    cp -a "${ROOTSYS}/lib/"lib*.so* "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
-    cp -a "${ROOTSYS}/lib/"*.pcm "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+# Copy essential CERN ROOT dynamic libraries & PCMs
+if [ -d "${ROOT_LIBDIR}" ]; then
+    echo "    Bundling essential ROOT dylibs and Cling dictionaries from ${ROOT_LIBDIR}..."
+    ROOT_ESSENTIAL_MODULES=(
+        Core Cling RIO Thread Imt Rint
+        MathCore Matrix Minuit Fumili Physics
+        Hist HistPainter Spectrum SpectrumPainter
+        Graf Graf3d Gpad Postscript ASImage ASImageGui
+        GQuartz GCocoa GX11 GX11TTF Gui Ged FitPanel Tree Net
+    )
+    for mod in "${ROOT_ESSENTIAL_MODULES[@]}"; do
+        cp -a "${ROOT_LIBDIR}/lib${mod}.dylib"* "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+        cp -a "${ROOT_LIBDIR}/lib${mod}.so"* "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+        cp -a "${ROOT_LIBDIR}/lib${mod}_rdict.pcm" "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+        cp -a "${ROOT_LIBDIR}/${mod}.pcm" "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+    done
+
+    ROOT_CORE_PCMS=(
+        _Builtin_intrinsics _Builtin_stddef
+        Cling_Runtime Cling_Runtime_Extra
+        ROOT_Config ROOT_Foundation_C ROOT_Foundation_Stage1_NoRTTI ROOT_Rtypes
+        std libc
+    )
+    for pcm in "${ROOT_CORE_PCMS[@]}"; do
+        cp -a "${ROOT_LIBDIR}/${pcm}.pcm" "${APP_BUNDLE}/Contents/Frameworks/" 2>/dev/null || true
+    done
 fi
 
 # Fix dynamic linker load paths (@rpath)
@@ -165,6 +220,19 @@ for dylib in "${APP_BUNDLE}/Contents/Frameworks/"*.dylib; do
         install_name_tool -id "@rpath/$(basename "$dylib")" "$dylib" 2>/dev/null || true
     fi
 done
+
+# Strip local debug symbols to reduce bundle size
+if command -v strip >/dev/null 2>&1; then
+    echo "    Stripping local debug symbols from Mach-O binaries..."
+    strip -x "${APP_BUNDLE}/Contents/MacOS/nutrackn_bin" 2>/dev/null || true
+    find "${APP_BUNDLE}/Contents/Frameworks" -type f \( -name "*.dylib" -o -name "*.so" \) -exec strip -x {} + 2>/dev/null || true
+fi
+
+# Re-sign the application bundle (mandatory on Apple Silicon arm64 after install_name_tool / strip)
+if command -v codesign >/dev/null 2>&1; then
+    echo "    Applying ad-hoc code signature to NuTrackN.app..."
+    codesign --force --deep --sign - "${APP_BUNDLE}" 2>/dev/null || true
+fi
 
 # ------------------------------------------------------------------------------
 # 5. Create Drag-and-Drop DMG Disk Image

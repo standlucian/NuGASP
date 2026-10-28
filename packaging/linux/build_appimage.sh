@@ -61,9 +61,7 @@ echo "    ✓ Found CERN ROOT: ${ROOTSYS}"
 # ------------------------------------------------------------------------------
 echo "==> [2/6] Compiling ${APP_NAME} binary..."
 cd "${NUTRACKN_DIR}"
-if [ ! -f "Makefile" ]; then
-    "${QMAKE_BIN}" nutrackn.pro
-fi
+"${QMAKE_BIN}" nutrackn.pro
 make -j"$(nproc)"
 
 if [ ! -f "${NUTRACKN_DIR}/${APP_EXE}" ]; then
@@ -109,18 +107,47 @@ for s in 16 32 48 64 128 256; do
     fi
 done
 
-# Copy ROOT runtime data (etc/, fonts/, include/)
+# Copy ROOT runtime data (etc/, fonts/, include/) and prune unused subsystems
 if [ -d "${ROOTSYS}/etc" ]; then
     mkdir -p "${APPDIR}/usr/etc"
     cp -a "${ROOTSYS}/etc" "${APPDIR}/usr/"
+    rm -rf "${APPDIR}/usr/etc/notebook" \
+           "${APPDIR}/usr/etc/proof" \
+           "${APPDIR}/usr/etc/html" \
+           "${APPDIR}/usr/etc/http" \
+           "${APPDIR}/usr/etc/daemons" \
+           "${APPDIR}/usr/etc/vmc" \
+           "${APPDIR}/usr/etc/pdg_table.txt" \
+           "${APPDIR}/usr/etc/RadioNuclides.txt" 2>/dev/null || true
 fi
 if [ -d "${ROOTSYS}/fonts" ]; then
     mkdir -p "${APPDIR}/usr/fonts"
     cp -a "${ROOTSYS}/fonts" "${APPDIR}/usr/"
+    # Remove bulky CJK fallback and unused decorative fonts
+    rm -f "${APPDIR}/usr/fonts/DroidSansFallback.ttf" \
+          "${APPDIR}/usr/fonts/FreeSerif"*.otf \
+          "${APPDIR}/usr/fonts/FreeMono"*.otf \
+          "${APPDIR}/usr/fonts/BlackChancery.ttf" \
+          "${APPDIR}/usr/fonts/comic"*.ttf \
+          "${APPDIR}/usr/fonts/impact.ttf" \
+          "${APPDIR}/usr/fonts/webdings.ttf" \
+          "${APPDIR}/usr/fonts/wingding.ttf" \
+          "${APPDIR}/usr/fonts/ariblk.ttf" \
+          "${APPDIR}/usr/fonts/monotype.ttf" 2>/dev/null || true
 fi
 if [ -d "${ROOTSYS}/include" ]; then
     mkdir -p "${APPDIR}/usr/include"
     cp -a "${ROOTSYS}/include" "${APPDIR}/usr/"
+    # Remove headers for unused heavy ROOT frameworks (TMVA, RooFit, Eve, RGL, etc.)
+    rm -rf "${APPDIR}/usr/include/TMVA" \
+           "${APPDIR}/usr/include/RooFit"* \
+           "${APPDIR}/usr/include/RooStats" \
+           "${APPDIR}/usr/include/Minuit2" \
+           "${APPDIR}/usr/include/bvh" \
+           "${APPDIR}/usr/include/ROOT/RDataFrame"* \
+           "${APPDIR}/usr/include/ROOT/RNTuple"* \
+           "${APPDIR}/usr/include/ROOT/REve"* \
+           "${APPDIR}/usr/include/ROOT.modulemap" 2>/dev/null || true
 fi
 
 # Copy documentation
@@ -132,14 +159,59 @@ fi
 # ------------------------------------------------------------------------------
 # 4. Bundle Shared Libraries & Qt Plugins
 # ------------------------------------------------------------------------------
-echo "==> [4/6] Bundling Qt5 and CERN ROOT runtime libraries..."
+echo "==> [4/6] Bundling slimmed Qt5 and CERN ROOT runtime libraries..."
 
-# Copy essential Qt plugins (avoid platformthemes/gtk3 which crash on host glibc mismatch)
-for plugin in platforms xcbglintegrations imageformats iconengines; do
-    if [ -d "${QT_PLUGINS_DIR}/${plugin}" ]; then
-        cp -a "${QT_PLUGINS_DIR}/${plugin}" "${APPDIR}/usr/plugins/"
+# Copy only required Qt plugins (XCB/offscreen platforms, GL integrations, standard image/SVG icons)
+# Avoids KIconEnginePlugin.so (KDE frameworks) and Wayland/EGLFS/VNC plugins
+mkdir -p "${APPDIR}/usr/plugins/platforms" \
+         "${APPDIR}/usr/plugins/xcbglintegrations" \
+         "${APPDIR}/usr/plugins/imageformats" \
+         "${APPDIR}/usr/plugins/iconengines"
+
+for p in libqxcb.so libqoffscreen.so libqminimal.so; do
+    if [ -f "${QT_PLUGINS_DIR}/platforms/${p}" ]; then
+        cp -a "${QT_PLUGINS_DIR}/platforms/${p}" "${APPDIR}/usr/plugins/platforms/"
     fi
 done
+if [ -d "${QT_PLUGINS_DIR}/xcbglintegrations" ]; then
+    cp -a "${QT_PLUGINS_DIR}/xcbglintegrations/"*.so "${APPDIR}/usr/plugins/xcbglintegrations/" 2>/dev/null || true
+fi
+for img in libqico.so libqjpeg.so libqsvg.so libqgif.so; do
+    if [ -f "${QT_PLUGINS_DIR}/imageformats/${img}" ]; then
+        cp -a "${QT_PLUGINS_DIR}/imageformats/${img}" "${APPDIR}/usr/plugins/imageformats/"
+    fi
+done
+if [ -f "${QT_PLUGINS_DIR}/iconengines/libqsvgicon.so" ]; then
+    cp -a "${QT_PLUGINS_DIR}/iconengines/libqsvgicon.so" "${APPDIR}/usr/plugins/iconengines/"
+fi
+
+# Copy only essential CERN ROOT libraries and Cling PCMs needed by NuTrackN
+# (Excludes RooFit, TMVA, RNTuple, RDataFrame, Eve, RGL, Geom, WebGui6, Gpadv7, PyROOT, SQL, etc.)
+if [ -d "${ROOTSYS}/lib" ]; then
+    echo "    Bundling essential CERN ROOT libraries and Cling dictionaries..."
+    ROOT_ESSENTIAL_MODULES=(
+        Core Cling RIO Thread Imt Rint
+        MathCore Matrix Minuit Fumili Physics
+        Hist HistPainter Spectrum SpectrumPainter
+        Graf Graf3d Gpad Postscript ASImage ASImageGui
+        GX11 GX11TTF Gui Ged FitPanel Tree Net
+    )
+    for mod in "${ROOT_ESSENTIAL_MODULES[@]}"; do
+        cp -a "${ROOTSYS}/lib/lib${mod}.so"* "${APPDIR}/usr/lib/" 2>/dev/null || true
+        cp -a "${ROOTSYS}/lib/lib${mod}_rdict.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
+        cp -a "${ROOTSYS}/lib/${mod}.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
+    done
+
+    ROOT_CORE_PCMS=(
+        _Builtin_intrinsics _Builtin_stddef
+        Cling_Runtime Cling_Runtime_Extra
+        ROOT_Config ROOT_Foundation_C ROOT_Foundation_Stage1_NoRTTI ROOT_Rtypes
+        std libc
+    )
+    for pcm in "${ROOT_CORE_PCMS[@]}"; do
+        cp -a "${ROOTSYS}/lib/${pcm}.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
+    done
+fi
 
 # Collect all dynamic library dependencies
 collect_libs() {
@@ -172,19 +244,17 @@ collect_libs() {
     done
 }
 
-# Scan binary and plugins for dependencies
+# Scan binary, plugins, and bundled ROOT libraries for transitive dependencies
 collect_libs "${APPDIR}/usr/bin/${APP_EXE}"
-find "${APPDIR}/usr/plugins" -type f -name "*.so*" -exec ldd {} 2>/dev/null \; | awk '/=>/ { print $3 }' | while read -r lib; do
-    if [ -n "$lib" ] && [ -f "$lib" ]; then
-        collect_libs "$lib"
-    fi
+find "${APPDIR}/usr/plugins" "${APPDIR}/usr/lib" -maxdepth 2 -type f -name "*.so*" | while read -r sofile; do
+    collect_libs "$sofile"
 done
 
-# Ensure all ROOT libraries, runtime plugins, Cling, and dictionaries are copied
-if [ -d "${ROOTSYS}/lib" ]; then
-    echo "    Bundling CERN ROOT libraries and Cling interpreter..."
-    cp -a "${ROOTSYS}/lib/"lib*.so* "${APPDIR}/usr/lib/" 2>/dev/null || true
-    cp -a "${ROOTSYS}/lib/"*.pcm "${APPDIR}/usr/lib/" 2>/dev/null || true
+# Strip debug & unneeded symbols from binary and bundled shared libraries to reduce size and speed up dynamic linking
+if command -v strip >/dev/null 2>&1; then
+    echo "    Stripping unneeded symbols from bundled binaries and libraries..."
+    strip --strip-unneeded "${APPDIR}/usr/bin/${APP_EXE}" 2>/dev/null || true
+    find "${APPDIR}/usr/lib" "${APPDIR}/usr/plugins" -type f -name "*.so*" -exec strip --strip-unneeded {} + 2>/dev/null || true
 fi
 
 # Bundle backward-compatibility glibc runtime to support older distributions (e.g. Ubuntu 22.04 with glibc 2.35)

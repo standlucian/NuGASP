@@ -58,19 +58,27 @@
    - [9.2 Inspecting Matrices (Q & MatrixDialog)](#92-inspecting-matrices-q--matrixdialog)
    - [9.3 Coincidence Gating (CW) & Background Subtraction (DW)](#93-coincidence-gating-cw--background-subtraction-dw)
 10. [Scripting, Macros & Automation](#10-scripting-macros--automation)
-    - [10.1 Interactive Command Prompt](#101-interactive-command-prompt)
+    - [10.1 Interactive Command Prompt & Batch Tokens](#101-interactive-command-prompt--batch-tokens)
     - [10.2 Numeric Macros (0 through 9) & Repetition Cycles](#102-numeric-macros-0-through-9--repetition-cycles)
     - [10.3 The Macro Manager Dialog (DM)](#103-the-macro-manager-dialog-dm)
     - [10.4 Saving, Loading & Distributing Macro Files (.mac)](#104-saving-loading--distributing-macro-files-mac)
 11. [Aesthetic Customization & Theme Management](#11-aesthetic-customization--theme-management)
-    - [11.1 Built-in Themes (Modern Dark, Modern Light, Classic Xtrackn)](#111-built-in-themes-modern-dark-modern-light-classic-xtrackn)
+    - [11.1 Built-in Themes (Modern Dark, Modern Light, Classic Xtrackn)](#111-built-in-themes)
     - [11.2 Customizing Palette Colors, Gridlines & Typography](#112-customizing-palette-colors-gridlines--typography)
     - [11.3 Theme Import and Export (.nugasp-theme)](#113-theme-import-and-export-nugasp-theme)
-12. [Appendices & Technical Specifications](#12-appendices--technical-specifications)
-    - [12.1 Master Keyboard Command & Shortcut Reference](#121-master-keyboard-command--shortcut-reference)
-    - [12.2 File Format Specifications](#122-file-format-specifications)
-    - [12.3 Coordinate System & Binning Conventions (0-Indexed Channels)](#123-coordinate-system--binning-conventions-0-indexed-channels)
-    - [12.4 System Requirements & Supported Platforms](#124-system-requirements--supported-platforms)
+12. [End-to-End Analysis Cookbook Workflows](#12-end-to-end-analysis-cookbook-workflows)
+    - [12.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)](#121-deconvoluting-an-overlapping-multiplet-r--g--cv)
+    - [12.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)](#122-batch-integrating-across-detectors-with-a-macro-1--cj)
+    - [12.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)](#123-correcting-gain-drift-across-100-in-beam-runs-ar)
+13. [Troubleshooting & Frequently Asked Questions (FAQ)](#13-troubleshooting--frequently-asked-questions-faq)
+    - [13.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)](#131-zoom--marker-placement-issues-e-ci-cj)
+    - [13.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment](#132-resolving-intervene-and-failed-states-in-run-by-run-alignment)
+    - [13.3 Low-Statistics Peak Fitting & Baseline Instabilities](#133-low-statistics-peak-fitting--baseline-instabilities)
+14. [Appendices & Technical Specifications](#14-appendices--technical-specifications)
+    - [14.1 Master Keyboard Command & Shortcut Reference](#141-master-keyboard-command--shortcut-reference)
+    - [14.2 File Format Specifications](#142-file-format-specifications)
+    - [14.3 Coordinate System & Binning Conventions (0-Indexed Channels)](#143-coordinate-system--binning-conventions-0-indexed-channels)
+    - [14.4 System Requirements & Supported Platforms](#144-system-requirements--supported-platforms)
 
 ---
 
@@ -186,11 +194,17 @@ NuTrackN automatically detects and parses all standard nuclear physics data form
 - **Compressed Coincidence Matrices (`.cmat`, `.mat`)**: GASPware symmetrized and raw 2D gamma coincidence matrices.
 
 ### 3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)
-NuTrackN can hold up to 9 spectra in memory simultaneously:
-- Press keys **`1` through `9`** to select the active foreground spectrum buffer.
-- Use **`Ctrl + →`** to add a new display column and **`Ctrl + ←`** to remove a column.
-- Use **`Ctrl + ↑`** and **`Ctrl + ↓`** to add or remove display rows.
-- Use **`SX`** / **`SY`** to enforce identical X or Y scales across all visible sub-canvases.
+NuTrackN supports multi-pad canvas grids alongside multi-spectrum overlays on any individual pad:
+- **Multi-Pad Grid Layout**:
+  - Use **`Ctrl + →`** to add a new display column and **`Ctrl + ←`** to remove a column.
+  - Use **`Ctrl + ↑`** and **`Ctrl + ↓`** to add or remove display rows.
+  - Click inside any sub-window to make it the active pad (highlighted by a colored frame border).
+- **Multi-Buffer Overlays & Stepping**:
+  - Up to 9 spectra can be overlaid within the same pad (`HijC` overlay stack), each rendered with its distinct theme palette color.
+  - Use **`N` / `N+` / `*1`** and **`N-` / `*2`** to step forward or backward through spectra/detectors, and **`*3` (`R+` / `NR`)** or **`*4` (`R-` / `PR`)** to step forward or backward across experimental runs.
+  - *(Note: On the canvas keyboard, single digits **`0`–`9`** trigger stored numeric macros; see [Section 10.2](#102-numeric-macros-0-through-9--repetition-cycles)).*
+- **Cross-Pad & Overlay Synchronization**:
+  - Use **`SX`** / **`SY`** to propagate the active pad's horizontal (X) or vertical (Y) scale and linear/logarithmic mode across all visible sub-canvases and their overlaid spectra.
 
 ### 3.3 Modern File Dialog (NuFileDialog) & Live Previews
 NuTrackN features an embedded high-speed file browser (`NuFileDialog`):
@@ -232,24 +246,24 @@ During in-beam accelerator experiments, acquisition data often resides on remote
 ## 4. Canvas Navigation, Scaling & Real-Time HUD
 
 ### 4.1 Display Scales & Vertical Adjustments
-- **`L`**: Toggle between **Linear** and **Logarithmic** Y-axis display.
+- **`L`**: Toggle between **Linear** and **Logarithmic** Y-axis display (automatically clamping log minimum to `0.5` counts and computing peak headroom across both the primary histogram and any overlaid spectra).
 - **`U` / `D`**: Vertically expand or compress the active histogram counts.
 - **`FO`**: Set the vertical axis maximum (Y-Max) directly to the count level under the cursor.
 - **`FU`**: Set the vertical axis minimum (Y-Min) directly to the count level under the cursor.
 - **`MZ`**: Draw a reference baseline line at zero counts.
 
 ### 4.2 Horizontal Panning & Zooming
-- **`E` (Expand)**: Zooms the horizontal axis to fit the region between the last two active markers.
+- **`E` (Expand)**: Zooms the horizontal axis to fit the region between the two most recently placed **`Spacebar`** markers.
 - **`X`**: Centers the view around the current cursor location with 2× magnification.
 - **`<` / `>`**: Pan the visible spectrum window 75% to the left or right.
-- **`FF`**: Full display reset (both horizontal and vertical axes auto-scale to full dataset).
-- **`FX` / `FY`**: Reset only the horizontal (energy/channel) or vertical (counts) scale.
+- **`FF` (or `FS`)**: Full display reset (both horizontal and vertical axes auto-scale to full dataset, equivalent to `FX` + `FY`).
+- **`FX` / `FY`**: Reset only the horizontal (energy/channel) or vertical (counts, with configurable 10% linear / 30% log headroom above the highest visible peak across all overlays) scale.
 - **`=`**: Redraw and refresh canvas.
 
 ### 4.3 Mouse Navigation & Interactive Marker Dragging
 - **Rubber-band Box Zoom**: Left-click and drag a rectangular region over any spectrum feature to zoom directly into that bounding box.
 - **Interactive Marker Dragging**: Left-click and drag any active marker along the spectrum curve to fine-tune integration or fitting limits interactively.
-- **Clickable Axis Labels**: Left-click or right-click the `X Min`, `X Max`, `Y Min`, or `Y Max` readout boxes on the bottom status bar to adjust limits in discrete steps.
+- **Clickable Axis Labels**: Left-click or right-click (with optional `Ctrl` modifier for fine/coarse stepping) the `X Min`, `X Max`, `Y Min`, or `Y Max` readout boxes on the **top status header bar** to adjust limits in discrete steps.
 
 ### 4.4 Real-Time HUD Peak Inspector
 Located in the upper right quadrant of the spectrum canvas, the **HUD Inspector** computes real-time statistics for whatever feature the cursor is hovering over:
@@ -270,38 +284,53 @@ Located in the upper right quadrant of the spectrum canvas, the **HUD Inspector*
 - **`[` and `]`**: Convenient left and right boundary placement.
 
 ### 5.2 Mathematical Formulation of Gross & Net Peak Area
-Given a photopeak bounded between channel $ch_{min}$ and channel $ch_{max}$, the total number of channels is:
-$$N_{ch} = ch_{max} - ch_{min} + 1$$
+Given a photopeak bounded by a pair of integration markers ($ch_{min}$ and $ch_{max}$), let $y_i$ denote the bin content at channel center $x_i$:
 
 1. **Gross Integrated Area ($G$)**:
    Calculated by the **`CI`** command without baseline subtraction:
-   $$G = \sum_{i = ch_{min}}^{ch_{max}} C_i$$
+   $$G = \sum_{i = ch_{min}}^{ch_{max}} y_i$$
 
-2. **Background Baseline Estimation ($B$)**:
-   The baseline under the peak is estimated from sideband regions of width $N_{bg}$ channels on the left and right of the peak:
-   $$\overline{C}_{left} = \frac{1}{N_{bg}} \sum_{j=1}^{N_{bg}} C_{ch_{min} - j}, \quad \overline{C}_{right} = \frac{1}{N_{bg}} \sum_{j=1}^{N_{bg}} C_{ch_{max} + j}$$
-   The total background counts $B$ trapped under the peak region is:
-   $$B = \frac{N_{ch}}{2} \cdot \left(\overline{C}_{left} + \overline{C}_{right}\right)$$
+2. **Least-Squares Linear Background Estimation (`CB` / `CJ`)**:
+   Background markers (**`B`**) are placed in consecutive pairs $[b_{1,\text{left}}, b_{1,\text{right}}], [b_{2,\text{left}}, b_{2,\text{right}}], \dots$ defining arbitrary background intervals on either side of the peak(s). Across all $N_{bg}$ channels enclosed by these background marker pairs, NuTrackN performs **ordinary least-squares (OLS) linear regression** to determine the best-fit baseline:
+   $$B(x) = m \cdot x + c$$
+   where the slope $m$ and intercept $c$ are evaluated from the background sample means $(\bar{x}, \bar{y})$:
+   $$m = \frac{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})(y_k - \bar{y})}{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})^2}, \quad c = \bar{y} - m \cdot \bar{x}$$
 
 3. **Net Peak Area ($N$)**:
-   Calculated by the **`CJ`** command:
-   $$N = G - B$$
+   Calculated by the **`CJ`** command (or automatically at the cursor via **`AJ`**) by subtracting the interpolated linear background $b_i = m \cdot x_i + c$ bin-by-bin across each pair of integration markers:
+   $$N \equiv M_0 = \sum_{i = ch_{min}}^{ch_{max}} (y_i - b_i) = \sum_{i = ch_{min}}^{ch_{max}} y_{\text{net}, i}$$
 
-### 5.3 Counting Statistics & Error Propagation
-Assuming Poisson counting statistics for independent bin contents ($\sigma^2(C_i) = C_i$), the variance on the gross area is $\sigma^2(G) = G$. The variance of the estimated background is:
-$$\sigma^2(B) = \left(\frac{N_{ch}}{2}\right)^2 \cdot \left[ \frac{\sigma^2(\overline{C}_{left})}{N_{bg}} + \frac{\sigma^2(\overline{C}_{right})}{N_{bg}} \right] = B \cdot \frac{N_{ch}}{2 \cdot N_{bg}}$$
+### 5.3 Counting Statistics, Statistical Moments & Error Propagation
+NuTrackN implements the authentic Xtrackn / GASPware statistical moment and variance propagation algorithm relative to the interval midpoint $x_{\text{mid}} = \frac{1}{2}(ch_{min} + ch_{max})$. Let $w_i = x_i - x_{\text{mid}}$ be the centered channel offset:
 
-The total uncertainty on the net peak area $\sigma_{net}$ is given by Gaussian error propagation:
-$$\sigma_{net} = \sqrt{\sigma^2(G) + \sigma^2(B)} = \sqrt{G + B \cdot \frac{N_{ch}}{2 \cdot N_{bg}}}$$
+1. **Net Moments ($M_0, M_1, M_2$) and Variance Moments ($D_0, D_1, D_2, D_4$)**:
+   For each bin $i$ in the integration window, the gross Poisson variance is $\sigma^2(y_i) = \max(y_i, 1)$ and the background variance contribution is $\sigma^2(b_i) = \max(b_i, 0)$, yielding a per-bin net variance $v_i = \max(y_i, 1) + \max(b_i, 0)$. The moments are accumulated as:
+   $$M_k = \sum_{i = ch_{min}}^{ch_{max}} y_{\text{net}, i} \, w_i^k \quad (k = 0, 1, 2), \qquad D_n = \sum_{i = ch_{min}}^{ch_{max}} v_i \, w_i^n \quad (n = 0, 1, 2, 4)$$
 
-**Centroid Determination**:
-The net centroid $Ch_0$ is evaluated from the first moment of the background-subtracted distribution:
-$$Ch_0 = \frac{\sum_{i = ch_{min}}^{ch_{max}} i \cdot (C_i - B_i)}{\sum_{i = ch_{min}}^{ch_{max}} (C_i - B_i)} = \frac{\sum_{i} i \cdot (C_i - B_i)}{N}$$
+2. **Net Area Uncertainty ($\sigma_N$)**:
+   $$\sigma_N = \sqrt{D_0} = \sqrt{\sum_{i = ch_{min}}^{ch_{max}} \left(\max(y_i, 1) + \max(b_i, 0)\right)}$$
+
+3. **First-Moment Centroid ($Ch_0$) & Uncertainty ($\sigma_{Ch_0}$)**:
+   With $\delta x = M_1 / M_0$, the background-subtracted centroid and its propagated variance are:
+   $$Ch_0 = x_{\text{mid}} + \delta x, \qquad \sigma^2(Ch_0) = \frac{D_2 - 2\,\delta x\,D_1 + (\delta x)^2 D_0}{M_0^2}$$
+
+4. **Second-Moment Peak Width (FWHM) & 4th-Moment Error Propagation**:
+   From the central variance $s^2 = (M_2 / M_0) - (\delta x)^2$, the statistical FWHM and its uncertainty are evaluated as:
+   $$\text{FWHM} = 2\sqrt{2\ln 2}\, s \approx 2.354820 \, \sqrt{s^2}$$
+   $$\sigma(\text{FWHM}) = \frac{\text{FWHM}}{2 s^2} \sqrt{4(\delta x)^2 \sigma^2(Ch_0) + \frac{D_4}{M_0^2} - \frac{2 M_2 D_2}{M_0^3} + \frac{M_2^2 D_0}{M_0^4}}$$
+
+5. **Spectroscopic Bracketed Uncertainty Formatting**:
+   Results printed to the Command Prompt and terminal use standard nuclear spectroscopy parenthetical notation for the least significant digits—for example, an energy of `1332.49(5)` keV denotes $1332.49 \pm 0.05\text{ keV}$, and an area of `14520(135)` denotes $14520 \pm 135\text{ counts}$.
 
 ### 5.4 Marker Management & Clearing
 - **`ZA`**: Erase all active markers from the canvas.
-- **`ZB`**: Erase only background markers.
-- **`ZI`**: Erase only integration markers.
+- **`ZB`**: Erase only background (`B`) markers.
+- **`ZI`**: Erase only integration (`I`) markers.
+- **`ZR`**: Erase only fit range (`R`) markers.
+- **`ZG`**: Erase only Gaussian peak (`G`) markers.
+- **`ZW`**: Erase only coincidence gate (`W`) markers.
+- **`ZJ` / `ZV`**: Erase auto-integration (`AJ`) or multi-fit (`CV`) markers.
+- **`MP` / `ZP`**: Show or clear automated peak-search (`CP`) labels.
 - **`MI` / `MJ`**: Re-display and highlight integration markers.
 
 ### 5.5 Output Report Logging
@@ -452,29 +481,30 @@ NuTrackN's **Run-by-Run Drift Alignment Manager (`AR`)** solves this by tracking
 
 ### 8.2 Sequence Preparation & Anchor Peak Configuration
 1. Open the **Run-by-Run Manager** by pressing **`AR`** or clicking the **Run-by-Run** toolbar button.
-2. **Load Run Sequence**: Select a sequence file or batch directory containing spectra for all experimental runs (e.g., `run0001.spe` through `run0250.spe`).
+2. **Load Run Sequence & Configure Detector Array**:
+   - Select a sequence file or batch directory containing spectra for all experimental runs (e.g., `run0001.spe` through `run0250.spe`), either locally or over an active SSH session.
+   - Specify the **Detector Range** (`detectorStart` to `detectorEnd`, e.g., Detectors `0` to `24`), **Spectrum Channel Length** (e.g., `4096` (4k), `8192` (8k), `16384` (16k), `65536` (64k)), **Binary Format** (`LongInt32`, `ShortInt16`, `Float32`, etc.), **Nominal Dispersion** (in keV/ch, e.g., `1.0` or `0.5`), and **Polynomial Order** (Linear $a_0, a_1$ or Quadratic $a_0, a_1, a_2$).
 3. **Configure Anchor Peaks**:
    - Add 1 to 5 prominent, well-isolated reference gamma lines present throughout the beam time (e.g., 511.0 keV annihilation, 1460.8 keV $^{40}\text{K}$, or strong in-beam reaction transitions).
-   - Enter physical energy ($E_{ref}$ in keV) and reference channel ($ch_{ref}$).
-   - Set the **Search Window** ($\pm \Delta ch$, default: $\pm 5$ channels).
+   - Enter physical energy ($E_{ref} \pm \sigma_E$ in keV), reference channel ($ch_{ref}$, or `0` for auto-find from nominal dispersion), minimum required peak counts, expected FWHM, and the **Search Window** ($\pm \Delta ch$, default: $\pm 5$ channels).
 
 ### 8.3 Automated Drift Tracking Engine
 Click **Run Calibration**:
-- The engine processes all runs asynchronously in background threads without freezing the user interface.
-- For each run and detector, the engine searches within the $\pm 5$ channel window around the expected centroid, initializes peak parameters, and executes a Poisson-likelihood Gaussian + Compton step fit.
-- The fitted centroid $ch_{fit}(t)$ is recorded alongside parameter uncertainties.
+- The engine (`RunByRunEngine`) processes all detector trajectories across all runs asynchronously in background threads without freezing the user interface (and supports non-blocking cancellation at any time).
+- For each `(Run, Detector)` pair, the engine searches within the $\pm \Delta ch$ window around the last valid centroid trajectory, initializes peak parameters, and executes a Poisson-likelihood Gaussian + Compton step fit.
+- If a run fails quality checks (e.g., beam trip or low statistics), the engine can automatically inherit the calibration from the most recent valid run (`isFallbackFromPrevious`) and record the source run index (`fallbackSourceRun`).
 
 ### 8.4 Status Interpretation: OK, INTERVENE, and FAILED
-Each run in the sequence table is classified into one of three distinct operational states:
+Each `(Run, Detector)` cell in the sequence matrix is classified into one of three operational states, backed by specific diagnostic status codes (`RunCalibStatus`):
 
-| Status Badge | Meaning | Description & Action Required |
+| Status Badge | Meaning | Diagnostic Reasons (`RunCalibStatus`) & Action Required |
 | :--- | :--- | :--- |
-| 🟢 **OK** | **Clean Convergence** | Peak was found within the window; fit converged with $\chi^2/\text{NDF} \le 2.0$ and expected physical FWHM. No manual action needed. |
-| 🟠 **INTERVENE** | **Manual Review Advised** | Peak converged, but has moderate centroid drift, elevated $\chi^2$, or low statistics. Click **Intervene** to inspect and approve. |
-| 🔴 **FAILED** | **Convergence Failure** | Peak not found, count rate too low, or minimizer did not converge. Requires manual intervention or fallback to previous run. |
+| 🟢 **OK** | **Clean Convergence** | `Success`: Peak was found within the search window; fit converged within `maxAllowedChi2NDF` and expected physical FWHM. No manual action needed. |
+| 🟠 **INTERVENE** | **Manual Review Advised** | `ExcessiveDrift`, `BadChi2`, `BadFWHM`, or `LowStatistics`: Peak converged, but exhibited drift approaching `maxAllowedDriftCh`, elevated $\chi^2/\text{NDF}$, broadened/narrowed width, or weak statistics. Click **Intervene** to inspect and approve. |
+| 🔴 **FAILED** | **Convergence Failure** | `NoPeakInWindow`, `RefAnchorFailed`, or `FileError`: Anchor peak missing, reference anchor failed, or spectrum file unreadable. Requires manual intervention or fallback to previous run. |
 
 ### 8.5 The Interactive Intervention Dialog
-Clicking **Intervene** on any flagged run opens the high-resolution diagnostic dialog:
+Clicking **Intervene** (or double-clicking a cell in the run-by-run matrix) automatically loads the spectrum onto the main canvas zoomed around the anchor region and opens the high-resolution diagnostic dialog:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -495,21 +525,21 @@ Clicking **Intervene** on any flagged run opens the high-resolution diagnostic d
 
 - **Centroid Drift Visualizer**: A colored horizontal indicator displays the exact deviation of the peak from the reference channel.
 - **Debounced Live Refit**: Adjusting the Centroid or FWHM spinboxes triggers an automatic refit after 400ms without requiring extra clicks.
-- **Parameter Locking**: For low-statistics runs, click **[Lock]** next to Centroid or FWHM to hold that parameter constant while fitting background and amplitude.
+- **Parameter Locking (`FitFixedParams`)**: For low-statistics runs, click **[Lock]** next to Centroid, FWHM, Baseline, Slope, or Step to hold that parameter constant while refitting the remaining free parameters.
 - **Independent Slope & Baseline Controls**: Fine-tune baseline sideband levels independently to handle localized Compton edges.
 
 ### 8.6 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal
-Once all runs are validated, click **Export Calibrations**:
+Once all runs are validated, export calibrations locally or directly to a remote SSH directory:
 1. **Legacy GASP Format (`.cal`)**:
-   Standard 2-parameter format compatible with GASPware, Xtrackn, and GSORT:
+   Standard GASPware / Xtrackn / GSORT format (can be exported as a combined file or per-run `.cal` files):
    ```text
    ! GASP Format Calibration File
    ! Run    Det    a0 (keV)       a1 (keV/ch)
    1        1      -0.512400      0.499821
    2        1      -0.511850      0.499834
    ```
-2. **Extended Multi-Order Format (`.ucal`)**:
-   Modern JSON-compatible format containing higher-order polynomial coefficients ($a_0, a_1, a_2$), parameter covariance $\text{cov}(a_0, a_1)$, residual standard error $s_{res}$, and reduced $\chi^2$.
+2. **Extended Multi-Order Uncertainty Format (`.ucal`)**:
+   Fixed-column tabular ASCII record containing the polynomial order (`NCoeff`), coefficients ($a_0, a_1, a_2$), parameter uncertainties ($\sigma_{a_0}, \sigma_{a_1}, \sigma_{a_2}$), intercept-slope covariance $\text{cov}(a_0, a_1)$, residual standard error $s_{\text{res}}$ (in keV), reduced $\chi^2/\text{NDF}$, and convergence status string (see [Section 14.2](#142-file-format-specifications) for the exact column schema).
 
 ---
 
@@ -539,42 +569,53 @@ To isolate gamma cascades feeding or depopulating a specific nuclear level:
 
 ## 10. Scripting, Macros & Automation
 
-### 10.1 Interactive Command Prompt
-At the bottom of the interface, the **Command Prompt** accepts direct text commands. Typing authentic Xtrack strings executes immediately without requiring mouse interaction:
+### 10.1 Interactive Command Prompt & Batch Tokens
+At the bottom of the interface, the **Command Prompt** accepts direct text commands. Typing authentic Xtrackn strings executes immediately without requiring mouse interaction:
 - Type `L` and press Enter to toggle log scale.
-- Type `CI` or `CJ` to integrate.
-- Combine multi-command chains separated by semicolons (e.g., `FX; FY; L; =`).
+- Type `CI` or `CJ` to integrate, or `AG` / `AJ` to auto-fit / auto-integrate at the cursor.
+- Combine multi-command chains separated by spaces, commas, or semicolons (e.g., `FX; FY; L; =` or `*1, FF, CP, CJ`).
+- **Batch Stepping & Automation Tokens**:
+  - **`*1` / `N+` / `N`**: Step to the next detector / spectrum.
+  - **`*2` / `N-`**: Step to the previous detector / spectrum.
+  - **`*3` / `R+` / `NR`**: Step to the next experimental run.
+  - **`*4` / `R-` / `PR`**: Step to the previous experimental run.
+  - **`CB`**: Fit linear background across active `B` markers.
+  - **`AG` / `AJ`**: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
+  - **`MP` / `ZP`**: Show or clear automated peak-search (`CP`) labels.
+  - **`OR` / `DR` / `SSH`**: Open the Remote Data / SSH Session Manager.
+  - **Nested Macro Calls**: Including a digit `0`–`9` inside a command string invokes that sub-macro (up to a recursion depth of 10).
 
 ### 10.2 Numeric Macros (0 through 9) & Repetition Cycles
-Assign frequently repeated command sequences to single digits:
-- **`D` + `0..9`**: Define a macro sequence (e.g., `D1` followed by `CP; CJ;`).
-- **`C` + `0..9`**: Execute stored macro `n` through its configured repetition cycles.
-- **`M` + `0..9`**: Print the stored macro string in the console.
+Assign frequently repeated command sequences to slots `0` through `9`:
+- **`0..9`**: Execute stored macro `n` **once** (`1x`).
+- **`D` + `0..9`**: Define a macro sequence interactively (e.g., `D1` followed by `*1; FF; CP; CJ`).
+- **`C` + `0..9`**: Cycle stored macro `n` in a loop for `#Cicli` iterations (prompts for cycle count if not preset).
+- **`M` + `0..9`**: Print the stored macro string and default cycle count in the Command Prompt.
 - **`Z` + `0..9`**: Clear macro `n`.
 
 ### 10.3 The Macro Manager Dialog (`DM`)
-Press **`DM`** (or click the **Macros** button) to open the graphical Macro Manager:
+Press **`DM`** (or click the **Macros** button) to open the graphical Macro Manager (`Automatic Command Strings & Macros (Block 4)`):
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│             Automatic Command Strings & Macros (Slots 0–9)             │
-├────────────────────────────────────────────────────────────────────────┤
-│ Slot │ Command String         │ Cycles │ Description / Note   │ Action │
-├──────┼────────────────────────┼────────┼──────────────────────┼────────┤
-│  0   │ CP; CG;                │   1    │ Auto-find & fit peak │ [Run]  │
-│  1   │ CI; DF;                │   5    │ Integrate & log ROI  │ [Run]  │
-│  2   │ FX; FY; =;             │   1    │ Reset full display   │ [Run]  │
-│ ...  │ ...                    │  ...   │ ...                  │ [Run]  │
-├────────────────────────────────────────────────────────────────────────┤
-│ [ Load .mac Script ]   [ Save .mac Script ]   [ Clear All ]   [ Close ]│
-└────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                 Automatic Command Strings & Macros (Block 4)                         │
+├──────┬────────────────────┬────────┬──────────────────────┬──────────────────────────┤
+│ Slot │ Command String     │ Cycles │ Description / Note   │ Actions                  │
+├──────┼────────────────────┼────────┼──────────────────────┼──────────────────────────┤
+│  #0  │ CP; CG;            │   1    │ Auto-find & fit peak │ [Run (1x)] [Cycle] [Clear]│
+│  #1  │ *1; CI; DF;        │  24    │ Integrate all dets   │ [Run (1x)] [Cycle] [Clear]│
+│  #2  │ FX; FY; =;         │   1    │ Reset full display   │ [Run (1x)] [Cycle] [Clear]│
+│ ...  │ ...                │  ...   │ ...                  │ [Run (1x)] [Cycle] [Clear]│
+├──────┴────────────────────┴────────┴──────────────────────┴──────────────────────────┤
+│ [ Load from File... ] [ Save to File... ]                 [ Apply ]  [ OK ]  [ Close ]│
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- Configure sequence strings, repetition loop counts, and laboratory notes for all 10 slots.
-- Click **[Run]** to trigger the macro directly from the dialog.
+- Configure sequence strings, repetition loop counts (`1`–`10000`), and laboratory notes for all 10 slots (`#0`–`#9`), with an embedded **Command Syntax & Tokens Reference** cheat sheet at the bottom of the dialog.
+- Click **[Run (1x)]** to execute a slot once, **[Cycle]** to run it for the configured number of cycles, or **[Clear]** to erase the slot.
 
 ### 10.4 Saving, Loading & Distributing Macro Files (`.mac`)
-Click **Save .mac Script** to save all 10 macro definitions to a plain ASCII `.mac` file. Share standardized analysis scripts across research groups to ensure reproducible data reductions.
+Click **Save to File...** or **Load from File...** (supporting both local disk and remote SSH directories via `NuFileDialog`) to export or import all macro definitions as a pipe-delimited `.mac` file (`ID|COMMAND_STRING|CYCLES|DESCRIPTION`; see [Section 14.2](#142-file-format-specifications)). Share standardized analysis scripts across research groups to ensure reproducible data reductions.
 
 ---
 
@@ -597,17 +638,46 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 
 ---
 
-## 12. Appendices & Technical Specifications
+## 12. End-to-End Analysis Cookbook Workflows
 
-### 12.1 Master Keyboard Command & Shortcut Reference
+### 12.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)
+Please write me
 
-#### 📂 File & Buffer Operations
+### 12.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)
+Please write me
+
+### 12.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)
+Please write me
+
+---
+
+## 13. Troubleshooting & Frequently Asked Questions (FAQ)
+
+### 13.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)
+Please write me
+
+### 13.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment
+Please write me
+
+### 13.3 Low-Statistics Peak Fitting & Baseline Instabilities
+Please write me
+
+---
+
+## 14. Appendices & Technical Specifications
+
+### 14.1 Master Keyboard Command & Shortcut Reference
+
+#### 📂 File, Buffer & Run/Detector Stepping Operations
 | Key / Command | Action | Description |
 | :--- | :--- | :--- |
-| **`N`** | **New Spectrum** | Open and load a new 1D spectrum into active window |
+| **`N` / `N+` / `*1`** | **Next Spectrum / Det** | Open or step to the next 1D spectrum / detector |
+| **`N-` / `*2`** | **Prev Spectrum / Det** | Step to the previous 1D spectrum / detector |
+| **`*3` / `R+` / `NR`** | **Next Run** | Increment experimental run number |
+| **`*4` / `R-` / `PR`** | **Previous Run** | Decrement experimental run number |
+| **`OR` / `DR` / `SSH`** | **Remote Data (SSH)** | Open Remote Data Acquisition & SSH Session Manager |
 | **`OS`** | **Output Spectrum** | Export current spectrum data to ASCII / CSV |
 | **`O=`** | **Output Plot** | Generate vector PostScript / PDF of current view |
-| **`1` – `9`** | **Select Spectrum** | Switch active spectrum buffer / toggle overlay |
 | **`Ctrl + →`** | **Add Column** | Add an additional spectrum display column to canvas |
 | **`Ctrl + ←`** | **Delete Column** | Remove last spectrum display column from canvas |
 | **`Ctrl + ↑`** | **Add Row** | Add an additional spectrum display row |
@@ -617,11 +687,11 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 | Key / Command | Action | Description |
 | :--- | :--- | :--- |
 | **`L`** | **Lin / Log Scale** | Toggle vertical axis between Linear and Logarithmic |
-| **`E`** | **Expand / Zoom** | Zoom view to region between the last two markers |
+| **`E`** | **Expand / Zoom** | Zoom view to region between the last two `Spacebar` markers |
 | **`X`** | **Expand at Cursor** | Zoom in centered at current mouse cursor position |
-| **`FF`** | **Full Display** | Reset view to full spectrum range (both X and Y) |
+| **`FF` / `FS`** | **Full Display** | Reset view to full spectrum range (`FX` + `FY`) |
 | **`FX`** | **Full X Range** | Reset horizontal axis to full energy/channel range |
-| **`FY`** | **Full Y Range** | Reset vertical axis to full auto-scaled count height |
+| **`FY`** | **Full Y Range** | Reset vertical axis to visible maximum with headroom |
 | **`<` / `>`** | **Pan Left / Right** | Shift visible spectrum window 75% to left or right |
 | **`=`** | **Redraw / Refresh** | Refresh canvas display and clear temporary lines |
 | **`FO` / `FU`** | **Set Y-Max / Y-Min** | Set vertical maximum or minimum to cursor count level |
@@ -631,18 +701,21 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 #### 📍 Markers & ROI Analysis
 | Key / Command | Action | Description |
 | :--- | :--- | :--- |
-| **`Spacebar`** | **Set Marker** | Place generic analysis marker at mouse pointer |
-| **`B`** | **Background Marker** | Place background boundary marker (`Blue`) |
-| **`I`** | **Integral Marker** | Place peak integration boundary marker (`Yellow`) |
+| **`Spacebar`** | **Set Marker** | Place generic analysis/zoom marker at mouse pointer |
+| **`B`** | **Background Marker** | Place background boundary marker (`Blue`, in pairs) |
+| **`I`** | **Integral Marker** | Place peak integration boundary marker (`Yellow`, in pairs) |
 | **`R`** | **Fit Range Marker** | Place Gaussian fitting range boundary marker (`Orange`) |
 | **`G`** | **Gauss Marker** | Place Gaussian peak centroid marker (`Pink`) |
 | **`W`** | **Gate Marker** | Place coincidence energy gate marker (`Purple`) |
 | **`[` / `]`** | **Left / Right ROI** | Convenient left and right boundary placement |
 | **`ZA`** | **Clear All Markers** | Delete all active markers across the canvas |
-| **`ZB` / `ZI`** | **Clear Bg / Int** | Delete only background or integral markers |
-| **`ZG` / `ZW`** | **Clear Gauss / Gate** | Delete only Gaussian peak or coincidence gate markers |
-| **`CI`** | **Integrate (No Bg)** | Calculate gross area between two markers (raw sum) |
-| **`CJ`** | **Integrate (With Bg)** | Calculate net peak area with linear background subtraction |
+| **`ZB` / `ZI`** | **Clear Bg / Int** | Delete only background (`B`) or integral (`I`) markers |
+| **`ZR` / `ZG` / `ZW`** | **Clear Fit / Gate** | Delete only range (`R`), Gaussian (`G`), or gate (`W`) markers |
+| **`ZJ` / `ZV`** | **Clear Auto / Multi** | Delete auto-integration (`AJ`) or multi-fit (`CV`) markers |
+| **`CB`** | **Fit Background** | Fit least-squares linear background across `B` marker pairs |
+| **`CI`** | **Integrate (No Bg)** | Calculate gross area between `I` marker pairs (raw sum) |
+| **`CJ`** | **Integrate (With Bg)** | Calculate net peak area, centroid & FWHM with linear bg subtraction |
+| **`AJ`** | **Auto Integrate** | Automatically integrate peak under cursor with local background |
 | **`DF` / `ZF`** | **Open / Close Log** | Designate or close output report logfile |
 
 #### ⚡ Calibration & Peak Fitting
@@ -654,8 +727,10 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 | **`AR`** | **Run-by-Run Calib** | Automated in-beam drift alignment manager |
 | **`DE`** | **Define Efficiency** | Open detector full-energy peak efficiency dialog |
 | **`CP`** | **Calculate Peaks** | Automated peak search across visible spectrum range |
-| **`CG`** | **Gaussian Fit** | Fit symmetric Gaussian peak within range markers |
+| **`MP` / `ZP`** | **Show / Clear Peaks** | Display or clear automated peak search (`CP`) annotations |
+| **`CG`** | **Gaussian Fit** | Fit symmetric Gaussian peak(s) within range markers |
 | **`CV`** | **Gauss + Step Fit** | Fit Gaussian with low-energy tail + ERFC Compton step |
+| **`AG`** | **Auto Gauss Fit** | Automatically fit Gaussian peak under current cursor position |
 | **`DG`** | **Define Fit Params** | Open peak fitting configuration (fixed/free FWHM, tails) |
 | **`+` / `-`** | **Add / Remove Peak** | Add or remove peak centroid from fitting group |
 
@@ -667,15 +742,16 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 | **`DW`** | **Define Cut Window** | Set coincidence gate boundaries and background slices |
 | **`DQ` / `CM`** | **Matrix Dialog** | Select matrix file and background subtraction scheme |
 | **`DM`** | **Macro Manager** | Open Macro & Command String Manager Dialog |
-| **`D` + `0..9`** | **Define Macro** | Assign command sequence to numeric key `0..9` |
-| **`C` + `0..9`** | **Execute Macro** | Run stored command sequence `0..9` |
-| **`M` + `0..9`** | **Show Macro** | Display stored command sequence in console |
+| **`0..9`** | **Run Macro (1x)** | Execute stored command sequence `0..9` once |
+| **`D` + `0..9`** | **Define Macro** | Assign command sequence to numeric slot `0..9` |
+| **`C` + `0..9`** | **Cycle Macro** | Loop stored command sequence `0..9` for $N$ cycles |
+| **`M` + `0..9`** | **Show Macro** | Display stored command sequence in Command Prompt |
 | **`Z` + `0..9`** | **Clear Macro** | Erase stored macro definition |
-| **`H` / `F1`** | **Help Dialog** | Open in-app Help and Heritage documentation |
+| **`H` / `?` / `F1`** | **Help Dialog** | Open in-app Help and Heritage documentation |
 
 ---
 
-### 12.2 File Format Specifications
+### 14.2 File Format Specifications
 
 #### Calibration File (`.mcal`)
 ```text
@@ -688,7 +764,7 @@ FWHM_A0 1.2501
 FWHM_A1 0.00184
 ```
 
-#### Run-by-Run Calibration File (`.cal`)
+#### Run-by-Run Legacy Calibration File (`.cal`)
 ```text
 ! GASPware Run-by-Run Drift Alignment
 ! Run    Det    a0 (keV)       a1 (keV/ch)
@@ -696,22 +772,26 @@ FWHM_A1 0.00184
 2        1      -0.511850      0.499834
 ```
 
+#### Run-by-Run Extended Uncertainty Calibration File (`.ucal`)
+```text
+# NuTrackN Extended Uncertainty Calibration File (.ucal)
+# Format: Run Det NCoeff a0 a1 a2 sigma_a0 sigma_a1 sigma_a2 cov_a0_a1 s_res(keV) chi2/ndf Status
+    1    1  2     -0.5124     0.499821   0.000000e+00     0.01420    0.0000112   0.000000e+00  -1.41200e-07     0.0312     1.142  OK
+    2    1  2     -0.5119     0.499834   0.000000e+00     0.01510    0.0000118   0.000000e+00  -1.52300e-07     0.0345     1.205  OK
+```
+
 #### Macro File (`.mac`)
 ```text
-! NuTrackN Macro Definitions
-[Slot_0]
-Command=CP; CG;
-Cycles=1
-Note=Auto-find and fit peak
-[Slot_1]
-Command=CI; DF;
-Cycles=5
-Note=Batch integrate
+# NuTrackN Macro Definitions (Block 4)
+# Format: ID|COMMAND_STRING|CYCLES|DESCRIPTION
+0|CP; CG|1|Auto-find and fit peak
+1|*1; CI; DF|24|Batch integrate across 24 detectors
+2|FX; FY; =|1|Reset full display
 ```
 
 ---
 
-### 12.3 Coordinate System & Binning Conventions (0-Indexed Channels)
+### 14.3 Coordinate System & Binning Conventions (0-Indexed Channels)
 NuTrackN strictly enforces **0-indexed channel numbering** across all data structures, canvas cursors, HUD inspector readouts, and export routines:
 - Channel 0 corresponds to the interval $[-0.5, +0.5)$ in continuous coordinate space.
 - A 4096-channel spectrum spans channels $0$ through $4095$ (inclusive).
@@ -721,7 +801,7 @@ NuTrackN strictly enforces **0-indexed channel numbering** across all data struc
 
 ---
 
-### 12.4 System Requirements & Supported Platforms
+### 14.4 System Requirements & Supported Platforms
 - **Linux**: Ubuntu 20.04+, Debian 11+, Fedora 36+, Arch Linux, CentOS/RHEL 8+ (AppImage or Native CMake build).
 - **macOS**: macOS 11.0 (Big Sur) through macOS 15.0+ (Sequoia) on Apple Silicon (M1/M2/M3/M4) or Intel Core 64-bit processors.
 - **Hardware**:

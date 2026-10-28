@@ -8,6 +8,13 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
+concurrency:
+  group: package-linux-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+
 jobs:
   build-linux:
     name: Build Linux AppImage (Ubuntu 22.04 LTS)
@@ -40,19 +47,36 @@ jobs:
             wget \
             curl
 
+      - name: Cache CERN ROOT 6.30.04 (Ubuntu 22.04)
+        id: cache-root
+        uses: actions/cache@v4
+        with:
+          path: ~/root
+          key: root-v6.30.04-ubuntu22.04-x86_64-gcc11.4
+
       - name: Download & Setup CERN ROOT for Ubuntu 22.04
+        if: steps.cache-root.outputs.cache-hit != 'true'
         run: |
           wget -q https://root.cern/download/root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz
-          sudo tar -xzf root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz -C /opt
+          tar -xzf root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz -C "$HOME"
           rm -f root_v6.30.04.Linux-ubuntu22.04-x86_64-gcc11.4.tar.gz
-          echo "/opt/root/bin" >> $GITHUB_PATH
-          echo "ROOTSYS=/opt/root" >> $GITHUB_ENV
+
+      - name: Configure CERN ROOT Environment
+        run: |
+          echo "$HOME/root/bin" >> $GITHUB_PATH
+          echo "ROOTSYS=$HOME/root" >> $GITHUB_ENV
 
       - name: Build Standalone NuTrackN AppImage
         run: |
-          source /opt/root/bin/thisroot.sh
+          source "$HOME/root/bin/thisroot.sh"
           chmod +x packaging/linux/build_appimage.sh
           ./packaging/linux/build_appimage.sh
+
+      - name: Verify Packaged AppImage
+        run: |
+          ls -lh dist/
+          ./dist/NuTrackN-x86_64.AppImage --version
+          ./dist/NuTrackN-x86_64.AppImage --help
 
       - name: Upload Standalone Linux Packages
         uses: actions/upload-artifact@v4
