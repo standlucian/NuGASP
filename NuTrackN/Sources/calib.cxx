@@ -32,6 +32,8 @@
 #include <QMessageBox>
 #include <QGroupBox>
 #include <QFile>
+#include <QDir>
+#include <QFileInfo>
 #include "NuFileDialog.h"
 
 //==============================================================================
@@ -191,6 +193,7 @@ bool SaveCalibrationFile(const QString &filePath,
                          const std::vector<CalibDetector> &detectors,
                          bool isMcalFormat)
 {
+    QDir().mkpath(QFileInfo(filePath).absolutePath());
     std::ofstream out(filePath.toStdString());
     if (!out.is_open()) return false;
 
@@ -235,6 +238,7 @@ bool SaveXtracknCalFile(const QString &filePath,
                         const std::vector<RunCalibResult> &results,
                         QString *errorMsg)
 {
+    QDir().mkpath(QFileInfo(filePath).absolutePath());
     std::ofstream out(filePath.toStdString());
     if (!out.is_open()) {
         if (errorMsg) *errorMsg = QString("Could not open file for writing: %1").arg(filePath);
@@ -304,6 +308,7 @@ bool SaveNuTrackNUcalFile(const QString &filePath,
                           const std::vector<RunCalibResult> &results,
                           QString *errorMsg)
 {
+    QDir().mkpath(QFileInfo(filePath).absolutePath());
     std::ofstream out(filePath.toStdString());
     if (!out.is_open()) {
         if (errorMsg) *errorMsg = QString("Could not open file for writing: %1").arg(filePath);

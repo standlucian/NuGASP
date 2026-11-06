@@ -2534,7 +2534,9 @@ void RunByRunManager::onExportCalClicked()
             QString err;
             if (SaveXtracknCalFile(savePath, allResults, &err)) {
                 if (isRemote && !remotePath.isEmpty()) {
-                    NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this);
+                    if (!NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this)) {
+                        return;
+                    }
                 }
                 QMessageBox::information(this, tr("Export Successful"),
                                          tr("Successfully saved %1 calibration records to:\n%2")
@@ -2553,11 +2555,23 @@ void RunByRunManager::onExportCalClicked()
             if (SaveXtracknPerRunCalFiles(dirPath, allResults, &err)) {
                 if (isRemote && !remotePath.isEmpty()) {
                     auto session = RemoteSession::globalSession();
-                    if (session && session->isConnected()) {
-                        session->createDirectory(remotePath);
-                        QDir localD(dirPath);
-                        for (const QString &f : localD.entryList(QStringList() << "*.cal", QDir::Files)) {
-                            session->uploadFile(localD.filePath(f), remotePath + "/" + f);
+                    if (!session || !session->isConnected()) {
+                        QMessageBox::critical(this, tr("SFTP Upload Error"),
+                                              tr("Cannot upload per-run files: SSH session is not active."));
+                        return;
+                    }
+                    QString mkdirErr;
+                    if (!session->createDirectory(remotePath, &mkdirErr)) {
+                        QMessageBox::critical(this, tr("SFTP Upload Error"), mkdirErr);
+                        return;
+                    }
+                    QDir localD(dirPath);
+                    for (const QString &f : localD.entryList(QStringList() << "*.cal", QDir::Files)) {
+                        QString upErr;
+                        if (!session->uploadFile(localD.filePath(f), remotePath + "/" + f, nullptr, &upErr)) {
+                            QMessageBox::critical(this, tr("SFTP Upload Error"),
+                                                  tr("Failed to upload '%1':\n%2").arg(f, upErr));
+                            return;
                         }
                     }
                 }
@@ -2597,7 +2611,9 @@ void RunByRunManager::onExportUcalClicked()
         QString err;
         if (SaveNuTrackNUcalFile(savePath, allResults, &err)) {
             if (isRemote && !remotePath.isEmpty()) {
-                NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this);
+                if (!NuFileDialog::finishRemoteSave(savePath, remotePath, &err, this)) {
+                    return;
+                }
             }
             QMessageBox::information(this, tr("Export Successful"),
                                      tr("Successfully saved %1 uncertainty calibration records to:\n%2")

@@ -42,7 +42,19 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
         m_isRemoteMode = false;
     }
 
-    m_currentLocalDir = initialDir.isEmpty() ? QDir::currentPath() : initialDir;
+    QString defaultFileName;
+    if (initialDir.isEmpty()) {
+        m_currentLocalDir = QDir::currentPath();
+    } else {
+        QFileInfo initInfo(initialDir);
+        if (initInfo.isDir()) {
+            m_currentLocalDir = initInfo.absoluteFilePath();
+        } else {
+            defaultFileName = initInfo.fileName();
+            QString parentPath = initInfo.path();
+            m_currentLocalDir = (parentPath.isEmpty() || parentPath == ".") ? QDir::currentPath() : parentPath;
+        }
+    }
     if (m_session && m_session->isConnected()) {
         m_currentRemoteDir = m_session->getCurrentRemoteDir();
         if (m_currentRemoteDir.isEmpty()) {
@@ -60,6 +72,9 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
     setStyleSheet(Design::getDialogStyleSheet());
 
     setupUI(caption, filter);
+    if (m_mode == NuFileMode::SaveFile && m_editSaveFileName && !defaultFileName.isEmpty()) {
+        m_editSaveFileName->setText(defaultFileName);
+    }
 
     if (m_isRemoteMode) {
         loadDirectory(m_currentRemoteDir);
@@ -673,6 +688,7 @@ void NuFileDialog::onAcceptActionClicked()
         if (m_isRemoteMode) {
             m_selectedRemotePath = m_currentRemoteDir;
             m_selectedPath = m_session->getLocalCachePath(m_currentRemoteDir);
+            QDir().mkpath(m_selectedPath);
         } else {
             m_selectedPath = m_currentLocalDir;
             m_selectedRemotePath.clear();
@@ -700,6 +716,7 @@ void NuFileDialog::onAcceptActionClicked()
                 : m_currentLocalDir + "/" + fileName;
             m_selectedRemotePath.clear();
         }
+        QDir().mkpath(QFileInfo(m_selectedPath).absolutePath());
         accept();
         return;
     }

@@ -12,6 +12,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QFileInfo>
+#include <QDir>
 #include "NuFileDialog.h"
 #include <fstream>
 #include <iomanip>
@@ -36,6 +37,8 @@ bool WriteSpectrumData(const std::string &filename,
         if (errorMsg) *errorMsg = QObject::tr("Spectrum data is empty. Nothing to export.");
         return false;
     }
+
+    QDir().mkpath(QFileInfo(QString::fromStdString(filename)).absolutePath());
 
     // Prepare buffer with exact requested channel count (pad with 0.0 or truncate)
     std::vector<double> outData(requestedChannels, 0.0);
