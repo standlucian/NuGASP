@@ -278,6 +278,7 @@ bool TracknHistogram::LoadFromFile(const std::string &filename) {
   }
 
   Reset();
+  ClearCalibration();
 
   // GASP / Xtrackn channel binning [0.0, N]:
   // Channel k (ROOT bin k+1) spans [k, k + 1.0] with bin center at k + 0.5
@@ -308,6 +309,7 @@ bool TracknHistogram::LoadFromData(const std::vector<double> &data, const std::s
   }
 
   Reset();
+  ClearCalibration();
 
   // Resize histogram bins to match incoming spectrum length with GASP [0.0, N] convention (bin k centered at k + 0.5)
   SetBins(static_cast<Int_t>(data.size()), 0.0, static_cast<Double_t>(data.size()));

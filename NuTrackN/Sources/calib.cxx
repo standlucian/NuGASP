@@ -250,13 +250,28 @@ bool SaveXtracknCalFile(const QString &filePath,
     std::setlocale(LC_NUMERIC, "C");
 
     for (const auto &res : results) {
+        // Skip failed or dead detectors completely: GASPware gsort (gsortcom1.F L1632-L1634)
+        // eliminates missing ADCs (det(jx).id = -1) when omitted from the .cal file.
+        if (res.status != RunCalibStatus::Success || res.a1 <= 0.0) {
+            continue;
+        }
+
+        // In GASPware gsort (gsortcom1.F L1646-L1647):
+        //   xcan = ican + rand_real2() (mean ican + 0.5)
+        //   enx  = a0 + a1 * xcan
+        //   ICAN = enx (Fortran INT() integer truncation)
+        // For ICAN to truncate symmetrically into integer bin index K (interval [K, K+1)),
+        // enx must be centered on K + 0.5, matching legacy trackn.F L4558 (pp = trpar + 0.5).
+        // Since NuTrackN fits centered bin coordinates (ch + 0.5), we add +0.5 ch to a0 for gsort:
+        const double gsortA0 = res.a0 + 0.5;
+
         char line[256];
         if (res.numCoeffs >= 3 && std::abs(res.a2) > 1e-15) {
             std::snprintf(line, sizeof(line), "%5d%5d%3d%10.3f%10.6f%14.6e\n",
-                          res.runNumber, res.detectorId, 3, res.a0, res.a1, res.a2);
+                          res.runNumber, res.detectorId, 3, gsortA0, res.a1, res.a2);
         } else {
             std::snprintf(line, sizeof(line), "%5d%5d%3d%10.3f%10.6f\n",
-                          res.runNumber, res.detectorId, 2, res.a0, res.a1);
+                          res.runNumber, res.detectorId, 2, gsortA0, res.a1);
         }
         for (char *p = line; *p; ++p) {
             if (*p == ',') *p = '.';
