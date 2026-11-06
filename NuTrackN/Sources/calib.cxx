@@ -256,14 +256,9 @@ bool SaveXtracknCalFile(const QString &filePath,
             continue;
         }
 
-        // In GASPware gsort (gsortcom1.F L1646-L1647):
-        //   xcan = ican + rand_real2() (mean ican + 0.5)
-        //   enx  = a0 + a1 * xcan
-        //   ICAN = enx (Fortran INT() integer truncation)
-        // For ICAN to truncate symmetrically into integer bin index K (interval [K, K+1)),
-        // enx must be centered on K + 0.5, matching legacy trackn.F L4558 (pp = trpar + 0.5).
-        // Since NuTrackN fits centered bin coordinates (ch + 0.5), we add +0.5 ch to a0 for gsort:
-        const double gsortA0 = res.a0 + 0.5;
+        // Write a0 directly without extra offset so sorted peaks in gsort map exactly
+        // to true literature physical energies:
+        const double gsortA0 = res.a0;
 
         char line[256];
         if (res.numCoeffs >= 3 && std::abs(res.a2) > 1e-15) {
