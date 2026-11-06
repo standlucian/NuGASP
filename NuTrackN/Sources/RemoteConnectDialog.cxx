@@ -27,6 +27,10 @@ RemoteConnectDialog::RemoteConnectDialog(std::shared_ptr<RemoteSession> session,
 
     setupUI();
     loadProfilesToCombo();
+    if (m_btnConnect) {
+        m_btnConnect->setDefault(true);
+        m_btnConnect->setFocus();
+    }
 }
 
 void RemoteConnectDialog::setupUI()
@@ -66,16 +70,19 @@ void RemoteConnectDialog::setupUI()
 
     m_btnNewProfile = new QPushButton(tr("+ New"), grpProfile);
     m_btnNewProfile->setFont(dlgFont);
+    m_btnNewProfile->setAutoDefault(false);
     connect(m_btnNewProfile, &QPushButton::clicked, this, &RemoteConnectDialog::onNewProfileClicked);
     profileLayout->addWidget(m_btnNewProfile);
 
     m_btnSaveProfile = new QPushButton(tr("Save"), grpProfile);
     m_btnSaveProfile->setFont(dlgFont);
+    m_btnSaveProfile->setAutoDefault(false);
     connect(m_btnSaveProfile, &QPushButton::clicked, this, &RemoteConnectDialog::onSaveProfileClicked);
     profileLayout->addWidget(m_btnSaveProfile);
 
     m_btnDeleteProfile = new QPushButton(tr("Delete"), grpProfile);
     m_btnDeleteProfile->setFont(dlgFont);
+    m_btnDeleteProfile->setAutoDefault(false);
     connect(m_btnDeleteProfile, &QPushButton::clicked, this, &RemoteConnectDialog::onDeleteProfileClicked);
     profileLayout->addWidget(m_btnDeleteProfile);
 
@@ -147,6 +154,7 @@ void RemoteConnectDialog::setupUI()
     m_editKeyFile->setPlaceholderText(tr("~/.ssh/id_ed25519 or ~/.ssh/id_rsa"));
     m_btnBrowseKey = new QPushButton(tr("Browse..."), grpParams);
     m_btnBrowseKey->setFont(dlgFont);
+    m_btnBrowseKey->setAutoDefault(false);
     connect(m_btnBrowseKey, &QPushButton::clicked, this, &RemoteConnectDialog::onBrowseKeyFileClicked);
     keyLayout->addWidget(m_editKeyFile, 1);
     keyLayout->addWidget(m_btnBrowseKey);
@@ -189,12 +197,14 @@ void RemoteConnectDialog::setupUI()
 
     m_btnTestConnection = new QPushButton(tr("⚡ Test / Verify Connection"), this);
     m_btnTestConnection->setFont(dlgFont);
+    m_btnTestConnection->setAutoDefault(false);
     m_btnTestConnection->setToolTip(tr("Test host reachability, authentication, and remote directory access without connecting"));
     connect(m_btnTestConnection, &QPushButton::clicked, this, &RemoteConnectDialog::onTestConnectionClicked);
     bottomLayout->addWidget(m_btnTestConnection);
 
     m_btnDisconnect = new QPushButton(tr("Disconnect"), this);
     m_btnDisconnect->setFont(dlgFont);
+    m_btnDisconnect->setAutoDefault(false);
     m_btnDisconnect->setStyleSheet("color: #ef5350; font-weight: bold;");
     connect(m_btnDisconnect, &QPushButton::clicked, this, &RemoteConnectDialog::onDisconnectClicked);
     bottomLayout->addWidget(m_btnDisconnect);
@@ -203,6 +213,8 @@ void RemoteConnectDialog::setupUI()
 
     m_btnConnect = new QPushButton(tr("Connect"), this);
     m_btnConnect->setFont(dlgFont);
+    m_btnConnect->setDefault(true);
+    m_btnConnect->setAutoDefault(true);
     m_btnConnect->setStyleSheet(QString("QPushButton { background-color: %1; color: white; font-weight: bold; padding: 6px 16px; border-radius: 4px; }"
                                         "QPushButton:hover { opacity: 0.9; }")
                                 .arg(Design::getDialogAccentColor().name()));
@@ -211,6 +223,7 @@ void RemoteConnectDialog::setupUI()
 
     m_btnClose = new QPushButton(tr("Close"), this);
     m_btnClose->setFont(dlgFont);
+    m_btnClose->setAutoDefault(false);
     connect(m_btnClose, &QPushButton::clicked, this, &QDialog::reject);
     bottomLayout->addWidget(m_btnClose);
 

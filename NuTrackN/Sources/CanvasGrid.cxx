@@ -85,7 +85,7 @@ void QMainCanvas::AddCulomn()
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
-                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, -0.5, 10240.0 - 0.5);
+                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0.0, 10240.0);
                     HijF[z][g]->SetLineColor(4);
                 }
                 for (auto *h : HijC[z][g]) {
@@ -181,7 +181,7 @@ void QMainCanvas::AddLine()
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
-                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, -0.5, 10240.0 - 0.5);
+                    HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0.0, 10240.0);
                     HijF[z][g]->SetLineColor(4);
                 }
                 for (auto *h : HijC[z][g]) {

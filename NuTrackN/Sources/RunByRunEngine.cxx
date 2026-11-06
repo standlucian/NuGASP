@@ -9,6 +9,9 @@
 #include "TF1.h"
 #include "TFitResult.h"
 #include "TFitResultPtr.h"
+#include "Math/Minimizer.h"
+#include "Math/Factory.h"
+#include "Math/IFunction.h"
 
 RunByRunEngine::RunByRunEngine(QObject *parent)
     : QObject(parent)
@@ -79,10 +82,16 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     // 1. Search for highest bin in search window (or use fixed centroid)
     int maxBin = lowCh;
     if (fixed.fixCentroid && fixed.fixedCentroid > 0.0) {
-        maxBin = std::clamp(static_cast<int>(std::round(fixed.fixedCentroid)), 1, totalBins - 2);
+        maxBin = std::clamp(static_cast<int>(std::floor(fixed.fixedCentroid)), 1, totalBins - 2);
     } else {
-        double maxVal = spectrum[lowCh];
-        for (int ch = lowCh; ch <= highCh; ++ch) {
+        const double searchRad = fixed.useExactFitWin
+            ? std::min(windowCh, std::max(3.5, (fixed.fixedFwhm > 0.2) ? (1.5 * fixed.fixedFwhm) : 5.0))
+            : windowCh;
+        const int sLow = std::max(1, static_cast<int>(std::floor(centerCh - searchRad)));
+        const int sHigh = std::min(totalBins - 2, static_cast<int>(std::ceil(centerCh + searchRad)));
+        maxBin = sLow;
+        double maxVal = spectrum[sLow];
+        for (int ch = sLow; ch <= sHigh; ++ch) {
             if (spectrum[ch] > maxVal) {
                 maxVal = spectrum[ch];
                 maxBin = ch;
@@ -104,25 +113,25 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         return result; // Low counts
     }
 
-    // 2. Estimate empirical FWHM via half-maximum walk from maxBin
+    // 2. Estimate empirical FWHM via half-maximum walk from maxBin (GASP bin center = ch + 0.5)
     double halfMax = baseVal + 0.5 * (maxVal - baseVal);
-    double leftHM = static_cast<double>(lowCh);
+    double leftHM = static_cast<double>(lowCh) + 0.5;
     for (int ch = maxBin; ch >= lowCh; --ch) {
         if (spectrum[ch] <= halfMax) {
             double y1 = spectrum[ch];
             double y2 = (ch + 1 <= maxBin) ? spectrum[ch + 1] : halfMax;
             double frac = (std::abs(y2 - y1) > 1e-6) ? (halfMax - y1) / (y2 - y1) : 0.0;
-            leftHM = ch + frac;
+            leftHM = (static_cast<double>(ch) + 0.5) + frac;
             break;
         }
     }
-    double rightHM = static_cast<double>(highCh);
+    double rightHM = static_cast<double>(highCh) + 0.5;
     for (int ch = maxBin; ch <= highCh; ++ch) {
         if (spectrum[ch] <= halfMax) {
             double y1 = (ch - 1 >= maxBin) ? spectrum[ch - 1] : halfMax;
             double y2 = spectrum[ch];
             double frac = (std::abs(y1 - y2) > 1e-6) ? (halfMax - y2) / (y1 - y2) : 0.0;
-            rightHM = ch - frac;
+            rightHM = (static_cast<double>(ch) + 0.5) - frac;
             break;
         }
     }
@@ -131,64 +140,56 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         ? obsFwhm
         : (fixed.fixFwhm ? fixed.fixedFwhm : std::clamp(windowCh * 0.25, 1.5, 6.0));
 
-    // 2. Dynamic peak extent & adaptive background windowing:
-    // Look at how big the peak is (amplitude & FWHM) to set peak exclusion boundaries
-    const double rawAmpl = std::max(1.0, maxVal - baseVal);
+    // 3. Deterministic fit window around maxBin (Xtrackn TRSETREG fwfact = 2.5: po +- 2.5 * FWHM, or exact user window)
     const double estSigma = fixed.fixFwhm ? std::max(0.1, fixed.fixedFwhm / 2.35482) : std::max(0.2, estFwhm / 2.35482);
-    const double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmpl))), 2.0, 3.5);
-    const int peakHalfWidth = std::clamp(static_cast<int>(std::ceil(nSig * estSigma)), 2, std::max(2, static_cast<int>(windowCh * 0.8)));
-
-    // Search outward from peak exclusion boundaries for true local background valleys (saddle points)
-    // to avoid sampling inside peak wings or climbing adjacent neighbor lines
-    int leftValley = std::max(0, maxBin - peakHalfWidth);
-    const int lSearchMin = std::max(0, maxBin - static_cast<int>(windowCh));
-    if (leftValley > lSearchMin) {
-        for (int ch = leftValley; ch >= lSearchMin; --ch) {
-            if (spectrum[ch] < spectrum[leftValley]) leftValley = ch;
-        }
-    }
-
-    int rightValley = std::min(totalBins - 1, maxBin + peakHalfWidth);
-    const int rSearchMax = std::min(totalBins - 1, maxBin + static_cast<int>(windowCh));
-    if (rSearchMax > rightValley) {
-        for (int ch = rightValley; ch <= rSearchMax; ++ch) {
-            if (spectrum[ch] < spectrum[rightValley]) rightValley = ch;
-        }
-    }
-
-    // Sample robust 3-bin medians at valley floors
-    double leftBkg = 0.0;
-    double rightBkg = 0.0;
-    if (!fixed.fixBaseline) {
-        std::vector<double> leftVals, rightVals;
-        for (int c = std::max(0, leftValley - 1); c <= std::min(totalBins - 1, leftValley + 1); ++c) leftVals.push_back(spectrum[c]);
-        for (int c = std::max(0, rightValley - 1); c <= std::min(totalBins - 1, rightValley + 1); ++c) rightVals.push_back(spectrum[c]);
-        std::sort(leftVals.begin(), leftVals.end());
-        std::sort(rightVals.begin(), rightVals.end());
-        leftBkg = !leftVals.empty() ? leftVals[leftVals.size() / 2] : spectrum[leftValley];
-        rightBkg = !rightVals.empty() ? rightVals[rightVals.size() / 2] : spectrum[rightValley];
-        baseVal = (leftBkg + rightBkg) / 2.0;
-    }
-
-    // Physical Compton step capping: in physical HPGe detectors, Compton step is at most ~5% of peak amplitude
-    const double rawStep = std::max(0.0, leftBkg - rightBkg);
-    const double maxPhysStep = std::max(0.0, 0.05 * rawAmpl);
-    const double estStep = std::min(rawStep, maxPhysStep);
-    const bool useStep = fixed.fixStep ? (fixed.fixedStep > 0.0) : (!fixed.fixBaseline && estStep >= 1.5 && rawAmpl >= 25.0);
-
-    // Adaptive fit window spanning from left valley to right valley
-    int fitMin = std::max(1, std::max(maxBin - static_cast<int>(windowCh), leftValley));
-    int fitMax = std::min(totalBins - 1, std::min(maxBin + static_cast<int>(windowCh), rightValley));
-    int nFitBins = fitMax - fitMin + 1;
-    if (nFitBins < 5) {
-        fitMin = std::max(1, maxBin - peakHalfWidth - 2);
-        fitMax = std::min(totalBins - 1, maxBin + peakHalfWidth + 2);
-        nFitBins = fitMax - fitMin + 1;
-    }
+    const int halfWin = fixed.useExactFitWin
+        ? std::clamp(static_cast<int>(std::round(windowCh)), 3, 200)
+        : std::clamp(static_cast<int>(std::round(2.5 * 2.35482 * estSigma)),
+                     5,
+                     std::max(6, static_cast<int>(std::round(windowCh * 1.5))));
+    const int fitMin = std::max(1, maxBin - halfWin);
+    const int fitMax = std::min(totalBins - 2, maxBin + halfWin);
+    const int nFitBins = fitMax - fitMin + 1;
     if (nFitBins < 5) return result;
 
-    // Use a lightweight ROOT TH1F for standard Gaussian + linear background + Compton step fit
-    TH1F hTemp("hAnchorTemp", "Anchor", nFitBins, fitMin - 0.5, fitMax + 0.5);
+    // Extract local SNIP continuum across [fitMin - margin, fitMax + margin]
+    const int snipMargin = std::clamp(static_cast<int>(std::round(6.0 * estFwhm)), 25, 100);
+    const int snipStart = std::max(0, fitMin - snipMargin);
+    const int snipEnd = std::min(totalBins - 1, fitMax + snipMargin);
+    std::vector<double> localSlice(spectrum.begin() + snipStart, spectrum.begin() + snipEnd + 1);
+    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * estFwhm)), 12, 35);
+    const std::vector<double> localSnip = computeSnipContinuum(localSlice, snipIters);
+
+    auto snipAtBin = [&](int binIdx) -> double {
+        const int idx = std::clamp(binIdx - snipStart, 0, static_cast<int>(localSnip.size()) - 1);
+        return std::max(0.0, localSnip[idx]);
+    };
+
+    // Baseline estimation from SNIP continuum (cross-checked against minimum 3-bin edge average)
+    if (!fixed.fixBaseline) {
+        double leftSum = 0.0, rightSum = 0.0;
+        int nLeft = 0, nRight = 0;
+        for (int c = fitMin; c <= std::min(fitMax, fitMin + 2); ++c) {
+            leftSum += spectrum[c];
+            nLeft++;
+        }
+        for (int c = std::max(fitMin, fitMax - 2); c <= fitMax; ++c) {
+            rightSum += spectrum[c];
+            nRight++;
+        }
+        const double leftAvg = (nLeft > 0) ? (leftSum / nLeft) : spectrum[fitMin];
+        const double rightAvg = (nRight > 0) ? (rightSum / nRight) : spectrum[fitMax];
+        const double edgeMin = std::max(0.0, std::min(leftAvg, rightAvg));
+        const double edgeMean = std::max(0.0, 0.5 * (leftAvg + rightAvg));
+        const double snipCenter = snipAtBin(maxBin);
+        baseVal = (snipCenter > 0.25) ? std::min(snipCenter, std::max(edgeMin, edgeMean)) : edgeMin;
+        if (baseVal >= maxVal) {
+            baseVal = std::max(0.0, maxVal * 0.1);
+        }
+    }
+
+    // Use a lightweight ROOT TH1F with GASP [fitMin, fitMax + 1.0] bin edges so channel k has center k + 0.5
+    TH1F hTemp("hAnchorTemp", "Anchor", nFitBins, static_cast<double>(fitMin), static_cast<double>(fitMax) + 1.0);
     hTemp.SetDirectory(nullptr);
     for (int i = 0; i < nFitBins; ++i) {
         const int ch = fitMin + i;
@@ -196,15 +197,35 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         hTemp.SetBinError(i + 1, std::max(1.0, std::sqrt(std::max(0.0, spectrum[ch]))));
     }
 
-    // Centered formula with Compton step:
-    // [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
-    // Parameter 3 is the local high-energy baseline AT the centroid
-    // Parameter 5 is the Compton step height
-    const double bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (useStep ? 0.0 : ((fitMax > fitMin) ? (rightBkg - leftBkg) / static_cast<double>(fitMax - fitMin) : 0.0));
-    const double estAmpl = std::max(1.0, maxVal - (useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal));
-    const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : static_cast<double>(maxBin);
+    const double estAmpl = std::max(1.0, maxVal - baseVal);
+    const double estMean = fixed.fixCentroid ? fixed.fixedCentroid : (static_cast<double>(maxBin) + 0.5);
 
-    TF1 fGaus("fAnchorGaus", "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
+    // Fit a straight-line chord L(x) = meanSnip + slopeSnip*(x - xMid) to localSnip across [fitMin, fitMax]
+    const double xMid = 0.5 * static_cast<double>(fitMin + fitMax) + 0.5;
+    double sumS = 0.0, sumXS = 0.0, sumXX = 0.0;
+    for (int ch = fitMin; ch <= fitMax; ++ch) {
+        const double dx = (static_cast<double>(ch) + 0.5) - xMid;
+        const double sVal = snipAtBin(ch);
+        sumS += sVal;
+        sumXS += dx * sVal;
+        sumXX += dx * dx;
+    }
+    const double meanSnipChord = sumS / static_cast<double>(nFitBins);
+    const double rawSlopeChord = (sumXX > 1e-9) ? (sumXS / sumXX) : 0.0;
+    const double maxAbsSlope = 0.05 * std::max(0.25, meanSnipChord);
+    const double slopeSnipChord = (meanSnipChord > 0.25)
+        ? std::clamp(rawSlopeChord, -maxAbsSlope, maxAbsSlope)
+        : 0.0;
+
+    // Gaussian + Fixed-Slope Straight-Chord SNIP Background: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + slope*(x - [1])
+    TF1 fGaus("fAnchorGaus",
+              [slopeSnipChord](double *x, double *p) -> double {
+                  const double dx = (x[0] - p[1]) / p[2];
+                  const double gaus = p[0] * std::exp(-0.5 * dx * dx);
+                  const double bkg = std::max(0.0, p[3] + slopeSnipChord * (x[0] - p[1]));
+                  return gaus + bkg;
+              },
+              static_cast<double>(fitMin), static_cast<double>(fitMax) + 1.0, 4);
 
     const double ampLow = 0.0;
     const double ampHigh = std::max(10.0, maxVal * 4.0);
@@ -214,8 +235,8 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     if (fixed.fixCentroid) {
         fGaus.FixParameter(1, fixed.fixedCentroid);
     } else {
-        const double meanLow = fitMin - 0.5;
-        const double meanHigh = fitMax + 0.5;
+        const double meanLow = static_cast<double>(fitMin);
+        const double meanHigh = static_cast<double>(fitMax) + 1.0;
         fGaus.SetParameter(1, std::clamp(estMean, meanLow, meanHigh));
         fGaus.SetParLimits(1, meanLow, meanHigh);
     }
@@ -226,45 +247,24 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         const double sigLow = 0.2;
         const double sigHigh = 25.0;
         fGaus.SetParameter(2, std::clamp(estSigma, sigLow, sigHigh));
-        fGaus.SetParLimits(2, sigLow, sigHigh); // HPGe physical peak width boundaries
+        fGaus.SetParLimits(2, sigLow, sigHigh);
     }
 
     if (fixed.fixBaseline) {
         fGaus.FixParameter(3, fixed.fixedBaseline);
     } else {
-        const double rawBkg = useStep ? (rightBkg > 0.0 ? rightBkg : baseVal) : baseVal;
-        const double bkgLow = 0.0;
-        const double bkgHigh = std::max(10.0, std::max(maxVal * 2.0, rawBkg * 2.0));
-        fGaus.SetParameter(3, std::clamp(rawBkg, bkgLow, bkgHigh));
+        // Tightly constrain background around the SNIP continuum so the fit cannot push background into the peak
+        const double bkgLow = std::max(0.0, 0.85 * baseVal - 0.5);
+        const double maxHeadroom = std::max(1.0, 0.15 * baseVal + 0.5 * std::sqrt(std::max(1.0, baseVal)));
+        const double bkgHigh = baseVal + std::min(maxHeadroom, std::max(0.5, 0.15 * estAmpl));
+        fGaus.SetParameter(3, std::clamp(baseVal, bkgLow, bkgHigh));
         fGaus.SetParLimits(3, bkgLow, bkgHigh);
     }
 
-    if (fixed.fixSlope) {
-        fGaus.FixParameter(4, fixed.fixedSlope);
-    } else if (useStep) {
-        // Critical: Lock slope to 0 when Compton step is active to eliminate collinearity and prevent sawtooth artifacts!
-        fGaus.FixParameter(4, 0.0);
-    } else {
-        const double maxSlopeMag = std::max({ 2.0, maxVal * 0.05, std::abs(bkgSlope) * 1.5 });
-        fGaus.SetParameter(4, std::clamp(bkgSlope, -maxSlopeMag, maxSlopeMag));
-        fGaus.SetParLimits(4, -maxSlopeMag, maxSlopeMag);
-    }
-
-    if (fixed.fixStep) {
-        fGaus.FixParameter(5, fixed.fixedStep);
-    } else if (useStep) {
-        const double stepLow = 0.0;
-        const double stepHigh = std::max(2.0, maxPhysStep * 1.5 + 2.0);
-        fGaus.SetParameter(5, std::clamp(estStep, stepLow, stepHigh));
-        fGaus.SetParLimits(5, stepLow, stepHigh);
-    } else {
-        fGaus.FixParameter(5, 0.0);
-    }
-
     // Fit with Poisson Likelihood + Bin Integration ("Q0NSIL"), fallback to standard Chi2 ("Q0NS")
-    TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NSIL", "", fitMin - 0.5, fitMax + 0.5);
+    TFitResultPtr fitRes = hTemp.Fit(&fGaus, "Q0NSIL", "", static_cast<double>(fitMin), static_cast<double>(fitMax) + 1.0);
     if (!fitRes.Get() || (!fitRes->IsValid() && fitRes->Status() != 0 && !(fixed.fixCentroid && (fitRes->Status() % 1000 == 0 || fitRes->Status() == 4)))) {
-        fitRes = hTemp.Fit(&fGaus, "Q0NS", "", fitMin - 0.5, fitMax + 0.5);
+        fitRes = hTemp.Fit(&fGaus, "Q0NS", "", static_cast<double>(fitMin), static_cast<double>(fitMax) + 1.0);
     }
     const bool fitValid = fitRes.Get() && (fitRes->IsValid() || fitRes->Status() == 0 || (fixed.fixCentroid && (fitRes->Status() % 1000 == 0 || fitRes->Status() == 4)));
     if (fitValid) {
@@ -288,10 +288,8 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
 
         double fittedMeanErr = 0.05;
         if (fixed.fixCentroid) {
-            // Parameter was fixed in ROOT MINUIT so GetParError(1) returns 0.
-            // Compute realistic physical statistical centroid uncertainty from peak width and area:
             const double statErr = (area > 1.0) ? (fittedSigma / std::sqrt(area)) : 0.05;
-            const double bkgVal = std::max(0.0, fGaus.GetParameter(3) + 0.5 * fGaus.GetParameter(5));
+            const double bkgVal = std::max(0.0, fGaus.GetParameter(3));
             const double bkgFactor = (area > 1.0 && bkgVal > 0.0)
                 ? std::sqrt(1.0 + (2.0 * bkgVal * fwhm) / area)
                 : 1.0;
@@ -300,16 +298,16 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
             fittedMeanErr = std::max(0.01, fGaus.GetParError(1));
         }
 
-        if (fittedMean >= lowCh && fittedMean <= highCh && fwhm >= 0.3 && fwhm <= 50.0 && fittedAmpl > 0.0) {
+        if (fittedMean >= static_cast<double>(lowCh) && fittedMean <= static_cast<double>(highCh) + 1.0
+            && fwhm >= 0.3 && fwhm <= 50.0 && fittedAmpl > 0.0) {
             result.centroidCh = fittedMean;
             result.centroidErrCh = fittedMeanErr;
             result.fwhmCh = fwhm;
             result.amplitude = fittedAmpl;
             result.background = fGaus.GetParameter(3);
-            result.bkgSlope = fGaus.GetParameter(4);
-            result.bkgStep = fGaus.GetParameter(5);
             result.area = area;
             result.chi2 = chi2;
+            result.fitWinCh = static_cast<double>(halfWin);
             result.isValid = true;
             return result;
         }
@@ -323,26 +321,26 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         result.centroidErrCh = std::clamp(sig / std::sqrt(estArea), 0.03, 0.35);
         result.fwhmCh = fixed.fixFwhm ? fixed.fixedFwhm : 3.5;
         result.amplitude = estAmpl;
-        result.background = fixed.fixBaseline ? fixed.fixedBaseline : (useStep && rightBkg > 0.0 ? rightBkg : baseVal);
-        result.bkgSlope = fixed.fixSlope ? fixed.fixedSlope : (useStep ? 0.0 : bkgSlope);
-        result.bkgStep = fixed.fixStep ? fixed.fixedStep : (useStep ? estStep : 0.0);
+        result.background = fixed.fixBaseline ? fixed.fixedBaseline : baseVal;
         result.area = estArea;
         result.chi2 = 1.0;
+        result.fitWinCh = static_cast<double>(halfWin);
         result.isValid = true;
         return result;
     }
 
-    // Fallback: Background-subtracted centroid & moment
+    // Fallback: Background-subtracted centroid & moment (GASP bin center = ch + 0.5)
     double sumW = 0.0, sumWX = 0.0, sumWXX = 0.0;
     const int momMin = std::max(1, maxBin - 6);
     const int momMax = std::min(totalBins - 1, maxBin + 6);
     const double momBase = (spectrum[momMin] + spectrum[momMax]) / 2.0;
 
     for (int ch = momMin; ch <= momMax; ++ch) {
-        double w = std::max(0.0, spectrum[ch] - momBase);
+        const double w = std::max(0.0, spectrum[ch] - momBase);
+        const double chCenter = static_cast<double>(ch) + 0.5;
         sumW += w;
-        sumWX += w * ch;
-        sumWXX += w * ch * ch;
+        sumWX += w * chCenter;
+        sumWXX += w * chCenter * chCenter;
     }
 
     if (sumW > minCounts) {
@@ -354,14 +352,1017 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
         result.fwhmCh = 2.35482 * sigma;
         result.amplitude = std::max(1.0, maxVal - momBase);
         result.background = momBase;
-        result.bkgSlope = 0.0;
-        result.bkgStep = 0.0;
         result.area = sumW;
         result.chi2 = 1.0;
-        result.isValid = (centroid >= lowCh && centroid <= highCh);
+        result.fitWinCh = static_cast<double>(halfWin);
+        result.isValid = (centroid >= static_cast<double>(lowCh) && centroid <= static_cast<double>(highCh) + 1.0);
     }
 
     return result;
+}
+
+//==============================================================================
+// Coupled Multi-Peak Spectrum Fitter (Xtrackn boundfit + CERN ROOT Minimizer)
+//==============================================================================
+namespace {
+
+struct BoundPeakSeed {
+    int anchorIdx{0};
+    double energy{0.0};
+    double energyErr{0.0};
+    double uNorm{0.0};        // E / nominalDispersion (nominal channel units)
+    double seedCh{0.0};       // Local empirical center from initial window scan
+    double seedErrCh{0.1};    // Statistical error on local center
+    double seedSigmaCh{1.5};  // Initial sigma estimate in channels
+    double seedAmpl{10.0};    // Initial peak height above background
+    double seedBkg{1.0};      // Initial flat background estimate
+    double windowCh{10.0};    // Search window half-width
+    double expFwhmCh{4.0};    // Expected FWHM in channels
+    int regionIdx{0};         // Assigned merged fit region index
+};
+
+struct BoundFitRegion {
+    int c1{1};                // Left bin index (inclusive)
+    int c2{2};                // Right bin index (inclusive)
+    double initBkg{0.0};      // Initial mean background for this region
+    double meanSnip{0.0};     // Mean SNIP continuum across [c1, c2]
+    double xCenterReg{0.0};   // Geometric center coordinate 0.5*(c1 + c2) + 0.5
+    double slopeSnip{0.0};    // Fixed linear chord slope (counts/ch) fitted to SNIP across [c1, c2]
+    std::vector<int> peakIndices; // Indices into activePeaks vector
+};
+
+// Xtrackn 3-point binomial smoothing kernel: [0.25, 0.50, 0.25] applied m passes (trackn.F L5405-L5426)
+void smoothSpectrumBinomial(std::vector<double> &spec, int nPasses)
+{
+    const int n = static_cast<int>(spec.size());
+    if (n <= 4 || nPasses <= 0) return;
+    std::vector<double> tmp(n, 0.0);
+    for (int pass = 0; pass < nPasses; ++pass) {
+        tmp[0] = 0.75 * spec[0] + 0.25 * spec[1];
+        for (int i = 1; i < n - 1; ++i) {
+            tmp[i] = 0.25 * spec[i - 1] + 0.50 * spec[i] + 0.25 * spec[i + 1];
+        }
+        tmp[n - 1] = 0.25 * spec[n - 2] + 0.75 * spec[n - 1];
+        spec.swap(tmp);
+    }
+}
+
+// Solve 2x2 or 3x3 weighted polynomial y(x) = c0 + c1*x (+ c2*x^2)
+bool solveSmallPoly(const std::vector<double> &x,
+                    const std::vector<double> &y,
+                    const std::vector<double> &w,
+                    int nPar,
+                    std::vector<double> &outCoeffs)
+{
+    const size_t N = x.size();
+    if (N < static_cast<size_t>(nPar) || nPar < 2 || nPar > 3) return false;
+    outCoeffs.assign(nPar, 0.0);
+
+    if (nPar == 2) {
+        double sw = 0.0, swx = 0.0, swy = 0.0, swxx = 0.0, swxy = 0.0;
+        for (size_t i = 0; i < N; ++i) {
+            const double wi = w[i];
+            sw   += wi;
+            swx  += wi * x[i];
+            swy  += wi * y[i];
+            swxx += wi * x[i] * x[i];
+            swxy += wi * x[i] * y[i];
+        }
+        const double det = sw * swxx - swx * swx;
+        if (std::abs(det) < 1e-12) return false;
+        outCoeffs[0] = (swxx * swy - swx * swxy) / det;
+        outCoeffs[1] = (sw * swxy - swx * swy) / det;
+        return true;
+    }
+
+    double m[3][3] = {{0.0}};
+    double b[3] = {0.0};
+    for (size_t i = 0; i < N; ++i) {
+        const double wi = w[i];
+        const double xi = x[i];
+        const double x2 = xi * xi;
+        const double x3 = x2 * xi;
+        const double x4 = x2 * x2;
+        m[0][0] += wi;      m[0][1] += wi * xi;  m[0][2] += wi * x2;
+        m[1][0] += wi * xi; m[1][1] += wi * x2;  m[1][2] += wi * x3;
+        m[2][0] += wi * x2; m[2][1] += wi * x3;  m[2][2] += wi * x4;
+        b[0] += wi * y[i];
+        b[1] += wi * xi * y[i];
+        b[2] += wi * x2 * y[i];
+    }
+    const double det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                     - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                     + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    if (std::abs(det) < 1e-15) {
+        return solveSmallPoly(x, y, w, 2, outCoeffs);
+    }
+    const double invDet = 1.0 / det;
+    double inv[3][3];
+    inv[0][0] = (m[1][1] * m[2][2] - m[1][2] * m[2][1]) * invDet;
+    inv[0][1] = (m[0][2] * m[2][1] - m[0][1] * m[2][2]) * invDet;
+    inv[0][2] = (m[0][1] * m[1][2] - m[0][2] * m[1][1]) * invDet;
+    inv[1][0] = (m[1][2] * m[2][0] - m[1][0] * m[2][2]) * invDet;
+    inv[1][1] = (m[0][0] * m[2][2] - m[0][2] * m[2][0]) * invDet;
+    inv[1][2] = (m[0][2] * m[1][0] - m[0][0] * m[1][2]) * invDet;
+    inv[2][0] = (m[1][0] * m[2][1] - m[1][1] * m[2][0]) * invDet;
+    inv[2][1] = (m[0][1] * m[2][0] - m[0][0] * m[2][1]) * invDet;
+    inv[2][2] = (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * invDet;
+
+    outCoeffs[0] = inv[0][0] * b[0] + inv[0][1] * b[1] + inv[0][2] * b[2];
+    outCoeffs[1] = inv[1][0] * b[0] + inv[1][1] * b[1] + inv[1][2] * b[2];
+    outCoeffs[2] = inv[2][0] * b[0] + inv[2][1] * b[1] + inv[2][2] * b[2];
+    return true;
+}
+
+// Build and merge fit regions around bound peak positions po(u_i) +- 1.5 * FWHM(u_i) (Xtrackn TRSETREG + TRSET)
+void buildBoundRegions(const std::vector<double> &spectrum,
+                       const std::vector<double> &snipBg,
+                       std::vector<BoundPeakSeed> &activePeaks,
+                       const std::vector<double> &pCoeffs,
+                       double w0, double w1,
+                       std::vector<BoundFitRegion> &outRegions)
+{
+    outRegions.clear();
+    const int totalBins = static_cast<int>(spectrum.size());
+    const int nPeaks = static_cast<int>(activePeaks.size());
+    if (nPeaks == 0 || totalBins <= 10) return;
+
+    struct PeakWin {
+        int peakIdx;
+        double po;
+        int c1;
+        int c2;
+    };
+    std::vector<PeakWin> wins;
+    wins.reserve(nPeaks);
+
+    for (int i = 0; i < nPeaks; ++i) {
+        const double u = activePeaks[i].uNorm;
+        double po = pCoeffs[0] + pCoeffs[1] * u;
+        if (pCoeffs.size() >= 3) po += pCoeffs[2] * u * u;
+
+        const double s2 = std::clamp(std::abs(w0 + w1 * (u / 1000.0)), 0.09, 250.0);
+        const double fwhm = 2.35482 * std::sqrt(s2);
+        const int maxHalfWin = std::max(6, static_cast<int>(std::round(activePeaks[i].windowCh * 1.5)));
+        const int halfWin = std::clamp(static_cast<int>(std::round(2.5 * fwhm)), 5, maxHalfWin);
+
+        const int centerBin = std::clamp(static_cast<int>(std::floor(po)), 1, totalBins - 2);
+        const int c1 = std::max(1, centerBin - halfWin);
+        const int c2 = std::min(totalBins - 2, centerBin + halfWin);
+        wins.push_back({i, po, c1, c2});
+    }
+
+    std::sort(wins.begin(), wins.end(), [](const PeakWin &a, const PeakWin &b) {
+        return a.po < b.po;
+    });
+
+    // Merge overlapping windows so adjacent peaks share a single continuum background region (Xtrackn TRSETREG L5182-L5217)
+    for (const auto &w : wins) {
+        if (!outRegions.empty() && w.c1 <= outRegions.back().c2) {
+            outRegions.back().c2 = std::max(outRegions.back().c2, w.c2);
+            outRegions.back().peakIndices.push_back(w.peakIdx);
+            activePeaks[w.peakIdx].regionIdx = static_cast<int>(outRegions.size()) - 1;
+        } else {
+            BoundFitRegion reg;
+            reg.c1 = w.c1;
+            reg.c2 = w.c2;
+            reg.peakIndices.push_back(w.peakIdx);
+            activePeaks[w.peakIdx].regionIdx = static_cast<int>(outRegions.size());
+            outRegions.push_back(reg);
+        }
+    }
+
+    // Estimate initial mean background B0_r and mean SNIP continuum across [c1, c2]
+    const bool hasSnip = (snipBg.size() == spectrum.size());
+    for (auto &reg : outRegions) {
+        double leftSum = 0.0, rightSum = 0.0;
+        int nLeft = 0, nRight = 0;
+        for (int c = reg.c1; c <= std::min(reg.c2, reg.c1 + 2); ++c) {
+            leftSum += spectrum[c];
+            nLeft++;
+        }
+        for (int c = std::max(reg.c1, reg.c2 - 2); c <= reg.c2; ++c) {
+            rightSum += spectrum[c];
+            nRight++;
+        }
+        const double leftAvg = (nLeft > 0) ? (leftSum / nLeft) : spectrum[reg.c1];
+        const double rightAvg = (nRight > 0) ? (rightSum / nRight) : spectrum[reg.c2];
+        const double edgeMinBkg = std::max(0.0, std::min(leftAvg, rightAvg));
+        const double edgeMeanBkg = std::max(0.0, 0.5 * (leftAvg + rightAvg));
+
+        reg.xCenterReg = 0.5 * static_cast<double>(reg.c1 + reg.c2) + 0.5;
+        double snipSum = 0.0, snipXSum = 0.0, snipXXSum = 0.0;
+        int nSnip = 0;
+        if (hasSnip) {
+            for (int c = reg.c1; c <= reg.c2; ++c) {
+                const double sVal = std::max(0.0, snipBg[c]);
+                const double dx = (static_cast<double>(c) + 0.5) - reg.xCenterReg;
+                snipSum += sVal;
+                snipXSum += dx * sVal;
+                snipXXSum += dx * dx;
+                nSnip++;
+            }
+        }
+        reg.meanSnip = (nSnip > 0) ? (snipSum / nSnip) : 0.0;
+        const double rawSlope = (snipXXSum > 1e-9) ? (snipXSum / snipXXSum) : 0.0;
+        const double maxAbsSlope = 0.05 * std::max(0.25, reg.meanSnip);
+        reg.slopeSnip = (reg.meanSnip > 0.25)
+            ? std::clamp(rawSlope, -maxAbsSlope, maxAbsSlope)
+            : 0.0;
+        reg.initBkg = (reg.meanSnip > 0.25) ? std::min(reg.meanSnip, std::max(edgeMinBkg, edgeMeanBkg)) : edgeMinBkg;
+    }
+}
+
+// Multi-region coupled objective function (Baker-Cousins Poisson Likelihood Deviance with SNIP Continuum)
+class CoupledBoundFCN : public ROOT::Math::IBaseFunctionMultiDim {
+public:
+    CoupledBoundFCN(const std::vector<double> &spectrum,
+                    const std::vector<double> &snipBg,
+                    const std::vector<BoundPeakSeed> &peaks,
+                    const std::vector<BoundFitRegion> &regions,
+                    int nEnergyPars)
+        : m_spectrum(spectrum),
+          m_snipBg(snipBg),
+          m_peaks(peaks),
+          m_regions(regions),
+          m_nE(nEnergyPars)
+    {
+        m_nDim = m_nE + 2 + static_cast<int>(m_regions.size()) + static_cast<int>(m_peaks.size());
+    }
+
+    unsigned int NDim() const override {
+        return static_cast<unsigned int>(m_nDim);
+    }
+
+    ROOT::Math::IBaseFunctionMultiDim* Clone() const override {
+        return new CoupledBoundFCN(m_spectrum, m_snipBg, m_peaks, m_regions, m_nE);
+    }
+
+    double DoEval(const double *par) const override {
+        // Parameter layout:
+        // [0 .. m_nE-1]                    : p_0, p_1 (, p_2) inverse calibration polynomial po(u)
+        // [m_nE, m_nE+1]                   : w_0, w_1 width-squared polynomial s^2(u) = w_0 + w_1*(u/1000)
+        // [m_nE+2 .. m_nE+2+nReg-1]        : B0_r mean continuum background per region
+        // [m_nE+2+nReg .. m_nDim-1]        : A_i amplitude per peak
+        const int nReg = static_cast<int>(m_regions.size());
+        const int nPeaks = static_cast<int>(m_peaks.size());
+        const int bkgOffset = m_nE + 2;
+        const int ampOffset = bkgOffset + nReg;
+        const bool hasSnip = (m_snipBg.size() == m_spectrum.size());
+
+        const double w0 = par[m_nE];
+        const double w1 = par[m_nE + 1];
+
+        // Precompute bound centroid po_i and variance s2_i for each peak (Xtrackn TRFUN L5340-L5348)
+        double po[32];
+        double inv2s2[32];
+        for (int i = 0; i < nPeaks && i < 32; ++i) {
+            const double u = m_peaks[i].uNorm;
+            double pos = par[0] + par[1] * u;
+            if (m_nE >= 3) pos += par[2] * u * u;
+            po[i] = pos;
+
+            const double rawS2 = w0 + w1 * (u / 1000.0);
+            const double s2 = std::clamp(std::abs(rawS2), 0.06, 400.0);
+            inv2s2[i] = 0.5 / s2;
+        }
+
+        // Baker-Cousins Poisson likelihood deviance across all regions and bins
+        double deviance = 0.0;
+        for (int r = 0; r < nReg; ++r) {
+            const auto &reg = m_regions[r];
+            const double bkgMean = std::max(0.0, par[bkgOffset + r]);
+            const bool useSnipChord = hasSnip && (reg.meanSnip > 0.25);
+
+            for (int ch = reg.c1; ch <= reg.c2; ++ch) {
+                const double xCenter = static_cast<double>(ch) + 0.5;
+                double yModel = useSnipChord
+                    ? std::max(0.0, bkgMean + reg.slopeSnip * (xCenter - reg.xCenterReg))
+                    : bkgMean;
+                for (int pIdx : reg.peakIndices) {
+                    if (pIdx < 32) {
+                        const double dx = xCenter - po[pIdx];
+                        const double arg = dx * dx * inv2s2[pIdx];
+                        if (arg < 40.0) {
+                            yModel += std::max(0.0, par[ampOffset + pIdx]) * std::exp(-arg);
+                        }
+                    }
+                }
+                yModel = std::max(1e-6, yModel);
+                const double nObs = std::max(0.0, m_spectrum[ch]);
+                if (nObs > 1e-9) {
+                    deviance += 2.0 * (yModel - nObs + nObs * std::log(nObs / yModel));
+                } else {
+                    deviance += 2.0 * yModel;
+                }
+            }
+        }
+        return deviance;
+    }
+
+private:
+    const std::vector<double> &m_spectrum;
+    const std::vector<double> &m_snipBg;
+    const std::vector<BoundPeakSeed> &m_peaks;
+    const std::vector<BoundFitRegion> &m_regions;
+    int m_nE{2};
+    int m_nDim{0};
+};
+
+// Objective function for whole-spectrum cross-correlation gain/shift pre-alignment (Xtrackn gainfit L4710-L4834)
+class GainFitCrossCorrFCN : public ROOT::Math::IBaseFunctionMultiDim {
+public:
+    GainFitCrossCorrFCN(const std::vector<double> &prevSpec,
+                        const std::vector<double> &currSpec,
+                        int minBin, int maxBin,
+                        double scaleNorm)
+        : m_prev(prevSpec),
+          m_curr(currSpec),
+          m_minBin(minBin),
+          m_maxBin(maxBin),
+          m_scaleNorm(scaleNorm)
+    {}
+
+    unsigned int NDim() const override { return 2; }
+
+    ROOT::Math::IBaseFunctionMultiDim* Clone() const override {
+        return new GainFitCrossCorrFCN(m_prev, m_curr, m_minBin, m_maxBin, m_scaleNorm);
+    }
+
+    double DoEval(const double *par) const override {
+        // par[0] = sf0 (shift in compressed bins)
+        // par[1] = sf1 (scale factor ~ 1.0)
+        const double sf0 = par[0];
+        const double sf1 = par[1];
+        const int nBins = static_cast<int>(m_curr.size());
+        double sumSqDiff = 0.0;
+
+        for (int j = m_minBin; j <= m_maxBin; ++j) {
+            const double yPos = sf0 + sf1 * static_cast<double>(j);
+            double currInterp = 0.0;
+            if (yPos >= 1.0 && yPos < static_cast<double>(nBins - 2)) {
+                const int idx = static_cast<int>(std::floor(yPos));
+                const double frac = yPos - static_cast<double>(idx);
+                currInterp = (1.0 - frac) * m_curr[idx] + frac * m_curr[idx + 1];
+            }
+            const double diff = m_prev[j] - m_scaleNorm * currInterp;
+            sumSqDiff += diff * diff;
+        }
+        return sumSqDiff;
+    }
+
+private:
+    const std::vector<double> &m_prev;
+    const std::vector<double> &m_curr;
+    int m_minBin{1};
+    int m_maxBin{1022};
+    double m_scaleNorm{1.0};
+};
+
+} // anonymous namespace
+
+//==============================================================================
+// computeSnipContinuum: Smooth 1D SNIP Compton continuum extraction
+//==============================================================================
+std::vector<double> RunByRunEngine::computeSnipContinuum(const std::vector<double> &spectrum,
+                                                         int iterations)
+{
+    const int n = static_cast<int>(spectrum.size());
+    if (n <= 4) return spectrum;
+
+    // 1. Pre-smooth with 3 passes of 3-point binomial filter so single-run zero/low-count Poisson dips
+    //    do not pull the peak-clipping envelope artificially downward.
+    std::vector<double> bg = spectrum;
+    for (int i = 0; i < n; ++i) {
+        if (bg[i] < 0.0) bg[i] = 0.0;
+    }
+    smoothSpectrumBinomial(bg, 3);
+
+    // 2. Iterative SNIP peak-clipping filter with decreasing window (p = m down to 1, Morhac NIM A 401):
+    //    Pass m first cuts a flat bridge across the base of each peak, and passes m-1 .. 1 bisect the corners,
+    //    eliminating triangular tent kinks under peak centers.
+    const int m = std::clamp(iterations, 4, 60);
+    std::vector<double> nextBg = bg;
+    for (int p = m; p >= 1; --p) {
+        for (int i = p; i < n - p; ++i) {
+            const double avg = 0.5 * (bg[i - p] + bg[i + p]);
+            nextBg[i] = (avg < bg[i]) ? avg : bg[i];
+        }
+        bg.swap(nextBg);
+    }
+
+    // 3. Light post-smoothing so the continuum derivative is continuous across peak windows
+    smoothSpectrumBinomial(bg, 2);
+    return bg;
+}
+
+double RunByRunEngine::evalSnipAt(const std::vector<double> &snipBg, double channelX)
+{
+    if (snipBg.empty()) return 0.0;
+    const int n = static_cast<int>(snipBg.size());
+    const double u = channelX - 0.5; // Continuous 0-based bin index (bin k has center k + 0.5)
+    if (u <= 0.0) return std::max(0.0, snipBg.front());
+    if (u >= static_cast<double>(n - 1)) return std::max(0.0, snipBg.back());
+    const int k = static_cast<int>(std::floor(u));
+    const double frac = u - static_cast<double>(k);
+    return std::max(0.0, (1.0 - frac) * snipBg[k] + frac * snipBg[k + 1]);
+}
+
+//==============================================================================
+// preAlignGainFit: Whole-spectrum cross-correlation pre-alignment (Xtrackn gainfit)
+//==============================================================================
+bool RunByRunEngine::preAlignGainFit(const std::vector<double> &prevPeakSpectrum,
+                                     const std::vector<double> &currPeakSpectrum,
+                                     const std::vector<double> &prevCentroids,
+                                     double maxAllowedDriftCh,
+                                     std::vector<double> &outExpectedCentroids)
+{
+    outExpectedCentroids = prevCentroids;
+    const int totalBins = static_cast<int>(std::min(prevPeakSpectrum.size(), currPeakSpectrum.size()));
+    if (totalBins <= 64 || prevCentroids.empty()) return false;
+
+    // Determine active channel span covering all anchor peaks (+ margin)
+    double minAnchor = prevCentroids.front();
+    double maxAnchor = prevCentroids.front();
+    for (double c : prevCentroids) {
+        if (c > 0.0) {
+            minAnchor = std::min(minAnchor, c);
+            maxAnchor = std::max(maxAnchor, c);
+        }
+    }
+    if (maxAnchor <= 10.0) return false;
+
+    // Choose power-of-2 compression factor fackap (1, 2, 4, or 8 ch/bin) so active range fits in ~1024 compressed bins
+    // (mirrors Xtrackn gainfit L4715-L4730: nkap = len/1024)
+    const int activeMaxCh = std::clamp(static_cast<int>(std::ceil(maxAnchor * 1.25 + 150.0)), 512, totalBins);
+    int fackap = 1;
+    while ((activeMaxCh / fackap) > 1024 && fackap < 16) {
+        fackap *= 2;
+    }
+    const int nComp = activeMaxCh / fackap;
+    if (nComp < 64) return false;
+
+    std::vector<double> compPrev(nComp, 0.0);
+    std::vector<double> compCurr(nComp, 0.0);
+    for (int i = 0; i < nComp; ++i) {
+        double sumP = 0.0, sumC = 0.0;
+        const int base = i * fackap;
+        for (int k = 0; k < fackap && (base + k) < totalBins; ++k) {
+            sumP += std::max(0.0, prevPeakSpectrum[base + k]);
+            sumC += std::max(0.0, currPeakSpectrum[base + k]);
+        }
+        compPrev[i] = sumP;
+        compCurr[i] = sumC;
+    }
+
+    // Smooth compressed peak spectra with 2 passes of 3-point binomial filter (Xtrackn gainfit L4736-L4737: call smooth(..., 2))
+    smoothSpectrumBinomial(compPrev, 2);
+    smoothSpectrumBinomial(compCurr, 2);
+
+    const int minCompBin = std::clamp(static_cast<int>(std::floor(std::max(20.0, minAnchor - 80.0) / fackap)),
+                                      4, nComp - 16);
+    const int maxCompBin = std::clamp(static_cast<int>(std::ceil(std::min(static_cast<double>(activeMaxCh - 20), maxAnchor + 80.0) / fackap)),
+                                      minCompBin + 16, nComp - 5);
+
+    double totPrev = 0.0, totCurr = 0.0;
+    for (int j = minCompBin; j <= maxCompBin; ++j) {
+        totPrev += compPrev[j];
+        totCurr += compCurr[j];
+    }
+    if (totPrev <= 20.0 || totCurr <= 20.0) return false;
+    const double scaleNorm = totPrev / totCurr;
+
+    GainFitCrossCorrFCN fcn(compPrev, compCurr, minCompBin, maxCompBin, scaleNorm);
+    const double identityPar[2] = {0.0, 1.0};
+    const double identityCost = fcn.DoEval(identityPar);
+    if (identityCost <= 1e-9) return false;
+
+    // 1. Coarse 1D shift scan across [-maxDriftComp, +maxDriftComp] to avoid local minima on sudden gain jumps
+    const double maxDriftComp = std::max(2.0, maxAllowedDriftCh / static_cast<double>(fackap));
+    double bestSf0 = 0.0;
+    double bestScanCost = identityCost;
+    const int scanSteps = std::clamp(static_cast<int>(std::ceil(2.0 * maxDriftComp)), 4, 80);
+    for (int s = -scanSteps; s <= scanSteps; ++s) {
+        const double candSf0 = 0.5 * static_cast<double>(s);
+        if (std::abs(candSf0) > maxDriftComp) continue;
+        const double candPar[2] = {candSf0, 1.0};
+        const double cCost = fcn.DoEval(candPar);
+        if (cCost < bestScanCost) {
+            bestScanCost = cCost;
+            bestSf0 = candSf0;
+        }
+    }
+
+    // 2. Refine (sf0, sf1) simultaneously using CERN ROOT Minuit2
+    std::unique_ptr<ROOT::Math::Minimizer> minimizer(
+        ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+    if (!minimizer) {
+        minimizer.reset(ROOT::Math::Factory::CreateMinimizer("Minuit", "Migrad"));
+    }
+
+    double finalSf0 = bestSf0;
+    double finalSf1 = 1.0;
+    double finalCost = bestScanCost;
+
+    if (minimizer) {
+        minimizer->SetMaxFunctionCalls(600);
+        minimizer->SetMaxIterations(300);
+        minimizer->SetTolerance(0.01);
+        minimizer->SetPrintLevel(0);
+        minimizer->SetFunction(fcn);
+        minimizer->SetLimitedVariable(0, "sf0", bestSf0, 0.1, -maxDriftComp, maxDriftComp);
+        minimizer->SetLimitedVariable(1, "sf1", 1.0, 5e-4, 0.985, 1.015);
+        minimizer->Minimize();
+
+        const double *xs = minimizer->X();
+        if (xs) {
+            const double minCost = fcn.DoEval(xs);
+            if (minCost < finalCost) {
+                finalSf0 = xs[0];
+                finalSf1 = xs[1];
+                finalCost = minCost;
+            }
+        }
+    }
+
+    // Only apply pre-alignment if it reduces the spectrum cross-correlation residual
+    if (finalCost >= identityCost * 0.995) {
+        return false;
+    }
+
+    // Transform expected peak channels (Xtrackn gainfit L4827: yfit(ii) = sf0*fackap + yfit(ii)*sf1)
+    const double shiftFullCh = finalSf0 * static_cast<double>(fackap);
+    for (size_t i = 0; i < prevCentroids.size(); ++i) {
+        const double shifted = shiftFullCh + finalSf1 * prevCentroids[i];
+        if (std::abs(shifted - prevCentroids[i]) <= maxAllowedDriftCh) {
+            outExpectedCentroids[i] = shifted;
+        }
+    }
+    return true;
+}
+
+bool RunByRunEngine::fitSpectrumBound(const std::vector<double> &spectrum,
+                                      const std::vector<AnchorPeakDef> &anchors,
+                                      const std::vector<double> &initialExpectedChannels,
+                                      const std::vector<double> &baseCentroids,
+                                      bool useQuadratic,
+                                      double nominalDispersion,
+                                      double maxAllowedDriftCh,
+                                      double maxAllowedChi2NDF,
+                                      RunCalibResult &outResult,
+                                      const std::vector<double> *precomputedSnip)
+{
+    const int totalBins = static_cast<int>(spectrum.size());
+    const size_t nAnchors = anchors.size();
+    const double disp = (nominalDispersion > 0.0) ? nominalDispersion : 1.0;
+    outResult.nominalGain = disp;
+
+    if (totalBins <= 10 || nAnchors == 0) {
+        outResult.status = RunCalibStatus::FileError;
+        outResult.failureReason = "Empty spectrum or no anchor peaks configured.";
+        return false;
+    }
+
+    // 0. Extract smooth SNIP Compton continuum shape across the spectrum (or reuse precomputedSnip)
+    double sumExpFwhm = 0.0;
+    for (const auto &def : anchors) {
+        sumExpFwhm += std::max(1.5, def.expectedFwhmCh);
+    }
+    const double avgExpFwhm = sumExpFwhm / static_cast<double>(nAnchors);
+    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * avgExpFwhm)), 12, 35);
+    std::vector<double> localSnip;
+    if (!precomputedSnip || precomputedSnip->size() != spectrum.size()) {
+        localSnip = computeSnipContinuum(spectrum, snipIters);
+    }
+    const std::vector<double> &snipBg = (precomputedSnip && precomputedSnip->size() == spectrum.size())
+                                        ? *precomputedSnip : localSnip;
+
+    // 1. Seed all configured anchor peaks (Xtrackn boundfit includes all ntrpeak peaks)
+    std::vector<FittedAnchor> allAnchors(nAnchors);
+    std::vector<BoundPeakSeed> activePeaks;
+    activePeaks.reserve(nAnchors);
+
+    for (size_t aIdx = 0; aIdx < nAnchors; ++aIdx) {
+        const auto &def = anchors[aIdx];
+        const double baseCh = (aIdx < baseCentroids.size()) ? baseCentroids[aIdx] : (def.physicalEnergy / disp);
+        const double expCh = (aIdx < initialExpectedChannels.size()) ? initialExpectedChannels[aIdx] : baseCh;
+        const double winCh = std::max(2.0, def.searchWindowCh);
+        const double expFwhm = std::max(0.8, def.expectedFwhmCh);
+        const double minCounts = std::max(1.0, def.minCounts);
+
+        auto scanWindow = [&](double searchCenter, double &outBkg, double &outNet, double &outMomCh, double &outSigma) -> bool {
+            const int lowCh = std::max(1, static_cast<int>(std::floor(searchCenter - winCh)));
+            const int highCh = std::min(totalBins - 2, static_cast<int>(std::ceil(searchCenter + winCh)));
+            if (lowCh >= highCh) return false;
+
+            // Search for highest continuum-subtracted peak bin inside [lowCh, highCh]
+            int maxBin = lowCh;
+            double maxNetVal = spectrum[lowCh] - snipBg[lowCh];
+            for (int ch = lowCh + 1; ch <= highCh; ++ch) {
+                const double netCandidate = spectrum[ch] - snipBg[ch];
+                if (netCandidate > maxNetVal) {
+                    maxNetVal = netCandidate;
+                    maxBin = ch;
+                }
+            }
+            const double maxVal = spectrum[maxBin];
+            double bkg = std::max(0.0, snipBg[maxBin]);
+            if (bkg >= maxVal) bkg = std::max(0.0, maxVal * 0.1);
+
+            const double net = std::max(0.0, maxVal - bkg);
+
+            // Local continuum-subtracted moment center around maxBin (+- FWHM), in GASP bin-center coordinates (c + 0.5)
+            const int hw = std::clamp(static_cast<int>(std::round(2.5 * expFwhm)), 5, std::max(6, static_cast<int>(std::round(winCh * 1.5))));
+            const int c1 = std::max(1, maxBin - hw);
+            const int c2 = std::min(totalBins - 2, maxBin + hw);
+            const int momHalf = std::clamp(static_cast<int>(std::round(0.85 * expFwhm)), 2, 8);
+            const int m1 = std::max(1, maxBin - momHalf);
+            const int m2 = std::min(totalBins - 2, maxBin + momHalf);
+            double sw = 0.0, swx = 0.0;
+            for (int c = m1; c <= m2; ++c) {
+                const double w = std::max(0.0, spectrum[c] - snipBg[c]);
+                sw += w;
+                swx += w * (static_cast<double>(c) + 0.5);
+            }
+            const double momCh = (sw > 0.0) ? (swx / sw) : (static_cast<double>(maxBin) + 0.5);
+
+            // Half-maximum width estimate
+            const double halfMax = bkg + 0.5 * net;
+            double lHM = static_cast<double>(c1) + 0.5, rHM = static_cast<double>(c2) + 0.5;
+            for (int c = maxBin; c >= c1; --c) {
+                if (spectrum[c] <= halfMax) {
+                    const double y1 = spectrum[c], y2 = (c + 1 <= maxBin) ? spectrum[c + 1] : halfMax;
+                    lHM = (static_cast<double>(c) + 0.5) + ((std::abs(y2 - y1) > 1e-6) ? (halfMax - y1) / (y2 - y1) : 0.0);
+                    break;
+                }
+            }
+            for (int c = maxBin; c <= c2; ++c) {
+                if (spectrum[c] <= halfMax) {
+                    const double y1 = (c - 1 >= maxBin) ? spectrum[c - 1] : halfMax, y2 = spectrum[c];
+                    rHM = (static_cast<double>(c) + 0.5) - ((std::abs(y1 - y2) > 1e-6) ? (halfMax - y2) / (y1 - y2) : 0.0);
+                    break;
+                }
+            }
+            const double obsFwhm = rHM - lHM;
+            const double fwhm = (obsFwhm >= 0.6 && obsFwhm <= expFwhm * 2.2) ? obsFwhm : expFwhm;
+
+            outBkg = bkg;
+            outNet = net;
+            outMomCh = momCh;
+            outSigma = std::clamp(fwhm / 2.35482, 0.3, 15.0);
+            const double estArea = net * outSigma * std::sqrt(2.0 * M_PI);
+            return ((estArea >= minCounts || net >= minCounts) && std::abs(momCh - searchCenter) <= maxAllowedDriftCh);
+        };
+
+        double bkg = 0.0, net = 0.0, momCh = expCh, sigCh = std::clamp(expFwhm / 2.35482, 0.3, 15.0);
+        bool strongSeed = scanWindow(expCh, bkg, net, momCh, sigCh);
+        if (!strongSeed && std::abs(expCh - baseCh) > 0.5) {
+            double bkg2 = 0.0, net2 = 0.0, momCh2 = baseCh, sigCh2 = sigCh;
+            if (scanWindow(baseCh, bkg2, net2, momCh2, sigCh2)) {
+                strongSeed = true;
+                bkg = bkg2;
+                net = net2;
+                momCh = momCh2;
+                sigCh = sigCh2;
+            }
+        }
+
+        BoundPeakSeed seed;
+        seed.anchorIdx = static_cast<int>(aIdx);
+        seed.energy = def.physicalEnergy;
+        seed.energyErr = (def.energyError > 0.0) ? def.energyError : 0.05;
+        seed.uNorm = def.physicalEnergy / disp;
+        // Always include every anchor peak; if a single peak is weak in this run, seed it at expCh
+        // with larger seed uncertainty so stronger peaks guide the initial polynomial seed.
+        seed.seedCh = strongSeed ? momCh : expCh;
+        const double estArea = std::max(10.0, net * sigCh * std::sqrt(2.0 * M_PI));
+        const double bkgFactor = std::sqrt(1.0 + (2.0 * std::max(0.0, bkg) * 2.35482 * sigCh) / estArea);
+        seed.seedErrCh = strongSeed ? std::clamp((sigCh / std::sqrt(estArea)) * bkgFactor, 0.02, 0.4) : 1.0;
+        seed.seedSigmaCh = sigCh;
+        seed.seedAmpl = std::max(1.0, net);
+        seed.seedBkg = std::max(0.0, bkg);
+        seed.windowCh = winCh;
+        seed.expFwhmCh = expFwhm;
+        activePeaks.push_back(seed);
+    }
+
+    const int nActive = static_cast<int>(activePeaks.size());
+    const int minRequired = useQuadratic ? 3 : 2;
+    if (nActive < minRequired) {
+        outResult.fittedAnchors = allAnchors;
+        outResult.status = RunCalibStatus::NoPeakInWindow;
+        outResult.failureReason = QString("Only %1 anchor peaks configured (minimum %2 required).")
+                                      .arg(nActive).arg(minRequired);
+        return false;
+    }
+
+    // 2. Initial polynomial seeds for po(u) and s^2(u) (Xtrackn boundfit L4864-L4915)
+    const int nE = (useQuadratic && nActive >= 3) ? 3 : 2;
+    std::vector<double> uVec(nActive), chVec(nActive), wPosVec(nActive);
+    std::vector<double> uScaledVec(nActive), s2Vec(nActive), wWidVec(nActive, 1.0);
+    for (int i = 0; i < nActive; ++i) {
+        uVec[i] = activePeaks[i].uNorm;
+        chVec[i] = activePeaks[i].seedCh;
+        wPosVec[i] = 1.0 / (activePeaks[i].seedErrCh * activePeaks[i].seedErrCh);
+        uScaledVec[i] = activePeaks[i].uNorm / 1000.0;
+        s2Vec[i] = activePeaks[i].seedSigmaCh * activePeaks[i].seedSigmaCh;
+        wWidVec[i] = std::max(1.0, activePeaks[i].seedAmpl);
+    }
+
+    std::vector<double> pCoeffs;
+    if (!solveSmallPoly(uVec, chVec, wPosVec, nE, pCoeffs)) {
+        pCoeffs = {0.0, 1.0};
+        if (nE == 3) pCoeffs.push_back(0.0);
+    }
+
+    std::vector<double> wCoeffs;
+    if (!solveSmallPoly(uScaledVec, s2Vec, wWidVec, 2, wCoeffs) || wCoeffs[1] < 0.0) {
+        double sumW = 0.0, sumWS2 = 0.0;
+        for (int i = 0; i < nActive; ++i) {
+            sumW += wWidVec[i];
+            sumWS2 += wWidVec[i] * s2Vec[i];
+        }
+        wCoeffs = {(sumW > 0.0) ? (sumWS2 / sumW) : s2Vec[0], 0.0};
+    }
+    double w0 = std::clamp(wCoeffs[0], 0.1, 100.0);
+    double w1 = std::clamp(wCoeffs[1], 0.0, 25.0);
+
+    // 3. Build initial regions and run Two-Pass Coupled Minimization (Xtrackn boundfit L4989-L5000)
+    std::vector<BoundFitRegion> regions;
+    buildBoundRegions(spectrum, snipBg, activePeaks, pCoeffs, w0, w1, regions);
+    if (regions.empty()) {
+        outResult.fittedAnchors = allAnchors;
+        outResult.status = RunCalibStatus::NoPeakInWindow;
+        outResult.failureReason = "Could not construct valid fit regions.";
+        return false;
+    }
+
+    auto runCoupledMinimizerPass = [&](bool releaseWidths,
+                                       std::vector<double> &ioPCoeffs,
+                                       double &ioW0,
+                                       double &ioW1,
+                                       std::vector<double> &outRegionBkgs,
+                                       std::vector<double> &outPeakAmpls,
+                                       std::vector<double> &outPosCov) -> bool {
+        buildBoundRegions(spectrum, snipBg, activePeaks, ioPCoeffs, ioW0, ioW1, regions);
+        const int nReg = static_cast<int>(regions.size());
+        if (nReg == 0) return false;
+
+        CoupledBoundFCN fcn(spectrum, snipBg, activePeaks, regions, nE);
+
+        std::unique_ptr<ROOT::Math::Minimizer> minimizer(
+            ROOT::Math::Factory::CreateMinimizer("Minuit2", "Migrad"));
+        if (!minimizer) {
+            minimizer.reset(ROOT::Math::Factory::CreateMinimizer("Minuit", "Migrad"));
+        }
+        if (!minimizer) return false;
+
+        minimizer->SetMaxFunctionCalls(5000);
+        minimizer->SetMaxIterations(2000);
+        minimizer->SetTolerance(0.01);
+        minimizer->SetPrintLevel(0);
+        minimizer->SetErrorDef(1.0); // Deviance 2*NLL has ErrorDef = 1.0 for 1-sigma errors
+        minimizer->SetFunction(fcn);
+
+        // Global inverse energy polynomial parameters p_0, p_1 (, p_2)
+        minimizer->SetLimitedVariable(0, "p0", ioPCoeffs[0], 0.05,
+                                      ioPCoeffs[0] - maxAllowedDriftCh - 10.0,
+                                      ioPCoeffs[0] + maxAllowedDriftCh + 10.0);
+        minimizer->SetLimitedVariable(1, "p1", ioPCoeffs[1], 1e-4, 0.5, 2.0);
+        if (nE >= 3) {
+            minimizer->SetLimitedVariable(2, "p2", ioPCoeffs[2], 1e-8, -1e-3, 1e-3);
+        }
+
+        // Global width-squared polynomial parameters w_0 > 0, w_1 >= 0 (strictly non-decreasing width with energy)
+        minimizer->SetLimitedVariable(nE,     "w0", std::clamp(ioW0, 0.08, 150.0), 0.05, 0.08, 150.0);
+        minimizer->SetLimitedVariable(nE + 1, "w1", std::clamp(ioW1, 0.0, 30.0),   0.02, 0.0,  30.0);
+        if (!releaseWidths) {
+            minimizer->FixVariable(nE);
+            minimizer->FixVariable(nE + 1);
+        }
+
+        // Region SNIP-scaled backgrounds B0_r (tightly bounded around SNIP continuum regions[r].initBkg)
+        const int bkgOffset = nE + 2;
+        for (int r = 0; r < nReg; ++r) {
+            const double snipRef = regions[r].initBkg;
+            double minPeakAmpl = 1e9;
+            for (int pIdx : regions[r].peakIndices) {
+                if (pIdx >= 0 && pIdx < nActive) {
+                    minPeakAmpl = std::min(minPeakAmpl, activePeaks[pIdx].seedAmpl);
+                }
+            }
+            if (minPeakAmpl > 1e8) minPeakAmpl = 10.0;
+
+            const double minB = std::max(0.0, 0.85 * snipRef - 0.5);
+            const double maxHeadroom = std::max(1.0, 0.15 * snipRef + 0.5 * std::sqrt(std::max(1.0, snipRef)));
+            const double maxB = snipRef + std::min(maxHeadroom, std::max(0.5, 0.15 * minPeakAmpl));
+            const double initB = (r < static_cast<int>(outRegionBkgs.size()) && outRegionBkgs[r] >= 0.0)
+                                 ? std::clamp(outRegionBkgs[r], minB, maxB)
+                                 : std::clamp(snipRef, minB, maxB);
+            minimizer->SetLimitedVariable(bkgOffset + r,
+                                          Form("B0_%d", r),
+                                          initB,
+                                          std::max(0.05, 0.03 * snipRef + 0.05),
+                                          minB,
+                                          maxB);
+        }
+
+        // Peak amplitudes A_i
+        const int ampOffset = bkgOffset + nReg;
+        for (int i = 0; i < nActive; ++i) {
+            const int rIdx = activePeaks[i].regionIdx;
+            const double regBkg = (rIdx >= 0 && rIdx < nReg) ? regions[rIdx].initBkg : activePeaks[i].seedBkg;
+            const double u = activePeaks[i].uNorm;
+            double po = ioPCoeffs[0] + ioPCoeffs[1] * u;
+            if (nE >= 3) po += ioPCoeffs[2] * u * u;
+            const int cBin = std::clamp(static_cast<int>(std::floor(po)), 1, totalBins - 2);
+            const double initA = (i < static_cast<int>(outPeakAmpls.size()) && outPeakAmpls[i] > 0.0)
+                                 ? outPeakAmpls[i]
+                                 : std::max(1.0, std::max(activePeaks[i].seedAmpl, spectrum[cBin] - regBkg));
+            const double maxA = std::max(20.0, initA * 4.0);
+            minimizer->SetLimitedVariable(ampOffset + i,
+                                          Form("A_%d", i),
+                                          std::clamp(initA, 0.1, maxA),
+                                          std::max(0.5, 0.05 * initA),
+                                          0.0,
+                                          maxA);
+        }
+
+        minimizer->Minimize();
+        if (releaseWidths) {
+            minimizer->Hesse();
+        }
+
+        const double *xs = minimizer->X();
+        if (!xs) return false;
+
+        for (int k = 0; k < nE; ++k) ioPCoeffs[k] = xs[k];
+        ioW0 = xs[nE];
+        ioW1 = xs[nE + 1];
+
+        outRegionBkgs.resize(nReg);
+        for (int r = 0; r < nReg; ++r) outRegionBkgs[r] = xs[bkgOffset + r];
+
+        outPeakAmpls.resize(nActive);
+        for (int i = 0; i < nActive; ++i) outPeakAmpls[i] = xs[ampOffset + i];
+
+        outPosCov.assign(nE * nE, 0.0);
+        for (int j = 0; j < nE; ++j) {
+            for (int k = 0; k < nE; ++k) {
+                outPosCov[j * nE + k] = minimizer->CovMatrix(j, k);
+            }
+        }
+        return true;
+    };
+
+    std::vector<double> regionBkgs;
+    std::vector<double> peakAmpls;
+    std::vector<double> posCov;
+
+    // Pass 1a: Freeze width polynomial (w0, w1) and optimize global positions + amplitudes + flat backgrounds
+    runCoupledMinimizerPass(false, pCoeffs, w0, w1, regionBkgs, peakAmpls, posCov);
+    // Pass 1b (TRSET dynamic window slide): Recenter windows around Pass-1 positions and refine
+    regionBkgs.clear();
+    runCoupledMinimizerPass(false, pCoeffs, w0, w1, regionBkgs, peakAmpls, posCov);
+    // Pass 2: Unfreeze width polynomial (w0, w1) and jointly refine positions, widths, amplitudes, and backgrounds
+    runCoupledMinimizerPass(true, pCoeffs, w0, w1, regionBkgs, peakAmpls, posCov);
+
+    // Rebuild final regions at converged parameters
+    buildBoundRegions(spectrum, snipBg, activePeaks, pCoeffs, w0, w1, regions);
+
+    // 4. Populate FittedAnchors from the converged coupled parameters
+    for (int i = 0; i < nActive; ++i) {
+        const auto &seed = activePeaks[i];
+        const double u = seed.uNorm;
+        double boundPo = pCoeffs[0] + pCoeffs[1] * u;
+        if (nE >= 3) boundPo += pCoeffs[2] * u * u;
+
+        const double s2 = std::clamp(std::abs(w0 + w1 * (u / 1000.0)), 0.09, 250.0);
+        const double sigma = std::sqrt(s2);
+        const double fwhm = 2.35482 * sigma;
+        const int rIdx = seed.regionIdx;
+        const double bkgMean = (rIdx >= 0 && rIdx < static_cast<int>(regionBkgs.size()))
+                               ? regionBkgs[rIdx] : seed.seedBkg;
+        const bool useSnipChord = (rIdx >= 0 && rIdx < static_cast<int>(regions.size()) && regions[rIdx].meanSnip > 0.25);
+        const double xCenterReg = useSnipChord ? regions[rIdx].xCenterReg : boundPo;
+        const double slopeSnip = useSnipChord ? regions[rIdx].slopeSnip : 0.0;
+        const int centBin = std::clamp(static_cast<int>(std::floor(boundPo)), 1, totalBins - 2);
+        const double bkgAtPeak = useSnipChord
+            ? std::max(0.0, bkgMean + slopeSnip * (boundPo - xCenterReg))
+            : bkgMean;
+        const double ampl = (i < static_cast<int>(peakAmpls.size()))
+                            ? peakAmpls[i] : seed.seedAmpl;
+        const double area = ampl * sigma * std::sqrt(2.0 * M_PI);
+
+        // Compute local Pearson reduced Chi2/ndf across this peak's +- 2.5*FWHM window
+        const int maxHalfWin = std::max(6, static_cast<int>(std::round(seed.windowCh * 1.5)));
+        const int hw = std::clamp(static_cast<int>(std::round(2.5 * fwhm)), 5, maxHalfWin);
+        const int c1 = std::max(1, centBin - hw);
+        const int c2 = std::min(totalBins - 2, centBin + hw);
+        double localChi2 = 0.0;
+        int nBins = 0;
+        for (int ch = c1; ch <= c2; ++ch) {
+            const double xCenter = static_cast<double>(ch) + 0.5;
+            double yMod = useSnipChord
+                ? std::max(0.0, bkgMean + slopeSnip * (xCenter - xCenterReg))
+                : bkgMean;
+            if (rIdx >= 0 && rIdx < static_cast<int>(regions.size())) {
+                for (int pIdx : regions[rIdx].peakIndices) {
+                    const double uOther = activePeaks[pIdx].uNorm;
+                    double poOther = pCoeffs[0] + pCoeffs[1] * uOther;
+                    if (nE >= 3) poOther += pCoeffs[2] * uOther * uOther;
+                    const double s2Other = std::clamp(std::abs(w0 + w1 * (uOther / 1000.0)), 0.09, 250.0);
+                    const double aOther = (pIdx < static_cast<int>(peakAmpls.size())) ? peakAmpls[pIdx] : activePeaks[pIdx].seedAmpl;
+                    const double dx = xCenter - poOther;
+                    yMod += aOther * std::exp(-0.5 * dx * dx / s2Other);
+                }
+            } else {
+                const double dx = xCenter - boundPo;
+                yMod += ampl * std::exp(-0.5 * dx * dx / s2);
+            }
+            const double obs = spectrum[ch];
+            const double var = std::max(1.0, obs);
+            localChi2 += (obs - yMod) * (obs - yMod) / var;
+            nBins++;
+        }
+        const double peakChi2Ndf = (nBins > 3) ? (localChi2 / static_cast<double>(nBins - 3)) : 1.0;
+
+        // Statistical centroid error (Xtrackn TRACKFIT L4563: dxfit = sqrt(s2/ar) with background factor)
+        const double statErr = (area > 1.0) ? (sigma / std::sqrt(area)) : 0.08;
+        const double bkgFactor = (area > 1.0 && bkgAtPeak > 0.0)
+            ? std::sqrt(1.0 + (2.0 * bkgAtPeak * fwhm) / area)
+            : 1.0;
+        double centErr = std::clamp(statErr * bkgFactor, 0.02, 0.40);
+
+        const int aIdx = seed.anchorIdx;
+
+        FittedAnchor fa;
+        fa.energy = seed.energy;
+        fa.energyErr = seed.energyErr;
+        fa.centroidCh = boundPo;
+        fa.centroidErrCh = centErr;
+        fa.fwhmCh = fwhm;
+        fa.amplitude = ampl;
+        fa.background = bkgAtPeak;
+        fa.area = area;
+        fa.chi2 = peakChi2Ndf;
+        fa.fitWinCh = static_cast<double>(hw);
+        // All configured anchor peaks remain included (isValid = true);
+        // peak exclusion only happens if the user manually unchecks a peak in the Intervention Dialog.
+        fa.isValid = true;
+        allAnchors[aIdx] = fa;
+    }
+
+    // 5. Invert the bound centroids po(E_i) into forward calibration E(ch)/disp = a0 + a1*ch (+ a2*ch^2)
+    // (Xtrackn TRACKFIT L4554-L4579)
+    bool calibOk = computeCalibration(allAnchors, useQuadratic, outResult, maxAllowedChi2NDF, disp);
+    outResult.fittedAnchors = allAnchors;
+
+    // Check run-level quality conditions without excluding individual peaks
+    int nFittedAboveMinCounts = 0;
+    for (int i = 0; i < nActive; ++i) {
+        const auto &seed = activePeaks[i];
+        const auto &fa = allAnchors[seed.anchorIdx];
+        const double minC = (seed.anchorIdx < static_cast<int>(anchors.size()))
+                            ? std::max(1.0, anchors[seed.anchorIdx].minCounts) : 10.0;
+        if (fa.area >= minC || fa.amplitude >= minC) {
+            nFittedAboveMinCounts++;
+        }
+    }
+    if (nFittedAboveMinCounts < minRequired) {
+        outResult.status = RunCalibStatus::LowStatistics;
+        outResult.failureReason = QString("Low statistics: only %1 of %2 anchor peaks met minimum area/counts (required: %3).")
+                                      .arg(nFittedAboveMinCounts).arg(nAnchors).arg(minRequired);
+        return false;
+    }
+    for (int i = 0; i < nActive; ++i) {
+        const auto &seed = activePeaks[i];
+        const auto &fa = allAnchors[seed.anchorIdx];
+        const double baseCh = (seed.anchorIdx < static_cast<int>(baseCentroids.size()))
+                              ? baseCentroids[seed.anchorIdx] : seed.uNorm;
+        const double expCh = (seed.anchorIdx < static_cast<int>(initialExpectedChannels.size()))
+                             ? initialExpectedChannels[seed.anchorIdx] : baseCh;
+        const double trackedDrift = std::min(std::abs(fa.centroidCh - expCh), std::abs(fa.centroidCh - baseCh));
+        if (trackedDrift > maxAllowedDriftCh) {
+            outResult.status = RunCalibStatus::ExcessiveDrift;
+            outResult.failureReason = QString("Excessive drift: anchor %1 keV shifted by %2 ch from expected %3 ch (max allowed %4 ch).")
+                                          .arg(seed.energy, 0, 'f', 1)
+                                          .arg(trackedDrift, 0, 'f', 2)
+                                          .arg(expCh, 0, 'f', 1)
+                                          .arg(maxAllowedDriftCh, 0, 'f', 1);
+            return false;
+        }
+        if (fa.fwhmCh < 0.4 || fa.fwhmCh > seed.expFwhmCh * 2.5) {
+            outResult.status = RunCalibStatus::BadFWHM;
+            outResult.failureReason = QString("Bad FWHM: anchor %1 keV fitted FWHM (%2 ch) is outside physical bounds [0.4, %3 ch].")
+                                          .arg(seed.energy, 0, 'f', 1)
+                                          .arg(fa.fwhmCh, 0, 'f', 2)
+                                          .arg(seed.expFwhmCh * 2.5, 0, 'f', 1);
+            return false;
+        }
+    }
+
+    return calibOk;
 }
 
 //==============================================================================
@@ -389,6 +1390,17 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
     const double disp = (nominalDispersion > 0.0) ? nominalDispersion
                       : ((outResult.nominalGain > 0.0) ? outResult.nominalGain : 1.0);
     outResult.nominalGain = disp;
+
+    // Average spectrum-fit reduced Chi2/ndf across active anchors (Xtrackn boundfit goodness-of-fit)
+    double sumSpecChi2 = 0.0;
+    int nSpecChi2 = 0;
+    for (const auto &a : valid) {
+        if (a.chi2 > 0.0) {
+            sumSpecChi2 += a.chi2;
+            nSpecChi2++;
+        }
+    }
+    const double avgSpecChi2 = (nSpecChi2 > 0) ? (sumSpecChi2 / static_cast<double>(nSpecChi2)) : 0.0;
 
     // Standard Linear Calibration: targetCh = a0 + a1 * ch (where targetCh = energy / disp)
     // Gains a1 are dimensionless relative gain correction factors (~1.0), maintaining the nominal dispersion.
@@ -443,7 +1455,10 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 
         const int ndf = std::max(1, static_cast<int>(valid.size()) - 2);
         outResult.sRes = std::sqrt(sumResSq / static_cast<double>(ndf));
-        outResult.chi2NDF = sumChi2 / static_cast<double>(ndf);
+        const double lineChi2Ndf = sumChi2 / static_cast<double>(ndf);
+        // In boundfit (or 2-point linear fit), centroids lie directly on the polynomial so lineChi2Ndf == 0;
+        // use std::max(lineChi2Ndf, avgSpecChi2) so both batch matrix and live inspection report the same Chi2/ndf.
+        outResult.chi2NDF = (lineChi2Ndf > 1e-4) ? std::max(lineChi2Ndf, avgSpecChi2) : avgSpecChi2;
 
         if (outResult.chi2NDF > maxAllowedChi2NDF || std::isnan(outResult.chi2NDF)) {
             outResult.status = RunCalibStatus::BadChi2;
@@ -533,7 +1548,8 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 
     const int ndf = std::max(1, static_cast<int>(valid.size()) - 3);
     outResult.sRes = std::sqrt(sumResSq / static_cast<double>(ndf));
-    outResult.chi2NDF = sumChi2 / static_cast<double>(ndf);
+    const double lineChi2Ndf = sumChi2 / static_cast<double>(ndf);
+    outResult.chi2NDF = (lineChi2Ndf > 1e-4) ? std::max(lineChi2Ndf, avgSpecChi2) : avgSpecChi2;
 
     if (outResult.chi2NDF > maxAllowedChi2NDF || std::isnan(outResult.chi2NDF)) {
         outResult.status = RunCalibStatus::BadChi2;
@@ -581,13 +1597,19 @@ void RunByRunEngine::run()
 
         // Initialize base centroids for all anchors: initialChannel or physicalEnergy / dispersion
         std::vector<double> baseCentroids;
+        double sumExpFwhm = 0.0;
         for (const auto &anchorDef : m_config.anchors) {
             double guessCh = (anchorDef.initialChannel > 0.0)
                 ? anchorDef.initialChannel
                 : (anchorDef.physicalEnergy / dispersion);
             baseCentroids.push_back(guessCh);
+            sumExpFwhm += std::max(1.5, anchorDef.expectedFwhmCh);
         }
         traj.lastValidCentroids = baseCentroids;
+        const int snipIters = std::clamp(
+            static_cast<int>(std::round(2.5 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
+            12, 35);
+        std::vector<double> lastValidPeakSpectrum;
 
         // 2. INNER LOOP: Run r in [0 .. nRuns - 1]
         for (int rIdx = 0; rIdx < nRuns; ++rIdx) {
@@ -630,72 +1652,45 @@ void RunByRunEngine::run()
                 continue;
             }
 
-            // Fit each anchor peak within bounded search window around detector's moving centroid
-            std::vector<FittedAnchor> fittedRunAnchors;
-
-            for (size_t aIdx = 0; aIdx < m_config.anchors.size(); ++aIdx) {
-                const auto &anchorDef = m_config.anchors[aIdx];
-                const double centerCh = (aIdx < traj.lastValidCentroids.size())
-                                            ? traj.lastValidCentroids[aIdx]
-                                            : baseCentroids[aIdx];
-                const double winCh = std::max(2.0, anchorDef.searchWindowCh);
-                const double expFwhm = std::max(0.5, anchorDef.expectedFwhmCh);
-
-                FittedAnchor fa = fitAnchorPeak(runSpectrum,
-                                               centerCh,
-                                               winCh,
-                                               anchorDef.minCounts,
-                                               anchorDef.physicalEnergy);
-                fa.energyErr = anchorDef.energyError;
-
-                // Fallback search around base centroid
-                if (!fa.isValid && std::abs(centerCh - baseCentroids[aIdx]) > 0.5) {
-                    fa = fitAnchorPeak(runSpectrum,
-                                       baseCentroids[aIdx],
-                                       winCh,
-                                       anchorDef.minCounts,
-                                       anchorDef.physicalEnergy);
-                    fa.energyErr = anchorDef.energyError;
-                }
-
-                // Verify FWHM and drift from base centroid
-                if (fa.isValid) {
-                    if (expFwhm > 0.0 && fa.fwhmCh > expFwhm * 2.5) {
-                        fa.isValid = false;
-                    }
-                    const double drift = std::abs(fa.centroidCh - baseCentroids[aIdx]);
-                    if (drift > m_config.maxAllowedDriftCh) {
-                        fa.isValid = false;
-                    }
-                }
-
-                fittedRunAnchors.push_back(fa);
+            // Extract SNIP Compton continuum background & continuum-subtracted peak spectrum
+            std::vector<double> snipBg = computeSnipContinuum(runSpectrum, snipIters);
+            std::vector<double> currPeakSpectrum(runSpectrum.size(), 0.0);
+            for (size_t c = 0; c < runSpectrum.size(); ++c) {
+                currPeakSpectrum[c] = std::max(0.0, runSpectrum[c] - snipBg[c]);
             }
 
-            int validAnchorCount = 0;
-            for (const auto &fa : fittedRunAnchors) {
-                if (fa.isValid) validAnchorCount++;
+            // Whole-spectrum cross-correlation gain/shift pre-alignment against previous valid run (Xtrackn gainfit)
+            std::vector<double> expectedCentroids = traj.lastValidCentroids;
+            if (!lastValidPeakSpectrum.empty()) {
+                preAlignGainFit(lastValidPeakSpectrum,
+                                currPeakSpectrum,
+                                traj.lastValidCentroids,
+                                m_config.maxAllowedDriftCh,
+                                expectedCentroids);
             }
-            const int minRequiredAnchors = m_config.useQuadratic ? 3 : 2;
 
-            bool calibSuccess = false;
-            if (validAnchorCount >= minRequiredAnchors) {
-                calibSuccess = computeCalibration(fittedRunAnchors, m_config.useQuadratic, res, m_config.maxAllowedChi2NDF, dispersion);
-            } else {
-                res.status = RunCalibStatus::NoPeakInWindow;
-                res.failureReason = QString("Only %1 of %2 valid anchor peaks found (minimum %3 required).")
-                                        .arg(validAnchorCount).arg(m_config.anchors.size()).arg(minRequiredAnchors);
-            }
+            // Simultaneous coupled multi-peak spectrum fit (Xtrackn boundfit + CERN ROOT Minimizer + SNIP Continuum)
+            const bool calibSuccess = fitSpectrumBound(runSpectrum,
+                                                       m_config.anchors,
+                                                       expectedCentroids,
+                                                       baseCentroids,
+                                                       m_config.useQuadratic,
+                                                       dispersion,
+                                                       m_config.maxAllowedDriftCh,
+                                                       m_config.maxAllowedChi2NDF,
+                                                       res,
+                                                       &snipBg);
 
             if (calibSuccess) {
                 res.status = RunCalibStatus::Success;
                 res.isFallbackFromPrevious = false;
-                // Update moving anchor centroids for all successfully fitted peaks
-                for (size_t aIdx = 0; aIdx < fittedRunAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
-                    if (fittedRunAnchors[aIdx].isValid) {
-                        traj.lastValidCentroids[aIdx] = fittedRunAnchors[aIdx].centroidCh;
+                // Update moving anchor centroids and reference peak spectrum from the converged valid run
+                for (size_t aIdx = 0; aIdx < res.fittedAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
+                    if (res.fittedAnchors[aIdx].isValid && res.fittedAnchors[aIdx].centroidCh > 0.0) {
+                        traj.lastValidCentroids[aIdx] = res.fittedAnchors[aIdx].centroidCh;
                     }
                 }
+                lastValidPeakSpectrum.swap(currPeakSpectrum);
                 traj.runResults.push_back(res);
                 traj.successCount++;
                 overallSuccessCount++;

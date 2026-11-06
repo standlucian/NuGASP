@@ -263,7 +263,7 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     }
 
     mainCanvas->background = new TFormula("background", "[0]*x+[1]");
-    mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", -0.5, activeHist->GetNbinsX() - 0.5);
+    mainCanvas->backgroundFunction = new TF1("backgroundFunction", "background", 0.0, activeHist->GetNbinsX());
     mainCanvas->backgroundFunction->SetParameter(0, mainCanvas->backgroundA1);
     mainCanvas->backgroundFunction->SetParameter(1, mainCanvas->backgroundA0);
 
@@ -279,11 +279,11 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     if (mainCanvas->range_markers.size() >= 2) {
         const Double_t r0 = std::min(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
         const Double_t r1 = std::max(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
-        mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0 - 0.5, r1 + 0.5);
+        mainCanvas->backgroundIntegral = mainCanvas->backgroundFunction->Integral(r0, r1 + 1.0);
         
         Double_t params[2] = {mainCanvas->backgroundA1, mainCanvas->backgroundA0};
         mainCanvas->backgroundIntegralError = mainCanvas->backgroundFunction->IntegralError(
-            r0 - 0.5, r1 + 0.5, params, mainCanvas->backgroundCovarianceMatrix->GetMatrixArray());
+            r0, r1 + 1.0, params, mainCanvas->backgroundCovarianceMatrix->GetMatrixArray());
     } else {
         mainCanvas->backgroundIntegral = 0.0;
         mainCanvas->backgroundIntegralError = 0.0;
@@ -643,8 +643,8 @@ void runAutoFit(QMainCanvas *mainCanvas, int x, int y)
 
     // Adaptive refit if fitted peak is broader than the detected boundaries
     if (gaussianFWHM * 2.5 > (fitMax - fitMin)) {
-        fitMin = std::max(-0.5, gaussianCenter - gaussianFWHM * 3.0);
-        fitMax = std::min(static_cast<Double_t>(hist->GetNbinsX()) - 0.5, gaussianCenter + gaussianFWHM * 3.0);
+        fitMin = std::max(0.0, gaussianCenter - gaussianFWHM * 3.0);
+        fitMax = std::min(static_cast<Double_t>(hist->GetNbinsX()), gaussianCenter + gaussianFWHM * 3.0);
         mainCanvas->gaussianWithBackgroundFunction->SetRange(fitMin, fitMax);
         mainCanvas->backgroundFunction->SetRange(fitMin, fitMax);
 
@@ -1032,7 +1032,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         }
     }
 
-    TF1 *fullFunction = new TF1("fullFunction", formulaStr.c_str(), r0 - 0.5, r1 + 0.5);
+    TF1 *fullFunction = new TF1("fullFunction", formulaStr.c_str(), r0, r1 + 1.0);
     fullFunction->SetParName(0, "BkgSlope");
     fullFunction->SetParName(1, "BkgConst");
 
@@ -1090,7 +1090,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
     // Initialize individual peak amplitudes, centroids, and widths
     for (std::size_t i = 0; i < nPeaks; ++i) {
-        const Double_t peakChannel = mainCanvas->gauss_markers[i];
+        const Double_t peakChannel = mainCanvas->gauss_markers[i] + 0.5;
         const Int_t peakBin = activeHist->FindBin(peakChannel);
         const Double_t rawCounts = activeHist->GetBinContent(peakBin);
         const Double_t estBkg = mainCanvas->backgroundA1 * peakChannel + mainCanvas->backgroundA0;
@@ -1115,7 +1115,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
             fullFunction->FixParameter(meanIdx, fixedCenterCh);
         } else {
             fullFunction->SetParameter(meanIdx, peakChannel);
-            fullFunction->SetParLimits(meanIdx, r0 - 0.5, r1 + 0.5);
+            fullFunction->SetParLimits(meanIdx, r0, r1 + 1.0);
         }
 
         // Decoupled width
@@ -1187,10 +1187,10 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         mainCanvas->m_bkgInterceptVal = mainCanvas->backgroundA0;
     }
 
-    TF1 bkgTF1("bkgTF1", "[0]*x + [1]", r0 - 0.5, r1 + 0.5);
+    TF1 bkgTF1("bkgTF1", "[0]*x + [1]", r0, r1 + 1.0);
     bkgTF1.SetParameter(0, mainCanvas->backgroundA1);
     bkgTF1.SetParameter(1, mainCanvas->backgroundA0);
-    mainCanvas->backgroundIntegral = bkgTF1.Integral(r0 - 0.5, r1 + 0.5);
+    mainCanvas->backgroundIntegral = bkgTF1.Integral(r0, r1 + 1.0);
 
     if (fitResult.Get() && fitResult->IsValid() && !hasExplicitBkg && !mainCanvas->m_bkgFixed) {
         TMatrixDSym bkgCov(2);
@@ -1199,7 +1199,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         bkgCov(1, 0) = fitResult->GetCovarianceMatrix()(1, 0);
         bkgCov(1, 1) = fitResult->GetCovarianceMatrix()(1, 1);
         mainCanvas->backgroundIntegralError = bkgTF1.IntegralError(
-            r0 - 0.5, r1 + 0.5, bkgTF1.GetParameters(), bkgCov.GetMatrixArray());
+            r0, r1 + 1.0, bkgTF1.GetParameters(), bkgCov.GetMatrixArray());
     } else if (mainCanvas->m_bkgFixed) {
         mainCanvas->backgroundIntegralError = 0.0;
     }
@@ -1208,7 +1208,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
     if (!mainCanvas->backgroundFunction) {
         mainCanvas->backgroundFunction = new TF1("backgroundFunction", "[0]*x+[1]", 0, 10240);
     }
-    mainCanvas->backgroundFunction->SetRange(r0 - 0.5, r1 + 0.5);
+    mainCanvas->backgroundFunction->SetRange(r0, r1 + 1.0);
     mainCanvas->backgroundFunction->SetParameter(0, mainCanvas->backgroundA1);
     mainCanvas->backgroundFunction->SetParameter(1, mainCanvas->backgroundA0);
 
@@ -1326,7 +1326,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         const Double_t curFWHM     = curSigma * 2.35482;
         const Double_t curFwhmErr  = curSigmaErr * 2.35482;
 
-        TF1 tempGaussFunction("tempGaussFunction", "gaus", r0 - 0.5, r1 + 0.5);
+        TF1 tempGaussFunction("tempGaussFunction", "gaus", r0, r1 + 1.0);
         tempGaussFunction.SetParameter(0, fullFunction->GetParameter(ampIdx));
         tempGaussFunction.SetParError(0, fullFunction->GetParError(ampIdx));
         tempGaussFunction.SetParameter(1, fullFunction->GetParameter(meanIdx));
@@ -1344,7 +1344,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
                 }
             }
             fitIntegralError = tempGaussFunction.IntegralError(
-                r0 - 0.5, r1 + 0.5, tempGaussFunction.GetParameters(), peakCov.GetMatrixArray());
+                r0, r1 + 1.0, tempGaussFunction.GetParameters(), peakCov.GetMatrixArray());
         }
 
         // Combined uncertainty: Gaussian peak integral error + background uncertainty
@@ -1354,7 +1354,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
 
         const Double_t peakCenter = fullFunction->GetParameter(meanIdx);
         const Double_t centerErr  = fullFunction->GetParError(meanIdx);
-        const Double_t peakArea   = tempGaussFunction.Integral(r0 - 0.5, r1 + 0.5);
+        const Double_t peakArea   = tempGaussFunction.Integral(r0, r1 + 1.0);
         peakCenters[i] = peakCenter;
 
         Double_t dispEnergy = peakCenter;

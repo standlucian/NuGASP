@@ -40,10 +40,9 @@ struct FittedAnchor {
     double fwhmCh{0.0};
     double amplitude{0.0};
     double background{0.0};
-    double bkgSlope{0.0};
-    double bkgStep{0.0};
     double area{0.0};
     double chi2{0.0};
+    double fitWinCh{0.0};          // Actual half-window (in channels) used in the fit
     bool   isValid{false};
 };
 
@@ -55,10 +54,7 @@ struct FitFixedParams {
     double fixedFwhm{0.0};
     bool fixBaseline{false};
     double fixedBaseline{0.0};
-    bool fixSlope{false};
-    double fixedSlope{0.0};
-    bool fixStep{false};
-    double fixedStep{0.0};
+    bool useExactFitWin{false};    // When true, use windowCh directly as the fitting half-window
 };
 
 // Result for a specific (Run, Detector)
@@ -151,6 +147,32 @@ public:
                                                double centerCh, double windowCh,
                                                double minCounts, double energy,
                                                const FitFixedParams &fixed);
+
+    // Extract smooth 1D Compton continuum background using iterative SNIP peak-clipping
+    static std::vector<double> computeSnipContinuum(const std::vector<double> &spectrum,
+                                                    int iterations = 20);
+
+    // Evaluate SNIP continuum at continuous GASP coordinate channelX (where bin k has center k + 0.5)
+    static double evalSnipAt(const std::vector<double> &snipBg, double channelX);
+
+    // Whole-spectrum cross-correlation gain/shift pre-alignment (Xtrackn gainfit on continuum-subtracted peaks)
+    static bool preAlignGainFit(const std::vector<double> &prevPeakSpectrum,
+                                const std::vector<double> &currPeakSpectrum,
+                                const std::vector<double> &prevCentroids,
+                                double maxAllowedDriftCh,
+                                std::vector<double> &outExpectedCentroids);
+
+    // Simultaneous coupled multi-peak spectrum fit (Xtrackn boundfit + CERN ROOT Minimizer)
+    static bool fitSpectrumBound(const std::vector<double> &spectrum,
+                                 const std::vector<AnchorPeakDef> &anchors,
+                                 const std::vector<double> &initialExpectedChannels,
+                                 const std::vector<double> &baseCentroids,
+                                 bool useQuadratic,
+                                 double nominalDispersion,
+                                 double maxAllowedDriftCh,
+                                 double maxAllowedChi2NDF,
+                                 RunCalibResult &outResult,
+                                 const std::vector<double> *precomputedSnip = nullptr);
 
     // Helper to compute polynomial calibration coefficients and uncertainties
     static bool computeCalibration(const std::vector<FittedAnchor> &anchors,

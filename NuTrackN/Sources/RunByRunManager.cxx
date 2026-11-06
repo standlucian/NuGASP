@@ -2238,10 +2238,83 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
     m_mainCanvas->gaussCenters[sel_i][sel_j].clear();
     m_mainCanvas->gaussCentersHeight[sel_i][sel_j].clear();
 
-    // 4. Fit anchor peaks and draw fit functions
+    // 4. Compute SNIP Compton continuum background across the spectrum and draw it on the canvas
     std::vector<double> peakPositions;
     int fitCount = 0;
     const int totalBins = static_cast<int>(specData.size());
+
+    double sumExpFwhm = 0.0;
+    for (const auto &a : m_anchors) {
+        sumExpFwhm += std::max(1.5, (a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : (3.5 / dispersion));
+    }
+    const double avgExpFwhm = m_anchors.empty() ? 4.0 : (sumExpFwhm / static_cast<double>(m_anchors.size()));
+    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * avgExpFwhm)), 12, 35);
+    auto snipPtr = std::make_shared<std::vector<double>>(RunByRunEngine::computeSnipContinuum(specData, snipIters));
+
+    if (pad && totalBins > 4 && snipPtr->size() == specData.size()) {
+        pad->cd();
+        TH1F *hSnip = new TH1F(Form("rbr_snip_continuum_%d", detId),
+                               "SNIP Background Continuum",
+                               totalBins, 0.0, static_cast<double>(totalBins));
+        hSnip->SetDirectory(nullptr);
+        hSnip->SetBit(TH1::kNoStats);
+        for (int b = 0; b < totalBins; ++b) {
+            hSnip->SetBinContent(b + 1, (*snipPtr)[b]);
+        }
+        hSnip->SetLineColor(kCyan + 2);
+        hSnip->SetLineStyle(7);
+        hSnip->SetLineWidth(2);
+        hSnip->Draw("HIST L same");
+        m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(hSnip);
+    }
+
+    auto computeSnipChordSlope = [snipPtr](double xMin, double xMax) -> double {
+        if (!snipPtr || snipPtr->empty() || xMax <= xMin + 1.0) return 0.0;
+        const int c1 = std::clamp(static_cast<int>(std::floor(xMin)), 0, static_cast<int>(snipPtr->size()) - 1);
+        const int c2 = std::clamp(static_cast<int>(std::floor(xMax)) - 1, c1, static_cast<int>(snipPtr->size()) - 1);
+        if (c2 <= c1) return 0.0;
+        const double xMid = 0.5 * static_cast<double>(c1 + c2) + 0.5;
+        double sumS = 0.0, sumXS = 0.0, sumXX = 0.0;
+        int nB = 0;
+        for (int c = c1; c <= c2; ++c) {
+            const double dx = (static_cast<double>(c) + 0.5) - xMid;
+            const double sVal = std::max(0.0, (*snipPtr)[c]);
+            sumS += sVal;
+            sumXS += dx * sVal;
+            sumXX += dx * dx;
+            nB++;
+        }
+        const double meanS = (nB > 0) ? (sumS / nB) : 0.0;
+        const double slopeS = (sumXX > 1e-9) ? (sumXS / sumXX) : 0.0;
+        const double maxAbsSlope = 0.05 * std::max(0.25, meanS);
+        return (meanS > 0.25) ? std::clamp(slopeS, -maxAbsSlope, maxAbsSlope) : 0.0;
+    };
+
+    auto makeSnipFitTF1 = [computeSnipChordSlope](const char *name, double xMin, double xMax) -> TF1* {
+        const double slopeS = computeSnipChordSlope(xMin, xMax);
+        TF1 *f = new TF1(name,
+                         [slopeS](double *x, double *p) -> double {
+                             const double sig = std::max(1e-4, std::abs(p[2]));
+                             const double dx = (x[0] - p[1]) / sig;
+                             const double gaus = (std::abs(dx) < 9.0) ? (p[0] * std::exp(-0.5 * dx * dx)) : 0.0;
+                             const double bkg = std::max(0.0, p[3] + slopeS * (x[0] - p[1]));
+                             return gaus + bkg;
+                         },
+                         xMin, xMax, 4);
+        f->SetNpx(std::max(150, static_cast<int>((xMax - xMin) * 6.0)));
+        return f;
+    };
+
+    auto makeSnipBkgTF1 = [computeSnipChordSlope](const char *name, double xMin, double xMax) -> TF1* {
+        const double slopeS = computeSnipChordSlope(xMin, xMax);
+        TF1 *f = new TF1(name,
+                         [slopeS](double *x, double *p) -> double {
+                             return std::max(0.0, p[0] + slopeS * (x[0] - p[1]));
+                         },
+                         xMin, xMax, 2);
+        f->SetNpx(std::max(100, static_cast<int>((xMax - xMin) * 4.0)));
+        return f;
+    };
 
     for (size_t aIdx = 0; aIdx < m_anchors.size(); ++aIdx) {
         const auto &a = m_anchors[aIdx];
@@ -2271,7 +2344,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
         double fittedCentroid = centerCh;
 
         // If this run already has a saved/accepted fit from intervention or calibration,
-        // faithfully draw the accepted fit curve and baseline directly on canvas!
+        // faithfully draw the accepted fit curve and SNIP-shaped baseline directly on canvas!
         if (savedFa && savedFa->centroidCh > 0.0) {
             fitSuccess = savedFa->isValid;
             fittedCentroid = savedFa->centroidCh;
@@ -2279,12 +2352,14 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             const double fwhmVal = (savedFa->fwhmCh > 0.2) ? savedFa->fwhmCh : (((a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : 3.5) / dispersion);
             const double sigmaVal = fwhmVal / 2.35482;
             const double bkgVal = savedFa->background;
-            const double slopeVal = savedFa->bkgSlope;
 
             const double windowCh = (a.searchWindowCh > 0.0) ? a.searchWindowCh : std::clamp(fwhmVal * 3.5, 12.0, 45.0);
-            const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
-            const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
-            const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
+            const int maxHalfWin = std::max(6, static_cast<int>(std::round(windowCh * 1.5)));
+            const int fitHalfWidth = (savedFa->fitWinCh > 1.0)
+                ? static_cast<int>(std::round(savedFa->fitWinCh))
+                : std::clamp(static_cast<int>(std::round(2.5 * fwhmVal)), 5, maxHalfWin);
+            const int fitMin = std::max(1, static_cast<int>(std::floor(meanVal)) - fitHalfWidth);
+            const int fitMax = std::min(totalBins - 1, static_cast<int>(std::floor(meanVal)) + fitHalfWidth);
 
             int binC = hist->FindBin(meanVal);
             double binCounts = (binC >= 1 && binC <= hist->GetNbinsX()) ? hist->GetBinContent(binC) : 0.0;
@@ -2292,31 +2367,24 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
 
             if (pad) pad->cd();
 
-            // Fit function (Gaussian + Linear background + Compton step) in vibrant red (or gray if excluded)
-            TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
+            // Fit function (Gaussian + SNIP-shaped background) in vibrant red (or gray if excluded)
+            TF1 *fFit = makeSnipFitTF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)), fitMin, fitMax + 1.0);
             fFit->SetParameter(0, amplVal);
             fFit->SetParameter(1, meanVal);
             fFit->SetParameter(2, sigmaVal);
             fFit->SetParameter(3, bkgVal);
-            fFit->SetParameter(4, slopeVal);
-            fFit->SetParameter(5, savedFa->bkgStep);
             fFit->SetLineColor(savedFa->isValid ? kRed : kGray);
             fFit->SetLineStyle(savedFa->isValid ? 1 : 3);
             fFit->SetLineWidth(savedFa->isValid ? 2 : 1);
             fFit->Draw("same");
             m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
 
-            // Baseline background function in dashed blue with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
-            TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", fitMin - 0.5, fitMax + 0.5);
+            // Local SNIP-shaped background function in dashed blue
+            TF1 *fBkg = makeSnipBkgTF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)), fitMin, fitMax + 1.0);
             fBkg->SetParameter(0, bkgVal);
-            fBkg->SetParameter(1, slopeVal);
-            fBkg->SetParameter(2, meanVal);
-            fBkg->SetParameter(3, savedFa->bkgStep);
-            fBkg->SetParameter(4, sigmaVal);
+            fBkg->SetParameter(1, meanVal);
             fBkg->SetLineColor(savedFa->isValid ? kBlue : (kGray + 1));
-            fBkg->SetLineWidth(1);
+            fBkg->SetLineWidth(2);
             fBkg->SetLineStyle(savedFa->isValid ? 2 : 3);
             fBkg->Draw("same");
             m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fBkg);
@@ -2344,36 +2412,32 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             fittedCentroid = fa.centroidCh;
             const double meanVal = fa.centroidCh;
             const double sigmaVal = std::max(0.1, fa.fwhmCh / 2.35482);
-            const int fitHalfWidth = std::clamp(static_cast<int>(windowCh * 0.85), 5, 35);
-            const int fitMin = std::max(1, static_cast<int>(meanVal) - fitHalfWidth);
-            const int fitMax = std::min(totalBins - 1, static_cast<int>(meanVal) + fitHalfWidth);
+            const int maxHalfWin = std::max(6, static_cast<int>(std::round(windowCh * 1.5)));
+            const int fitHalfWidth = (fa.fitWinCh > 1.0)
+                ? static_cast<int>(std::round(fa.fitWinCh))
+                : std::clamp(static_cast<int>(std::round(2.5 * fa.fwhmCh)), 5, maxHalfWin);
+            const int fitMin = std::max(1, static_cast<int>(std::floor(meanVal)) - fitHalfWidth);
+            const int fitMax = std::min(totalBins - 1, static_cast<int>(std::floor(meanVal)) + fitHalfWidth);
 
             if (pad) pad->cd();
 
-            // Fit function (Gaussian + Linear background + Compton step) in vibrant red
-            TF1 *fFit = new TF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", fitMin - 0.5, fitMax + 0.5);
+            // Fit function (Gaussian + SNIP-shaped background) in vibrant red
+            TF1 *fFit = makeSnipFitTF1(Form("rbr_fit_%d_%d", detId, static_cast<int>(aIdx)), fitMin, fitMax + 1.0);
             fFit->SetParameter(0, fa.amplitude);
             fFit->SetParameter(1, fa.centroidCh);
             fFit->SetParameter(2, sigmaVal);
             fFit->SetParameter(3, fa.background);
-            fFit->SetParameter(4, fa.bkgSlope);
-            fFit->SetParameter(5, fa.bkgStep);
             fFit->SetLineColor(kRed);
             fFit->SetLineWidth(2);
             fFit->Draw("same");
             m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fFit);
 
-            // Baseline background function in dashed blue with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
-            TF1 *fBkg = new TF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)),
-                                "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", fitMin - 0.5, fitMax + 0.5);
+            // Local SNIP-shaped background function in dashed blue
+            TF1 *fBkg = makeSnipBkgTF1(Form("rbr_background_%d_%d", detId, static_cast<int>(aIdx)), fitMin, fitMax + 1.0);
             fBkg->SetParameter(0, fa.background);
-            fBkg->SetParameter(1, fa.bkgSlope);
-            fBkg->SetParameter(2, fa.centroidCh);
-            fBkg->SetParameter(3, fa.bkgStep);
-            fBkg->SetParameter(4, sigmaVal);
+            fBkg->SetParameter(1, fa.centroidCh);
             fBkg->SetLineColor(kBlue);
-            fBkg->SetLineWidth(1);
+            fBkg->SetLineWidth(2);
             fBkg->SetLineStyle(2);
             fBkg->Draw("same");
             m_mainCanvas->autoFitMarkers[sel_i][sel_j].push_back(fBkg);
@@ -2656,12 +2720,12 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     infoLayout->addWidget(lblCurStatus);
     mainVBox->addWidget(grpInfo);
 
-    // 2. Interactive Peak Table with Independent Baseline & Slope Background and Parameter Locks
-    QGroupBox *grpPeaks = new QGroupBox(tr("Peak Anchors, Independent Background (Baseline & Slope) & Parameter Locks"), &dlg);
+    // 2. Interactive Peak Table with Flat Baseline Background and Parameter Locks
+    QGroupBox *grpPeaks = new QGroupBox(tr("Peak Anchors, Flat Background Baseline & Parameter Locks"), &dlg);
     QVBoxLayout *peaksVBox = new QVBoxLayout(grpPeaks);
 
     QTableWidget *tbl = new QTableWidget(&dlg);
-    tbl->setColumnCount(9);
+    tbl->setColumnCount(8);
     tbl->setHorizontalHeaderLabels({
         tr("Action"),
         tr("Use"),
@@ -2670,8 +2734,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         tr("Shift (\u0394 ch)"),
         tr("Window (\u00b1 ch)"),
         tr("FWHM (ch) 🔒"),
-        tr("Baseline (cts) 🔒"),
-        tr("Slope (cts/ch) 🔒")
+        tr("Baseline (cts) 🔒")
     });
     tbl->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tbl->horizontalHeader()->setStretchLastSection(true);
@@ -2688,7 +2751,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double centroidErrCh{0.05};
         double peakChi2{1.0};
         double amplitude{0.0};
-        double bkgStep{0.0};
         double lastFittedCentroid{0.0};
 
         QDoubleSpinBox *spinCentroid{nullptr};
@@ -2703,9 +2765,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         QDoubleSpinBox *spinBkg{nullptr};
         QPushButton *btnFixBkg{nullptr};
-
-        QDoubleSpinBox *spinSlope{nullptr};
-        QPushButton *btnFixSlope{nullptr};
 
         TLine *guideLine{nullptr};
         TF1 *fitFunc{nullptr};
@@ -2743,10 +2802,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double initCentroidErr = 0.05;
         double initPeakChi2 = 1.0;
         double initFwhm = (anc.expectedFwhmCh > 0.0) ? anc.expectedFwhmCh : (3.5 / dispersion);
-        double initWin = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : (5.0 / dispersion);
+        const double searchWinCh = (anc.searchWindowCh > 0.0) ? anc.searchWindowCh : (5.0 / dispersion);
+        double initWin = std::clamp(std::round(2.5 * initFwhm), 5.0, std::max(6.0, std::round(searchWinCh * 1.5)));
         double initBkg = 10.0;
-        double initSlope = 0.0;
-        double initStep = 0.0;
         double initAmpl = 0.0;
         bool isUsed = true;
         bool foundSaved = false;
@@ -2757,9 +2815,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (fa.centroidCh > 0.0) {
                     initCentroid = fa.centroidCh;
                     if (fa.fwhmCh > 0.2) initFwhm = fa.fwhmCh;
+                    initWin = (fa.fitWinCh > 1.0)
+                        ? fa.fitWinCh
+                        : std::clamp(std::round(2.5 * initFwhm), 5.0, std::max(6.0, std::round(searchWinCh * 1.5)));
                     initBkg = fa.background;
-                    initSlope = fa.bkgSlope;
-                    initStep = fa.bkgStep;
                     initAmpl = fa.amplitude;
                     if (fa.centroidErrCh > 0.0) {
                         initCentroidErr = fa.centroidErrCh;
@@ -2775,7 +2834,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         if (!foundSaved && !specData.empty()) {
             double centerCh = nominalCh;
-            double windowCh = initWin;
+            double windowCh = searchWinCh;
             double minCounts = (anc.minCounts > 0.0) ? anc.minCounts : 20.0;
             FittedAnchor fa = RunByRunEngine::fitAnchorPeak(specData, centerCh, windowCh, minCounts, anc.physicalEnergy);
             if (!fa.isValid && std::abs(centerCh - nominalCh) > 0.5) {
@@ -2784,9 +2843,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             if (fa.isValid && fa.centroidCh > 0.0) {
                 initCentroid = fa.centroidCh;
                 if (fa.fwhmCh > 0.2) initFwhm = fa.fwhmCh;
+                initWin = (fa.fitWinCh > 1.0)
+                    ? fa.fitWinCh
+                    : std::clamp(std::round(2.5 * initFwhm), 5.0, std::max(6.0, std::round(searchWinCh * 1.5)));
                 initBkg = fa.background;
-                initSlope = fa.bkgSlope;
-                initStep = fa.bkgStep;
                 initAmpl = fa.amplitude;
                 if (fa.centroidErrCh > 0.0) initCentroidErr = fa.centroidErrCh;
                 if (fa.chi2 > 0.0) initPeakChi2 = fa.chi2;
@@ -2797,62 +2857,20 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[i].centroidErrCh = initCentroidErr;
         rowWidgets[i].peakChi2 = initPeakChi2;
         rowWidgets[i].amplitude = initAmpl;
-        rowWidgets[i].bkgStep = initStep;
         rowWidgets[i].lastFittedCentroid = initCentroid;
 
-        // Estimate background from spectrum edges only if no saved anchor was found
+        // Estimate flat background from 3-bin window edge minimum if no saved anchor was found
         if (!foundSaved && !specData.empty()) {
-            double cCh = initCentroid;
-            double wCh = initWin;
-            int maxB = std::clamp(static_cast<int>(std::round(cCh)), 0, static_cast<int>(specData.size()) - 1);
-            double pkVal = specData[maxB];
-            double estBase = (specData[std::max(0, static_cast<int>(cCh - wCh))] + specData[std::min(static_cast<int>(specData.size()) - 1, static_cast<int>(cCh + wCh))]) / 2.0;
-            double rawAmp = std::max(1.0, pkVal - estBase);
-            double sigCh = std::max(0.4, initFwhm / 2.35482);
-
-            double nSig = std::clamp(std::sqrt(2.0 * std::log(std::max(10.0, rawAmp))), 2.0, 3.5);
-            int pkHalf = std::clamp(static_cast<int>(std::ceil(nSig * sigCh)), 2, std::max(2, static_cast<int>(wCh * 0.8)));
-
-            int lMin = std::max(0, maxB - static_cast<int>(wCh));
-            int lMax = std::max(0, maxB - pkHalf);
-            int lValley = lMax;
-            if (lMax > lMin) {
-                for (int ch = lMax; ch >= lMin; --ch) {
-                    if (specData[ch] < specData[lValley]) lValley = ch;
-                }
-            }
-
-            int rMin = std::min(static_cast<int>(specData.size()) - 1, maxB + pkHalf);
-            int rMax = std::min(static_cast<int>(specData.size()) - 1, maxB + static_cast<int>(wCh));
-            int rValley = rMin;
-            if (rMax > rMin) {
-                for (int ch = rMin; ch <= rMax; ++ch) {
-                    if (specData[ch] < specData[rValley]) rValley = ch;
-                }
-            }
-
-            std::vector<double> lVals, rVals;
-            for (int c = std::max(0, lValley - 1); c <= std::min(static_cast<int>(specData.size()) - 1, lValley + 1); ++c) lVals.push_back(specData[c]);
-            for (int c = std::max(0, rValley - 1); c <= std::min(static_cast<int>(specData.size()) - 1, rValley + 1); ++c) rVals.push_back(specData[c]);
-            std::sort(lVals.begin(), lVals.end());
-            std::sort(rVals.begin(), rVals.end());
-            double lMed = !lVals.empty() ? lVals[lVals.size() / 2] : specData[lValley];
-            double rMed = !rVals.empty() ? rVals[rVals.size() / 2] : specData[rValley];
-
-            double rawStp = std::max(0.0, lMed - rMed);
-            double maxStp = std::max(0.0, 0.05 * rawAmp);
-            double finStp = std::min(rawStp, maxStp);
-
-            if (finStp >= 1.5 && rawAmp >= 25.0) {
-                initStep = finStp;
-                initBkg = rMed;
-                initSlope = 0.0;
-            } else {
-                initStep = 0.0;
-                initBkg = (lMed + rMed) / 2.0;
-                initSlope = (rValley > lValley) ? (rMed - lMed) / static_cast<double>(rValley - lValley) : 0.0;
-            }
-            rowWidgets[i].bkgStep = initStep;
+            const int totalB = static_cast<int>(specData.size());
+            const int cBin = std::clamp(static_cast<int>(std::round(initCentroid)), 1, totalB - 2);
+            const int hw = std::clamp(static_cast<int>(std::round(1.5 * initFwhm)), 4, std::max(5, static_cast<int>(std::round(initWin))));
+            const int c1 = std::max(1, cBin - hw);
+            const int c2 = std::min(totalB - 2, cBin + hw);
+            double lSum = 0.0, rSum = 0.0;
+            int nL = 0, nR = 0;
+            for (int c = c1; c <= std::min(c2, c1 + 2); ++c) { lSum += specData[c]; nL++; }
+            for (int c = std::max(c1, c2 - 2); c <= c2; ++c) { rSum += specData[c]; nR++; }
+            initBkg = std::max(0.0, std::min(nL > 0 ? lSum / nL : specData[c1], nR > 0 ? rSum / nR : specData[c2]));
         }
 
         // Col 0: Refit Peak button at the start of the row with explicit text and generous width
@@ -2955,31 +2973,13 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         spinB->setDecimals(1);
         spinB->setSingleStep(1.0);
         spinB->setValue(initBkg);
-        spinB->setToolTip(tr("Baseline offset (cts) directly under peak centroid."));
+        spinB->setToolTip(tr("Flat baseline offset (cts) across peak fitting region."));
         QPushButton *btnFixB = makeLockButton(tr("Baseline"), wBkg);
         lBkg->addWidget(spinB, 1);
         lBkg->addWidget(btnFixB);
         rowWidgets[i].spinBkg = spinB;
         rowWidgets[i].btnFixBkg = btnFixB;
         tbl->setCellWidget(i, 7, wBkg);
-
-        // Col 8: Background Slope SpinBox + Lock Button
-        QWidget *wSlope = new QWidget(tbl);
-        QHBoxLayout *lSlope = new QHBoxLayout(wSlope);
-        lSlope->setContentsMargins(2, 2, 2, 2);
-        lSlope->setSpacing(4);
-        QDoubleSpinBox *spinS = new QDoubleSpinBox(wSlope);
-        spinS->setRange(-1000.0, 1000.0);
-        spinS->setDecimals(3);
-        spinS->setSingleStep(0.01);
-        spinS->setValue(initSlope);
-        spinS->setToolTip(tr("Background slope (cts/ch) across the peak fitting region."));
-        QPushButton *btnFixS = makeLockButton(tr("Slope"), wSlope);
-        lSlope->addWidget(spinS, 1);
-        lSlope->addWidget(btnFixS);
-        rowWidgets[i].spinSlope = spinS;
-        rowWidgets[i].btnFixSlope = btnFixS;
-        tbl->setCellWidget(i, 8, wSlope);
     }
 
     peaksVBox->addWidget(tbl);
@@ -3043,7 +3043,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double cCh = rowWidgets[peakIdx].spinCentroid->value();
         double fCh = rowWidgets[peakIdx].spinFwhm->value();
         double bkgVal = rowWidgets[peakIdx].spinBkg->value();
-        double slopeVal = rowWidgets[peakIdx].spinSlope->value();
         double nomCh = rowWidgets[peakIdx].nominalCentroid;
         double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
 
@@ -3095,15 +3094,40 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         guideLine->SetY1(0.0);
         guideLine->SetY2(yMax * 1.05);
 
-        // 4. Gaussian Fit Function TF1 with Compton step: [0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))
+        // 4. Gaussian + Straight-Chord SNIP Background Fit Function TF1
         int binC = h->FindBin(cCh);
         double binCounts = (binC >= 1 && binC <= h->GetNbinsX()) ? h->GetBinContent(binC) : 0.0;
         double ampl = std::max(1.0, binCounts - bkgVal);
         rowWidgets[peakIdx].amplitude = ampl;
         double sigma = std::max(0.2, fCh / 2.35482);
-        double xMin = std::max(0.0, cCh - wCh);
-        double xMax = std::min(static_cast<double>(h->GetNbinsX()), cCh + wCh);
-        double stepVal = rowWidgets[peakIdx].bkgStep;
+        const int fitHalfW = std::max(3, static_cast<int>(std::round(wCh)));
+        const int fitMin = std::max(1, static_cast<int>(std::floor(cCh)) - fitHalfW);
+        const int fitMax = std::min(h->GetNbinsX() - 1, static_cast<int>(std::floor(cCh)) + fitHalfW);
+        double xMin = static_cast<double>(fitMin);
+        double xMax = static_cast<double>(fitMax) + 1.0;
+
+        TH1F *hSnipPad = activePad ? dynamic_cast<TH1F*>(activePad->GetPrimitive(Form("rbr_snip_continuum_%d", detId))) : nullptr;
+        auto evalPadChordSlope = [hSnipPad](double xLeft, double xRight) -> double {
+            if (!hSnipPad || xRight <= xLeft + 1.0) return 0.0;
+            const int b1 = std::clamp(hSnipPad->FindBin(xLeft), 1, hSnipPad->GetNbinsX());
+            const int b2 = std::clamp(hSnipPad->FindBin(xRight - 1e-4), b1, hSnipPad->GetNbinsX());
+            if (b2 <= b1) return 0.0;
+            const double xMid = 0.5 * (hSnipPad->GetBinCenter(b1) + hSnipPad->GetBinCenter(b2));
+            double sumS = 0.0, sumXS = 0.0, sumXX = 0.0;
+            int nB = 0;
+            for (int b = b1; b <= b2; ++b) {
+                const double dx = hSnipPad->GetBinCenter(b) - xMid;
+                const double sVal = std::max(0.0, hSnipPad->GetBinContent(b));
+                sumS += sVal;
+                sumXS += dx * sVal;
+                sumXX += dx * dx;
+                nB++;
+            }
+            const double meanS = (nB > 0) ? (sumS / nB) : 0.0;
+            const double slopeS = (sumXX > 1e-9) ? (sumXS / sumXX) : 0.0;
+            const double maxAbsSlope = 0.05 * std::max(0.25, meanS);
+            return (meanS > 0.25) ? std::clamp(slopeS, -maxAbsSlope, maxAbsSlope) : 0.0;
+        };
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
         if (fFit && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fFit)) {
@@ -3115,7 +3139,16 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
         if (!fFit) {
             fFit = new TF1(Form("rbr_fit_%d_%d", detId, peakIdx),
-                           "[0]*exp(-0.5*((x-[1])/[2])^2) + [3] + [4]*(x-[1]) + [5]*0.5*TMath::Erfc((x-[1])/(sqrt(2.0)*[2]))", xMin, xMax);
+                           [evalPadChordSlope, fitHalfW](double *x, double *p) -> double {
+                               const double sig = std::max(1e-4, std::abs(p[2]));
+                               const double dx = (x[0] - p[1]) / sig;
+                               const double gaus = (std::abs(dx) < 9.0) ? (p[0] * std::exp(-0.5 * dx * dx)) : 0.0;
+                               const double slopeS = evalPadChordSlope(p[1] - fitHalfW, p[1] + fitHalfW + 1.0);
+                               const double bkg = std::max(0.0, p[3] + slopeS * (x[0] - p[1]));
+                               return gaus + bkg;
+                           },
+                           xMin, xMax, 4);
+            fFit->SetNpx(std::max(150, static_cast<int>((xMax - xMin) * 6.0)));
             fFit->SetLineColor(kRed);
             fFit->SetLineWidth(2);
             fFit->Draw("same");
@@ -3127,10 +3160,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         fFit->SetParameter(1, cCh);
         fFit->SetParameter(2, sigma);
         fFit->SetParameter(3, bkgVal);
-        fFit->SetParameter(4, slopeVal);
-        fFit->SetParameter(5, stepVal);
 
-        // 5. Baseline Background Function TF1 with Compton step: [0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))
+        // 5. Local Straight-Chord SNIP Baseline Background Function TF1
         TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
         if (fBkg && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fBkg)) {
             fBkg = nullptr;
@@ -3141,9 +3172,14 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
         if (!fBkg) {
             fBkg = new TF1(Form("rbr_background_%d_%d", detId, peakIdx),
-                           "[0] + [1]*(x-[2]) + [3]*0.5*TMath::Erfc((x-[2])/(sqrt(2.0)*[4]))", xMin, xMax);
+                           [evalPadChordSlope, fitHalfW](double *x, double *p) -> double {
+                               const double slopeS = evalPadChordSlope(p[1] - fitHalfW, p[1] + fitHalfW + 1.0);
+                               return std::max(0.0, p[0] + slopeS * (x[0] - p[1]));
+                           },
+                           xMin, xMax, 2);
+            fBkg->SetNpx(std::max(100, static_cast<int>((xMax - xMin) * 4.0)));
             fBkg->SetLineColor(kBlue);
-            fBkg->SetLineWidth(1);
+            fBkg->SetLineWidth(2);
             fBkg->SetLineStyle(2);
             fBkg->Draw("same");
             m_mainCanvas->autoFitMarkers[s_i][s_j].push_back(fBkg);
@@ -3151,10 +3187,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         rowWidgets[peakIdx].bkgFunc = fBkg;
         fBkg->SetRange(xMin, xMax);
         fBkg->SetParameter(0, bkgVal);
-        fBkg->SetParameter(1, slopeVal);
-        fBkg->SetParameter(2, cCh);
-        fBkg->SetParameter(3, stepVal);
-        fBkg->SetParameter(4, sigma);
+        if (fBkg->GetNpar() >= 2) {
+            fBkg->SetParameter(1, cCh);
+        }
 
         // 6. Centroid Text Label TLatex directly over peak
         TLatex *peakLabel = rowWidgets[peakIdx].peakLabel;
@@ -3242,10 +3277,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             fa.centroidErrCh = std::max(0.01, rowWidgets[i].centroidErrCh);
             fa.fwhmCh = rowWidgets[i].spinFwhm->value();
             fa.background = rowWidgets[i].spinBkg->value();
-            fa.bkgSlope = rowWidgets[i].spinSlope->value();
-            fa.bkgStep = rowWidgets[i].bkgStep;
             fa.amplitude = rowWidgets[i].amplitude;
             fa.chi2 = rowWidgets[i].peakChi2;
+            fa.fitWinCh = rowWidgets[i].spinWindow ? rowWidgets[i].spinWindow->value() : std::clamp(std::round(2.5 * fa.fwhmCh), 5.0, 45.0);
             fa.isValid = (rowWidgets[i].chkUse && rowWidgets[i].chkUse->isChecked());
             allAnchors.push_back(fa);
             if (fa.isValid) {
@@ -3303,19 +3337,29 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         QString statusColor = (ok && res.status == RunCalibStatus::Success) ? "#4caf50" : "#ffa726";
         QString statusName = (ok && res.status == RunCalibStatus::Success) ? "GOOD (Acceptable \u03c7\u00b2)" : "INTERVENE (High \u03c7\u00b2)";
 
-        lblCurStatus->setText(QString("<b>Current Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
+        QString batchFlagNotice;
+        if (curRes.status != RunCalibStatus::Success || !curRes.failureReason.isEmpty()) {
+            const QString reasonText = curRes.failureReason.isEmpty()
+                ? tr("Flagged during batch run")
+                : curRes.failureReason;
+            batchFlagNotice = QString("<br><b>Batch Flag / Failure Reason:</b> <span style='color:#ff8a80; font-weight:bold;'>%1</span>")
+                                  .arg(reasonText);
+        }
+
+        lblCurStatus->setText(QString("<b>Live Preview Status:</b> <span style='color:%1; font-weight:bold;'>%2</span> &nbsp;|&nbsp; "
                                       "<b>Gain (a1):</b> %3 &nbsp;|&nbsp; "
                                       "<b>Offset (a0):</b> %4 ch &nbsp;|&nbsp; "
                                       "<b>Residual (s_res):</b> %5 keV &nbsp;|&nbsp; "
-                                      "<b>Calibration Line \u03c7\u00b2/ndf:</b> <span style='color:%1; font-weight:bold;'>%6</span> &nbsp;|&nbsp; "
-                                      "<b>Cutoff:</b> \u2264 %7")
+                                      "<b>Calibration \u03c7\u00b2/ndf:</b> <span style='color:%1; font-weight:bold;'>%6</span> &nbsp;|&nbsp; "
+                                      "<b>Cutoff:</b> \u2264 %7%8")
                                   .arg(statusColor)
                                   .arg(statusName)
                                   .arg(gainStr)
                                   .arg(offStr)
                                   .arg(resStr)
                                   .arg(chi2Str)
-                                  .arg(QString::number(maxChi2, 'f', 1)));
+                                  .arg(QString::number(maxChi2, 'f', 1))
+                                  .arg(batchFlagNotice));
 
         if (ok && res.status == RunCalibStatus::Success) {
             lblPreviewStatus->setText(QString("<span style='color:#4caf50;'>✅ ACCEPTABLE CALIBRATION: Gain (a1) = %1 | Offset (a0) = %2 ch | Residual (s_res) = %3 keV | <b>Energy Calibration Line \u03c7\u00b2/ndf = %4</b> (\u2264 %5 cutoff)</span>"
@@ -3380,7 +3424,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         double cCh = rowWidgets[peakIdx].spinCentroid->value();
         double fCh = rowWidgets[peakIdx].spinFwhm->value();
         double bkgVal = rowWidgets[peakIdx].spinBkg->value();
-        double slopeVal = rowWidgets[peakIdx].spinSlope->value();
         double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
         double en = rowWidgets[peakIdx].energy;
         const double prevCentroidErr = rowWidgets[peakIdx].centroidErrCh;
@@ -3394,16 +3437,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         fixed.fixBaseline = rowWidgets[peakIdx].btnFixBkg && rowWidgets[peakIdx].btnFixBkg->isChecked();
         fixed.fixedBaseline = bkgVal;
+        fixed.useExactFitWin = true;
 
-        fixed.fixSlope = rowWidgets[peakIdx].btnFixSlope && rowWidgets[peakIdx].btnFixSlope->isChecked();
-        fixed.fixedSlope = slopeVal;
-
-        // When the user clicks "Refit Peak" to optimize around their chosen centroid:
-        // if centroid is unlocked, search locally around cCh (within ± min(wCh, max(3.5, fCh * 1.5)))
-        // so MINUIT refines the peak the user is pointing to instead of jumping to a distant peak.
-        double fitWindow = fixed.fixCentroid ? wCh : std::clamp(fCh * 1.5, 3.5, std::max(5.0, wCh * 0.5));
-
-        FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, fitWindow, 5.0, en, fixed);
+        // Refit directly using the user's chosen fitting half-window wCh from the Window (±ch) spinbox
+        FittedAnchor fa = RunByRunEngine::fitAnchorPeakWithFixed(specData, cCh, wCh, 5.0, en, fixed);
         if (fa.isValid) {
             if (!fixed.fixCentroid) {
                 rowWidgets[peakIdx].spinCentroid->blockSignals(true);
@@ -3420,13 +3457,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 rowWidgets[peakIdx].spinBkg->setValue(fa.background);
                 rowWidgets[peakIdx].spinBkg->blockSignals(false);
             }
-            if (!fixed.fixSlope) {
-                rowWidgets[peakIdx].spinSlope->blockSignals(true);
-                rowWidgets[peakIdx].spinSlope->setValue(fa.bkgSlope);
-                rowWidgets[peakIdx].spinSlope->blockSignals(false);
-            }
             rowWidgets[peakIdx].amplitude = fa.amplitude;
-            rowWidgets[peakIdx].bkgStep = fa.bkgStep;
             rowWidgets[peakIdx].lastFittedCentroid = fa.centroidCh;
 
             if (fixed.fixCentroid && prevCentroidErr >= 0.02) {
@@ -3441,18 +3472,17 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             updateCanvasPeakOverlay(peakIdx);
 
             QString lockMsg;
-            if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline || fixed.fixSlope) {
+            if (fixed.fixCentroid || fixed.fixFwhm || fixed.fixBaseline) {
                 lockMsg = tr(" (respecting locked parameters)");
             }
             QToolTip::showText(rowWidgets[peakIdx].btnRefit->mapToGlobal(QPoint(0, 0)),
-                               tr("Fitted successfully%1:\nCentroid = %2 \u00b1 %3 ch\nPeak Fit \u03c7\u00b2/ndf = %4\nFWHM = %5 ch\nBaseline = %6 cts, Slope = %7 cts/ch")
+                               tr("Fitted successfully%1:\nCentroid = %2 \u00b1 %3 ch\nPeak Fit \u03c7\u00b2/ndf = %4\nFWHM = %5 ch\nBaseline = %6 cts")
                                    .arg(lockMsg)
                                    .arg(rowWidgets[peakIdx].spinCentroid->value(), 0, 'f', 2)
                                    .arg(rowWidgets[peakIdx].centroidErrCh, 0, 'f', 3)
                                    .arg(rowWidgets[peakIdx].peakChi2 > 0.0 ? QString::number(rowWidgets[peakIdx].peakChi2, 'f', 2) : "-")
                                    .arg(rowWidgets[peakIdx].spinFwhm->value(), 0, 'f', 2)
-                                   .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1)
-                                   .arg(rowWidgets[peakIdx].spinSlope->value(), 0, 'f', 3));
+                                   .arg(rowWidgets[peakIdx].spinBkg->value(), 0, 'f', 1));
         } else {
             QMessageBox::information(&dlg, tr("Refit Notice"),
                                      tr("Could not converge Gaussian fit around channel %1. You can nudge parameters manually or lock specific values.")
@@ -3492,11 +3522,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         });
 
         connect(rowWidgets[i].spinBkg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
-            recalcLivePreview();
-            updateCanvasPeakOverlay(peakIdx);
-        });
-
-        connect(rowWidgets[i].spinSlope, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });

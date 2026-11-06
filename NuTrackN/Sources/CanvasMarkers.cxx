@@ -1121,9 +1121,9 @@ void QMainCanvas::quickEnergyCalibration()
         return;
     }
 
-    // Convert bin to 0-indexed channel (ROOT bin N corresponds to X-axis [N-1, N], center N-0.5. True channel = N - 1)
-    double ch1 = bin1 - 1.0;
-    double ch2 = bin2 - 1.0;
+    // Convert bin to GASP channel center (ROOT bin N corresponds to X-axis [N-1, N], center (N-1) + 0.5)
+    double ch1 = hist->GetBinCenter(bin1);
+    double ch2 = hist->GetBinCenter(bin2);
 
     bool ok1, ok2;
     double e1 = QInputDialog::getDouble(this, "Quick Calibration",

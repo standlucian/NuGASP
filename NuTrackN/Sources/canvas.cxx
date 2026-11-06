@@ -540,7 +540,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     gStyle->SetCanvasColor(initialRootBg);
     gStyle->SetPadColor(initialRootBg);
     gStyle->SetFrameFillColor(initialRootBg);
-    HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, -0.5, 10240.0 - 0.5);
+    HijF[1][1] = new TracknHistogram("HijF[1][1]", "", 10240, 0.0, 10240.0);
     HijF[1][1]->GetXaxis()->SetNdivisions(510, kTRUE);
     HijF[1][1]->GetXaxis()->SetLabelSize(0);
     HijF[1][1]->GetXaxis()->SetTickLength(0);
