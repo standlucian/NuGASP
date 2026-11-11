@@ -26,9 +26,14 @@ struct DriftPlotPoint {
     int runNumber{0};
     QString runFileName;
     double gain{0.0};
+    double rawGain{0.0};
+    bool hasRawGain{false};
     double smoothedGain{0.0};
     bool hasSmoothedGain{false};
+    int chunkId{-1};
+    bool isChunkBoundary{false};
     bool isJumpBoundary{false};
+    bool isChunked{false};
     double nominalGain{1.0};
     double chi2ndf{0.0};
     RunCalibStatus status{RunCalibStatus::Success};
@@ -124,6 +129,7 @@ private slots:
     void onReadPeaksFromFileClicked();
     void onGrabParametersClicked();
     void onStartCalibrationClicked();
+    void onChunkCalibClicked();
     void onCancelCalibrationClicked();
     void onExportCalClicked();
     void onExportUcalClicked();
@@ -191,6 +197,8 @@ private:
 
     // Execution Controls
     QPushButton            *m_btnStart{nullptr};
+    QPushButton            *m_btnChunkCalib{nullptr};
+    QSpinBox               *m_spinChunkSize{nullptr};
     QPushButton            *m_btnCancel{nullptr};
     QPushButton            *m_btnExportCal{nullptr};
     QPushButton            *m_btnExportUcal{nullptr};

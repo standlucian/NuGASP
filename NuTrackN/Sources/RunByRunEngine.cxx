@@ -1662,10 +1662,34 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
     return true;
 }
 
+void RunByRunEngine::setChunkedMode(bool enabled, int chunkSize, double jumpCutoff, bool applySmoothing,
+                                    const std::vector<DetectorTrajectory> &pass1Traj)
+{
+    m_isChunkedRun = enabled;
+    m_chunkSize = std::max(2, chunkSize);
+    m_jumpCutoff = (jumpCutoff > 0.0) ? jumpCutoff : 0.00035;
+    m_chunkApplySmoothing = applySmoothing;
+    if (!pass1Traj.empty()) {
+        m_pass1Trajectories = pass1Traj;
+    }
+}
+
 //==============================================================================
-// run: Detector-by-Detector Trajectory Tracking Loop
+// run: Dispatches to either single-run pass or chunked pass
 //==============================================================================
 void RunByRunEngine::run()
+{
+    if (m_isChunkedRun) {
+        runChunkedPass();
+    } else {
+        runSingleRunPass();
+    }
+}
+
+//==============================================================================
+// runSingleRunPass: Detector-by-Detector Trajectory Tracking Loop (Pass 1)
+//==============================================================================
+void RunByRunEngine::runSingleRunPass()
 {
     m_stopRequested.store(false);
     m_trajectories.clear();
@@ -1807,8 +1831,353 @@ void RunByRunEngine::run()
                                                  .arg(dispersion, 0, 'f', 1));
         }
 
+        traj.rawRunResults = traj.runResults;
         emit detectorFinished(detId, traj.successCount, traj.failureCount);
         m_trajectories.push_back(traj);
+    }
+
+    const bool wasCancelled = m_stopRequested.load();
+    emit batchFinished(wasCancelled, overallSuccessCount, overallFailureCount);
+}
+
+//==============================================================================
+// runChunkedPass: High-Statistics Raw Histogram Chunking bounded by Jumps
+//==============================================================================
+void RunByRunEngine::runChunkedPass()
+{
+    m_stopRequested.store(false);
+    m_trajectories.clear();
+
+    const int nRuns = static_cast<int>(m_config.runFilePaths.size());
+    const int nDets = m_config.detectorEnd - m_config.detectorStart + 1;
+    if (nRuns <= 0 || nDets <= 0 || m_config.anchors.empty() || m_pass1Trajectories.empty()) {
+        emit batchFinished(false, 0, 0);
+        return;
+    }
+
+    const double dispersion = (m_config.nominalDispersion > 0.0) ? m_config.nominalDispersion : 1.0;
+    const int K = std::max(2, m_chunkSize);
+    const double jumpCut = (m_jumpCutoff > 0.0) ? m_jumpCutoff : 0.00035;
+
+    int overallSuccessCount = 0;
+    int overallFailureCount = 0;
+    int processedSteps = 0;
+    const int totalSteps = nDets * nRuns;
+
+    // Base centroids
+    std::vector<double> baseCentroids;
+    double sumExpFwhm = 0.0;
+    for (const auto &anchorDef : m_config.anchors) {
+        double guessCh = (anchorDef.initialChannel > 0.0)
+            ? anchorDef.initialChannel
+            : (anchorDef.physicalEnergy / dispersion);
+        baseCentroids.push_back(guessCh);
+        sumExpFwhm += std::max(1.5, anchorDef.expectedFwhmCh);
+    }
+    const int snipIters = std::clamp(
+        static_cast<int>(std::round(2.5 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
+        12, 35);
+
+    // OUTER LOOP: Detector d in [detectorStart .. detectorEnd]
+    for (int detId = m_config.detectorStart; detId <= m_config.detectorEnd; ++detId) {
+        if (m_stopRequested.load()) break;
+
+        emit detectorStarted(detId, nDets);
+
+        // Find Pass 1 trajectory for this detector
+        const DetectorTrajectory *pass1Traj = nullptr;
+        for (const auto &t : m_pass1Trajectories) {
+            if (t.detectorId == detId) {
+                pass1Traj = &t;
+                break;
+            }
+        }
+
+        DetectorTrajectory traj;
+        traj.detectorId = detId;
+        traj.isChunked = true;
+        traj.chunkSize = K;
+
+        // If no Pass 1 trajectory or all runs failed, skip dead detector
+        if (!pass1Traj || pass1Traj->runResults.empty() || pass1Traj->successCount == 0) {
+            if (pass1Traj) {
+                traj = *pass1Traj;
+                traj.isChunked = true;
+                traj.chunkSize = K;
+            }
+            m_trajectories.push_back(traj);
+            processedSteps += nRuns;
+            emit progressUpdated((processedSteps * 100) / totalSteps, QString("Skipping uncalibrated Detector #%1").arg(detId));
+            emit detectorFinished(detId, 0, nRuns);
+            continue;
+        }
+
+        traj.rawRunResults = pass1Traj->runResults;
+        traj.lastValidCentroids = pass1Traj->lastValidCentroids;
+
+        // Step 1: Identify jump boundaries across consecutive valid runs in Pass 1
+        std::vector<bool> isJumpBefore(nRuns, false);
+        int prevValid = -1;
+        for (int i = 0; i < nRuns; ++i) {
+            if (i >= static_cast<int>(pass1Traj->runResults.size())) break;
+            const auto &res = pass1Traj->runResults[i];
+            if (res.status != RunCalibStatus::Success || res.a1 <= 0.0) continue;
+            if (prevValid >= 0) {
+                double dGain = std::abs(res.a1 - pass1Traj->runResults[prevValid].a1);
+                if (dGain >= jumpCut) {
+                    isJumpBefore[i] = true;
+                }
+            }
+            prevValid = i;
+        }
+
+        // Step 2: Partition runs into segments bounded by jumps
+        struct RunSegment {
+            int startRun{0};
+            int endRun{0};
+        };
+        std::vector<RunSegment> segments;
+        int segStart = 0;
+        for (int i = 1; i < nRuns; ++i) {
+            if (isJumpBefore[i]) {
+                segments.push_back({segStart, i - 1});
+                segStart = i;
+            }
+        }
+        segments.push_back({segStart, nRuns - 1});
+
+        // Step 3: Within each segment, form chunks of size K, sum raw spectra, and fit
+        struct ChunkResult {
+            int chunkId{0};
+            std::vector<int> runIndices;
+            double centerRunIndex{0.0};
+            RunCalibResult fitRes;
+            bool success{false};
+        };
+
+        std::vector<ChunkResult> allChunks;
+        int globalChunkId = 0;
+
+        for (const auto &seg : segments) {
+            int r = seg.startRun;
+            while (r <= seg.endRun) {
+                int cEnd = std::min(seg.endRun, r + K - 1);
+                ChunkResult chunk;
+                chunk.chunkId = globalChunkId++;
+                double sumR = 0.0;
+                for (int cr = r; cr <= cEnd; ++cr) {
+                    chunk.runIndices.push_back(cr);
+                    sumR += static_cast<double>(cr);
+                }
+                chunk.centerRunIndex = sumR / static_cast<double>(chunk.runIndices.size());
+
+                // Sum raw spectra for runs in chunk
+                std::vector<double> chunkSpec(m_config.spectrumChannels, 0.0);
+                int validRawReadCount = 0;
+                for (int cr : chunk.runIndices) {
+                    if (cr >= static_cast<int>(m_config.runFilePaths.size())) continue;
+                    std::vector<double> rSpec;
+                    QString rErr;
+                    if (ReadSpectrumData(m_config.runFilePaths[cr].toStdString(),
+                                         m_config.spectrumFormat,
+                                         m_config.spectrumChannels,
+                                         detId,
+                                         rSpec,
+                                         &rErr) && !rSpec.empty()) {
+                        for (int ch = 0; ch < m_config.spectrumChannels && ch < static_cast<int>(rSpec.size()); ++ch) {
+                            chunkSpec[ch] += rSpec[ch];
+                        }
+                        validRawReadCount++;
+                    }
+                }
+
+                if (validRawReadCount > 0) {
+                    // Compute SNIP continuum for chunk
+                    auto snipBg = computeSnipContinuum(chunkSpec, snipIters);
+
+                    // Use centroid from Pass 1 nearest to centerRunIndex as expectedCentroids
+                    int centerR = static_cast<int>(std::round(chunk.centerRunIndex));
+                    std::vector<double> expectedCentroids = traj.lastValidCentroids;
+                    if (pass1Traj && centerR >= 0 && centerR < static_cast<int>(pass1Traj->runResults.size())) {
+                        const auto &refRes = pass1Traj->runResults[centerR];
+                        for (size_t aIdx = 0; aIdx < refRes.fittedAnchors.size() && aIdx < expectedCentroids.size(); ++aIdx) {
+                            if (refRes.fittedAnchors[aIdx].isValid && refRes.fittedAnchors[aIdx].centroidCh > 0.0) {
+                                expectedCentroids[aIdx] = refRes.fittedAnchors[aIdx].centroidCh;
+                            }
+                        }
+                    }
+
+                    RunCalibResult cRes;
+                    cRes.detectorId = detId;
+                    cRes.runNumber = centerR + 1;
+                    cRes.runFileName = QString("Chunk_%1").arg(chunk.chunkId);
+                    cRes.nominalGain = dispersion;
+
+                    const bool calOk = fitSpectrumBound(chunkSpec,
+                                                        m_config.anchors,
+                                                        expectedCentroids,
+                                                        baseCentroids,
+                                                        m_config.useQuadratic,
+                                                        dispersion,
+                                                        m_config.maxAllowedDriftCh,
+                                                        m_config.maxAllowedChi2NDF,
+                                                        cRes,
+                                                        &snipBg);
+                    if (calOk) {
+                        cRes.status = RunCalibStatus::Success;
+                        chunk.fitRes = cRes;
+                        chunk.success = true;
+                        // Update last valid centroids
+                        for (size_t aIdx = 0; aIdx < cRes.fittedAnchors.size() && aIdx < traj.lastValidCentroids.size(); ++aIdx) {
+                            if (cRes.fittedAnchors[aIdx].isValid && cRes.fittedAnchors[aIdx].centroidCh > 0.0) {
+                                traj.lastValidCentroids[aIdx] = cRes.fittedAnchors[aIdx].centroidCh;
+                            }
+                        }
+                    } else {
+                        chunk.fitRes = cRes;
+                        chunk.success = false;
+                    }
+                }
+
+                allChunks.push_back(chunk);
+                r = cEnd + 1;
+            }
+        }
+
+        // Step 4: Map chunk results back to each individual run within segments
+        traj.runResults.resize(nRuns);
+        int detSuccess = 0;
+        int detFail = 0;
+
+        for (const auto &seg : segments) {
+            // Collect chunks belonging to this segment
+            std::vector<ChunkResult*> segChunks;
+            for (auto &ck : allChunks) {
+                if (!ck.runIndices.empty() && ck.runIndices.front() >= seg.startRun && ck.runIndices.back() <= seg.endRun) {
+                    segChunks.push_back(&ck);
+                }
+            }
+
+            // Assign calibration to each run in segment
+            for (int rIdx = seg.startRun; rIdx <= seg.endRun; ++rIdx) {
+                RunCalibResult runRes;
+                if (pass1Traj && rIdx < static_cast<int>(pass1Traj->runResults.size())) {
+                    runRes = pass1Traj->runResults[rIdx];
+                    runRes.rawA0 = pass1Traj->runResults[rIdx].a0;
+                    runRes.rawA1 = pass1Traj->runResults[rIdx].a1;
+                    runRes.hasRawA1 = true;
+                } else {
+                    runRes.runNumber = rIdx + 1;
+                    runRes.runFileName = QFileInfo(m_config.runFilePaths[rIdx]).fileName();
+                    runRes.fullFilePath = m_config.runFilePaths[rIdx];
+                    runRes.detectorId = detId;
+                    runRes.nominalGain = dispersion;
+                }
+
+                runRes.isJumpBoundary = isJumpBefore[rIdx];
+
+                // Find chunk containing rIdx
+                ChunkResult *parentChunk = nullptr;
+                for (auto *ck : segChunks) {
+                    for (int cr : ck->runIndices) {
+                        if (cr == rIdx) {
+                            parentChunk = ck;
+                            break;
+                        }
+                    }
+                    if (parentChunk) break;
+                }
+
+                if (parentChunk) {
+                    runRes.chunkId = parentChunk->chunkId;
+                    runRes.isChunkBoundary = (rIdx == parentChunk->runIndices.front());
+                }
+
+                double finA1 = 1.0;
+                double finA0 = 0.0;
+                double finA2 = 0.0;
+                bool ok = false;
+
+                if (m_chunkApplySmoothing && segChunks.size() > 1) {
+                    double rD = static_cast<double>(rIdx);
+                    if (rD <= segChunks.front()->centerRunIndex) {
+                        if (segChunks.front()->success) {
+                            finA1 = segChunks.front()->fitRes.a1;
+                            finA0 = segChunks.front()->fitRes.a0;
+                            finA2 = segChunks.front()->fitRes.a2;
+                            ok = true;
+                        }
+                    } else if (rD >= segChunks.back()->centerRunIndex) {
+                        if (segChunks.back()->success) {
+                            finA1 = segChunks.back()->fitRes.a1;
+                            finA0 = segChunks.back()->fitRes.a0;
+                            finA2 = segChunks.back()->fitRes.a2;
+                            ok = true;
+                        }
+                    } else {
+                        for (size_t c = 0; c + 1 < segChunks.size(); ++c) {
+                            double c1 = segChunks[c]->centerRunIndex;
+                            double c2 = segChunks[c + 1]->centerRunIndex;
+                            if (rD >= c1 && rD <= c2) {
+                                double frac = (c2 > c1) ? ((rD - c1) / (c2 - c1)) : 0.0;
+                                const auto &res1 = segChunks[c]->fitRes;
+                                const auto &res2 = segChunks[c + 1]->fitRes;
+                                if (segChunks[c]->success && segChunks[c + 1]->success) {
+                                    finA1 = (1.0 - frac) * res1.a1 + frac * res2.a1;
+                                    finA0 = (1.0 - frac) * res1.a0 + frac * res2.a0;
+                                    finA2 = (1.0 - frac) * res1.a2 + frac * res2.a2;
+                                    ok = true;
+                                } else if (segChunks[c]->success) {
+                                    finA1 = res1.a1; finA0 = res1.a0; finA2 = res1.a2; ok = true;
+                                } else if (segChunks[c + 1]->success) {
+                                    finA1 = res2.a1; finA0 = res2.a0; finA2 = res2.a2; ok = true;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                } else if (parentChunk && parentChunk->success) {
+                    finA1 = parentChunk->fitRes.a1;
+                    finA0 = parentChunk->fitRes.a0;
+                    finA2 = parentChunk->fitRes.a2;
+                    ok = true;
+                }
+
+                if (ok) {
+                    runRes.a0 = finA0;
+                    runRes.a1 = finA1;
+                    runRes.a2 = finA2;
+                    runRes.status = RunCalibStatus::Success;
+                    if (parentChunk && parentChunk->success) {
+                        runRes.sRes = parentChunk->fitRes.sRes;
+                        runRes.chi2NDF = parentChunk->fitRes.chi2NDF;
+                        runRes.fittedAnchors = parentChunk->fitRes.fittedAnchors;
+                    }
+                    detSuccess++;
+                    overallSuccessCount++;
+                } else {
+                    if (runRes.status == RunCalibStatus::Success) {
+                        detSuccess++;
+                        overallSuccessCount++;
+                    } else {
+                        detFail++;
+                        overallFailureCount++;
+                    }
+                }
+
+                traj.runResults[rIdx] = runRes;
+                processedSteps++;
+                const int overallPct = (processedSteps * 100) / std::max(1, totalSteps);
+                emit runProcessed(detId, rIdx, nRuns, runRes);
+                emit progressUpdated(overallPct, QString("Chunking Detector #%1: Run %2 of %3 (%4)")
+                                                     .arg(detId).arg(rIdx + 1).arg(nRuns).arg(runRes.runFileName));
+            }
+        }
+
+        traj.successCount = detSuccess;
+        traj.failureCount = detFail;
+        m_trajectories.push_back(traj);
+        emit detectorFinished(detId, detSuccess, detFail);
     }
 
     const bool wasCancelled = m_stopRequested.load();

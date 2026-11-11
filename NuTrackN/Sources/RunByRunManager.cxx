@@ -216,26 +216,37 @@ void DetectorDriftPlotWidget::mouseMoveEvent(QMouseEvent *event)
             statusHtml = "<font color='#ef5350'><b>Failed / Uncalibrated</b></font>";
         }
 
-        QString smoothTip;
-        if (m_smoothingEnabled && pt.hasSmoothedGain) {
-            smoothTip = QString("<b>Smoothed Gain a1:</b> <font color='#ffd54f'><b>%1</b></font><br/>")
-                            .arg(pt.smoothedGain, 0, 'f', 6);
+        QString gainDetailsHtml;
+        if (pt.isChunked && pt.hasRawGain) {
+            gainDetailsHtml = QString("<b>Pass 1 Raw a1:</b> %1<br/>"
+                                      "<b>Finalized a1:</b> <font color='#ffd54f'><b>%2</b></font><br/>"
+                                      "<b>Chunk:</b> #%3%4<br/>")
+                                  .arg(pt.rawGain, 0, 'f', 6)
+                                  .arg(pt.gain, 0, 'f', 6)
+                                  .arg(pt.chunkId >= 0 ? QString::number(pt.chunkId) : "-")
+                                  .arg(pt.isChunkBoundary ? " (Chunk Boundary)" : "");
+        } else if (m_smoothingEnabled && pt.hasSmoothedGain) {
+            gainDetailsHtml = QString("<b>Fitted Gain a1:</b> %1<br/>"
+                                      "<b>Smoothed Gain a1:</b> <font color='#ffd54f'><b>%2</b></font><br/>")
+                                  .arg(pt.isValid ? QString::number(pt.gain, 'f', 6) : "-")
+                                  .arg(pt.smoothedGain, 0, 'f', 6);
+        } else {
+            gainDetailsHtml = QString("<b>Fitted Gain a1:</b> %1<br/>")
+                                  .arg(pt.isValid ? QString::number(pt.gain, 'f', 6) : "-");
         }
 
         QString tip = QString("<b>Run #%1:</b> %2<br/>"
                              "<b>Detector:</b> #%3<br/>"
                              "<b>Nominal Dispersion:</b> %4 keV/ch<br/>"
-                             "<b>Fitted Gain a1:</b> %5<br/>"
-                             "%6"
-                             "<b>Reduced &chi;&sup2;/ndf:</b> %7<br/>"
-                             "<b>Status:</b> %8<br/>"
+                             "%5"
+                             "<b>Reduced &chi;&sup2;/ndf:</b> %6<br/>"
+                             "<b>Status:</b> %7<br/>"
                              "<span style='color:#90caf9;'><i>Double-click to inspect spectrum and peak fits</i></span>")
                          .arg(pt.runNumber)
                          .arg(pt.runFileName)
                          .arg(m_detectorId)
                          .arg(QString::number(pt.nominalGain, 'f', 3))
-                         .arg(pt.isValid ? QString::number(pt.gain, 'f', 6) : "-")
-                         .arg(smoothTip)
+                         .arg(gainDetailsHtml)
                          .arg((pt.chi2ndf > 0.0) ? QString::number(pt.chi2ndf, 'f', 2) : "-")
                          .arg(statusHtml);
 
@@ -321,12 +332,18 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
     double minGain = 1e9, maxGain = -1e9;
     double minChi = 0.0, maxChi = 0.0;
     int validCount = 0;
+    bool anyChunked = false;
 
     for (const auto &pt : m_points) {
+        if (pt.isChunked) anyChunked = true;
         if (pt.isValid) {
             minGain = std::min(minGain, pt.gain);
             maxGain = std::max(maxGain, pt.gain);
             validCount++;
+        }
+        if (pt.isChunked && pt.hasRawGain) {
+            minGain = std::min(minGain, pt.rawGain);
+            maxGain = std::max(maxGain, pt.rawGain);
         }
         if (m_smoothingEnabled && pt.hasSmoothedGain) {
             minGain = std::min(minGain, pt.smoothedGain);
@@ -391,7 +408,23 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
     p.drawText(rGain.left() + 4, rGain.top() - 6,
                QString("Gain a1 — Detector #%1").arg(m_detectorId >= 0 ? QString::number(m_detectorId) : "-"));
 
-    if (m_smoothingEnabled && validCount > 1) {
+    if (anyChunked && validCount > 1) {
+        QFont legFont("Arial", 8, QFont::Bold);
+        p.setFont(legFont);
+
+        QString chunkLegend = "— Finalized a1 (Chunked)";
+        int chunkW = p.fontMetrics().horizontalAdvance(chunkLegend);
+
+        QString rawLegend = "— Raw Pass 1 a1   ";
+        int rawW = p.fontMetrics().horizontalAdvance(rawLegend);
+
+        double legX = rGain.right() - chunkW - rawW - 4;
+        p.setPen(QColor(76, 175, 80, 180));
+        p.drawText(legX, rGain.top() - 6, rawLegend);
+
+        p.setPen(QColor("#ffd54f"));
+        p.drawText(legX + rawW, rGain.top() - 6, chunkLegend);
+    } else if (m_smoothingEnabled && validCount > 1) {
         QFont legFont("Arial", 8, QFont::Bold);
         p.setFont(legFont);
 
@@ -440,58 +473,116 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
         return rChi.bottom() - norm * rChi.height();
     };
 
+    // Draw chunk boundary vertical dashed lines across rGain
+    if (anyChunked && nPts > 1) {
+        p.setPen(QPen(QColor("#37474f"), 1, Qt::DashLine));
+        for (int i = 1; i < nPts; ++i) {
+            if (m_points[i].isChunkBoundary) {
+                double cx = (getX(i - 1) + getX(i)) / 2.0;
+                p.drawLine(QPointF(cx, rGain.top()), QPointF(cx, rGain.bottom()));
+            }
+        }
+    }
 
     // Draw connecting lines for Gain
     if (validCount > 1) {
-        QPainterPath gainPath;
-        bool inSegment = false;
-        for (int i = 0; i < nPts; ++i) {
-            const auto &pt = m_points[i];
-            if (pt.isValid) {
-                double px = getX(i);
-                double py = getYGain(pt.gain);
-                if (!inSegment) {
-                    gainPath.moveTo(px, py);
-                    inSegment = true;
-                } else {
-                    gainPath.lineTo(px, py);
-                }
-            } else {
-                inSegment = false;
-            }
-        }
-        p.setPen(QPen(QColor(76, 175, 80, m_smoothingEnabled ? 140 : 255), m_smoothingEnabled ? 1.5 : 2.0));
-        p.drawPath(gainPath);
-
-        // Draw smoothed Gain curve
-        if (m_smoothingEnabled) {
-            QPainterPath smoothPath;
-            bool inSmoothSeg = false;
+        if (anyChunked) {
+            // Draw Pass 1 raw Gain curve
+            QPainterPath rawPath;
+            bool inRawSeg = false;
             for (int i = 0; i < nPts; ++i) {
                 const auto &pt = m_points[i];
-                if (pt.hasSmoothedGain) {
-                    if (pt.isJumpBoundary && inSmoothSeg) {
-                        inSmoothSeg = false; // Break path across hardware jumps!
-                    }
+                if (pt.hasRawGain) {
                     double px = getX(i);
-                    double py = getYGain(pt.smoothedGain);
-                    if (!inSmoothSeg) {
-                        smoothPath.moveTo(px, py);
-                        inSmoothSeg = true;
+                    double py = getYGain(pt.rawGain);
+                    if (!inRawSeg) {
+                        rawPath.moveTo(px, py);
+                        inRawSeg = true;
                     } else {
-                        smoothPath.lineTo(px, py);
+                        rawPath.lineTo(px, py);
                     }
                 } else {
-                    inSmoothSeg = false;
+                    inRawSeg = false;
                 }
             }
-            p.setPen(QPen(QColor("#ffd54f"), 2.5)); // Amber/gold smooth curve
-            p.drawPath(smoothPath);
+            p.setPen(QPen(QColor(76, 175, 80, 140), 1.5));
+            p.drawPath(rawPath);
+
+            // Draw Finalized chunked Gain curve (breaking at hardware jumps)
+            QPainterPath finalPath;
+            bool inFinalSeg = false;
+            for (int i = 0; i < nPts; ++i) {
+                const auto &pt = m_points[i];
+                if (pt.isValid) {
+                    if (pt.isJumpBoundary && inFinalSeg) {
+                        inFinalSeg = false; // Break path across hardware jumps!
+                    }
+                    double px = getX(i);
+                    double py = getYGain(pt.gain);
+                    if (!inFinalSeg) {
+                        finalPath.moveTo(px, py);
+                        inFinalSeg = true;
+                    } else {
+                        finalPath.lineTo(px, py);
+                    }
+                } else {
+                    inFinalSeg = false;
+                }
+            }
+            p.setPen(QPen(QColor("#ffd54f"), 2.5)); // Amber/gold finalized curve
+            p.drawPath(finalPath);
+        } else {
+            // Normal (Pass 1) Gain curve
+            QPainterPath gainPath;
+            bool inSegment = false;
+            for (int i = 0; i < nPts; ++i) {
+                const auto &pt = m_points[i];
+                if (pt.isValid) {
+                    double px = getX(i);
+                    double py = getYGain(pt.gain);
+                    if (!inSegment) {
+                        gainPath.moveTo(px, py);
+                        inSegment = true;
+                    } else {
+                        gainPath.lineTo(px, py);
+                    }
+                } else {
+                    inSegment = false;
+                }
+            }
+            p.setPen(QPen(QColor(76, 175, 80, m_smoothingEnabled ? 140 : 255), m_smoothingEnabled ? 1.5 : 2.0));
+            p.drawPath(gainPath);
+
+            // Draw smoothed Gain curve
+            if (m_smoothingEnabled) {
+                QPainterPath smoothPath;
+                bool inSmoothSeg = false;
+                for (int i = 0; i < nPts; ++i) {
+                    const auto &pt = m_points[i];
+                    if (pt.hasSmoothedGain) {
+                        if (pt.isJumpBoundary && inSmoothSeg) {
+                            inSmoothSeg = false; // Break path across hardware jumps!
+                        }
+                        double px = getX(i);
+                        double py = getYGain(pt.smoothedGain);
+                        if (!inSmoothSeg) {
+                            smoothPath.moveTo(px, py);
+                            inSmoothSeg = true;
+                        } else {
+                            smoothPath.lineTo(px, py);
+                        }
+                    } else {
+                        inSmoothSeg = false;
+                    }
+                }
+                p.setPen(QPen(QColor("#ffd54f"), 2.5)); // Amber/gold smooth curve
+                p.drawPath(smoothPath);
+            }
         }
 
         // Draw connecting lines for Chi2
         QPainterPath chiPath;
-        inSegment = false;
+        bool inSegment = false;
         for (int i = 0; i < nPts; ++i) {
             const auto &pt = m_points[i];
             if (pt.isValid) {
@@ -523,38 +614,71 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
         const auto &pt = m_points[i];
         double px = getX(i);
         bool isHovered = (i == m_hoveredIndex);
-        double rad = isHovered ? 6.0 : 4.0;
 
-        QColor ptColor;
-        if (pt.isFallback) {
-            ptColor = QColor("#ffa726"); // Amber
-        } else if (pt.isValid) {
-            ptColor = QColor("#4caf50"); // Green
-        } else if (pt.status == RunCalibStatus::BadChi2) {
-            ptColor = QColor("#f57c00"); // Orange for Intervene
+        if (anyChunked) {
+            // Draw raw Pass 1 dot
+            if (pt.hasRawGain) {
+                double pyRaw = getYGain(pt.rawGain);
+                p.setPen(QPen(QColor(76, 175, 80, 200), 1.0));
+                p.setBrush(QColor(76, 175, 80, 160));
+                p.drawEllipse(QPointF(px, pyRaw), 3.0, 3.0);
+            }
+
+            // Draw finalized chunked dot
+            QColor ptColor;
+            if (pt.isValid) {
+                ptColor = QColor("#ffd54f"); // Gold
+            } else if (pt.status == RunCalibStatus::BadChi2) {
+                ptColor = QColor("#f57c00");
+            } else {
+                ptColor = QColor("#ef5350");
+            }
+
+            double pyGain = pt.isValid ? getYGain(pt.gain) : (rGain.bottom() - 10.0);
+            double rad = isHovered ? 6.0 : 4.0;
+            p.setPen(QPen(ptColor.lighter(130), 1.5));
+            p.setBrush(ptColor);
+            p.drawEllipse(QPointF(px, pyGain), rad, rad);
+
+            if (isHovered && pt.isValid) {
+                p.setPen(QPen(QColor("#ffffff"), 2.0));
+                p.setBrush(Qt::NoBrush);
+                p.drawEllipse(QPointF(px, pyGain), 7.5, 7.5);
+            }
         } else {
-            ptColor = QColor("#ef5350"); // Red for Fail
-        }
+            double rad = isHovered ? 6.0 : 4.0;
+            QColor ptColor;
+            if (pt.isFallback) {
+                ptColor = QColor("#ffa726"); // Amber
+            } else if (pt.isValid) {
+                ptColor = QColor("#4caf50"); // Green
+            } else if (pt.status == RunCalibStatus::BadChi2) {
+                ptColor = QColor("#f57c00"); // Orange for Intervene
+            } else {
+                ptColor = QColor("#ef5350"); // Red for Fail
+            }
 
-        // Gain point
-        double pyGain = pt.isValid ? getYGain(pt.gain) : (rGain.bottom() - 10.0);
-        p.setPen(QPen(ptColor.lighter(130), 1.5));
-        p.setBrush(ptColor);
-        p.drawEllipse(QPointF(px, pyGain), rad, rad);
+            // Gain point
+            double pyGain = pt.isValid ? getYGain(pt.gain) : (rGain.bottom() - 10.0);
+            p.setPen(QPen(ptColor.lighter(130), 1.5));
+            p.setBrush(ptColor);
+            p.drawEllipse(QPointF(px, pyGain), rad, rad);
 
-        // Highlight smoothed gain point when hovered
-        if (m_smoothingEnabled && pt.hasSmoothedGain && isHovered) {
-            double pySmooth = getYGain(pt.smoothedGain);
-            p.setPen(QPen(QColor("#ffd54f"), 2.0));
-            p.setBrush(Qt::NoBrush);
-            p.drawEllipse(QPointF(px, pySmooth), 6.5, 6.5);
+            // Highlight smoothed gain point when hovered
+            if (m_smoothingEnabled && pt.hasSmoothedGain && isHovered) {
+                double pySmooth = getYGain(pt.smoothedGain);
+                p.setPen(QPen(QColor("#ffd54f"), 2.0));
+                p.setBrush(Qt::NoBrush);
+                p.drawEllipse(QPointF(px, pySmooth), 6.5, 6.5);
+            }
         }
 
         // Chi2 point
+        QColor chiColor = pt.isValid ? QColor("#00e5ff") : QColor("#ef5350");
         double pyChi = (pt.chi2ndf > 0.0) ? getYChi(pt.chi2ndf) : (rChi.bottom() - 10.0);
-        p.setPen(QPen(ptColor.lighter(130), 1.5));
-        p.setBrush(ptColor);
-        p.drawEllipse(QPointF(px, pyChi), rad, rad);
+        p.setPen(QPen(chiColor.lighter(130), 1.5));
+        p.setBrush(chiColor);
+        p.drawEllipse(QPointF(px, pyChi), isHovered ? 5.5 : 3.5, isHovered ? 5.5 : 3.5);
     }
 
     // X-axis Run ticks & labels at bottom of rChi
@@ -850,18 +974,34 @@ void RunByRunManager::setupUI()
     m_btnCancel = new QPushButton(tr("⬛ Cancel"), this);
     m_btnCancel->setEnabled(false);
 
+    m_spinChunkSize = new QSpinBox(this);
+    m_spinChunkSize->setRange(2, 50);
+    m_spinChunkSize->setValue(5);
+    m_spinChunkSize->setSuffix(tr(" runs"));
+    m_spinChunkSize->setToolTip(tr("Number of consecutive runs to sum into high-statistics chunks (strictly bounded by hardware jumps)."));
+
+    m_btnChunkCalib = new QPushButton(tr("⚡ Re-Calibrate with Chunks"), this);
+    m_btnChunkCalib->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 6px 14px;");
+    m_btnChunkCalib->setToolTip(tr("Pass 2: Sum raw spectra across chunk runs (without crossing jumps) and re-fit peaks with high statistics."));
+    m_btnChunkCalib->setEnabled(false);
+
     m_btnExportCal = new QPushButton(tr("💾 Export Legacy Xtrackn .cal"), this);
     m_btnExportCal->setEnabled(false);
     m_btnExportUcal = new QPushButton(tr("📊 Export Extended .ucal (Uncertainties)"), this);
     m_btnExportUcal->setEnabled(false);
 
     connect(m_btnStart, &QPushButton::clicked, this, &RunByRunManager::onStartCalibrationClicked);
+    connect(m_btnChunkCalib, &QPushButton::clicked, this, &RunByRunManager::onChunkCalibClicked);
     connect(m_btnCancel, &QPushButton::clicked, this, &RunByRunManager::onCancelCalibrationClicked);
     connect(m_btnExportCal, &QPushButton::clicked, this, &RunByRunManager::onExportCalClicked);
     connect(m_btnExportUcal, &QPushButton::clicked, this, &RunByRunManager::onExportUcalClicked);
 
     execBar->addWidget(m_btnStart);
     execBar->addWidget(m_btnCancel);
+    execBar->addSpacing(15);
+    execBar->addWidget(new QLabel(tr("Chunk:"), this));
+    execBar->addWidget(m_spinChunkSize);
+    execBar->addWidget(m_btnChunkCalib);
     execBar->addSpacing(20);
     execBar->addWidget(m_btnExportCal);
     execBar->addWidget(m_btnExportUcal);
@@ -1797,6 +1937,7 @@ void RunByRunManager::onStartCalibrationClicked()
     m_completedTrajectories.clear();
     m_isRunning = true;
     m_btnStart->setEnabled(false);
+    m_btnChunkCalib->setEnabled(false);
     m_btnCancel->setEnabled(true);
     m_btnExportCal->setEnabled(false);
     m_btnExportUcal->setEnabled(false);
@@ -1810,6 +1951,81 @@ void RunByRunManager::onStartCalibrationClicked()
 
     m_engine = std::make_unique<RunByRunEngine>();
     m_engine->setConfig(cfg);
+
+    m_workerThread = new QThread(this);
+    m_engine->moveToThread(m_workerThread);
+
+    connect(m_engine.get(), &RunByRunEngine::detectorStarted, this, &RunByRunManager::onDetectorStarted);
+    connect(m_engine.get(), &RunByRunEngine::runProcessed, this, &RunByRunManager::onRunProcessed);
+    connect(m_engine.get(), &RunByRunEngine::detectorFinished, this, &RunByRunManager::onDetectorFinished);
+    connect(m_engine.get(), &RunByRunEngine::progressUpdated, this, &RunByRunManager::onProgressUpdated);
+    connect(m_engine.get(), &RunByRunEngine::batchFinished, this, &RunByRunManager::onBatchFinished);
+
+    connect(m_workerThread, &QThread::started, m_engine.get(), &RunByRunEngine::run);
+    connect(m_engine.get(), &RunByRunEngine::batchFinished, m_workerThread, &QThread::quit);
+
+    m_workerThread->start();
+}
+
+void RunByRunManager::onChunkCalibClicked()
+{
+    if (m_runFilePaths.empty() || m_completedTrajectories.empty()) {
+        QMessageBox::warning(this, tr("No Data"), tr("Please perform initial single-run calibration first before running chunked calibration."));
+        return;
+    }
+
+    // Read back anchors from table
+    syncAnchorsFromTable();
+
+    if (m_anchors.size() < 2) {
+        QMessageBox::warning(this, tr("Insufficient Anchors"),
+                             tr("Please specify at least 2 anchor lines to calculate energy calibration slope and offset."));
+        return;
+    }
+
+    const int dStart = m_spinDetStart->value();
+    const int dEnd = m_spinDetEnd->value();
+    if (dStart > dEnd) {
+        QMessageBox::warning(this, tr("Invalid Detectors"), tr("Start detector cannot be greater than end detector."));
+        return;
+    }
+
+    const int chunkSize = m_spinChunkSize ? m_spinChunkSize->value() : 5;
+    const double jumpCut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
+    const bool applySmoothing = m_chkSmoothGain ? m_chkSmoothGain->isChecked() : true;
+
+    // Configure Engine
+    RunByRunConfig cfg;
+    cfg.runFilePaths = m_runFilePaths;
+    cfg.detectorStart = dStart;
+    cfg.detectorEnd = dEnd;
+    cfg.spectrumChannels = m_comboChannelLength->currentData().toInt();
+    cfg.spectrumFormat = SpectrumFormat::LongInt32;
+    cfg.anchors = m_anchors;
+    cfg.useQuadratic = m_chkQuadratic->isChecked();
+    cfg.maxAllowedDriftCh = m_spinDriftTolerance->value();
+    cfg.maxAllowedChi2NDF = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
+    cfg.nominalDispersion = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
+
+    m_isRunning = true;
+    m_btnStart->setEnabled(false);
+    m_btnChunkCalib->setEnabled(false);
+    m_btnCancel->setEnabled(true);
+    m_btnExportCal->setEnabled(false);
+    m_btnExportUcal->setEnabled(false);
+    m_progressBar->setValue(0);
+    m_lblStatusText->setText(tr("Starting Pass 2: High-statistics chunked calibration (K=%1, jump cut=%2%)...")
+                                 .arg(chunkSize).arg(jumpCut * 100.0, 0, 'f', 3));
+
+    if (m_workerThread && m_workerThread->isRunning()) {
+        if (m_engine) m_engine->requestStop();
+        m_workerThread->quit();
+        m_workerThread->wait(2000);
+    }
+
+    m_engine = std::make_unique<RunByRunEngine>();
+    m_engine->setConfig(cfg);
+    m_engine->setChunkedMode(true, chunkSize, jumpCut, applySmoothing, m_completedTrajectories);
 
     m_workerThread = new QThread(this);
     m_engine->moveToThread(m_workerThread);
@@ -1863,16 +2079,37 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
     double nomG = (result.nominalGain > 0.0) ? result.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
 
     if (result.status == RunCalibStatus::Success && !result.isFallbackFromPrevious) {
-        item->setText("GOOD");
-        item->setBackground(QBrush(QColor("#2e7d32"))); // Green
+        if (result.chunkId >= 0) {
+            item->setText(QString("CHK #%1").arg(result.chunkId));
+            item->setBackground(QBrush(QColor("#00695c"))); // Teal for chunked
+        } else {
+            item->setText("GOOD");
+            item->setBackground(QBrush(QColor("#2e7d32"))); // Green
+        }
         item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2\nNominal: %3 keV/ch\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
-                             .arg(result.runFileName).arg(detId)
-                             .arg(nomG, 0, 'f', 2)
-                             .arg(result.a0, 0, 'f', 4)
-                             .arg(result.a1, 0, 'f', 6)
-                             .arg(result.sRes, 0, 'f', 4)
-                             .arg(result.chi2NDF, 0, 'f', 2));
+
+        QString tipText;
+        if (result.hasRawA1) {
+            tipText = QString("Run: %1 | Det: %2 [CHUNK #%3%4]\nNominal: %5 keV/ch\nPass 1 Raw a1: %6\nFinalized a1: %7\na0: %8 ch\ns_res: %9 keV\nchi2/ndf: %10")
+                          .arg(result.runFileName).arg(detId)
+                          .arg(result.chunkId)
+                          .arg(result.isChunkBoundary ? " (Boundary)" : "")
+                          .arg(nomG, 0, 'f', 2)
+                          .arg(result.rawA1, 0, 'f', 6)
+                          .arg(result.a1, 0, 'f', 6)
+                          .arg(result.a0, 0, 'f', 4)
+                          .arg(result.sRes, 0, 'f', 4)
+                          .arg(result.chi2NDF, 0, 'f', 2);
+        } else {
+            tipText = QString("Run: %1 | Det: %2\nNominal: %3 keV/ch\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
+                          .arg(result.runFileName).arg(detId)
+                          .arg(nomG, 0, 'f', 2)
+                          .arg(result.a0, 0, 'f', 4)
+                          .arg(result.a1, 0, 'f', 6)
+                          .arg(result.sRes, 0, 'f', 4)
+                          .arg(result.chi2NDF, 0, 'f', 2);
+        }
+        item->setToolTip(tipText);
     } else if (result.isFallbackFromPrevious) {
         item->setText(QString("~%1 (R%2)").arg(result.a1, 0, 'f', 4).arg(result.fallbackSourceRun));
         item->setBackground(QBrush(QColor("#e65100"))); // Amber / Orange
@@ -1931,6 +2168,7 @@ void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int tota
     if (m_engine) {
         m_completedTrajectories = m_engine->getTrajectories();
     }
+    m_btnChunkCalib->setEnabled(!m_completedTrajectories.empty());
 
     if (m_workerThread) {
         m_workerThread->quit();
@@ -2353,6 +2591,8 @@ void RunByRunManager::updatePlot(int detId)
     std::vector<DriftPlotPoint> plotPoints;
     plotPoints.reserve(numRuns);
 
+    const bool isChunkedTraj = targetTraj->isChunked;
+
     for (int r = 0; r < numRuns; ++r) {
         const auto &res = targetTraj->runResults[r];
         double runNomGain = (res.nominalGain > 0.0) ? res.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
@@ -2363,11 +2603,24 @@ void RunByRunManager::updatePlot(int detId)
         pt.runFileName = res.runFileName;
         pt.nominalGain = runNomGain;
         pt.gain = res.a1;
+        pt.isChunked = isChunkedTraj;
+
+        if (isChunkedTraj && res.hasRawA1) {
+            pt.rawGain = res.rawA1;
+            pt.hasRawGain = true;
+            pt.chunkId = res.chunkId;
+            pt.isChunkBoundary = res.isChunkBoundary;
+        } else if (r < static_cast<int>(targetTraj->rawRunResults.size())) {
+            pt.rawGain = targetTraj->rawRunResults[r].a1;
+            pt.hasRawGain = (targetTraj->rawRunResults[r].status == RunCalibStatus::Success);
+        }
+
         pt.chi2ndf = res.chi2NDF;
         pt.status = res.status;
         pt.isFallback = res.isFallbackFromPrevious;
         pt.fallbackSourceRun = res.fallbackSourceRun;
         pt.isValid = (res.status == RunCalibStatus::Success);
+        pt.isJumpBoundary = res.isJumpBoundary;
         plotPoints.push_back(pt);
     }
 
@@ -2376,8 +2629,13 @@ void RunByRunManager::updatePlot(int detId)
     int win = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
     double cut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
-    if (doSmooth) {
+    if (doSmooth && !isChunkedTraj) {
         computeSmoothedGains(plotPoints, win, keepJumps, cut);
+    } else if (isChunkedTraj) {
+        for (auto &pt : plotPoints) {
+            pt.smoothedGain = pt.gain;
+            pt.hasSmoothedGain = pt.isValid;
+        }
     }
 
     for (int r = 0; r < numRuns; ++r) {
@@ -2398,26 +2656,30 @@ void RunByRunManager::updatePlot(int detId)
         m_tablePlotData->setItem(r, 2, itemNom);
 
         if (res.status == RunCalibStatus::Success && !res.isFallbackFromPrevious) {
-            m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(res.a1, 'f', 6)));
+            double pass1Gain = pt.hasRawGain ? pt.rawGain : res.a1;
+            m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(pass1Gain, 'f', 6)));
 
-            QTableWidgetItem *itemSmooth = new QTableWidgetItem(pt.hasSmoothedGain ? QString::number(pt.smoothedGain, 'f', 6) : "-");
+            double finalGainVal = isChunkedTraj ? res.a1 : (pt.hasSmoothedGain ? pt.smoothedGain : res.a1);
+            QTableWidgetItem *itemSmooth = new QTableWidgetItem(QString::number(finalGainVal, 'f', 6));
             itemSmooth->setTextAlignment(Qt::AlignCenter);
-            if (pt.hasSmoothedGain) itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
+            itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
             m_tablePlotData->setItem(r, 4, itemSmooth);
 
             m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
             m_tablePlotData->setItem(r, 6, new QTableWidgetItem(QString::number(res.sRes, 'f', 4)));
             m_tablePlotData->setItem(r, 7, new QTableWidgetItem(QString::number(res.chi2NDF, 'f', 2)));
-            QTableWidgetItem *st = new QTableWidgetItem("OK");
+            QTableWidgetItem *st = new QTableWidgetItem(isChunkedTraj ? QString("CHUNK #%1").arg(pt.chunkId >= 0 ? QString::number(pt.chunkId) : "-") : "OK");
             st->setForeground(QBrush(QColor("#4caf50")));
             st->setTextAlignment(Qt::AlignCenter);
             m_tablePlotData->setItem(r, 8, st);
         } else if (res.isFallbackFromPrevious) {
-            m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(res.a1, 'f', 6)));
+            double pass1Gain = pt.hasRawGain ? pt.rawGain : res.a1;
+            m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(pass1Gain, 'f', 6)));
 
-            QTableWidgetItem *itemSmooth = new QTableWidgetItem(pt.hasSmoothedGain ? QString::number(pt.smoothedGain, 'f', 6) : "-");
+            double finalGainVal = isChunkedTraj ? res.a1 : (pt.hasSmoothedGain ? pt.smoothedGain : res.a1);
+            QTableWidgetItem *itemSmooth = new QTableWidgetItem(QString::number(finalGainVal, 'f', 6));
             itemSmooth->setTextAlignment(Qt::AlignCenter);
-            if (pt.hasSmoothedGain) itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
+            itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
             m_tablePlotData->setItem(r, 4, itemSmooth);
 
             m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
@@ -2837,7 +3099,7 @@ void RunByRunManager::onExportCalClicked()
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        if (applySmoothing) {
+        if (applySmoothing && !traj.isChunked) {
             DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps, jumpCut);
             for (const auto &r : smoothedTraj.runResults) {
                 allResults.push_back(r);
@@ -2939,7 +3201,7 @@ void RunByRunManager::onExportUcalClicked()
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        if (applySmoothing) {
+        if (applySmoothing && !traj.isChunked) {
             DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps, jumpCut);
             for (const auto &r : smoothedTraj.runResults) {
                 allResults.push_back(r);

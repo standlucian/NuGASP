@@ -83,6 +83,14 @@ struct RunCalibResult {
     double sRes{0.0};         // Residual standard error (in keV)
     double chi2NDF{0.0};
 
+    // Raw Pass 1 values (when chunked)
+    double rawA0{0.0};
+    double rawA1{0.0};
+    bool hasRawA1{false};
+    int chunkId{-1};
+    bool isChunkBoundary{false};
+    bool isJumpBoundary{false};
+
     std::vector<FittedAnchor> fittedAnchors;
 };
 
@@ -90,9 +98,12 @@ struct RunCalibResult {
 struct DetectorTrajectory {
     int detectorId{0};
     std::vector<RunCalibResult> runResults;
+    std::vector<RunCalibResult> rawRunResults;
     std::vector<double> lastValidCentroids;
     int successCount{0};
     int failureCount{0};
+    bool isChunked{false};
+    int chunkSize{5};
 };
 
 // Configuration passed into the batch engine
@@ -123,6 +134,10 @@ public:
 
     void setConfig(const RunByRunConfig &config);
     const RunByRunConfig& getConfig() const { return m_config; }
+
+    void setChunkedMode(bool enabled, int chunkSize, double jumpCutoff, bool applySmoothing,
+                        const std::vector<DetectorTrajectory> &pass1Traj = {});
+    bool isChunkedMode() const { return m_isChunkedRun; }
 
 public slots:
     // Start batch calibration (can be called asynchronously)
@@ -189,9 +204,18 @@ signals:
     void batchFinished(bool cancelled, int totalSuccess, int totalFailures);
 
 private:
+    void runSingleRunPass();
+    void runChunkedPass();
+
     RunByRunConfig m_config;
     std::atomic<bool> m_stopRequested{false};
     std::vector<DetectorTrajectory> m_trajectories;
+
+    bool m_isChunkedRun{false};
+    int m_chunkSize{5};
+    double m_jumpCutoff{0.00035};
+    bool m_chunkApplySmoothing{true};
+    std::vector<DetectorTrajectory> m_pass1Trajectories;
 };
 
 Q_DECLARE_METATYPE(RunCalibResult)
