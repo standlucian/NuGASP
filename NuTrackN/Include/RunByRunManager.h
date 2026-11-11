@@ -56,6 +56,8 @@ public:
     int smoothingWindow() const { return m_smoothingWindow; }
     void setPreserveJumps(bool preserve);
     bool preserveJumps() const { return m_preserveJumps; }
+    void setJumpThreshold(double threshold);
+    double jumpThreshold() const { return m_jumpThreshold; }
 
 signals:
     void runPointDoubleClicked(int runIndex);
@@ -74,6 +76,7 @@ private:
     bool m_smoothingEnabled{false};
     int m_smoothingWindow{5};
     bool m_preserveJumps{true};
+    double m_jumpThreshold{0.00035};
 };
 
 class RunDownloadWorker : public QObject {
@@ -153,8 +156,8 @@ private:
     void startAsyncDownload();
     void cancelAsyncDownload();
     void cleanupDownloadThread();
-    void computeSmoothedGains(std::vector<DriftPlotPoint> &points, int windowSize, bool preserveJumps);
-    DetectorTrajectory getSmoothedTrajectory(const DetectorTrajectory &traj, int windowSize, bool preserveJumps) const;
+    void computeSmoothedGains(std::vector<DriftPlotPoint> &points, int windowSize, bool preserveJumps, double jumpThreshold = 0.00035);
+    DetectorTrajectory getSmoothedTrajectory(const DetectorTrajectory &traj, int windowSize, bool preserveJumps, double jumpThreshold = 0.00035) const;
 
     QMainCanvas            *m_mainCanvas{nullptr};
     std::unique_ptr<RunByRunEngine> m_engine;
@@ -202,6 +205,7 @@ private:
     QCheckBox              *m_chkSmoothGain{nullptr};
     QSpinBox               *m_spinSmoothWindow{nullptr};
     QCheckBox              *m_chkPreserveJumps{nullptr};
+    QDoubleSpinBox         *m_spinJumpThreshold{nullptr};
     DetectorDriftPlotWidget *m_plotWidget{nullptr};
     QTableWidget           *m_tablePlotData{nullptr}; // Numeric trend data & diagnostics
 
