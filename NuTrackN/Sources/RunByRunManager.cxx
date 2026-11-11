@@ -1951,6 +1951,7 @@ void RunByRunManager::onStartCalibrationClicked()
     }
 
     m_completedTrajectories.clear();
+    m_pass1Trajectories.clear();
     m_isRunning = true;
     m_btnStart->setEnabled(false);
     m_btnChunkCalib->setEnabled(false);
@@ -2042,7 +2043,8 @@ void RunByRunManager::onChunkCalibClicked()
 
     m_engine = std::make_unique<RunByRunEngine>();
     m_engine->setConfig(cfg);
-    m_engine->setChunkedMode(true, chunkSize, jumpCut, applySmoothing, chunkMaxChi2, m_completedTrajectories);
+    const auto &baseTraj = !m_pass1Trajectories.empty() ? m_pass1Trajectories : m_completedTrajectories;
+    m_engine->setChunkedMode(true, chunkSize, jumpCut, applySmoothing, chunkMaxChi2, baseTraj);
 
     m_workerThread = new QThread(this);
     m_engine->moveToThread(m_workerThread);
@@ -2179,6 +2181,9 @@ void RunByRunManager::onBatchFinished(bool cancelled, int totalSuccess, int tota
 
     if (m_engine) {
         m_completedTrajectories = m_engine->getTrajectories();
+        if (!m_engine->isChunkedMode()) {
+            m_pass1Trajectories = m_completedTrajectories;
+        }
     }
     m_btnChunkCalib->setEnabled(!m_completedTrajectories.empty());
 

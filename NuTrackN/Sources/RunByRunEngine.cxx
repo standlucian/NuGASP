@@ -1914,7 +1914,12 @@ void RunByRunEngine::runChunkedPass()
             continue;
         }
 
-        traj.rawRunResults = pass1Traj->runResults;
+        // If this pass1Traj is itself already chunked, retrieve its preserved Pass 1 single-run results
+        if (!pass1Traj->rawRunResults.empty() && pass1Traj->isChunked) {
+            traj.rawRunResults = pass1Traj->rawRunResults;
+        } else {
+            traj.rawRunResults = pass1Traj->runResults;
+        }
         traj.lastValidCentroids = pass1Traj->lastValidCentroids;
 
         // Step 1: Identify jump boundaries across consecutive valid runs in Pass 1
@@ -2096,7 +2101,12 @@ void RunByRunEngine::runChunkedPass()
             // Assign calibration to each run in segment
             for (int rIdx = seg.startRun; rIdx <= seg.endRun; ++rIdx) {
                 RunCalibResult runRes;
-                if (pass1Traj && rIdx < static_cast<int>(pass1Traj->runResults.size())) {
+                if (rIdx < static_cast<int>(traj.rawRunResults.size())) {
+                    runRes = traj.rawRunResults[rIdx];
+                    runRes.rawA0 = traj.rawRunResults[rIdx].a0;
+                    runRes.rawA1 = traj.rawRunResults[rIdx].a1;
+                    runRes.hasRawA1 = true;
+                } else if (pass1Traj && rIdx < static_cast<int>(pass1Traj->runResults.size())) {
                     runRes = pass1Traj->runResults[rIdx];
                     runRes.rawA0 = pass1Traj->runResults[rIdx].a0;
                     runRes.rawA1 = pass1Traj->runResults[rIdx].a1;

@@ -219,6 +219,7 @@ private:
     QTableWidget           *m_tablePlotData{nullptr}; // Numeric trend data & diagnostics
 
     // Cached results
+    std::vector<DetectorTrajectory> m_pass1Trajectories;
     std::vector<DetectorTrajectory> m_completedTrajectories;
     bool m_isRunning{false};
 };
