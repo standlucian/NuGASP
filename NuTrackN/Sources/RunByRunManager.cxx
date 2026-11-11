@@ -4339,6 +4339,8 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
             if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+            // When intervening on a chunk, do not overwrite runs that were excluded from the chunk
+            if (isChunkIntervention && targetTraj->runResults[applyR].chunkId != curRes.chunkId) continue;
 
             const bool wasFailure = (targetTraj->runResults[applyR].status != RunCalibStatus::Success);
             RunCalibResult runCal = liveCalibResult;
@@ -4442,6 +4444,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
             for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
                 if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+                if (isChunkIntervention && targetTraj->runResults[applyR].chunkId != curRes.chunkId) continue;
                 const bool wasFailure = (targetTraj->runResults[applyR].status != RunCalibStatus::Success);
                 RunCalibResult runCal = liveCalibResult;
                 runCal.runNumber = applyR + 1;
@@ -4482,6 +4485,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         } else {
             for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
                 if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+                if (isChunkIntervention && targetTraj->runResults[applyR].chunkId != curRes.chunkId) continue;
                 targetTraj->runResults[applyR].nominalGain = runNomGain;
                 targetTraj->runResults[applyR].status = RunCalibStatus::Success;
                 targetTraj->runResults[applyR].isFallbackFromPrevious = false;

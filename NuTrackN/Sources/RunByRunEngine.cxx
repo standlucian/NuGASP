@@ -1969,7 +1969,8 @@ void RunByRunEngine::runChunkedPass()
         }
         segments.push_back({segStart, nRuns - 1});
 
-        // Step 3: Within each segment, form chunks of size K, sum raw spectra, and fit
+        // Step 3: Within each segment, form chunks of size K from VALID (successful) runs only.
+        // Failed fits from Pass 1 are strictly excluded from chunking.
         struct ChunkResult {
             int chunkId{0};
             std::vector<int> runIndices;
@@ -1982,19 +1983,35 @@ void RunByRunEngine::runChunkedPass()
         int globalChunkId = 0;
 
         for (const auto &seg : segments) {
-            int r = seg.startRun;
-            while (r <= seg.endRun) {
-                int cEnd = std::min(seg.endRun, r + K - 1);
+            // Collect only runs that had successful fits in Pass 1 within this segment
+            std::vector<int> validRunsInSeg;
+            for (int r = seg.startRun; r <= seg.endRun; ++r) {
+                if (r < static_cast<int>(pass1Traj->runResults.size())) {
+                    const auto &p1Res = pass1Traj->runResults[r];
+                    if (p1Res.status == RunCalibStatus::Success && p1Res.a1 > 0.0) {
+                        validRunsInSeg.push_back(r);
+                    }
+                }
+            }
+
+            if (validRunsInSeg.empty()) {
+                continue; // No valid runs to form chunks in this segment
+            }
+
+            size_t vIdx = 0;
+            while (vIdx < validRunsInSeg.size()) {
+                size_t vEnd = std::min(validRunsInSeg.size() - 1, vIdx + K - 1);
                 ChunkResult chunk;
                 chunk.chunkId = globalChunkId++;
                 double sumR = 0.0;
-                for (int cr = r; cr <= cEnd; ++cr) {
+                for (size_t vi = vIdx; vi <= vEnd; ++vi) {
+                    int cr = validRunsInSeg[vi];
                     chunk.runIndices.push_back(cr);
                     sumR += static_cast<double>(cr);
                 }
                 chunk.centerRunIndex = sumR / static_cast<double>(chunk.runIndices.size());
 
-                // Sum raw spectra for runs in chunk
+                // Sum raw spectra for runs in chunk (guaranteed to be successful fits only)
                 std::vector<double> chunkSpec(m_config.spectrumChannels, 0.0);
                 int validRawReadCount = 0;
                 for (int cr : chunk.runIndices) {
@@ -2096,7 +2113,7 @@ void RunByRunEngine::runChunkedPass()
                 }
 
                 allChunks.push_back(chunk);
-                r = cEnd + 1;
+                vIdx = vEnd + 1;
             }
         }
 
@@ -2136,6 +2153,32 @@ void RunByRunEngine::runChunkedPass()
                 }
 
                 runRes.isJumpBoundary = isJumpBefore[rIdx];
+
+                // Check whether this run succeeded in Pass 1
+                bool wasPass1Success = false;
+                if (pass1Traj && rIdx < static_cast<int>(pass1Traj->runResults.size())) {
+                    wasPass1Success = (pass1Traj->runResults[rIdx].status == RunCalibStatus::Success && pass1Traj->runResults[rIdx].a1 > 0.0);
+                }
+
+                // If this run was a failed fit in Pass 1, EXCLUDE it from chunking:
+                // Preserve its original failure status, failure reason, and diagnostic info!
+                if (!wasPass1Success) {
+                    runRes.status = (rIdx < static_cast<int>(traj.rawRunResults.size()))
+                                        ? traj.rawRunResults[rIdx].status
+                                        : (pass1Traj ? pass1Traj->runResults[rIdx].status : RunCalibStatus::BadChi2);
+                    if (runRes.status == RunCalibStatus::Success) {
+                        runRes.status = RunCalibStatus::BadChi2;
+                    }
+                    runRes.failureReason = (rIdx < static_cast<int>(traj.rawRunResults.size()))
+                                               ? traj.rawRunResults[rIdx].failureReason
+                                               : (pass1Traj ? pass1Traj->runResults[rIdx].failureReason : "Fit failed in Pass 1 (excluded from chunking)");
+                    detFail++;
+                    overallFailureCount++;
+                    traj.runResults[rIdx] = runRes;
+                    processedSteps++;
+                    emit runProcessed(detId, rIdx, nRuns, runRes);
+                    continue;
+                }
 
                 // Find chunk containing rIdx
                 ChunkResult *parentChunk = nullptr;

@@ -7,75 +7,75 @@
 ---
 
 ## Table of Contents
-1. [Introduction, Heritage & Design Philosophy](#1-introduction-heritage--design-philosophy)
-   - [1.1 The Heritage of Xtrackn & GASPware](#11-the-heritage-of-xtrackn--gaspware)
-   - [1.2 Modern Architecture & Innovations](#12-modern-architecture--innovations)
-   - [1.3 Historical Attributions & Acknowledgments](#13-historical-attributions--acknowledgments)
-2. [Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
-   - [2.1 Linux (1-Click AppImage)](#21-linux-1-click-appimage)
-   - [2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#22-macos-drag-and-drop-dmg-for-apple-silicon--intel)
-   - [2.3 Building from Source](#23-building-from-source)
-   - [2.4 First Spectrum Walkthrough in 60 Seconds](#24-first-spectrum-walkthrough-in-60-seconds)
-3. [Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
-   - [3.1 Supported Nuclear Spectroscopy Formats](#31-supported-nuclear-spectroscopy-formats)
-   - [3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#32-loading-spectra--multi-buffer-overlays-buffers-19)
-   - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
-   - [3.4 Remote Data Acquisition & SSH Session Manager](#34-remote-data-acquisition--ssh-session-manager)
-   - [3.5 Exporting Processed Data](#35-exporting-processed-data)
-4. [Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
-   - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
-   - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
-   - [4.3 Mouse Navigation & Interactive Marker Dragging](#43-mouse-navigation--interactive-marker-dragging)
-   - [4.4 Real-Time HUD Peak Inspector](#44-real-time-hud-peak-inspector)
-5. [Peak Integration & Region of Interest (ROI) Analysis](#5-peak-integration--region-of-interest-roi-analysis)
-   - [5.1 Setting Boundary Markers](#51-setting-boundary-markers)
-   - [5.2 Mathematical Formulation of Gross & Net Peak Area](#52-mathematical-formulation-of-gross--net-peak-area)
-   - [5.3 Counting Statistics & Error Propagation](#53-counting-statistics--error-propagation)
-   - [5.4 Marker Management & Clearing](#54-marker-management--clearing)
-   - [5.5 Output Report Logging](#55-output-report-logging)
-6. [Standard Energy & Efficiency Calibration](#6-standard-energy--efficiency-calibration)
-   - [6.1 Calibration Physics Formulation](#61-calibration-physics-formulation)
-   - [6.2 Fast 2-Point Calibration Routine (K)](#62-fast-2-point-calibration-routine-k)
-   - [6.3 Full Polynomial Calibration Dialog (DK)](#63-full-polynomial-calibration-dialog-dk)
-   - [6.4 Automated Standard Radioisotope Calibration (AK)](#64-automated-standard-radioisotope-calibration-ak)
-   - [6.5 Detector Full-Energy Peak Efficiency Calibration (DE)](#65-detector-full-energy-peak-efficiency-calibration-de)
-7. [Advanced Peak Fitting & Multiplet Deconvolution](#7-advanced-peak-fitting--multiplet-deconvolution)
-   - [7.1 Physical Peak Models (Gaussian & Low-Energy Tail)](#71-physical-peak-models-gaussian--low-energy-tail)
-   - [7.2 Step Backgrounds: ERFC Compton Plateau & Median Sidebands](#72-step-backgrounds-erfc-compton-plateau--median-sidebands)
-   - [7.3 Poisson Maximum Likelihood Estimation vs. Least-Squares](#73-poisson-maximum-likelihood-estimation-vs-least-squares)
-   - [7.4 Dynamic Peak Extent, Valley Search & Physical Capping](#74-dynamic-peak-extent-valley-search--physical-capping)
-   - [7.5 Multiplet Deconvolution & Parameter Linking/Locking](#75-multiplet-deconvolution--parameter-linkinglocking)
-   - [7.6 Goodness of Fit & Residuals Inspection](#76-goodness-of-fit--residuals-inspection)
-8. [In-Beam Run-by-Run Drift Alignment (Flagship Workflow)](#8-in-beam-run-by-run-drift-alignment-flagship-workflow)
-   - [8.1 Physics of Thermal & Rate Gain Drifts in Long Experiments](#81-physics-of-thermal--rate-gain-drifts-in-long-experiments)
-   - [8.2 Sequence Preparation & Anchor Peak Configuration](#82-sequence-preparation--anchor-peak-configuration)
-   - [8.3 Automated Drift Tracking Engine](#83-automated-drift-tracking-engine)
-   - [8.4 Status Interpretation: OK, INTERVENE, and FAILED](#84-status-interpretation-ok-intervene-and-failed)
-   - [8.5 The Interactive Intervention Dialog](#85-the-interactive-intervention-dialog)
-   - [8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing](#86-high-statistics-chunking--hardware-jump-aware-smoothing)
-   - [8.7 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal](#87-export-formats-legacy-gasp-cal-vs-extended-multi-order-ucal)
-9. [2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis)
-   - [9.1 Foundations of Gamma-Gamma Coincidence Matrices](#91-foundations-of-gamma-gamma-coincidence-matrices)
-   - [9.2 Inspecting Matrices (Q & MatrixDialog)](#92-inspecting-matrices-q--matrixdialog)
-   - [9.3 Coincidence Gating (CW) & Background Subtraction (DW)](#93-coincidence-gating-cw--background-subtraction-dw)
-10. [Scripting, Macros & Automation](#10-scripting-macros--automation)
+- [1. Introduction, Heritage & Design Philosophy](#1-introduction-heritage--design-philosophy)
+    - [1.1 The Heritage of Xtrackn & GASPware](#11-the-heritage-of-xtrackn--gaspware)
+    - [1.2 Historical Attributions & Acknowledgments](#13-historical-attributions--acknowledgments)
+    - [1.3 AI Assistance & Development Disclosure](#14-ai-assistance--development-disclosure)
+- [2. Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
+    - [2.1 Linux (1-Click AppImage)](#21-linux-1-click-appimage)
+    - [2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#22-macos-drag-and-drop-dmg-for-apple-silicon--intel)
+    - [2.3 Building from Source](#23-building-from-source)
+    - [2.4 First Spectrum Walkthrough in 60 Seconds](#24-first-spectrum-walkthrough-in-60-seconds)
+- [3. Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
+    - [3.1 Supported Nuclear Spectroscopy Formats](#31-supported-nuclear-spectroscopy-formats)
+    - [3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#32-loading-spectra--multi-buffer-overlays-buffers-19)
+    - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
+    - [3.4 Remote Data Acquisition & SSH Session Manager](#34-remote-data-acquisition--ssh-session-manager)
+    - [3.5 Exporting Processed Data](#35-exporting-processed-data)
+- [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
+    - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
+    - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
+    - [4.3 Mouse Navigation & Interactive Marker Dragging](#43-mouse-navigation--interactive-marker-dragging)
+    - [4.4 Real-Time HUD Peak Inspector](#44-real-time-hud-peak-inspector)
+- [5. Peak Integration & Region of Interest (ROI) Analysis](#5-peak-integration--region-of-interest-roi-analysis)
+    - [5.1 Setting Boundary Markers](#51-setting-boundary-markers)
+    - [5.2 Mathematical Formulation of Gross & Net Peak Area](#52-mathematical-formulation-of-gross--net-peak-area)
+    - [5.3 Counting Statistics & Error Propagation](#53-counting-statistics--error-propagation)
+    - [5.4 Marker Management & Clearing](#54-marker-management--clearing)
+    - [5.5 Output Report Logging](#55-output-report-logging)
+- [6. Standard Energy & Efficiency Calibration](#6-standard-energy--efficiency-calibration)
+    - [6.1 Calibration Physics Formulation](#61-calibration-physics-formulation)
+    - [6.2 Fast 2-Point Calibration Routine (K)](#62-fast-2-point-calibration-routine-k)
+    - [6.3 Full Polynomial Calibration Dialog (DK)](#63-full-polynomial-calibration-dialog-dk)
+    - [6.4 Automated Standard Radioisotope Calibration (AK)](#64-automated-standard-radioisotope-calibration-ak)
+    - [6.5 Detector Full-Energy Peak Efficiency Calibration (DE)](#65-detector-full-energy-peak-efficiency-calibration-de)
+- [7. Advanced Peak Fitting & Multiplet Deconvolution](#7-advanced-peak-fitting--multiplet-deconvolution)
+    - [7.1 Physical Peak Models (Gaussian & Low-Energy Tail)](#71-physical-peak-models-gaussian--low-energy-tail)
+    - [7.2 Step Backgrounds: ERFC Compton Plateau & Median Sidebands](#72-step-backgrounds-erfc-compton-plateau--median-sidebands)
+    - [7.3 Poisson Maximum Likelihood Estimation vs. Least-Squares](#73-poisson-maximum-likelihood-estimation-vs-least-squares)
+    - [7.4 Dynamic Peak Extent, Valley Search & Physical Capping](#74-dynamic-peak-extent-valley-search--physical-capping)
+    - [7.5 Multiplet Deconvolution & Parameter Linking/Locking](#75-multiplet-deconvolution--parameter-linkinglocking)
+    - [7.6 Goodness of Fit & Residuals Inspection](#76-goodness-of-fit--residuals-inspection)
+- [8. In-Beam Run-by-Run Drift Alignment (Flagship Workflow)](#8-in-beam-run-by-run-drift-alignment-flagship-workflow)
+    - [8.1 Physics of Thermal & Rate Gain Drifts in Long Experiments](#81-physics-of-thermal--rate-gain-drifts-in-long-experiments)
+    - [8.2 Sequence Preparation & Anchor Peak Configuration](#82-sequence-preparation--anchor-peak-configuration)
+    - [8.3 Automated Drift Tracking Engine](#83-automated-drift-tracking-engine)
+    - [8.4 Status Interpretation: OK, INTERVENE, and FAILED](#84-status-interpretation-ok-intervene-and-failed)
+    - [8.5 The Interactive Intervention Dialog](#85-the-interactive-intervention-dialog)
+    - [8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing](#86-high-statistics-chunking--hardware-jump-aware-smoothing)
+    - [8.7 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal](#87-export-formats-legacy-gasp-cal-vs-extended-multi-order-ucal)
+- [9. 2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis)
+    - [9.1 Foundations of Gamma-Gamma Coincidence Matrices](#91-foundations-of-gamma-gamma-coincidence-matrices)
+    - [9.2 Inspecting Matrices (Q & MatrixDialog)](#92-inspecting-matrices-q--matrixdialog)
+    - [9.3 Coincidence Gating (CW) & Background Subtraction (DW)](#93-coincidence-gating-cw--background-subtraction-dw)
+- [10. Scripting, Macros & Automation](#10-scripting-macros--automation)
     - [10.1 Interactive Command Prompt & Batch Tokens](#101-interactive-command-prompt--batch-tokens)
     - [10.2 Numeric Macros (0 through 9) & Repetition Cycles](#102-numeric-macros-0-through-9--repetition-cycles)
     - [10.3 The Macro Manager Dialog (DM)](#103-the-macro-manager-dialog-dm)
     - [10.4 Saving, Loading & Distributing Macro Files (.mac)](#104-saving-loading--distributing-macro-files-mac)
-11. [Aesthetic Customization & Theme Management](#11-aesthetic-customization--theme-management)
+- [11. Aesthetic Customization & Theme Management](#11-aesthetic-customization--theme-management)
     - [11.1 Built-in Themes (Modern Dark, Modern Light, Classic Xtrackn)](#111-built-in-themes)
     - [11.2 Customizing Palette Colors, Gridlines & Typography](#112-customizing-palette-colors-gridlines--typography)
     - [11.3 Theme Import and Export (.nugasp-theme)](#113-theme-import-and-export-nugasp-theme)
-12. [End-to-End Analysis Cookbook Workflows](#12-end-to-end-analysis-cookbook-workflows)
+- [12. End-to-End Analysis Cookbook Workflows](#12-end-to-end-analysis-cookbook-workflows)
     - [12.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)](#121-deconvoluting-an-overlapping-multiplet-r--g--cv)
     - [12.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)](#122-batch-integrating-across-detectors-with-a-macro-1--cj)
     - [12.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)](#123-correcting-gain-drift-across-100-in-beam-runs-ar)
-13. [Troubleshooting & Frequently Asked Questions (FAQ)](#13-troubleshooting--frequently-asked-questions-faq)
+- [13. Troubleshooting & Frequently Asked Questions (FAQ)](#13-troubleshooting--frequently-asked-questions-faq)
     - [13.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)](#131-zoom--marker-placement-issues-e-ci-cj)
     - [13.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment](#132-resolving-intervene-and-failed-states-in-run-by-run-alignment)
     - [13.3 Low-Statistics Peak Fitting & Baseline Instabilities](#133-low-statistics-peak-fitting--baseline-instabilities)
-14. [Appendices & Technical Specifications](#14-appendices--technical-specifications)
+- [14. Appendices & Technical Specifications](#14-appendices--technical-specifications)
     - [14.1 Master Keyboard Command & Shortcut Reference](#141-master-keyboard-command--shortcut-reference)
     - [14.2 File Format Specifications](#142-file-format-specifications)
     - [14.3 Coordinate System & Binning Conventions (0-Indexed Channels)](#143-coordinate-system--binning-conventions-0-indexed-channels)
@@ -93,37 +93,12 @@ For decades, the classic Fortran/C software **Xtrackn** and the larger **GASPwar
 **NuTrackN preserves 100% of authentic Xtrack keyboard commands**, while re-engineering the underlying platform into modern C++17 with:
 - **CERN ROOT Graphics Engine**: Sub-millisecond rendering of high-statistics histograms and logarithmic axes.
 - **Modern Qt5 User Interface**: High-DPI screen support, responsive dialogs, live parameter tables, and curated dark/light themes.
-- **2D Matrix Coincidence Viewer**: Fast slicing and projection of multi-gigabyte $\gamma$-$\gamma$ coincidence matrices (`.cmat`).
+- **2D Matrix Coincidence Viewer**: Fast slicing and projection of multi-gigabyte γ-γ coincidence matrices (`.cmat`).
 - **Autonomous Standalone Deployment**: 1-click execution without requiring users to configure compiler paths or install CERN ROOT manually.
 - **Run-by-Run Drift Alignment**: Automated in-beam gain tracking across hundreds of acquisition runs.
 
-### 1.2 Modern Architecture & Innovations
-NuTrackN couples the raw numerical computing performance of CERN ROOT with a high-responsiveness Qt5 event loop:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        NuTrackN Architecture                          │
-├────────────────────────────────────────────────────────────────────────┤
-│  Qt5 Presentation Layer (Modern Dark / Light / Classic Themes)         │
-│  ├── QMainCanvas (OpenGL-accelerated ROOT embedded canvas)             │
-│  ├── Live HUD Peak Inspector (Hover centroid & FWHM moments)          │
-│  ├── RunByRunManager & Intervention Dialog (Drift alignment)           │
-│  ├── RemoteClient (SSH tunnel & remote acquisition browsing)           │
-│  └── MacroDialog (Slot 0–9 automation chains & cycling)               │
-├────────────────────────────────────────────────────────────────────────┤
-│  Nuclear Physics Computing Engine                                      │
-│  ├── Poisson Likelihood & Adaptive Multiplet Minimizer (TMinuit)      │
-│  ├── ERFC Compton Step & Median Sideband Background Modeling           │
-│  ├── Coincidence Matrix Gating & 2D Projection Engine (.cmat)         │
-│  └── Calibration Polynomial Regression Engine (Uncertainty Covariance)│
-├────────────────────────────────────────────────────────────────────────┤
-│  Data I/O & Storage Abstraction                                        │
-│  └── Ortec (.spe, .chn), Radware, ROOT (.root), ASCII, GASP (.cmat)    │
-└────────────────────────────────────────────────────────────────────────┘
-```
-
-### 1.3 Historical Attributions & Acknowledgments
-The algorithms, design philosophies, and core workflows of NuTrackN stand upon decades of foundational work by the creators and maintainers of **GASPware** and **Xtrackn**, originally created for the GASP $\gamma$-ray spectrometer at the INFN Laboratori Nazionali di Legnaro (LNL) and Padova, Italy.
+### 1.2 Historical Attributions & Acknowledgments
+The algorithms, design philosophies, and core workflows of NuTrackN stand upon decades of foundational work by the creators and maintainers of **GASPware** and **Xtrackn**, originally created for the GASP γ-ray spectrometer at the INFN Laboratori Nazionali di Legnaro (LNL) and Padova, Italy.
 
 We gratefully acknowledge and credit:
 - **Dino Bazzacco** (*INFN Sezione di Padova*): Main designer and author of the core GASP data analysis programs, including **TRACKN**, **CMAT**, and **GSORT**.
@@ -134,6 +109,13 @@ Special thanks are also due to the authors of key open-source utilities and algo
 - **Fred Hucht** (*Universität Duisburg*): Creator of the **Ygl** library, which provided SGI GL graphics emulation under the X Window System.
 - **Takuji Nishimura & Makoto Matsumoto**: Creators of the **Mersenne Twister** pseudorandom number generator used in event simulation and background generation.
 - The authors at **M.S.I. Stockholm** and the **Niels Bohr Institute (NBI)** for the **laslib** PostScript plotting packages.
+
+### 1.3 AI Assistance & Development Disclosure
+NuTrackN was developed through human-directed, AI-assisted software engineering using Google DeepMind's Antigravity (Gemini) coding agent. AI assistance was utilized for porting legacy Fortran and C routines into modern C++17/Qt5, designing UI dialogs and graphics canvas integrations, structuring automated packaging scripts, and drafting documentation.
+
+All mathematical formulations, nuclear physics algorithms (e.g., SNIP continuum extraction, Poisson maximum likelihood estimation, covariance error propagation), and calibration procedures have been verified, scientifically reviewed, and validated against experimental gamma-ray data.
+
+However, it is important to note that, while credit for code synthesis and acceleration belongs to the AI agents, full responsibility for any errors and oversights rests solely with the human maintainers. Should you encounter unexpected behavior or software bugs, please open an issue on GitHub. Our apologies in advance for any rough edges that may crop up!
 
 ---
 
@@ -378,13 +360,13 @@ Press **`AK`** to open the Automated Calibration Engine:
 2. NuTrackN executes an automated peak hunt, identifies characteristic energy spacing ratios, associates peaks with literature lines, and fits the calibration polynomial automatically.
 
 ### 6.5 Detector Full-Energy Peak Efficiency Calibration (`DE`)
-The absolute full-energy peak efficiency at energy $E_\gamma$ is determined from standard calibrated radioactive sources:
-$$\epsilon(E_\gamma) = \frac{N_{net}(E_\gamma)}{A_{act} \cdot I_\gamma \cdot t_{live}}$$
+The absolute full-energy peak efficiency at energy $E_γ$ is determined from standard calibrated radioactive sources:
+$$\epsilon(E_γ) = \frac{N_{net}(E_γ)}{A_{act} \cdot I_γ \cdot t_{live}}$$
 where:
 - $N_{net}$: Measured net peak counts.
 - $A_{act}$: Source activity at the measurement epoch, corrected for radioactive decay:
   $$A_{act}(t) = A_0 \cdot \exp\left( -\frac{\ln 2 \cdot \Delta t}{T_{1/2}} \right)$$
-- $I_\gamma$: Absolute emission probability per decay.
+- $I_γ$: Absolute emission probability per decay.
 - $t_{live}$: Measurement live time (seconds).
 
 Press **`DE`** to open the **Efficiency Calibration Dialog**:

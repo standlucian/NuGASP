@@ -1,3 +1,9 @@
+# Editor backup & swap files
+*~
+~*
+*.swp
+*.swo
+
 # C++ object and build files
 *.o
 *.obj
