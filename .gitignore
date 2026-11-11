@@ -69,6 +69,8 @@ NuTrackN/Autosort
 NuTrackN/INSTALL.TXT
 NuTrackN/*.nugasp-theme
 NuTrackN/peaks.dat
+Screenshot*.png
+NuTrackN/Screenshot*.png
 
 # 2D Coincidence Matrices
 *.cmat
