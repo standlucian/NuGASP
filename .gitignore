@@ -52,3 +52,33 @@ packaging/**/.cache/
 *.AppImage
 *.dmg
 
+# Legacy code and archival trees
+NuTrackN/Legacy/
+Legacy/
+
+# In-beam sequence runs, raw spectra, and test data
+NuTrackN/seqRuns/
+seqRuns/
+NuTrackN/testSpectra*
+NuTrackN/HPGe*
+NuTrackN/1163-*
+NuTrackN/G0.*
+NuTrackN/G1.*
+NuTrackN/FileList
+NuTrackN/Autosort
+NuTrackN/INSTALL.TXT
+NuTrackN/*.nugasp-theme
+NuTrackN/peaks.dat
+
+# 2D Coincidence Matrices
+*.cmat
+*.mat
+*.2D
+
+# Energy & Efficiency Calibration files
+*.cal
+*.mcal
+*.ucal
+CAL*.DAT
+
+
