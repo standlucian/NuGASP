@@ -857,12 +857,6 @@ void RunByRunManager::setupUI()
     execBar->addSpacing(20);
     execBar->addWidget(m_btnExportCal);
     execBar->addWidget(m_btnExportUcal);
-    execBar->addSpacing(10);
-    m_chkExportSmoothed = new QCheckBox(tr("Apply smoothed gain to export"), this);
-    m_chkExportSmoothed->setChecked(true);
-    m_chkExportSmoothed->setEnabled(false);
-    m_chkExportSmoothed->setToolTip(tr("When checked and 'Smooth a1' is enabled, exported calibrations will use the smoothed parameters."));
-    execBar->addWidget(m_chkExportSmoothed);
     execBar->addStretch(1);
     mainLayout->addLayout(execBar);
 
@@ -939,7 +933,6 @@ void RunByRunManager::setupUI()
         bool enabled = m_chkSmoothGain->isChecked();
         m_spinSmoothWindow->setEnabled(enabled);
         m_chkPreserveJumps->setEnabled(enabled);
-        if (m_chkExportSmoothed) m_chkExportSmoothed->setEnabled(enabled);
         if (m_plotWidget) {
             m_plotWidget->setSmoothingEnabled(enabled);
             m_plotWidget->setSmoothingWindow(m_spinSmoothWindow->value());
@@ -2814,8 +2807,7 @@ void RunByRunManager::onExportCalClicked()
         return;
     }
 
-    bool applySmoothing = m_chkExportSmoothed && m_chkExportSmoothed->isChecked() &&
-                          m_chkSmoothGain && m_chkSmoothGain->isChecked();
+    bool applySmoothing = m_chkSmoothGain && m_chkSmoothGain->isChecked();
     int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
 
@@ -2916,8 +2908,7 @@ void RunByRunManager::onExportUcalClicked()
         return;
     }
 
-    bool applySmoothing = m_chkExportSmoothed && m_chkExportSmoothed->isChecked() &&
-                          m_chkSmoothGain && m_chkSmoothGain->isChecked();
+    bool applySmoothing = m_chkSmoothGain && m_chkSmoothGain->isChecked();
     int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
 

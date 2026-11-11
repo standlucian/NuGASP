@@ -191,7 +191,6 @@ private:
     QPushButton            *m_btnCancel{nullptr};
     QPushButton            *m_btnExportCal{nullptr};
     QPushButton            *m_btnExportUcal{nullptr};
-    QCheckBox              *m_chkExportSmoothed{nullptr};
     QProgressBar           *m_progressBar{nullptr};
     QLabel                 *m_lblStatusText{nullptr};
 
