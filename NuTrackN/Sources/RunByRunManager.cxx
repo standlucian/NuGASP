@@ -131,6 +131,30 @@ void DetectorDriftPlotWidget::clearData()
     update();
 }
 
+void DetectorDriftPlotWidget::setSmoothingEnabled(bool enabled)
+{
+    if (m_smoothingEnabled != enabled) {
+        m_smoothingEnabled = enabled;
+        update();
+    }
+}
+
+void DetectorDriftPlotWidget::setSmoothingWindow(int window)
+{
+    if (m_smoothingWindow != window) {
+        m_smoothingWindow = window;
+        update();
+    }
+}
+
+void DetectorDriftPlotWidget::setPreserveJumps(bool preserve)
+{
+    if (m_preserveJumps != preserve) {
+        m_preserveJumps = preserve;
+        update();
+    }
+}
+
 void DetectorDriftPlotWidget::leaveEvent(QEvent *event)
 {
     Q_UNUSED(event);
@@ -184,18 +208,26 @@ void DetectorDriftPlotWidget::mouseMoveEvent(QMouseEvent *event)
             statusHtml = "<font color='#ef5350'><b>Failed / Uncalibrated</b></font>";
         }
 
+        QString smoothTip;
+        if (m_smoothingEnabled && pt.hasSmoothedGain) {
+            smoothTip = QString("<b>Smoothed Gain a1:</b> <font color='#ffd54f'><b>%1</b></font><br/>")
+                            .arg(pt.smoothedGain, 0, 'f', 6);
+        }
+
         QString tip = QString("<b>Run #%1:</b> %2<br/>"
                              "<b>Detector:</b> #%3<br/>"
                              "<b>Nominal Dispersion:</b> %4 keV/ch<br/>"
                              "<b>Fitted Gain a1:</b> %5<br/>"
-                             "<b>Reduced &chi;&sup2;/ndf:</b> %6<br/>"
-                             "<b>Status:</b> %7<br/>"
+                             "%6"
+                             "<b>Reduced &chi;&sup2;/ndf:</b> %7<br/>"
+                             "<b>Status:</b> %8<br/>"
                              "<span style='color:#90caf9;'><i>Double-click to inspect spectrum and peak fits</i></span>")
                          .arg(pt.runNumber)
                          .arg(pt.runFileName)
                          .arg(m_detectorId)
                          .arg(QString::number(pt.nominalGain, 'f', 3))
                          .arg(pt.isValid ? QString::number(pt.gain, 'f', 6) : "-")
+                         .arg(smoothTip)
                          .arg((pt.chi2ndf > 0.0) ? QString::number(pt.chi2ndf, 'f', 2) : "-")
                          .arg(statusHtml);
 
@@ -288,6 +320,10 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
             maxGain = std::max(maxGain, pt.gain);
             validCount++;
         }
+        if (m_smoothingEnabled && pt.hasSmoothedGain) {
+            minGain = std::min(minGain, pt.smoothedGain);
+            maxGain = std::max(maxGain, pt.smoothedGain);
+        }
         if (pt.chi2ndf > 0.0) {
             maxChi = std::max(maxChi, pt.chi2ndf);
         }
@@ -347,6 +383,26 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
     p.drawText(rGain.left() + 4, rGain.top() - 6,
                QString("Gain a1 — Detector #%1").arg(m_detectorId >= 0 ? QString::number(m_detectorId) : "-"));
 
+    if (m_smoothingEnabled && validCount > 1) {
+        QFont legFont("Arial", 8, QFont::Bold);
+        p.setFont(legFont);
+
+        QString smoothLegend = QString("— Smoothed a1 (W=%1%2)")
+                                   .arg(m_smoothingWindow)
+                                   .arg(m_preserveJumps ? tr(", jumps preserved") : "");
+        int smoothW = p.fontMetrics().horizontalAdvance(smoothLegend);
+
+        QString rawLegend = "— Raw a1   ";
+        int rawW = p.fontMetrics().horizontalAdvance(rawLegend);
+
+        double legX = rGain.right() - smoothW - rawW - 4;
+        p.setPen(QColor(76, 175, 80, 180));
+        p.drawText(legX, rGain.top() - 6, rawLegend);
+
+        p.setPen(QColor("#ffd54f"));
+        p.drawText(legX + rawW, rGain.top() - 6, smoothLegend);
+    }
+
     // Title for Chi2 Plot
     p.setPen(QColor("#4fc3f7")); // Light cyan
     p.drawText(rChi.left() + 4, rChi.top() - 6, "Reduced \u03c7\u00b2 / ndf");
@@ -396,8 +452,34 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
                 inSegment = false;
             }
         }
-        p.setPen(QPen(QColor("#4caf50"), 2));
+        p.setPen(QPen(QColor(76, 175, 80, m_smoothingEnabled ? 140 : 255), m_smoothingEnabled ? 1.5 : 2.0));
         p.drawPath(gainPath);
+
+        // Draw smoothed Gain curve
+        if (m_smoothingEnabled) {
+            QPainterPath smoothPath;
+            bool inSmoothSeg = false;
+            for (int i = 0; i < nPts; ++i) {
+                const auto &pt = m_points[i];
+                if (pt.hasSmoothedGain) {
+                    if (pt.isJumpBoundary && inSmoothSeg) {
+                        inSmoothSeg = false; // Break path across hardware jumps!
+                    }
+                    double px = getX(i);
+                    double py = getYGain(pt.smoothedGain);
+                    if (!inSmoothSeg) {
+                        smoothPath.moveTo(px, py);
+                        inSmoothSeg = true;
+                    } else {
+                        smoothPath.lineTo(px, py);
+                    }
+                } else {
+                    inSmoothSeg = false;
+                }
+            }
+            p.setPen(QPen(QColor("#ffd54f"), 2.5)); // Amber/gold smooth curve
+            p.drawPath(smoothPath);
+        }
 
         // Draw connecting lines for Chi2
         QPainterPath chiPath;
@@ -451,6 +533,14 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
         p.setPen(QPen(ptColor.lighter(130), 1.5));
         p.setBrush(ptColor);
         p.drawEllipse(QPointF(px, pyGain), rad, rad);
+
+        // Highlight smoothed gain point when hovered
+        if (m_smoothingEnabled && pt.hasSmoothedGain && isHovered) {
+            double pySmooth = getYGain(pt.smoothedGain);
+            p.setPen(QPen(QColor("#ffd54f"), 2.0));
+            p.setBrush(Qt::NoBrush);
+            p.drawEllipse(QPointF(px, pySmooth), 6.5, 6.5);
+        }
 
         // Chi2 point
         double pyChi = (pt.chi2ndf > 0.0) ? getYChi(pt.chi2ndf) : (rChi.bottom() - 10.0);
@@ -767,6 +857,12 @@ void RunByRunManager::setupUI()
     execBar->addSpacing(20);
     execBar->addWidget(m_btnExportCal);
     execBar->addWidget(m_btnExportUcal);
+    execBar->addSpacing(10);
+    m_chkExportSmoothed = new QCheckBox(tr("Apply smoothed gain to export"), this);
+    m_chkExportSmoothed->setChecked(true);
+    m_chkExportSmoothed->setEnabled(false);
+    m_chkExportSmoothed->setToolTip(tr("When checked and 'Smooth a1' is enabled, exported calibrations will use the smoothed parameters."));
+    execBar->addWidget(m_chkExportSmoothed);
     execBar->addStretch(1);
     mainLayout->addLayout(execBar);
 
@@ -816,6 +912,47 @@ void RunByRunManager::setupUI()
     connect(m_comboPlotDet, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &RunByRunManager::onDetectorPlotSelectionChanged);
     plotSelectBar->addWidget(m_comboPlotDet, 1);
+
+    plotSelectBar->addSpacing(15);
+    m_chkSmoothGain = new QCheckBox(tr("Smooth a1:"), this);
+    m_chkSmoothGain->setChecked(false);
+    m_chkSmoothGain->setToolTip(tr("Enable moving smoothing filter to suppress statistical jitter across runs."));
+    plotSelectBar->addWidget(m_chkSmoothGain);
+
+    plotSelectBar->addWidget(new QLabel(tr("Window:"), this));
+    m_spinSmoothWindow = new QSpinBox(this);
+    m_spinSmoothWindow->setRange(3, 31);
+    m_spinSmoothWindow->setSingleStep(2);
+    m_spinSmoothWindow->setValue(5);
+    m_spinSmoothWindow->setSuffix(tr(" runs"));
+    m_spinSmoothWindow->setToolTip(tr("Moving average window size (in runs). Odd values recommended."));
+    m_spinSmoothWindow->setEnabled(false);
+    plotSelectBar->addWidget(m_spinSmoothWindow);
+
+    m_chkPreserveJumps = new QCheckBox(tr("Preserve Jumps"), this);
+    m_chkPreserveJumps->setChecked(true);
+    m_chkPreserveJumps->setToolTip(tr("Detect hardware amplifier gain jumps (|Δa1| > threshold) and prevent smoothing across discontinuity boundaries."));
+    m_chkPreserveJumps->setEnabled(false);
+    plotSelectBar->addWidget(m_chkPreserveJumps);
+
+    auto refreshSmoothingUI = [this]() {
+        bool enabled = m_chkSmoothGain->isChecked();
+        m_spinSmoothWindow->setEnabled(enabled);
+        m_chkPreserveJumps->setEnabled(enabled);
+        if (m_chkExportSmoothed) m_chkExportSmoothed->setEnabled(enabled);
+        if (m_plotWidget) {
+            m_plotWidget->setSmoothingEnabled(enabled);
+            m_plotWidget->setSmoothingWindow(m_spinSmoothWindow->value());
+            m_plotWidget->setPreserveJumps(m_chkPreserveJumps->isChecked());
+        }
+        int curDet = m_comboPlotDet->currentData().toInt();
+        updatePlot(curDet);
+    };
+
+    connect(m_chkSmoothGain, &QCheckBox::toggled, this, refreshSmoothingUI);
+    connect(m_spinSmoothWindow, QOverload<int>::of(&QSpinBox::valueChanged), this, refreshSmoothingUI);
+    connect(m_chkPreserveJumps, &QCheckBox::toggled, this, refreshSmoothingUI);
+
     plotLayout->addLayout(plotSelectBar);
 
     QSplitter *vSplitter = new QSplitter(Qt::Vertical, grpPlot);
@@ -832,10 +969,10 @@ void RunByRunManager::setupUI()
     m_tablePlotData = new QTableWidget(this);
     m_tablePlotData->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_tablePlotData->setContextMenuPolicy(Qt::CustomContextMenu);
-    m_tablePlotData->setColumnCount(8);
+    m_tablePlotData->setColumnCount(9);
     m_tablePlotData->setHorizontalHeaderLabels({
-        tr("Run #"), tr("Run File"), tr("Nominal (keV/ch)"), tr("Gain a1"), tr("Offset a0 (ch)"),
-        tr("Residual (keV)"), tr("Chi2/ndf"), tr("Status")
+        tr("Run #"), tr("Run File"), tr("Nominal (keV/ch)"), tr("Gain a1"), tr("Smoothed a1"),
+        tr("Offset a0 (ch)"), tr("Residual (keV)"), tr("Chi2/ndf"), tr("Status")
     });
     m_tablePlotData->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     connect(m_tablePlotData, &QTableWidget::cellDoubleClicked, this, [this](int r, int /*col*/) {
@@ -1983,6 +2120,152 @@ void RunByRunManager::showIssueReportModal(int totalSuccess, int totalIntervene,
 }
 
 //==============================================================================
+// computeSmoothedGains: Moving window smoothing with jump-boundary preservation
+//==============================================================================
+void RunByRunManager::computeSmoothedGains(std::vector<DriftPlotPoint> &points, int windowSize, bool preserveJumps)
+{
+    const int n = static_cast<int>(points.size());
+    if (n == 0) return;
+
+    if (windowSize < 3) windowSize = 3;
+    if (windowSize % 2 == 0) windowSize += 1;
+    const int halfW = windowSize / 2;
+
+    // Detect hardware amplifier jumps across consecutive valid runs
+    std::vector<bool> isJumpBefore(n, false);
+    if (preserveJumps) {
+        int prevValidIdx = -1;
+        for (int i = 0; i < n; ++i) {
+            if (!points[i].isValid) continue;
+            if (prevValidIdx >= 0) {
+                double dGain = std::abs(points[i].gain - points[prevValidIdx].gain);
+                // Threshold 0.0008 corresponds to ~0.08% relative gain shift (~3.2 channels at 4000 ch, ~1.6 keV)
+                if (dGain >= 0.0008) {
+                    isJumpBefore[i] = true;
+                    points[i].isJumpBoundary = true;
+                }
+            }
+            prevValidIdx = i;
+        }
+    }
+
+    // Segment partition bounded by hardware jumps
+    std::vector<int> segmentId(n, 0);
+    int curSeg = 0;
+    for (int i = 0; i < n; ++i) {
+        if (isJumpBefore[i]) curSeg++;
+        segmentId[i] = curSeg;
+    }
+
+    const double sigma = std::max(1.0, halfW / 1.5);
+    const double twoSigSq = 2.0 * sigma * sigma;
+
+    for (int i = 0; i < n; ++i) {
+        if (!points[i].isValid) {
+            points[i].hasSmoothedGain = false;
+            continue;
+        }
+
+        const int seg = segmentId[i];
+        double sumW = 0.0;
+        double sumWG = 0.0;
+
+        const int jMin = std::max(0, i - halfW);
+        const int jMax = std::min(n - 1, i + halfW);
+
+        for (int j = jMin; j <= jMax; ++j) {
+            if (!points[j].isValid) continue;
+            if (segmentId[j] != seg) continue; // Respect hardware jump boundary
+
+            double dist = static_cast<double>(j - i);
+            double w = std::exp(-(dist * dist) / twoSigSq);
+            sumW += w;
+            sumWG += w * points[j].gain;
+        }
+
+        if (sumW > 0.0) {
+            points[i].smoothedGain = sumWG / sumW;
+            points[i].hasSmoothedGain = true;
+        } else {
+            points[i].smoothedGain = points[i].gain;
+            points[i].hasSmoothedGain = true;
+        }
+    }
+}
+
+//==============================================================================
+// getSmoothedTrajectory: Applies jump-aware smoothing to trajectory calibration
+//==============================================================================
+DetectorTrajectory RunByRunManager::getSmoothedTrajectory(const DetectorTrajectory &traj, int windowSize, bool preserveJumps) const
+{
+    DetectorTrajectory outTraj = traj;
+    const int n = static_cast<int>(outTraj.runResults.size());
+    if (n == 0) return outTraj;
+
+    if (windowSize < 3) windowSize = 3;
+    if (windowSize % 2 == 0) windowSize += 1;
+    const int halfW = windowSize / 2;
+
+    std::vector<bool> isJumpBefore(n, false);
+    if (preserveJumps) {
+        int prevValidIdx = -1;
+        for (int i = 0; i < n; ++i) {
+            const auto &res = outTraj.runResults[i];
+            if (res.status != RunCalibStatus::Success || res.a1 <= 0.0) continue;
+            if (prevValidIdx >= 0) {
+                double dGain = std::abs(res.a1 - outTraj.runResults[prevValidIdx].a1);
+                if (dGain >= 0.0008) {
+                    isJumpBefore[i] = true;
+                }
+            }
+            prevValidIdx = i;
+        }
+    }
+
+    std::vector<int> segmentId(n, 0);
+    int curSeg = 0;
+    for (int i = 0; i < n; ++i) {
+        if (isJumpBefore[i]) curSeg++;
+        segmentId[i] = curSeg;
+    }
+
+    const double sigma = std::max(1.0, halfW / 1.5);
+    const double twoSigSq = 2.0 * sigma * sigma;
+
+    for (int i = 0; i < n; ++i) {
+        auto &res = outTraj.runResults[i];
+        if (res.status != RunCalibStatus::Success || res.a1 <= 0.0) continue;
+
+        const int seg = segmentId[i];
+        double sumW = 0.0;
+        double sumWA1 = 0.0;
+        double sumWA0 = 0.0;
+
+        const int jMin = std::max(0, i - halfW);
+        const int jMax = std::min(n - 1, i + halfW);
+
+        for (int j = jMin; j <= jMax; ++j) {
+            const auto &other = outTraj.runResults[j];
+            if (other.status != RunCalibStatus::Success || other.a1 <= 0.0) continue;
+            if (segmentId[j] != seg) continue;
+
+            double dist = static_cast<double>(j - i);
+            double w = std::exp(-(dist * dist) / twoSigSq);
+            sumW += w;
+            sumWA1 += w * other.a1;
+            sumWA0 += w * other.a0;
+        }
+
+        if (sumW > 0.0) {
+            res.a1 = sumWA1 / sumW;
+            res.a0 = sumWA0 / sumW;
+        }
+    }
+
+    return outTraj;
+}
+
+//==============================================================================
 // updatePlot
 //==============================================================================
 void RunByRunManager::updatePlot(int detId)
@@ -2020,7 +2303,7 @@ void RunByRunManager::updatePlot(int detId)
             itemNom->setForeground(QBrush(QColor("#64b5f6")));
             m_tablePlotData->setItem(r, 2, itemNom);
 
-            for (int c = 3; c <= 6; ++c) {
+            for (int c = 3; c <= 7; ++c) {
                 QTableWidgetItem *it = new QTableWidgetItem("-");
                 it->setTextAlignment(Qt::AlignCenter);
                 m_tablePlotData->setItem(r, c, it);
@@ -2029,7 +2312,7 @@ void RunByRunManager::updatePlot(int detId)
             QTableWidgetItem *st = new QTableWidgetItem(tr("Ready (Uncalibrated)"));
             st->setForeground(QBrush(QColor("#90a4ae")));
             st->setTextAlignment(Qt::AlignCenter);
-            m_tablePlotData->setItem(r, 7, st);
+            m_tablePlotData->setItem(r, 8, st);
 
             DriftPlotPoint pt;
             pt.runIndex = r;
@@ -2057,19 +2340,7 @@ void RunByRunManager::updatePlot(int detId)
 
     for (int r = 0; r < numRuns; ++r) {
         const auto &res = targetTraj->runResults[r];
-
-        QTableWidgetItem *itemRun = new QTableWidgetItem(QString::number(res.runNumber));
-        itemRun->setData(Qt::UserRole, r);
-        itemRun->setTextAlignment(Qt::AlignCenter);
-        m_tablePlotData->setItem(r, 0, itemRun);
-
-        m_tablePlotData->setItem(r, 1, new QTableWidgetItem(res.runFileName));
-
         double runNomGain = (res.nominalGain > 0.0) ? res.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
-        QTableWidgetItem *itemNom = new QTableWidgetItem(QString("%1").arg(runNomGain, 0, 'f', (std::abs(runNomGain - 0.5) < 0.001 || std::abs(runNomGain - 1.0) < 0.001) ? 1 : 2));
-        itemNom->setTextAlignment(Qt::AlignCenter);
-        itemNom->setForeground(QBrush(QColor("#64b5f6")));
-        m_tablePlotData->setItem(r, 2, itemNom);
 
         DriftPlotPoint pt;
         pt.runIndex = r;
@@ -2081,53 +2352,89 @@ void RunByRunManager::updatePlot(int detId)
         pt.status = res.status;
         pt.isFallback = res.isFallbackFromPrevious;
         pt.fallbackSourceRun = res.fallbackSourceRun;
+        pt.isValid = (res.status == RunCalibStatus::Success);
+        plotPoints.push_back(pt);
+    }
+
+    // Compute smoothed gains if option is checked
+    bool doSmooth = m_chkSmoothGain && m_chkSmoothGain->isChecked();
+    int win = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
+    bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
+    if (doSmooth) {
+        computeSmoothedGains(plotPoints, win, keepJumps);
+    }
+
+    for (int r = 0; r < numRuns; ++r) {
+        const auto &res = targetTraj->runResults[r];
+        const auto &pt = plotPoints[r];
+
+        QTableWidgetItem *itemRun = new QTableWidgetItem(QString::number(res.runNumber));
+        itemRun->setData(Qt::UserRole, r);
+        itemRun->setTextAlignment(Qt::AlignCenter);
+        m_tablePlotData->setItem(r, 0, itemRun);
+
+        m_tablePlotData->setItem(r, 1, new QTableWidgetItem(res.runFileName));
+
+        double runNomGain = pt.nominalGain;
+        QTableWidgetItem *itemNom = new QTableWidgetItem(QString("%1").arg(runNomGain, 0, 'f', (std::abs(runNomGain - 0.5) < 0.001 || std::abs(runNomGain - 1.0) < 0.001) ? 1 : 2));
+        itemNom->setTextAlignment(Qt::AlignCenter);
+        itemNom->setForeground(QBrush(QColor("#64b5f6")));
+        m_tablePlotData->setItem(r, 2, itemNom);
 
         if (res.status == RunCalibStatus::Success && !res.isFallbackFromPrevious) {
-            pt.isValid = true;
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(res.a1, 'f', 6)));
-            m_tablePlotData->setItem(r, 4, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
-            m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.sRes, 'f', 4)));
-            m_tablePlotData->setItem(r, 6, new QTableWidgetItem(QString::number(res.chi2NDF, 'f', 2)));
+
+            QTableWidgetItem *itemSmooth = new QTableWidgetItem(pt.hasSmoothedGain ? QString::number(pt.smoothedGain, 'f', 6) : "-");
+            itemSmooth->setTextAlignment(Qt::AlignCenter);
+            if (pt.hasSmoothedGain) itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
+            m_tablePlotData->setItem(r, 4, itemSmooth);
+
+            m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
+            m_tablePlotData->setItem(r, 6, new QTableWidgetItem(QString::number(res.sRes, 'f', 4)));
+            m_tablePlotData->setItem(r, 7, new QTableWidgetItem(QString::number(res.chi2NDF, 'f', 2)));
             QTableWidgetItem *st = new QTableWidgetItem("OK");
             st->setForeground(QBrush(QColor("#4caf50")));
             st->setTextAlignment(Qt::AlignCenter);
-            m_tablePlotData->setItem(r, 7, st);
+            m_tablePlotData->setItem(r, 8, st);
         } else if (res.isFallbackFromPrevious) {
-            pt.isValid = true;
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(res.a1, 'f', 6)));
-            m_tablePlotData->setItem(r, 4, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
-            m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.sRes, 'f', 4)));
-            m_tablePlotData->setItem(r, 6, new QTableWidgetItem(QString::number(res.chi2NDF, 'f', 2)));
+
+            QTableWidgetItem *itemSmooth = new QTableWidgetItem(pt.hasSmoothedGain ? QString::number(pt.smoothedGain, 'f', 6) : "-");
+            itemSmooth->setTextAlignment(Qt::AlignCenter);
+            if (pt.hasSmoothedGain) itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
+            m_tablePlotData->setItem(r, 4, itemSmooth);
+
+            m_tablePlotData->setItem(r, 5, new QTableWidgetItem(QString::number(res.a0, 'f', 4)));
+            m_tablePlotData->setItem(r, 6, new QTableWidgetItem(QString::number(res.sRes, 'f', 4)));
+            m_tablePlotData->setItem(r, 7, new QTableWidgetItem(QString::number(res.chi2NDF, 'f', 2)));
             QTableWidgetItem *st = new QTableWidgetItem(QString("FALLBACK (R%1)").arg(res.fallbackSourceRun));
             st->setForeground(QBrush(QColor("#ffa726")));
             st->setTextAlignment(Qt::AlignCenter);
             st->setToolTip(res.failureReason);
-            m_tablePlotData->setItem(r, 7, st);
+            m_tablePlotData->setItem(r, 8, st);
         } else if (res.status == RunCalibStatus::BadChi2) {
-            pt.isValid = false;
-            m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
-            m_tablePlotData->setItem(r, 4, new QTableWidgetItem("-"));
-            m_tablePlotData->setItem(r, 5, new QTableWidgetItem("-"));
-            m_tablePlotData->setItem(r, 6, new QTableWidgetItem(res.chi2NDF > 0.0 ? QString::number(res.chi2NDF, 'f', 2) : "-"));
-            QTableWidgetItem *st = new QTableWidgetItem("INTERVENE");
-            st->setForeground(QBrush(QColor("#ffa726")));
-            st->setTextAlignment(Qt::AlignCenter);
-            st->setToolTip(res.failureReason.isEmpty() ? tr("Double-click to inspect and intervene") : res.failureReason);
-            m_tablePlotData->setItem(r, 7, st);
-        } else {
-            pt.isValid = false;
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 4, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 5, new QTableWidgetItem("-"));
             m_tablePlotData->setItem(r, 6, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 7, new QTableWidgetItem(res.chi2NDF > 0.0 ? QString::number(res.chi2NDF, 'f', 2) : "-"));
+            QTableWidgetItem *st = new QTableWidgetItem("INTERVENE");
+            st->setForeground(QBrush(QColor("#ffa726")));
+            st->setTextAlignment(Qt::AlignCenter);
+            st->setToolTip(res.failureReason.isEmpty() ? tr("Double-click to inspect and intervene") : res.failureReason);
+            m_tablePlotData->setItem(r, 8, st);
+        } else {
+            m_tablePlotData->setItem(r, 3, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 4, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 5, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 6, new QTableWidgetItem("-"));
+            m_tablePlotData->setItem(r, 7, new QTableWidgetItem("-"));
             QTableWidgetItem *st = new QTableWidgetItem("FAIL");
             st->setForeground(QBrush(QColor("#ef5350")));
             st->setTextAlignment(Qt::AlignCenter);
             st->setToolTip(res.failureReason.isEmpty() ? tr("No peaks found or fit failed") : res.failureReason);
-            m_tablePlotData->setItem(r, 7, st);
+            m_tablePlotData->setItem(r, 8, st);
         }
-
-        plotPoints.push_back(pt);
     }
 
     if (m_plotWidget) {
@@ -2507,10 +2814,22 @@ void RunByRunManager::onExportCalClicked()
         return;
     }
 
+    bool applySmoothing = m_chkExportSmoothed && m_chkExportSmoothed->isChecked() &&
+                          m_chkSmoothGain && m_chkSmoothGain->isChecked();
+    int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
+    bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
+
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        for (const auto &r : traj.runResults) {
-            allResults.push_back(r);
+        if (applySmoothing) {
+            DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps);
+            for (const auto &r : smoothedTraj.runResults) {
+                allResults.push_back(r);
+            }
+        } else {
+            for (const auto &r : traj.runResults) {
+                allResults.push_back(r);
+            }
         }
     }
 
@@ -2538,9 +2857,10 @@ void RunByRunManager::onExportCalClicked()
                         return;
                     }
                 }
+                QString smoothNote = applySmoothing ? tr(" (using smoothed gain, W=%1)").arg(smoothWin) : "";
                 QMessageBox::information(this, tr("Export Successful"),
-                                         tr("Successfully saved %1 calibration records to:\n%2")
-                                             .arg(allResults.size()).arg(isRemote ? remotePath : savePath));
+                                         tr("Successfully saved %1 calibration records%2 to:\n%3")
+                                             .arg(allResults.size()).arg(smoothNote).arg(isRemote ? remotePath : savePath));
             } else {
                 QMessageBox::critical(this, tr("Export Error"), err);
             }
@@ -2575,9 +2895,10 @@ void RunByRunManager::onExportCalClicked()
                         }
                     }
                 }
+                QString smoothNote = applySmoothing ? tr(" (using smoothed gain, W=%1)").arg(smoothWin) : "";
                 QMessageBox::information(this, tr("Export Successful"),
-                                         tr("Successfully generated per-run .cal files in directory:\n%1")
-                                             .arg(isRemote ? remotePath : dirPath));
+                                         tr("Successfully generated per-run .cal files%1 in directory:\n%2")
+                                             .arg(smoothNote).arg(isRemote ? remotePath : dirPath));
             } else {
                 QMessageBox::critical(this, tr("Export Error"), err);
             }
@@ -2595,10 +2916,22 @@ void RunByRunManager::onExportUcalClicked()
         return;
     }
 
+    bool applySmoothing = m_chkExportSmoothed && m_chkExportSmoothed->isChecked() &&
+                          m_chkSmoothGain && m_chkSmoothGain->isChecked();
+    int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
+    bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
+
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        for (const auto &r : traj.runResults) {
-            allResults.push_back(r);
+        if (applySmoothing) {
+            DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps);
+            for (const auto &r : smoothedTraj.runResults) {
+                allResults.push_back(r);
+            }
+        } else {
+            for (const auto &r : traj.runResults) {
+                allResults.push_back(r);
+            }
         }
     }
 
@@ -2615,9 +2948,10 @@ void RunByRunManager::onExportUcalClicked()
                     return;
                 }
             }
+            QString smoothNote = applySmoothing ? tr(" (using smoothed gain, W=%1)").arg(smoothWin) : "";
             QMessageBox::information(this, tr("Export Successful"),
-                                     tr("Successfully saved %1 uncertainty calibration records to:\n%2")
-                                         .arg(allResults.size()).arg(isRemote ? remotePath : savePath));
+                                     tr("Successfully saved %1 uncertainty calibration records%2 to:\n%3")
+                                         .arg(allResults.size()).arg(smoothNote).arg(isRemote ? remotePath : savePath));
         } else {
             QMessageBox::critical(this, tr("Export Error"), err);
         }

@@ -26,6 +26,9 @@ struct DriftPlotPoint {
     int runNumber{0};
     QString runFileName;
     double gain{0.0};
+    double smoothedGain{0.0};
+    bool hasSmoothedGain{false};
+    bool isJumpBoundary{false};
     double nominalGain{1.0};
     double chi2ndf{0.0};
     RunCalibStatus status{RunCalibStatus::Success};
@@ -47,6 +50,12 @@ public:
 
     void setData(int detectorId, const std::vector<DriftPlotPoint> &points);
     void clearData();
+    void setSmoothingEnabled(bool enabled);
+    bool isSmoothingEnabled() const { return m_smoothingEnabled; }
+    void setSmoothingWindow(int window);
+    int smoothingWindow() const { return m_smoothingWindow; }
+    void setPreserveJumps(bool preserve);
+    bool preserveJumps() const { return m_preserveJumps; }
 
 signals:
     void runPointDoubleClicked(int runIndex);
@@ -62,6 +71,9 @@ private:
     std::vector<DriftPlotPoint> m_points;
     int m_hoveredIndex{-1};
     QPoint m_mousePos;
+    bool m_smoothingEnabled{false};
+    int m_smoothingWindow{5};
+    bool m_preserveJumps{true};
 };
 
 class RunDownloadWorker : public QObject {
@@ -141,6 +153,8 @@ private:
     void startAsyncDownload();
     void cancelAsyncDownload();
     void cleanupDownloadThread();
+    void computeSmoothedGains(std::vector<DriftPlotPoint> &points, int windowSize, bool preserveJumps);
+    DetectorTrajectory getSmoothedTrajectory(const DetectorTrajectory &traj, int windowSize, bool preserveJumps) const;
 
     QMainCanvas            *m_mainCanvas{nullptr};
     std::unique_ptr<RunByRunEngine> m_engine;
@@ -177,6 +191,7 @@ private:
     QPushButton            *m_btnCancel{nullptr};
     QPushButton            *m_btnExportCal{nullptr};
     QPushButton            *m_btnExportUcal{nullptr};
+    QCheckBox              *m_chkExportSmoothed{nullptr};
     QProgressBar           *m_progressBar{nullptr};
     QLabel                 *m_lblStatusText{nullptr};
 
@@ -185,6 +200,9 @@ private:
 
     // Drift Trend View
     QComboBox              *m_comboPlotDet{nullptr};
+    QCheckBox              *m_chkSmoothGain{nullptr};
+    QSpinBox               *m_spinSmoothWindow{nullptr};
+    QCheckBox              *m_chkPreserveJumps{nullptr};
     DetectorDriftPlotWidget *m_plotWidget{nullptr};
     QTableWidget           *m_tablePlotData{nullptr}; // Numeric trend data & diagnostics
 
