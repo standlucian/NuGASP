@@ -52,7 +52,8 @@
    - [8.3 Automated Drift Tracking Engine](#83-automated-drift-tracking-engine)
    - [8.4 Status Interpretation: OK, INTERVENE, and FAILED](#84-status-interpretation-ok-intervene-and-failed)
    - [8.5 The Interactive Intervention Dialog](#85-the-interactive-intervention-dialog)
-   - [8.6 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal](#86-export-formats-legacy-gasp-cal-vs-extended-multi-order-ucal)
+   - [8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing](#86-high-statistics-chunking--hardware-jump-aware-smoothing)
+   - [8.7 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal](#87-export-formats-legacy-gasp-cal-vs-extended-multi-order-ucal)
 9. [2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis)
    - [9.1 Foundations of Gamma-Gamma Coincidence Matrices](#91-foundations-of-gamma-gamma-coincidence-matrices)
    - [9.2 Inspecting Matrices (Q & MatrixDialog)](#92-inspecting-matrices-q--matrixdialog)
@@ -528,7 +529,28 @@ Clicking **Intervene** (or double-clicking a cell in the run-by-run matrix) auto
 - **Parameter Locking (`FitFixedParams`)**: For low-statistics runs, click **[Lock]** next to Centroid, FWHM, Baseline, Slope, or Step to hold that parameter constant while refitting the remaining free parameters.
 - **Independent Slope & Baseline Controls**: Fine-tune baseline sideband levels independently to handle localized Compton edges.
 
-### 8.6 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal
+### 8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing
+When analyzing low-cross-section transitions or short beam runs, individual run spectra may lack sufficient counting statistics for stable peak fitting. NuTrackN provides a two-stage Pass 2 refinement system:
+
+#### 1. Hardware Jump Boundary Detection
+Hardware gain jumps (e.g., preamplifier resetting, high-voltage adjustments, or NIM crate thermal steps) produce abrupt gain discontinuities. NuTrackN automatically identifies these steps:
+- **Cut (`%`)**: Configurable threshold (default `0.035 %`, corresponding to $|\Delta a_1| / a_1 \ge 0.00035$ or $\sim 1.4$ channels at channel 4000).
+- Runs separated by jumps greater than this cut are partitioned into distinct, isolated segments. Neither chunking nor smoothing is permitted to cross jump boundaries, preserving true physical gain shifts.
+
+#### 2. Pass 2 Raw Spectrum Chunking
+Clicking **⚡ Re-Calibrate with Chunks** groups consecutive runs within each jump-bounded segment into chunks of size $K$ (configured via **Chunk: [ K ] runs**):
+- **Raw Histogram Summing**: The engine accumulates raw spectra channel-by-channel across the chunk runs, multiplying peak statistics by $K$ and reducing statistical centroid variance by $\sqrt{K}$.
+- **Chunk Max $\chi^2$ Cutoff**: Because Poisson uncertainty $\sigma = \sqrt{N}$ increases the reduced $\chi^2/\text{ndf}$ for high-count composites (e.g. from $\sim 2$ up to $\sim 15 - 30$ despite sub-channel centroid accuracy), a dedicated **Chunk Max $\chi^2$** spinbox (default `25.0`) prevents false rejections of high-statistics chunk fits.
+- **Linear Center-Interpolation**: Fitted calibration parameters from chunk centers are smoothly interpolated across the constituent runs, eliminating non-physical staircase steps.
+- **Chunk Intervention**: If a chunk composite fit fails or exceeds the cutoff, its runs are flagged as `INTERVENE` (orange). Double-clicking any constituent run opens the intervention dialog directly on the composite chunk spectrum, and applying or force-accepting the fit synchronously calibrates all runs in that chunk.
+
+#### 3. Moving Window Smoothing (`Smooth a1:`)
+To eliminate residual statistical jitter while preserving the underlying continuous gain drift:
+- Check **Smooth a1:** in the inspector bar and select the moving average **Window** (e.g., 3 to 31 runs, odd).
+- With **Preserve Jumps** enabled, smoothing applies a Gaussian-weighted moving filter strictly within continuous hardware segments, stopping dead at jump boundaries.
+- The drift inspection canvas live-renders both the raw Pass 1 gain points (faint green) and the finalized/smoothed chunk trajectory (solid gold curve). Both `.cal` and `.ucal` exports automatically incorporate the smoothed parameters when this option is checked.
+
+### 8.7 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal
 Once all runs are validated, export calibrations locally or directly to a remote SSH directory:
 1. **Legacy GASP Format (`.cal`)**:
    Standard GASPware / Xtrackn / GSORT format (can be exported as a combined file or per-run `.cal` files):
