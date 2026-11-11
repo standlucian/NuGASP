@@ -218,11 +218,13 @@ void DetectorDriftPlotWidget::mouseMoveEvent(QMouseEvent *event)
 
         QString gainDetailsHtml;
         if (pt.isChunked && pt.hasRawGain) {
+            double curFinalA1 = (m_smoothingEnabled && pt.hasSmoothedGain) ? pt.smoothedGain : pt.gain;
             gainDetailsHtml = QString("<b>Pass 1 Raw a1:</b> %1<br/>"
-                                      "<b>Finalized a1:</b> <font color='#ffd54f'><b>%2</b></font><br/>"
-                                      "<b>Chunk:</b> #%3%4<br/>")
+                                      "<b>Finalized a1:</b> <font color='#ffd54f'><b>%2</b></font>%3<br/>"
+                                      "<b>Chunk:</b> #%4%5<br/>")
                                   .arg(pt.rawGain, 0, 'f', 6)
-                                  .arg(pt.gain, 0, 'f', 6)
+                                  .arg(curFinalA1, 0, 'f', 6)
+                                  .arg(m_smoothingEnabled ? " <i>(smoothed)</i>" : "")
                                   .arg(pt.chunkId >= 0 ? QString::number(pt.chunkId) : "-")
                                   .arg(pt.isChunkBoundary ? " (Chunk Boundary)" : "");
         } else if (m_smoothingEnabled && pt.hasSmoothedGain) {
@@ -412,7 +414,9 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
         QFont legFont("Arial", 8, QFont::Bold);
         p.setFont(legFont);
 
-        QString chunkLegend = "— Finalized a1 (Chunked)";
+        QString chunkLegend = m_smoothingEnabled
+                                  ? QString("— Smoothed Chunked a1 (W=%1)").arg(m_smoothingWindow)
+                                  : "— Finalized a1 (Chunked)";
         int chunkW = p.fontMetrics().horizontalAdvance(chunkLegend);
 
         QString rawLegend = "— Raw Pass 1 a1   ";
@@ -518,7 +522,8 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
                         inFinalSeg = false; // Break path across hardware jumps!
                     }
                     double px = getX(i);
-                    double py = getYGain(pt.gain);
+                    double curGain = (m_smoothingEnabled && pt.hasSmoothedGain) ? pt.smoothedGain : pt.gain;
+                    double py = getYGain(curGain);
                     if (!inFinalSeg) {
                         finalPath.moveTo(px, py);
                         inFinalSeg = true;
@@ -634,7 +639,8 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
                 ptColor = QColor("#ef5350");
             }
 
-            double pyGain = pt.isValid ? getYGain(pt.gain) : (rGain.bottom() - 10.0);
+            double curGain = (m_smoothingEnabled && pt.hasSmoothedGain) ? pt.smoothedGain : pt.gain;
+            double pyGain = pt.isValid ? getYGain(curGain) : (rGain.bottom() - 10.0);
             double rad = isHovered ? 6.0 : 4.0;
             p.setPen(QPen(ptColor.lighter(130), 1.5));
             p.setBrush(ptColor);
@@ -2635,7 +2641,7 @@ void RunByRunManager::updatePlot(int detId)
     int win = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
     double cut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
-    if (doSmooth && !isChunkedTraj) {
+    if (doSmooth) {
         computeSmoothedGains(plotPoints, win, keepJumps, cut);
     } else if (isChunkedTraj) {
         for (auto &pt : plotPoints) {
@@ -2665,7 +2671,7 @@ void RunByRunManager::updatePlot(int detId)
             double pass1Gain = pt.hasRawGain ? pt.rawGain : res.a1;
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(pass1Gain, 'f', 6)));
 
-            double finalGainVal = isChunkedTraj ? res.a1 : (pt.hasSmoothedGain ? pt.smoothedGain : res.a1);
+            double finalGainVal = (doSmooth && pt.hasSmoothedGain) ? pt.smoothedGain : res.a1;
             QTableWidgetItem *itemSmooth = new QTableWidgetItem(QString::number(finalGainVal, 'f', 6));
             itemSmooth->setTextAlignment(Qt::AlignCenter);
             itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
@@ -2682,7 +2688,7 @@ void RunByRunManager::updatePlot(int detId)
             double pass1Gain = pt.hasRawGain ? pt.rawGain : res.a1;
             m_tablePlotData->setItem(r, 3, new QTableWidgetItem(QString::number(pass1Gain, 'f', 6)));
 
-            double finalGainVal = isChunkedTraj ? res.a1 : (pt.hasSmoothedGain ? pt.smoothedGain : res.a1);
+            double finalGainVal = (doSmooth && pt.hasSmoothedGain) ? pt.smoothedGain : res.a1;
             QTableWidgetItem *itemSmooth = new QTableWidgetItem(QString::number(finalGainVal, 'f', 6));
             itemSmooth->setTextAlignment(Qt::AlignCenter);
             itemSmooth->setForeground(QBrush(QColor("#ffd54f")));
@@ -3105,7 +3111,7 @@ void RunByRunManager::onExportCalClicked()
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        if (applySmoothing && !traj.isChunked) {
+        if (applySmoothing) {
             DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps, jumpCut);
             for (const auto &r : smoothedTraj.runResults) {
                 allResults.push_back(r);
@@ -3207,7 +3213,7 @@ void RunByRunManager::onExportUcalClicked()
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
-        if (applySmoothing && !traj.isChunked) {
+        if (applySmoothing) {
             DetectorTrajectory smoothedTraj = getSmoothedTrajectory(traj, smoothWin, keepJumps, jumpCut);
             for (const auto &r : smoothedTraj.runResults) {
                 allResults.push_back(r);
