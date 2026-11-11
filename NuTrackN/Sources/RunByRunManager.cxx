@@ -397,7 +397,7 @@ void DetectorDriftPlotWidget::paintEvent(QPaintEvent *event)
 
         QString smoothLegend = QString("— Smoothed a1 (W=%1%2)")
                                    .arg(m_smoothingWindow)
-                                   .arg(m_preserveJumps ? QString(", jumps > %1").arg(m_jumpThreshold, 0, 'f', 5) : "");
+                                   .arg(m_preserveJumps ? QString(", jumps > %1%").arg(m_jumpThreshold * 100.0, 0, 'f', 3) : "");
         int smoothW = p.fontMetrics().horizontalAdvance(smoothLegend);
 
         QString rawLegend = "— Raw a1   ";
@@ -939,11 +939,12 @@ void RunByRunManager::setupUI()
 
     plotSelectBar->addWidget(new QLabel(tr("Cut:"), this));
     m_spinJumpThreshold = new QDoubleSpinBox(this);
-    m_spinJumpThreshold->setRange(0.00005, 0.01000);
-    m_spinJumpThreshold->setSingleStep(0.00005);
-    m_spinJumpThreshold->setDecimals(5);
-    m_spinJumpThreshold->setValue(0.00035);
-    m_spinJumpThreshold->setToolTip(tr("Gain step cutoff (|Δa1|) for detecting hardware jumps.\nDefault: 0.00035 (~1.4 channels shift at 4000 ch, ~0.7 keV).\nSmaller values catch subtle baseline steps; larger values only catch major jumps."));
+    m_spinJumpThreshold->setRange(0.005, 1.000);
+    m_spinJumpThreshold->setSingleStep(0.005);
+    m_spinJumpThreshold->setDecimals(3);
+    m_spinJumpThreshold->setValue(0.035);
+    m_spinJumpThreshold->setSuffix(" %");
+    m_spinJumpThreshold->setToolTip(tr("Gain step cutoff in percent (|Δa1| / a1 × 100%) for detecting hardware jumps.\nDefault: 0.035% (~1.4 channels shift at 4000 ch, ~0.7 keV).\nSmaller values catch subtle baseline steps; larger values only catch major jumps."));
     m_spinJumpThreshold->setEnabled(false);
     plotSelectBar->addWidget(m_spinJumpThreshold);
 
@@ -957,7 +958,7 @@ void RunByRunManager::setupUI()
             m_plotWidget->setSmoothingEnabled(enabled);
             m_plotWidget->setSmoothingWindow(m_spinSmoothWindow->value());
             m_plotWidget->setPreserveJumps(keepJumps);
-            m_plotWidget->setJumpThreshold(m_spinJumpThreshold->value());
+            m_plotWidget->setJumpThreshold(m_spinJumpThreshold->value() / 100.0);
         }
         int curDet = m_comboPlotDet->currentData().toInt();
         updatePlot(curDet);
@@ -2374,7 +2375,7 @@ void RunByRunManager::updatePlot(int detId)
     bool doSmooth = m_chkSmoothGain && m_chkSmoothGain->isChecked();
     int win = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
-    double cut = m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.00035;
+    double cut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
     if (doSmooth) {
         computeSmoothedGains(plotPoints, win, keepJumps, cut);
     }
@@ -2832,7 +2833,7 @@ void RunByRunManager::onExportCalClicked()
     bool applySmoothing = m_chkSmoothGain && m_chkSmoothGain->isChecked();
     int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
-    double jumpCut = m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.00035;
+    double jumpCut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
@@ -2934,7 +2935,7 @@ void RunByRunManager::onExportUcalClicked()
     bool applySmoothing = m_chkSmoothGain && m_chkSmoothGain->isChecked();
     int smoothWin = m_spinSmoothWindow ? m_spinSmoothWindow->value() : 5;
     bool keepJumps = m_chkPreserveJumps ? m_chkPreserveJumps->isChecked() : true;
-    double jumpCut = m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.00035;
+    double jumpCut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
 
     std::vector<RunCalibResult> allResults;
     for (const auto &traj : m_completedTrajectories) {
