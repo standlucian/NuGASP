@@ -2850,7 +2850,7 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
         sumExpFwhm += std::max(1.5, (a.expectedFwhmCh > 0.0) ? a.expectedFwhmCh : (3.5 / dispersion));
     }
     const double avgExpFwhm = m_anchors.empty() ? 4.0 : (sumExpFwhm / static_cast<double>(m_anchors.size()));
-    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * avgExpFwhm)), 12, 35);
+    const int snipIters = std::clamp(static_cast<int>(std::round(4.0 * avgExpFwhm)), 20, 60);
     auto snipPtr = std::make_shared<std::vector<double>>(RunByRunEngine::computeSnipContinuum(specData, snipIters));
 
     if (pad && totalBins > 4 && snipPtr->size() == specData.size()) {

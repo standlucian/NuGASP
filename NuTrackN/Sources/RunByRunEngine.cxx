@@ -153,11 +153,11 @@ FittedAnchor RunByRunEngine::fitAnchorPeakWithFixed(const std::vector<double> &s
     if (nFitBins < 5) return result;
 
     // Extract local SNIP continuum across [fitMin - margin, fitMax + margin]
-    const int snipMargin = std::clamp(static_cast<int>(std::round(6.0 * estFwhm)), 25, 100);
+    const int snipMargin = std::clamp(static_cast<int>(std::round(6.0 * estFwhm)), 35, 120);
     const int snipStart = std::max(0, fitMin - snipMargin);
     const int snipEnd = std::min(totalBins - 1, fitMax + snipMargin);
     std::vector<double> localSlice(spectrum.begin() + snipStart, spectrum.begin() + snipEnd + 1);
-    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * estFwhm)), 12, 35);
+    const int snipIters = std::clamp(static_cast<int>(std::round(4.0 * estFwhm)), 20, 60);
     const std::vector<double> localSnip = computeSnipContinuum(localSlice, snipIters);
 
     auto snipAtBin = [&](int binIdx) -> double {
@@ -750,7 +750,7 @@ private:
 } // anonymous namespace
 
 //==============================================================================
-// computeSnipContinuum: Smooth 1D SNIP Compton continuum extraction
+// computeSnipContinuum: 1D SNIP Compton continuum extraction with Morhac LLS
 //==============================================================================
 std::vector<double> RunByRunEngine::computeSnipContinuum(const std::vector<double> &spectrum,
                                                          int iterations)
@@ -766,20 +766,36 @@ std::vector<double> RunByRunEngine::computeSnipContinuum(const std::vector<doubl
     }
     smoothSpectrumBinomial(bg, 3);
 
-    // 2. Iterative SNIP peak-clipping filter with decreasing window (p = m down to 1, Morhac NIM A 401):
-    //    Pass m first cuts a flat bridge across the base of each peak, and passes m-1 .. 1 bisect the corners,
-    //    eliminating triangular tent kinks under peak centers.
-    const int m = std::clamp(iterations, 4, 60);
-    std::vector<double> nextBg = bg;
-    for (int p = m; p >= 1; --p) {
-        for (int i = p; i < n - p; ++i) {
-            const double avg = 0.5 * (bg[i - p] + bg[i + p]);
-            nextBg[i] = (avg < bg[i]) ? avg : bg[i];
-        }
-        bg.swap(nextBg);
+    // 2. Remedy 2: Morhac LLS (Log-Log-Square-root) transformation (CERN ROOT TSpectrum standard).
+    //    v_i = ln(ln(sqrt(y_i + 1) + 1) + 1).
+    //    This non-linear compression drastically suppresses peak amplitudes relative to the
+    //    underlying continuum, preventing the clipping envelope from climbing up peak shoulders.
+    std::vector<double> v(n, 0.0);
+    for (int i = 0; i < n; ++i) {
+        v[i] = std::log(std::log(std::sqrt(std::max(0.0, bg[i]) + 1.0) + 1.0) + 1.0);
     }
 
-    // 3. Light post-smoothing so the continuum derivative is continuous across peak windows
+    // 3. Remedy 1: Iterative SNIP peak-clipping filter with decreasing window (p = m down to 1).
+    //    Pass m first spans across the full base width of peaks, and passes m-1 .. 1 bisect corners.
+    const int m = std::clamp(iterations, 4, 80);
+    std::vector<double> nextV = v;
+    for (int p = m; p >= 1; --p) {
+        for (int i = p; i < n - p; ++i) {
+            const double avg = 0.5 * (v[i - p] + v[i + p]);
+            nextV[i] = (avg < v[i]) ? avg : v[i];
+        }
+        v.swap(nextV);
+    }
+
+    // 4. Exact inverse LLS transformation: y = [exp(exp(v) - 1) - 1]^2 - 1
+    for (int i = 0; i < n; ++i) {
+        const double e1 = std::exp(v[i]) - 1.0;
+        const double e2 = std::exp(e1) - 1.0;
+        const double yRec = (e2 * e2) - 1.0;
+        bg[i] = std::max(0.0, yRec);
+    }
+
+    // 5. Light post-smoothing so the continuum derivative is continuous across peak windows
     smoothSpectrumBinomial(bg, 2);
     return bg;
 }
@@ -957,7 +973,7 @@ bool RunByRunEngine::fitSpectrumBound(const std::vector<double> &spectrum,
         sumExpFwhm += std::max(1.5, def.expectedFwhmCh);
     }
     const double avgExpFwhm = sumExpFwhm / static_cast<double>(nAnchors);
-    const int snipIters = std::clamp(static_cast<int>(std::round(2.5 * avgExpFwhm)), 12, 35);
+    const int snipIters = std::clamp(static_cast<int>(std::round(4.0 * avgExpFwhm)), 20, 60);
     std::vector<double> localSnip;
     if (!precomputedSnip || precomputedSnip->size() != spectrum.size()) {
         localSnip = computeSnipContinuum(spectrum, snipIters);
@@ -1731,8 +1747,8 @@ void RunByRunEngine::runSingleRunPass()
         }
         traj.lastValidCentroids = baseCentroids;
         const int snipIters = std::clamp(
-            static_cast<int>(std::round(2.5 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
-            12, 35);
+            static_cast<int>(std::round(4.0 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
+            20, 60);
         std::vector<double> lastValidPeakSpectrum;
 
         // 2. INNER LOOP: Run r in [0 .. nRuns - 1]
@@ -1877,8 +1893,8 @@ void RunByRunEngine::runChunkedPass()
         sumExpFwhm += std::max(1.5, anchorDef.expectedFwhmCh);
     }
     const int snipIters = std::clamp(
-        static_cast<int>(std::round(2.5 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
-        12, 35);
+        static_cast<int>(std::round(4.0 * (sumExpFwhm / static_cast<double>(m_config.anchors.size())))),
+        20, 60);
 
     // OUTER LOOP: Detector d in [detectorStart .. detectorEnd]
     for (int detId = m_config.detectorStart; detId <= m_config.detectorEnd; ++detId) {
