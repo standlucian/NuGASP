@@ -980,6 +980,13 @@ void RunByRunManager::setupUI()
     m_spinChunkSize->setSuffix(tr(" runs"));
     m_spinChunkSize->setToolTip(tr("Number of consecutive runs to sum into high-statistics chunks (strictly bounded by hardware jumps)."));
 
+    m_spinChunkMaxChi2 = new QDoubleSpinBox(this);
+    m_spinChunkMaxChi2->setRange(1.0, 200.0);
+    m_spinChunkMaxChi2->setValue(25.0);
+    m_spinChunkMaxChi2->setSingleStep(5.0);
+    m_spinChunkMaxChi2->setDecimals(1);
+    m_spinChunkMaxChi2->setToolTip(tr("Acceptable reduced Chi2/ndf cutoff for high-statistics composite chunk spectra (default 25.0)."));
+
     m_btnChunkCalib = new QPushButton(tr("⚡ Re-Calibrate with Chunks"), this);
     m_btnChunkCalib->setStyleSheet("font-weight: bold; background-color: #0277bd; color: white; padding: 6px 14px;");
     m_btnChunkCalib->setToolTip(tr("Pass 2: Sum raw spectra across chunk runs (without crossing jumps) and re-fit peaks with high statistics."));
@@ -1001,6 +1008,9 @@ void RunByRunManager::setupUI()
     execBar->addSpacing(15);
     execBar->addWidget(new QLabel(tr("Chunk:"), this));
     execBar->addWidget(m_spinChunkSize);
+    execBar->addSpacing(6);
+    execBar->addWidget(new QLabel(tr("Chunk Max χ²:"), this));
+    execBar->addWidget(m_spinChunkMaxChi2);
     execBar->addWidget(m_btnChunkCalib);
     execBar->addSpacing(20);
     execBar->addWidget(m_btnExportCal);
@@ -1993,6 +2003,7 @@ void RunByRunManager::onChunkCalibClicked()
     const int chunkSize = m_spinChunkSize ? m_spinChunkSize->value() : 5;
     const double jumpCut = (m_spinJumpThreshold ? m_spinJumpThreshold->value() : 0.035) / 100.0;
     const bool applySmoothing = m_chkSmoothGain ? m_chkSmoothGain->isChecked() : true;
+    const double chunkMaxChi2 = m_spinChunkMaxChi2 ? m_spinChunkMaxChi2->value() : 25.0;
 
     // Configure Engine
     RunByRunConfig cfg;
@@ -2014,8 +2025,8 @@ void RunByRunManager::onChunkCalibClicked()
     m_btnExportCal->setEnabled(false);
     m_btnExportUcal->setEnabled(false);
     m_progressBar->setValue(0);
-    m_lblStatusText->setText(tr("Starting Pass 2: High-statistics chunked calibration (K=%1, jump cut=%2%)...")
-                                 .arg(chunkSize).arg(jumpCut * 100.0, 0, 'f', 3));
+    m_lblStatusText->setText(tr("Starting Pass 2: High-statistics chunked calibration (K=%1, jump cut=%2%, max χ²=%3)...")
+                                 .arg(chunkSize).arg(jumpCut * 100.0, 0, 'f', 3).arg(chunkMaxChi2, 0, 'f', 1));
 
     if (m_workerThread && m_workerThread->isRunning()) {
         if (m_engine) m_engine->requestStop();
@@ -2025,7 +2036,7 @@ void RunByRunManager::onChunkCalibClicked()
 
     m_engine = std::make_unique<RunByRunEngine>();
     m_engine->setConfig(cfg);
-    m_engine->setChunkedMode(true, chunkSize, jumpCut, applySmoothing, m_completedTrajectories);
+    m_engine->setChunkedMode(true, chunkSize, jumpCut, applySmoothing, chunkMaxChi2, m_completedTrajectories);
 
     m_workerThread = new QThread(this);
     m_engine->moveToThread(m_workerThread);
@@ -2079,20 +2090,15 @@ void RunByRunManager::onRunProcessed(int detId, int runIndex, int totalRuns, con
     double nomG = (result.nominalGain > 0.0) ? result.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
 
     if (result.status == RunCalibStatus::Success && !result.isFallbackFromPrevious) {
-        if (result.chunkId >= 0) {
-            item->setText(QString("CHK #%1").arg(result.chunkId));
-            item->setBackground(QBrush(QColor("#00695c"))); // Teal for chunked
-        } else {
-            item->setText("GOOD");
-            item->setBackground(QBrush(QColor("#2e7d32"))); // Green
-        }
+        item->setText("GOOD");
+        item->setBackground(QBrush(QColor("#2e7d32"))); // Green
         item->setForeground(QBrush(Qt::white));
 
         QString tipText;
         if (result.hasRawA1) {
             tipText = QString("Run: %1 | Det: %2 [CHUNK #%3%4]\nNominal: %5 keV/ch\nPass 1 Raw a1: %6\nFinalized a1: %7\na0: %8 ch\ns_res: %9 keV\nchi2/ndf: %10")
                           .arg(result.runFileName).arg(detId)
-                          .arg(result.chunkId)
+                          .arg(result.chunkId >= 0 ? QString::number(result.chunkId) : "-")
                           .arg(result.isChunkBoundary ? " (Boundary)" : "")
                           .arg(nomG, 0, 'f', 2)
                           .arg(result.rawA1, 0, 'f', 6)
@@ -3254,20 +3260,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         return;
     }
 
-    // Automatically load spectrum and auto-zoom to peak area on main canvas
-    inspectSpectrumOnCanvas(row, col);
-
-    // Read spectrum for this run and detector
-    std::vector<double> specData;
-    QString err;
-    const int chLen = m_comboChannelLength ? m_comboChannelLength->currentData().toInt() : 65536;
-    if (!ReadSpectrumData(filePath.toStdString(), SpectrumFormat::LongInt32, chLen, detId, specData, &err) || specData.empty()) {
-        QMessageBox::warning(this, tr("Spectrum Read Error"),
-                             tr("Could not read spectrum for detector %1 from:\n%2\n\n%3")
-                                 .arg(detId).arg(filePath).arg(err));
-        return;
-    }
-
     // Find current trajectory and result if they exist
     DetectorTrajectory *targetTraj = nullptr;
     for (auto &traj : m_completedTrajectories) {
@@ -3288,11 +3280,76 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         curRes.status = RunCalibStatus::BadChi2;
     }
 
+    const bool isChunkIntervention = (curRes.chunkId >= 0 &&
+                                      curRes.chunkStartRun >= 0 &&
+                                      curRes.chunkEndRun >= curRes.chunkStartRun &&
+                                      curRes.chunkEndRun < static_cast<int>(m_runFilePaths.size()));
+
+    const int chLen = m_comboChannelLength ? m_comboChannelLength->currentData().toInt() : 65536;
+    std::vector<double> specData;
+    QString err;
+
+    if (isChunkIntervention) {
+        // Read and composite all runs belonging to this chunk
+        for (int rIdx = curRes.chunkStartRun; rIdx <= curRes.chunkEndRun; ++rIdx) {
+            const QString rPath = m_runFilePaths[rIdx];
+            if (m_isRemoteRuns && !QFile::exists(rPath) && rIdx < static_cast<int>(m_remoteRunPaths.size())) {
+                auto sess = RemoteSession::globalSession();
+                QString syncErr;
+                QString syncPath = rPath;
+                if (sess) {
+                    sess->syncRemoteFileToCache(m_remoteRunPaths[rIdx], syncPath, nullptr, &syncErr);
+                }
+            }
+
+            std::vector<double> singleSpec;
+            if (ReadSpectrumData(rPath.toStdString(), SpectrumFormat::LongInt32, chLen, detId, singleSpec, &err) && !singleSpec.empty()) {
+                if (specData.empty()) {
+                    specData = std::move(singleSpec);
+                } else {
+                    const size_t nBins = std::min(specData.size(), singleSpec.size());
+                    for (size_t b = 0; b < nBins; ++b) {
+                        specData[b] += singleSpec[b];
+                    }
+                }
+            }
+        }
+
+        if (specData.empty()) {
+            QMessageBox::warning(this, tr("Chunk Spectrum Read Error"),
+                                 tr("Could not read composite chunk spectrum for detector %1 across runs %2..%3:\n%4")
+                                     .arg(detId).arg(curRes.chunkStartRun + 1).arg(curRes.chunkEndRun + 1).arg(err));
+            return;
+        }
+
+        // Display chunk composite spectrum on main canvas with distinct header
+        if (m_mainCanvas) {
+            const QString chunkSpecTitle = QString("Chunk #%1 (Runs %2..%3)#%4")
+                                               .arg(curRes.chunkId)
+                                               .arg(curRes.chunkStartRun + 1)
+                                               .arg(curRes.chunkEndRun + 1)
+                                               .arg(detId);
+            m_mainCanvas->loadSpectrumDataToPad(specData, chunkSpecTitle, false);
+        }
+    } else {
+        // Automatically load single run spectrum and auto-zoom to peak area on main canvas
+        inspectSpectrumOnCanvas(row, col);
+
+        if (!ReadSpectrumData(filePath.toStdString(), SpectrumFormat::LongInt32, chLen, detId, specData, &err) || specData.empty()) {
+            QMessageBox::warning(this, tr("Spectrum Read Error"),
+                                 tr("Could not read spectrum for detector %1 from:\n%2\n\n%3")
+                                     .arg(detId).arg(filePath).arg(err));
+            return;
+        }
+    }
+
     const double dispersion = (curRes.nominalGain > 0.0) ? curRes.nominalGain : ((m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0);
     curRes.nominalGain = dispersion;
     const double runNomGain = dispersion;
 
-    const double maxChi2 = m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0;
+    const double maxChi2 = isChunkIntervention
+                               ? (m_spinChunkMaxChi2 ? m_spinChunkMaxChi2->value() : 25.0)
+                               : (m_spinMaxChi2 ? m_spinMaxChi2->value() : 5.0);
     const bool useQuadratic = m_chkQuadratic ? m_chkQuadratic->isChecked() : false;
 
     // Make the big calibration manager bugger off so the user has an unobstructed view of the spectrum on the main canvas!
@@ -3313,7 +3370,16 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Create Modal Intervention Dialog with the main canvas window as parent
     QWidget *parentWnd = m_mainCanvas ? static_cast<QWidget*>(m_mainCanvas) : this->parentWidget();
     QDialog dlg(parentWnd);
-    dlg.setWindowTitle(tr("Inspect & Tune Fit — Run: %1, Detector #%2 (%3 keV/ch)").arg(runName).arg(detId).arg(runNomGain, 0, 'f', 2));
+    if (isChunkIntervention) {
+        dlg.setWindowTitle(tr("Inspect & Tune Chunk #%1 (Runs %2–%3) — Detector #%4 (%5 keV/ch)")
+                               .arg(curRes.chunkId)
+                               .arg(curRes.chunkStartRun + 1)
+                               .arg(curRes.chunkEndRun + 1)
+                               .arg(detId)
+                               .arg(runNomGain, 0, 'f', 2));
+    } else {
+        dlg.setWindowTitle(tr("Inspect & Tune Fit — Run: %1, Detector #%2 (%3 keV/ch)").arg(runName).arg(detId).arg(runNomGain, 0, 'f', 2));
+    }
     dlg.setWindowFlags(dlg.windowFlags() | Qt::WindowMinMaxButtonsHint);
     dlg.resize(1020, 620);
     dlg.setFont(Design::getDialogFont());
@@ -4257,9 +4323,25 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             targetTraj = &m_completedTrajectories.back();
         }
 
-        if (row < static_cast<int>(targetTraj->runResults.size())) {
-            const bool wasFailure = (targetTraj->runResults[row].status != RunCalibStatus::Success);
-            targetTraj->runResults[row] = liveCalibResult;
+        const int startApplyRow = isChunkIntervention ? curRes.chunkStartRun : row;
+        const int endApplyRow = isChunkIntervention ? curRes.chunkEndRun : row;
+
+        for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
+            if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+
+            const bool wasFailure = (targetTraj->runResults[applyR].status != RunCalibStatus::Success);
+            RunCalibResult runCal = liveCalibResult;
+            runCal.runNumber = applyR + 1;
+            runCal.runFileName = QFileInfo(m_runFilePaths[applyR]).fileName();
+            runCal.fullFilePath = m_runFilePaths[applyR];
+            runCal.detectorId = detId;
+            runCal.chunkId = curRes.chunkId;
+            runCal.chunkStartRun = curRes.chunkStartRun;
+            runCal.chunkEndRun = curRes.chunkEndRun;
+            runCal.isChunkBoundary = (applyR == curRes.chunkStartRun);
+
+            targetTraj->runResults[applyR] = runCal;
+
             if (wasFailure && liveCalibResult.status == RunCalibStatus::Success) {
                 targetTraj->successCount++;
                 if (targetTraj->failureCount > 0) targetTraj->failureCount--;
@@ -4267,6 +4349,28 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 if (targetTraj->successCount > 0) targetTraj->successCount--;
                 targetTraj->failureCount++;
             }
+
+            // Update Matrix Cell
+            QTableWidgetItem *item = m_gridMatrix->item(applyR, col);
+            if (!item) {
+                item = new QTableWidgetItem();
+                m_gridMatrix->setItem(applyR, col, item);
+            }
+            if (liveCalibResult.status == RunCalibStatus::Success) {
+                item->setText("GOOD");
+                item->setBackground(QBrush(QColor("#2e7d32")));
+            } else {
+                item->setText("INTERVENE");
+                item->setBackground(QBrush(QColor("#ffa726")));
+            }
+            item->setForeground(QBrush(Qt::white));
+            item->setToolTip(QString("Run: %1 | Det: %2%3 [MANUALLY ADJUSTED]\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
+                                 .arg(runCal.runFileName).arg(detId)
+                                 .arg(isChunkIntervention ? QString(" [CHUNK #%1]").arg(curRes.chunkId) : "")
+                                 .arg(liveCalibResult.a0, 0, 'f', 4)
+                                 .arg(liveCalibResult.a1, 0, 'f', 6)
+                                 .arg(liveCalibResult.sRes, 0, 'f', 4)
+                                 .arg(liveCalibResult.chi2NDF, 0, 'f', 2));
         }
 
         // Update last valid centroids
@@ -4276,27 +4380,6 @@ void RunByRunManager::openInterventionDialog(int row, int col)
                 targetTraj->lastValidCentroids.push_back(fa.centroidCh);
             }
         }
-
-        // Update Matrix Cell
-        QTableWidgetItem *item = m_gridMatrix->item(row, col);
-        if (!item) {
-            item = new QTableWidgetItem();
-            m_gridMatrix->setItem(row, col, item);
-        }
-        if (liveCalibResult.status == RunCalibStatus::Success) {
-            item->setText("GOOD");
-            item->setBackground(QBrush(QColor("#2e7d32")));
-        } else {
-            item->setText("INTERVENE");
-            item->setBackground(QBrush(QColor("#ffa726")));
-        }
-        item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2 [MANUALLY ADJUSTED]\na0: %3 ch\na1: %4\ns_res: %5 keV\nchi2/ndf: %6")
-                             .arg(runName).arg(detId)
-                             .arg(liveCalibResult.a0, 0, 'f', 4)
-                             .arg(liveCalibResult.a1, 0, 'f', 6)
-                             .arg(liveCalibResult.sRes, 0, 'f', 4)
-                             .arg(liveCalibResult.chi2NDF, 0, 'f', 2));
 
         // Refresh canvas with updated calibration & peak fits
         inspectSpectrumOnCanvas(row, col);
@@ -4337,44 +4420,79 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             if (fa.isValid) validCount++;
         }
 
+        const int startApplyRow = isChunkIntervention ? curRes.chunkStartRun : row;
+        const int endApplyRow = isChunkIntervention ? curRes.chunkEndRun : row;
+
         if (validCount >= 2 && liveCalibResult.a1 > 0.0) {
             liveCalibResult.status = RunCalibStatus::Success;
             liveCalibResult.isFallbackFromPrevious = false;
             liveCalibResult.nominalGain = runNomGain;
             liveCalibResult.failureReason = "Force accepted by user";
-            if (row < static_cast<int>(targetTraj->runResults.size())) {
-                const bool wasFailure = (targetTraj->runResults[row].status != RunCalibStatus::Success);
-                targetTraj->runResults[row] = liveCalibResult;
+
+            for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
+                if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+                const bool wasFailure = (targetTraj->runResults[applyR].status != RunCalibStatus::Success);
+                RunCalibResult runCal = liveCalibResult;
+                runCal.runNumber = applyR + 1;
+                runCal.runFileName = QFileInfo(m_runFilePaths[applyR]).fileName();
+                runCal.fullFilePath = m_runFilePaths[applyR];
+                runCal.detectorId = detId;
+                runCal.chunkId = curRes.chunkId;
+                runCal.chunkStartRun = curRes.chunkStartRun;
+                runCal.chunkEndRun = curRes.chunkEndRun;
+                runCal.isChunkBoundary = (applyR == curRes.chunkStartRun);
+
+                targetTraj->runResults[applyR] = runCal;
                 if (wasFailure) {
                     targetTraj->successCount++;
                     if (targetTraj->failureCount > 0) targetTraj->failureCount--;
                 }
+
+                QTableWidgetItem *item = m_gridMatrix->item(applyR, col);
+                if (!item) {
+                    item = new QTableWidgetItem();
+                    m_gridMatrix->setItem(applyR, col, item);
+                }
+                item->setText("GOOD");
+                item->setBackground(QBrush(QColor("#2e7d32")));
+                item->setForeground(QBrush(Qt::white));
+                item->setToolTip(QString("Run: %1 | Det: %2%3 [FORCE ACCEPTED]\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
+                                     .arg(runCal.runFileName).arg(detId)
+                                     .arg(isChunkIntervention ? QString(" [CHUNK #%1]").arg(curRes.chunkId) : "")
+                                     .arg(runCal.a0, 0, 'f', 4)
+                                     .arg(runCal.a1, 0, 'f', 6)
+                                     .arg(runCal.sRes, 0, 'f', 4)
+                                     .arg(runCal.chi2NDF, 0, 'f', 2));
             }
             targetTraj->lastValidCentroids.clear();
             for (const auto &fa : liveCalibResult.fittedAnchors) {
                 if (fa.isValid) targetTraj->lastValidCentroids.push_back(fa.centroidCh);
             }
-        } else if (row < static_cast<int>(targetTraj->runResults.size())) {
-            targetTraj->runResults[row].nominalGain = runNomGain;
-            targetTraj->runResults[row].status = RunCalibStatus::Success;
-            targetTraj->runResults[row].isFallbackFromPrevious = false;
-            targetTraj->runResults[row].failureReason = "Force accepted by user";
-        }
+        } else {
+            for (int applyR = startApplyRow; applyR <= endApplyRow; ++applyR) {
+                if (applyR < 0 || applyR >= static_cast<int>(targetTraj->runResults.size())) continue;
+                targetTraj->runResults[applyR].nominalGain = runNomGain;
+                targetTraj->runResults[applyR].status = RunCalibStatus::Success;
+                targetTraj->runResults[applyR].isFallbackFromPrevious = false;
+                targetTraj->runResults[applyR].failureReason = "Force accepted by user";
 
-        QTableWidgetItem *item = m_gridMatrix->item(row, col);
-        if (!item) {
-            item = new QTableWidgetItem();
-            m_gridMatrix->setItem(row, col, item);
+                QTableWidgetItem *item = m_gridMatrix->item(applyR, col);
+                if (!item) {
+                    item = new QTableWidgetItem();
+                    m_gridMatrix->setItem(applyR, col, item);
+                }
+                item->setText("GOOD");
+                item->setBackground(QBrush(QColor("#2e7d32")));
+                item->setForeground(QBrush(Qt::white));
+                item->setToolTip(QString("Run: %1 | Det: %2%3 [FORCE ACCEPTED]\na0: %4 ch\na1: %5\ns_res: %6 keV\nchi2/ndf: %7")
+                                     .arg(QFileInfo(m_runFilePaths[applyR]).fileName()).arg(detId)
+                                     .arg(isChunkIntervention ? QString(" [CHUNK #%1]").arg(curRes.chunkId) : "")
+                                     .arg(targetTraj->runResults[applyR].a0, 0, 'f', 4)
+                                     .arg(targetTraj->runResults[applyR].a1, 0, 'f', 6)
+                                     .arg(targetTraj->runResults[applyR].sRes, 0, 'f', 4)
+                                     .arg(targetTraj->runResults[applyR].chi2NDF, 0, 'f', 2));
+            }
         }
-        item->setText("GOOD");
-        item->setBackground(QBrush(QColor("#2e7d32")));
-        item->setForeground(QBrush(Qt::white));
-        item->setToolTip(QString("Run: %1 | Det: %2 [FORCE ACCEPTED]\na0: %3 ch\na1: %4\ns_res: %5 keV\nchi2/ndf: %6")
-                             .arg(runName).arg(detId)
-                             .arg(targetTraj->runResults[row].a0, 0, 'f', 4)
-                             .arg(targetTraj->runResults[row].a1, 0, 'f', 6)
-                             .arg(targetTraj->runResults[row].sRes, 0, 'f', 4)
-                             .arg(targetTraj->runResults[row].chi2NDF, 0, 'f', 2));
 
         // Refresh canvas with updated calibration & peak fits
         inspectSpectrumOnCanvas(row, col);

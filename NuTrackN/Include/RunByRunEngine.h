@@ -88,6 +88,8 @@ struct RunCalibResult {
     double rawA1{0.0};
     bool hasRawA1{false};
     int chunkId{-1};
+    int chunkStartRun{-1};
+    int chunkEndRun{-1};
     bool isChunkBoundary{false};
     bool isJumpBoundary{false};
 
@@ -136,6 +138,7 @@ public:
     const RunByRunConfig& getConfig() const { return m_config; }
 
     void setChunkedMode(bool enabled, int chunkSize, double jumpCutoff, bool applySmoothing,
+                        double chunkMaxChi2NDF = 25.0,
                         const std::vector<DetectorTrajectory> &pass1Traj = {});
     bool isChunkedMode() const { return m_isChunkedRun; }
 
@@ -215,6 +218,7 @@ private:
     int m_chunkSize{5};
     double m_jumpCutoff{0.00035};
     bool m_chunkApplySmoothing{true};
+    double m_chunkMaxChi2NDF{25.0};
     std::vector<DetectorTrajectory> m_pass1Trajectories;
 };
 

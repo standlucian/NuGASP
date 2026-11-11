@@ -199,6 +199,7 @@ private:
     QPushButton            *m_btnStart{nullptr};
     QPushButton            *m_btnChunkCalib{nullptr};
     QSpinBox               *m_spinChunkSize{nullptr};
+    QDoubleSpinBox         *m_spinChunkMaxChi2{nullptr};
     QPushButton            *m_btnCancel{nullptr};
     QPushButton            *m_btnExportCal{nullptr};
     QPushButton            *m_btnExportUcal{nullptr};

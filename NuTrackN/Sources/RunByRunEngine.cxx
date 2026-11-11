@@ -1663,12 +1663,14 @@ bool RunByRunEngine::computeCalibration(const std::vector<FittedAnchor> &anchors
 }
 
 void RunByRunEngine::setChunkedMode(bool enabled, int chunkSize, double jumpCutoff, bool applySmoothing,
+                                    double chunkMaxChi2NDF,
                                     const std::vector<DetectorTrajectory> &pass1Traj)
 {
     m_isChunkedRun = enabled;
     m_chunkSize = std::max(2, chunkSize);
     m_jumpCutoff = (jumpCutoff > 0.0) ? jumpCutoff : 0.00035;
     m_chunkApplySmoothing = applySmoothing;
+    m_chunkMaxChi2NDF = (chunkMaxChi2NDF > 0.0) ? chunkMaxChi2NDF : 25.0;
     if (!pass1Traj.empty()) {
         m_pass1Trajectories = pass1Traj;
     }
@@ -1995,11 +1997,41 @@ void RunByRunEngine::runChunkedPass()
                     // Compute SNIP continuum for chunk
                     auto snipBg = computeSnipContinuum(chunkSpec, snipIters);
 
-                    // Use centroid from Pass 1 nearest to centerRunIndex as expectedCentroids
-                    int centerR = static_cast<int>(std::round(chunk.centerRunIndex));
-                    std::vector<double> expectedCentroids = traj.lastValidCentroids;
-                    if (pass1Traj && centerR >= 0 && centerR < static_cast<int>(pass1Traj->runResults.size())) {
-                        const auto &refRes = pass1Traj->runResults[centerR];
+                    // Find closest successful Pass 1 run within chunk (or segment) to seed expectedCentroids
+                    int bestRefR = -1;
+                    double bestDist = 1e9;
+                    if (pass1Traj) {
+                        for (int cr : chunk.runIndices) {
+                            if (cr >= 0 && cr < static_cast<int>(pass1Traj->runResults.size())) {
+                                const auto &ref = pass1Traj->runResults[cr];
+                                if (ref.status == RunCalibStatus::Success) {
+                                    double d = std::abs(static_cast<double>(cr) - chunk.centerRunIndex);
+                                    if (d < bestDist) {
+                                        bestDist = d;
+                                        bestRefR = cr;
+                                    }
+                                }
+                            }
+                        }
+                        if (bestRefR < 0) {
+                            for (int sr = seg.startRun; sr <= seg.endRun; ++sr) {
+                                if (sr >= 0 && sr < static_cast<int>(pass1Traj->runResults.size())) {
+                                    const auto &ref = pass1Traj->runResults[sr];
+                                    if (ref.status == RunCalibStatus::Success) {
+                                        double d = std::abs(static_cast<double>(sr) - chunk.centerRunIndex);
+                                        if (d < bestDist) {
+                                            bestDist = d;
+                                            bestRefR = sr;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    std::vector<double> expectedCentroids = baseCentroids;
+                    if (bestRefR >= 0 && pass1Traj) {
+                        const auto &refRes = pass1Traj->runResults[bestRefR];
                         for (size_t aIdx = 0; aIdx < refRes.fittedAnchors.size() && aIdx < expectedCentroids.size(); ++aIdx) {
                             if (refRes.fittedAnchors[aIdx].isValid && refRes.fittedAnchors[aIdx].centroidCh > 0.0) {
                                 expectedCentroids[aIdx] = refRes.fittedAnchors[aIdx].centroidCh;
@@ -2007,11 +2039,14 @@ void RunByRunEngine::runChunkedPass()
                         }
                     }
 
+                    int centerR = static_cast<int>(std::round(chunk.centerRunIndex));
                     RunCalibResult cRes;
                     cRes.detectorId = detId;
                     cRes.runNumber = centerR + 1;
                     cRes.runFileName = QString("Chunk_%1").arg(chunk.chunkId);
                     cRes.nominalGain = dispersion;
+
+                    const double chunkChi2Limit = (m_chunkMaxChi2NDF > 0.0) ? m_chunkMaxChi2NDF : 25.0;
 
                     const bool calOk = fitSpectrumBound(chunkSpec,
                                                         m_config.anchors,
@@ -2020,7 +2055,7 @@ void RunByRunEngine::runChunkedPass()
                                                         m_config.useQuadratic,
                                                         dispersion,
                                                         m_config.maxAllowedDriftCh,
-                                                        m_config.maxAllowedChi2NDF,
+                                                        chunkChi2Limit,
                                                         cRes,
                                                         &snipBg);
                     if (calOk) {
@@ -2090,6 +2125,8 @@ void RunByRunEngine::runChunkedPass()
 
                 if (parentChunk) {
                     runRes.chunkId = parentChunk->chunkId;
+                    runRes.chunkStartRun = parentChunk->runIndices.front();
+                    runRes.chunkEndRun = parentChunk->runIndices.back();
                     runRes.isChunkBoundary = (rIdx == parentChunk->runIndices.front());
                 }
 
@@ -2156,13 +2193,19 @@ void RunByRunEngine::runChunkedPass()
                     detSuccess++;
                     overallSuccessCount++;
                 } else {
-                    if (runRes.status == RunCalibStatus::Success) {
-                        detSuccess++;
-                        overallSuccessCount++;
-                    } else {
-                        detFail++;
-                        overallFailureCount++;
+                    // Chunk fit failed: flag for intervention!
+                    runRes.status = RunCalibStatus::BadChi2;
+                    if (parentChunk) {
+                        runRes.failureReason = QString("Chunk #%1 (Runs %2-%3) fit requires intervention: %4")
+                                                   .arg(parentChunk->chunkId)
+                                                   .arg(parentChunk->runIndices.front() + 1)
+                                                   .arg(parentChunk->runIndices.back() + 1)
+                                                   .arg(parentChunk->fitRes.failureReason.isEmpty() ? "Chi2 exceeds cutoff" : parentChunk->fitRes.failureReason);
+                        runRes.chi2NDF = parentChunk->fitRes.chi2NDF;
+                        runRes.fittedAnchors = parentChunk->fitRes.fittedAnchors;
                     }
+                    detFail++;
+                    overallFailureCount++;
                 }
 
                 traj.runResults[rIdx] = runRes;
