@@ -564,17 +564,34 @@ Once an SSH session is authenticated, NuTrackN's remote SFTP subsystem is global
 
 ---
 
-### 3.2 Supported Nuclear Spectroscopy Formats
-NuTrackN automatically detects, parses, and validates all major nuclear and particle physics data formats without requiring manual format flag selection:
-- **Ortec Maestro (`.spe`, `.chn`)**: Standard multichannel analyzer ASCII and binary records with header metadata (live time, real time, acquisition date, and preset tags).
-- **Canberra Formats & Generic ASCII (`.dat`, `.txt`, `.csv`)**: Single-column integer/floating-point counts or two-column $(Channel, Counts)$ with space, tab, semicolon, or comma separation.
-- **Radware (`.spe`)**: Both 16-bit/32-bit integer and floating-point Radware spectrum buffers commonly utilized in heavy-ion γ-ray spectroscopy.
-- **CERN ROOT Histograms (`.root`)**: 1D histograms (`TH1D`, `TH1F`, `TH1I`) and 2D matrices (`TH2D`). When opening a ROOT file containing multiple histograms, an interactive object selection browser lets you choose the target spectrum.
-- **Compressed Coincidence Matrices (`.cmat`, `.mat`)**: GASPware symmetrized and raw 2D gamma-gamma coincidence matrices.
+### 3.2 Supported Nuclear Spectroscopy Formats & File Types
+NuTrackN operates strictly and natively on the fundamental data structures of nuclear spectroscopy without relying on bloated proprietary container formats:
+
+1. **2D Compressed Coincidence Matrices (`.cmat`)**:
+   - High-density symmetrized $\gamma$-$\gamma$ coincidence matrices from the GASP / GASPware analysis suite.
+   - Handled directly by NuTrackN's integrated C matrix compression library (`complib`).
+   - Registered as NuTrackN's official OS desktop file association (`application/x-gasp-matrix`). Double-clicking a `.cmat` file in your desktop file manager opens it directly in NuTrackN.
+
+2. **1D Binary Spectra (Raw Streams / Unheadered)**:
+   - **32-bit Integer (`LongInt32` / `long`)**: Standard 4 bytes per channel (`uint32_t` / `int32_t`). The native standard for NuTrackN/XTrackN (typically 4096, 8192, 10240, 16384, 32768, or 65536 channels).
+   - **16-bit Integer (`ShortInt16` / `short`)**: Compact 2 bytes per channel (`uint16_t` / `int16_t`).
+   - **32-bit Float (`Float32` / `float`)**: Single-precision IEEE 754 floating point (4 bytes per channel), common for efficiency-corrected or background-subtracted spectra.
+   - **64-bit Float (`Double64` / `double`)**: Double-precision IEEE 754 floating point (8 bytes per channel), used for high-precision analytical calculations.
+
+3. **1D ASCII Spectra (`.txt`, `.dat`, `.asc`, etc.)**:
+   - Plain text whitespace-, tab-, or comma-separated numeric counts.
+   - Supports both single-column counts ($Y$ only) and two-column channel/counts ($X, Y$).
+   - Automatic line skipping for commentary or metadata headers starting with `#`, `!`, `;`, or `$`.
+
+4. **Single vs. Chained (Multi-Spectrum) Files**:
+   - Both binary and ASCII files can contain either a **single spectrum** or **multiple chained/concatenated spectra** (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).
+   - **Automatic Heuristic Detection**: Upon selection, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10240, 16k, 32k, 64k) to determine the format, channel length, and number of chained spectra automatically.
+   - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the **`N`** / **`N-`** hotkeys.
+   - **Multi-Spectrum Export (`SpectrumExportDialog`)**: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.
 
 > [!NOTE]
 > **Operating System File Association Policy:**  
-> To respect existing laboratory workstations and software installations (such as standalone CERN ROOT distributions, Radware suites, or Ortec Maestro), NuTrackN registers OS-level desktop file associations **exclusively for `.cmat` coincidence matrices**. It deliberately avoids registering associations for generic `.spe`, `.root`, `.chn`, or `.dat` files. All supported spectrum and histogram formats can be loaded seamlessly at any time from within NuTrackN via the file open dialog (`N` key or toolbar button).
+> NuTrackN registers OS-level desktop file associations **exclusively for `.cmat` coincidence matrices**. It deliberately avoids registering associations for generic `.spe`, `.dat`, or `.bin` files so as not to interfere with other system software. All 1D spectra (binary short/long/float/double and ASCII, single or chained) can be loaded seamlessly at any time from within NuTrackN via the file open dialog (`N` key or toolbar button).
 
 ---
 
@@ -589,12 +606,13 @@ NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`
   - When saving to a remote destination, NuTrackN transparently stages the data and performs an atomic SFTP upload, reporting real-time status.
 - **Live Spectrum Mini-Preview**:
   - Selecting any spectrum file in the file list instantly computes and renders a thumbnail preview of the spectrum shape, total counts, and channel length in the side inspector panel before you open it.
-- **Format Import Specifications Dialog**:
-  - When opening a raw or non-header ASCII data file, NuTrackN presents an interactive format specification dialog:
-    - **Channel Length**: Choose standard MCA bin sizes (1024, 2048, 4096, 8192, 16384) or autodetect from the line count.
-    - **Column Mapping**: Specify whether data is single-column (counts only) or two-column (channel index + counts).
-    - **Header Line Offset**: Set the number of leading metadata or commentary lines to skip.
-    - **Interactive Preview**: Inspect an interactive preview curve confirming that your import parameters properly unpack the spectrum shape.
+- **Spectrum Import Dialog (`SpectrumImportDialog`)**:
+  - When opening a 1D spectrum, NuTrackN inspects the file and opens the interactive import configuration dialog:
+    - **Auto-Detection Banner**: Instantly displays the detected format, channel size, and total chained spectra with a confidence report.
+    - **Data Format Selection**: Choose or override format between 32-bit Integer (`uint32_t`), 16-bit Integer (`uint16_t`), ASCII text, 32-bit Float, or 64-bit Double.
+    - **Channel Length Selection**: Select standard nuclear spectroscopy presets (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k, all channels in file, or custom spinbox).
+    - **Multi-Spectrum Chained Index**: For multi-spectrum files, jump directly to any detector/run index using the `# Index` selector and `◀` / `▶` buttons.
+    - **Interactive Curve Preview**: Displays a real-time graphical preview of the parsed spectrum data before loading onto the canvas.
 
 ---
 
