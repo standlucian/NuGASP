@@ -18,7 +18,7 @@
 - [2. Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
     - [2.1 Obtaining Pre-Built Packages (GitHub Releases)](#21-obtaining-pre-built-packages-github-releases)
     - [2.2 Linux (1-Click AppImage)](#22-linux-1-click-appimage)
-    - [2.3 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#23-macos-drag-and-drop-dmg-for-apple-silicon--intel)
+    - [2.3 macOS (Drag-and-Drop DMG for Apple Silicon)](#23-macos-drag-and-drop-dmg-for-apple-silicon)
     - [2.4 Building from Source](#24-building-from-source)
     - [2.5 First Spectrum Walkthrough in 60 Seconds](#25-first-spectrum-walkthrough-in-60-seconds)
 - [3. Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
@@ -197,7 +197,7 @@ To ensure long-term sustainability across evolving laboratory operating systems 
 
 ##### Unified Build System & Automated CI/CD
 - **CMake Single Source of Truth**: Consolidating on Modern CMake (3.25+) with `CMakePresets.json` as the single canonical build configuration, phasing out legacy `.pro` files while maintaining 1-click Qt Creator integration.
-- **Automated Multi-Platform Packaging**: Expanding automated GitHub Actions workflows to continuously package standalone Linux AppImages, Flatpaks, native Debian/RPM packages, and universal macOS DMG binaries on every tagged release.
+- **Automated Multi-Platform Packaging**: Expanding automated GitHub Actions workflows to continuously package standalone Linux AppImages, Flatpaks, native Debian/RPM packages, and native Apple Silicon macOS DMG bundles on every tagged release.
 
 ### 1.7 Software License & Academic Citation
 
@@ -244,8 +244,11 @@ To download the latest image for your platform:
 2. Scroll down to the **Assets** accordion at the bottom of the release notes.
 3. Select the package corresponding to your operating system:
    - **Linux (x86_64, all distributions with glibc 2.28+)**: Download **`NuTrackN-x86_64.AppImage`**.
-   - **macOS (Apple Silicon M1 / M2 / M3 / M4)**: Download **`NuTrackN-macOS-arm64.dmg`**.
-   - **macOS (Intel Core x86_64)**: Download **`NuTrackN-macOS-x86_64.dmg`**.
+   - **macOS (Apple Silicon ARM64 — M1 / M2 / M3 / M4 / M5)**: Download **`NuTrackN-macOS-arm64.dmg`**.
+
+> [!NOTE]
+> **macOS Architecture Notice:**  
+> NuTrackN exclusively targets modern Apple Silicon architecture (`arm64`). Legacy Intel-based Macs (x86_64) are neither supported nor planned for future development.
 
 > [!TIP]
 > **Zero External Dependencies Required!**  
@@ -272,8 +275,8 @@ nutrackn
 ```
 *(To remove: run `nutrackn --uninstall`).*
 
-### 2.3 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)
-1. Download `NuTrackN-macOS-arm64.dmg` (Apple Silicon M1/M2/M3/M4) or `NuTrackN-macOS-x86_64.dmg` (Intel Core) from the [Releases page](https://github.com/standlucian/NuGASP/releases).
+### 2.3 macOS (Drag-and-Drop DMG for Apple Silicon)
+1. Download `NuTrackN-macOS-arm64.dmg` (Apple Silicon M1/M2/M3/M4/M5) from the [Releases page](https://github.com/standlucian/NuGASP/releases).
 2. Open the disk image and drag **`NuTrackN.app`** into your `/Applications` folder.
 3. To enable the command line shortcut in Terminal:
    ```bash
@@ -974,7 +977,7 @@ NuTrackN strictly enforces **0-indexed channel numbering** across all data struc
 
 ### 14.4 System Requirements & Supported Platforms
 - **Linux**: Ubuntu 20.04+, Debian 11+, Fedora 36+, Arch Linux, CentOS/RHEL 8+ (AppImage or Native CMake build).
-- **macOS**: macOS 11.0 (Big Sur) through macOS 15.0+ (Sequoia) on Apple Silicon (M1/M2/M3/M4) or Intel Core 64-bit processors.
+- **macOS**: macOS 11.0 (Big Sur) through macOS 15.0+ (Sequoia) exclusively on Apple Silicon (M1/M2/M3/M4/M5). Legacy Intel Core Macs are neither supported nor planned.
 - **Hardware**:
   - Minimum: 2 GB RAM, 1 GHz Dual-Core CPU, $1280 \times 800$ display.
   - Recommended: 8 GB RAM, Quad-Core CPU, OpenGL 3.3+ acceleration, 4K High-DPI display.
