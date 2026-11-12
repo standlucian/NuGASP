@@ -488,50 +488,70 @@ Traditional nuclear physics analysis software required users to either manually 
 
 NuTrackN eliminates these friction points by running 100% natively on your local workstation while embedding a high-performance **asynchronous SSH/SFTP client subsystem** directly into the interface:
 
-```text
-┌────────────────────────────────────────────────────────────────────────┐
-│           Connect to Remote Data Computer (SSH / SFTP)                 │
-├────────────────────────────────────────────────────────────────────────┤
-│ Saved Profiles: [ Tandem DAQ Node 1                ▼ ] [+ New] [Save]  │
-├────────────────────────────────────────────────────────────────────────┤
-│ Profile Name:   [ Tandem DAQ Node 1                                  ] │
-│ Host / IP:      [ 192.168.1.100              ]   Port: [ 22        ]   │
-│ Username:       [ data                                               ] │
-│ Authentication: (•) SSH Private Key (Recommended)  ( ) Password        │
-│ Key File:       [ ~/.ssh/id_ed25519                       ] [Browse..] │
-│ Passphrase:     [ ••••••••••••••••••••••••••                         ] │
-│ Remote Workdir: [ /data/exp2026/run_calib/                           ] │
-├────────────────────────────────────────────────────────────────────────┤
-│ [⚡ Test / Verify Connection]      [Disconnect]              [Connect] │
-└────────────────────────────────────────────────────────────────────────┘
-```
+![NuTrackN Remote SSH / SFTP Session Manager](images/ssh_connection_dialog.png)
 
 #### Step-by-Step Remote Connection Walkthrough:
 1. **Open the Remote Connection Manager**:
-   - Click the toolbar button labelled **`SSH Connect`** (located on the bottom action button grid of the primary canvas).
-   - Alternatively, press **`Ctrl+Shift+R`** from any active canvas.
-   - You can also click the **`🌐 Remote Server`** toggle button directly within the spectrum file open dialog (`NuFileDialog`).
+    - Click the toolbar button labelled **`SSH Connect`** (located on the bottom action button grid of the primary canvas).
+    - Alternatively, press **`Ctrl+Shift+R`** from any active canvas.
+    - You can also click the **`🌐 Remote Server`** toggle button directly within the spectrum file open dialog (`NuFileDialog`).
 2. **Configure a Connection Profile**:
-   - **Saved Profiles**: Click **`+ New`** and enter an identifiable name in **Profile Name** (e.g., `Tandem DAQ Node 1` or `Storage Server Hall A`).
-   - **Host / IP Address & Port**: Enter the remote machine's IP address (e.g. `192.168.1.100`) or fully qualified domain name (`daq.physics.lab`), with the target SSH port (default: `22`).
-   - **Username**: Enter the remote user account name (e.g. `data`, `expuser`, or `gasp`).
-   - **Authentication Mode**:
-     - **SSH Private Key (Recommended)**: Select this radio button, click **`Browse...`**, and choose your private key file (e.g., `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`). If your key is encrypted with a passphrase, enter it in the **Password / Passphrase** field.
-     - **Password**: Select this option if key-based authentication is disabled on the remote server, and enter your account password.
-   - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`).
+    - **Saved Profiles & Bookmarks**: Click **`+ New`** and enter an identifiable name in **Profile Name** (e.g., `Tandem DAQ Node 1` or `Storage Server Hall A`).
+    - **Host / IP Address & Port**: Enter the remote machine's IP address (e.g. `192.168.1.100`) or fully qualified domain name (`daq.physics.lab`), with the target SSH port (default: `22`).
+    - **Username**: Enter the remote user account name (e.g. `data`, `expuser`, or `gasp`).
+    - **Authentication Mode**:
+        - **SSH Private Key (Recommended)**: Select this radio button. NuTrackN automatically displays the **Private Key File** field. Click **`Browse...`** and select your local private key (default: `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`).
+        - **Password**: Select this option if key-based authentication is disabled on the remote server. NuTrackN dynamically switches the input field to a masked **Password** input.
+    - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`).
 3. **Verify Connection (`⚡ Test / Verify Connection`)**:
-   - Click **`⚡ Test / Verify Connection`**. NuTrackN performs an immediate pre-flight handshake in the background:
-     - Tests socket reachability and TCP latency.
-     - Validates host key fingerprint and cryptographic cipher exchange.
-     - Authenticates credentials and verifies read/execute permissions on the specified remote directory.
-   - If successful, a green verification banner confirms reachability and directory contents.
+    - Click **`⚡ Test / Verify Connection`**. NuTrackN performs an immediate pre-flight handshake in the background:
+        - Tests socket reachability and TCP round-trip latency.
+        - Validates host key fingerprint and cryptographic cipher exchange.
+        - Authenticates credentials and verifies read/execute permissions on the specified remote directory.
+    - If successful, a green verification banner confirms reachability and directory contents.
 4. **Establish Connection & Save**:
-   - Click **`Save`** to store the profile in your secure local configuration for instant 1-click access during upcoming beam shifts.
-   - Click **`Connect`**.
+    - Click **`Save`** to store the profile in your secure local configuration for instant 1-click access during upcoming beam shifts.
+    - Click **`Connect`**.
 5. **Live Status Badge & Tooltip**:
-   - Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: **`SSH: Tandem DAQ Node 1`**.
-   - Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.
-   - Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.
+    - Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: **`SSH: Tandem DAQ Node 1`**.
+    - Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.
+    - Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.
+
+#### Quick Guide: Generating & Deploying an SSH Key for Remote DAQ Access
+Using cryptographic SSH key pairs eliminates repetitive password prompts during shifts, protects laboratory infrastructure from password brute-forcing, and enables seamless automated background file caching in NuTrackN.
+
+An SSH key pair consists of two matched components:
+- **Private Key (`id_ed25519`)**: Stored securely on your personal laptop or analysis workstation in `~/.ssh/`. It is never transmitted across the network and must never be shared.
+- **Public Key (`id_ed25519.pub`)**: Placed on the remote DAQ machine in `~/.ssh/authorized_keys`. It acts as an open digital padlock that only your private key can open.
+
+##### Step 1: Generate a Modern Ed25519 Key Pair on Your Workstation
+Open a terminal on your local computer and run:
+```bash
+ssh-keygen -t ed25519 -C "daq_access"
+```
+- Press **Enter** to accept the default file location (`~/.ssh/id_ed25519`).
+- Press **Enter** twice if you prefer a passwordless key, or enter a passphrase to encrypt your private key locally.
+
+##### Step 2: Install Your Public Key onto the Remote DAQ Machine
+To copy your public key to the remote data acquisition computer in a single command:
+```bash
+ssh-copy-id user@192.168.1.xxx
+```
+*(Replace `user` and `192.168.1.xxx` with your remote DAQ account username and IP address. You will be prompted for the remote account password one final time).*
+
+> [!TIP]
+> **Manual Key Installation (if `ssh-copy-id` is unavailable):**  
+> If the remote server does not provide `ssh-copy-id`, append your public key manually with:
+> ```bash
+> cat ~/.ssh/id_ed25519.pub | ssh user@192.168.1.xxx "mkdir -p ~/.ssh && chmod 700 ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+> ```
+
+##### Step 3: Verify Terminal Access & Connect in NuTrackN
+Test passwordless terminal login:
+```bash
+ssh user@192.168.1.xxx
+```
+Once connected without entering a password, launch NuTrackN, open the **Remote Connection Manager** (`Ctrl+Shift+R`), choose **SSH Private Key (Recommended)** with `~/.ssh/id_ed25519`, and click **`⚡ Test / Verify Connection`**!
 
 #### Transparent Remote Browsing & Smart Local Caching:
 Once an SSH session is authenticated:

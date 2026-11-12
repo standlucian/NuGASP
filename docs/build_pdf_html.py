@@ -10,6 +10,7 @@ Converts docs/USER_MANUAL.md into docs/USER_MANUAL.html with:
 import os
 import re
 import sys
+import base64
 import markdown
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -478,6 +479,17 @@ def build_html():
     }}
     .alert-caution .alert-title {{ color: #b91c1c; }}
 
+    img {{
+      max-width: 92%;
+      height: auto;
+      display: block;
+      margin: 16px auto;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+      page-break-inside: avoid;
+    }}
+
     blockquote {{
       border-left: 4px solid var(--border-color);
       margin: 1em 0;
@@ -681,8 +693,22 @@ def build_html():
 </html>
 """
 
+    # Step 8: Inline local images as base64 data URIs for 100% self-contained portable HTML/PDF
+    def embed_images_b64(match):
+        rel_path = match.group(1)
+        full_path = os.path.join(SCRIPT_DIR, rel_path)
+        if os.path.exists(full_path):
+            with open(full_path, "rb") as img_f:
+                b64 = base64.b64encode(img_f.read()).decode('utf-8')
+            ext = os.path.splitext(full_path)[1].lower().strip('.')
+            mime = "image/png" if ext == "png" else ("image/jpeg" if ext in ["jpg", "jpeg"] else "image/svg+xml")
+            return f'src="data:{mime};base64,{b64}"'
+        return match.group(0)
+
+    final_html = re.sub(r'src="(images/[^"]+)"', embed_images_b64, full_html)
+
     with open(HTML_PATH, "w", encoding="utf-8") as f:
-        f.write(full_html)
+        f.write(final_html)
 
     print(f"Successfully generated print-ready manual at:\n  {HTML_PATH}")
 
