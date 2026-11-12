@@ -553,11 +553,14 @@ ssh user@192.168.1.xxx
 ```
 Once connected without entering a password, launch NuTrackN, open the **Remote Connection Manager** (`Ctrl+Shift+R`), choose **SSH Private Key (Recommended)** with `~/.ssh/id_ed25519`, and click **`⚡ Test / Verify Connection`**!
 
-#### Transparent Remote Browsing & Smart Local Caching:
-Once an SSH session is authenticated:
-- **Spectrum Reading (`N` or Toolbar `R`)**: The file open browser automatically defaults to your remote acquisition directory. You can browse remote directory trees over SFTP as smoothly as a local drive.
-- **Smart Session Caching**: When you select a remote spectrum file, NuTrackN streams the file over encrypted SFTP and caches it in a high-speed local session cache directory (`~/.cache/nutrackn/remote/...`). Subsequent operations on that spectrum execute at full native NVMe speed.
-- **Run-by-Run Calibration Integration**: Automated gain drift tracking downloads batch sequences and detector files asynchronously in background worker threads, displaying live transfer progress without ever freezing canvas rendering or GUI interaction.
+#### Transparent Remote Browsing, Bi-Directional Transfer & Smart Local Caching:
+Once an SSH session is authenticated, NuTrackN's remote SFTP subsystem is globally integrated across the entire application—not just for reading raw 1D spectra:
+
+- **1D Spectrum Reading (`R`, `N`, or Toolbar `R`)**: The spectrum browser automatically defaults to your remote acquisition directory. Remote files are streamed over SFTP and staged in your high-speed local session cache (`~/.cache/nutrackn/remote/...`), allowing subsequent calculations, fits, and display zooms to execute at native NVMe speed.
+- **2D Coincidence Matrices (`OpenCM`, `M`, or `Ctrl+M`)**: Select and load 2D coincidence matrices (`.cmat`, `.mat`) directly from remote DAQ clusters or central experimental storage.
+- **Writing, Exporting & Uploading Spectra / Reports**: Saving or exporting processed spectra (`OS`, `SpectrumExportDialog`), peak integration logfiles (`DF`), or peak fit parameters to a remote directory automatically stages the file locally and seamlessly uploads it to the remote destination over SFTP.
+- **Calibration & Efficiency File Management**: Load and save energy calibration files (`.cal`, `.ucal`), polynomial coefficient tables, efficiency spectra, and isotope energy reference libraries directly across the remote filesystem.
+- **Run-by-Run Gain Drift Calibration Integration**: The Run-by-Run Calibration Manager downloads batch run sequences and multi-detector spectra asynchronously in background worker threads, featuring live multi-file progress tracking without ever freezing GUI interaction or canvas rendering.
 
 ---
 
@@ -581,6 +584,9 @@ NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`
 - **Location Switching (Local vs. Remote)**:
   - The top bar features quick-toggle buttons between your local filesystem and the active remote server (**`🌐 Remote: user@host`**).
   - Quick-navigation bookmarks provide 1-click shortcuts to the current experiment directory, USB media mount points, user home, and temporary scratch folders.
+- **Bi-Directional Operation (Read & Write)**:
+  - Supports both loading files (1D spectra, 2D matrices, calibration tables) and saving/exporting output.
+  - When saving to a remote destination, NuTrackN transparently stages the data and performs an atomic SFTP upload, reporting real-time status.
 - **Live Spectrum Mini-Preview**:
   - Selecting any spectrum file in the file list instantly computes and renders a thumbnail preview of the spectrum shape, total counts, and channel length in the side inspector panel before you open it.
 - **Format Import Specifications Dialog**:
