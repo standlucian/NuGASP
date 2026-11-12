@@ -52,26 +52,78 @@ def build_html():
         toc_raw = ""
         rest_raw = protected
 
-    # Step 3: Tag each chapter heading (## <number>. ...) with .chapter-heading
-    def tag_chapter(m):
-        num = m.group(1)
-        title = m.group(2)
-        slug = re.sub(r"[^\w\- ]", "", f"{num} {title}").strip().lower().replace(" ", "-")
-        return f'<h2 id="{slug}" class="chapter-heading">{num}. {title}</h2>'
-
-    tagged_rest = re.sub(r"^##\s+(\d+)\.\s+(.*)$", tag_chapter, rest_raw, flags=re.MULTILINE)
-
-    # Step 4: Convert Markdown pieces to HTML separately
+    # Step 3: Split into individual chapters and wrap in semantic <section class="chapter-container">
     md_extensions = ["tables", "fenced_code"]
     title_html = markdown.markdown(title_raw, extensions=md_extensions)
     toc_html = markdown.markdown(toc_raw, extensions=md_extensions)
-    rest_html = markdown.markdown(tagged_rest, extensions=md_extensions)
+
+    chapter_splits = re.split(r'(?m)(?=^##\s+\d+\.\s+)', rest_raw)
+    chapters_html_list = []
+    for ch_raw in chapter_splits:
+        ch_raw = ch_raw.strip()
+        if not ch_raw:
+            continue
+        ch_m = re.match(r'^##\s+(\d+)\.\s+(.*)$', ch_raw, flags=re.MULTILINE)
+        if ch_m:
+            ch_num = ch_m.group(1)
+            ch_title = ch_m.group(2)
+            slug = re.sub(r"[^\w\- ]", "", f"{ch_num} {ch_title}").strip().lower().replace(" ", "-")
+            ch_body_tagged = re.sub(
+                r'^##\s+' + re.escape(ch_num) + r'\.\s+' + re.escape(ch_title) + r'$',
+                f'<h2 id="{slug}" class="chapter-heading">{ch_num}. {ch_title}</h2>',
+                ch_raw,
+                count=1,
+                flags=re.MULTILINE
+            )
+            ch_html = markdown.markdown(ch_body_tagged, extensions=md_extensions)
+            chapters_html_list.append(f'<section class="chapter-container" id="chapter-{ch_num}">\n{ch_html}\n</section>')
+        else:
+            ch_html = markdown.markdown(ch_raw, extensions=md_extensions)
+            chapters_html_list.append(f'<div class="extra-section">\n{ch_html}\n</div>')
+
+    chapters_html = "\n\n".join(chapters_html_list)
+
+    # Step 4: Inside Front Cover (Colophon / Publication Details)
+    # Serves as Page 2 (Verso / Even page) in duplex printing, ensuring TOC starts on Page 3 (Recto / Odd page)
+    colophon_html = """<div class="inside-cover-page">
+  <div class="colophon">
+    <div class="colophon-title">NuTrackN Official User Manual</div>
+    <div class="colophon-meta">Release Version 2.0.1 (2026 Edition)</div>
+
+    <div class="colophon-block">
+      <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
+      High-performance analysis software designed for experimental nuclear physics research, in-beam drift tracking, and coincidence matrix analysis.
+    </div>
+
+    <div class="colophon-block">
+      <strong>Author &amp; Maintainer:</strong> Lucian Stan (<a href="mailto:lucian.stan@nipne.ro">lucian.stan@nipne.ro</a>)<br>
+      <strong>Affiliation:</strong> Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE)<br>
+      Department of Nuclear Physics • Tandem Accelerators Complex • Măgurele, Romania
+    </div>
+
+    <div class="colophon-block">
+      <strong>Open-Source Software License:</strong> GNU General Public License v3.0 (GPLv3)<br>
+      <strong>Official Repository:</strong> <a href="https://github.com/standlucian/NuGASP">https://github.com/standlucian/NuGASP</a><br>
+      <strong>Algorithmic Heritage:</strong> GASPware &amp; Xtrackn spectrometer analysis packages (D. Bazzacco, INFN Legnaro / Padova).
+    </div>
+
+    <div class="colophon-block">
+      <strong>Standard Academic Citation:</strong><br>
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.1, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+    </div>
+
+    <div class="colophon-notice">
+      <em>This page is intentionally placed on the verso (even-numbered) leaf for double-sided (duplex) book printing.</em>
+    </div>
+  </div>
+</div>"""
 
     # Combine with appropriate wrapper divs
     combined_html = (
         f'<div class="title-page">\n{title_html}\n</div>\n\n'
-        f'<div class="toc-section">\n{toc_html}\n</div>\n\n'
-        f'<div class="content-body">\n{rest_html}\n</div>\n'
+        f'{colophon_html}\n\n'
+        f'<div class="toc-section" id="table-of-contents">\n{toc_html}\n</div>\n\n'
+        f'<div class="content-body">\n{chapters_html}\n</div>\n'
     )
 
     # Step 5: Restore LaTeX math
@@ -219,6 +271,47 @@ def build_html():
       font-size: 12.5pt;
       color: #475569;
       margin: 10px 0;
+    }}
+
+    /* ----------------------------------------------------
+       INSIDE COVER / COLOPHON STYLING
+       ---------------------------------------------------- */
+    .inside-cover-page {{
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 30px 40px;
+      margin: 30px 0 50px 0;
+      color: #475569;
+      font-size: 9.5pt;
+      line-height: 1.6;
+    }}
+
+    .colophon-title {{
+      font-size: 14pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }}
+
+    .colophon-meta {{
+      font-size: 10pt;
+      font-weight: 600;
+      color: #0284c7;
+      margin-bottom: 16px;
+    }}
+
+    .colophon-block {{
+      margin-bottom: 14px;
+    }}
+
+    .colophon-notice {{
+      margin-top: 24px;
+      font-style: italic;
+      color: #94a3b8;
+      font-size: 8.5pt;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
     }}
 
     /* ----------------------------------------------------
@@ -378,12 +471,54 @@ def build_html():
     }}
 
     /* ----------------------------------------------------
-       PRINT & PAGE BREAK RULES
+       PRINT & PAGE BREAK RULES (RECTO / DUPLEX BOOK LAYOUT)
        ---------------------------------------------------- */
     @media print {{
       @page {{
         size: A4;
         margin: 18mm 15mm 20mm 15mm;
+      }}
+
+      /* Facing page margins & running footers for duplex printing */
+      @page :left {{
+        margin-left: 15mm;
+        margin-right: 20mm;
+        @bottom-left {{
+          content: counter(page);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8.5pt;
+          color: #64748b;
+        }}
+        @bottom-right {{
+          content: "NuTrackN User Manual (v2.0.1)";
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8pt;
+          color: #94a3b8;
+        }}
+      }}
+
+      @page :right {{
+        margin-left: 20mm;
+        margin-right: 15mm;
+        @bottom-right {{
+          content: counter(page);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8.5pt;
+          color: #64748b;
+        }}
+        @bottom-left {{
+          content: "NuTrackN User Manual (v2.0.1)";
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8pt;
+          color: #94a3b8;
+        }}
+      }}
+
+      @page :blank {{
+        @bottom-left {{ content: ""; }}
+        @bottom-right {{ content: ""; }}
+        @top-left {{ content: ""; }}
+        @top-right {{ content: ""; }}
       }}
 
       body {{
@@ -397,9 +532,10 @@ def build_html():
         padding: 0;
       }}
 
-      /* Cover / Title Page: Ends with Page Break */
+      /* Cover / Title Page: Page 1 (Recto / Odd) */
       .title-page {{
         page-break-before: avoid;
+        break-before: avoid;
         page-break-after: always;
         break-after: page;
         min-height: 85vh;
@@ -408,22 +544,47 @@ def build_html():
         justify-content: center;
       }}
 
-      /* Table of Contents: Starts on Page 2, Ends with Page Break */
-      .toc-section {{
+      /* Inside Front Cover / Colophon: Page 2 (Verso / Even) */
+      .inside-cover-page {{
         page-break-before: always;
         break-before: page;
         page-break-after: always;
         break-after: page;
+        min-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+      }}
+
+      /* Table of Contents: Must begin on Recto (Page 3 - Odd) and end with Recto break */
+      .toc-section {{
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
+        break-after: recto;
+        break-after: right;
+        page-break-after: right;
         background-color: transparent;
         border: none;
         padding: 0;
         margin: 0;
       }}
 
-      /* Every Chapter (H2) starts on a brand-new page */
+      /* Every Chapter: Begins strictly on a Recto (Odd-Numbered) Page */
+      .chapter-container {{
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
+      }}
+
       .chapter-heading {{
-        page-break-before: always;
-        break-before: page;
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
         padding-top: 10mm;
       }}
 

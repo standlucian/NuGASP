@@ -111,6 +111,47 @@
     }
 
     /* ----------------------------------------------------
+       INSIDE COVER / COLOPHON STYLING
+       ---------------------------------------------------- */
+    .inside-cover-page {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 30px 40px;
+      margin: 30px 0 50px 0;
+      color: #475569;
+      font-size: 9.5pt;
+      line-height: 1.6;
+    }
+
+    .colophon-title {
+      font-size: 14pt;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+    }
+
+    .colophon-meta {
+      font-size: 10pt;
+      font-weight: 600;
+      color: #0284c7;
+      margin-bottom: 16px;
+    }
+
+    .colophon-block {
+      margin-bottom: 14px;
+    }
+
+    .colophon-notice {
+      margin-top: 24px;
+      font-style: italic;
+      color: #94a3b8;
+      font-size: 8.5pt;
+      border-top: 1px dashed #cbd5e1;
+      padding-top: 10px;
+    }
+
+    /* ----------------------------------------------------
        TABLE OF CONTENTS STYLING
        ---------------------------------------------------- */
     .toc-section {
@@ -267,12 +308,54 @@
     }
 
     /* ----------------------------------------------------
-       PRINT & PAGE BREAK RULES
+       PRINT & PAGE BREAK RULES (RECTO / DUPLEX BOOK LAYOUT)
        ---------------------------------------------------- */
     @media print {
       @page {
         size: A4;
         margin: 18mm 15mm 20mm 15mm;
+      }
+
+      /* Facing page margins & running footers for duplex printing */
+      @page :left {
+        margin-left: 15mm;
+        margin-right: 20mm;
+        @bottom-left {
+          content: counter(page);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8.5pt;
+          color: #64748b;
+        }
+        @bottom-right {
+          content: "NuTrackN User Manual (v2.0.1)";
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8pt;
+          color: #94a3b8;
+        }
+      }
+
+      @page :right {
+        margin-left: 20mm;
+        margin-right: 15mm;
+        @bottom-right {
+          content: counter(page);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8.5pt;
+          color: #64748b;
+        }
+        @bottom-left {
+          content: "NuTrackN User Manual (v2.0.1)";
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          font-size: 8pt;
+          color: #94a3b8;
+        }
+      }
+
+      @page :blank {
+        @bottom-left { content: ""; }
+        @bottom-right { content: ""; }
+        @top-left { content: ""; }
+        @top-right { content: ""; }
       }
 
       body {
@@ -286,9 +369,10 @@
         padding: 0;
       }
 
-      /* Cover / Title Page: Ends with Page Break */
+      /* Cover / Title Page: Page 1 (Recto / Odd) */
       .title-page {
         page-break-before: avoid;
+        break-before: avoid;
         page-break-after: always;
         break-after: page;
         min-height: 85vh;
@@ -297,22 +381,47 @@
         justify-content: center;
       }
 
-      /* Table of Contents: Starts on Page 2, Ends with Page Break */
-      .toc-section {
+      /* Inside Front Cover / Colophon: Page 2 (Verso / Even) */
+      .inside-cover-page {
         page-break-before: always;
         break-before: page;
         page-break-after: always;
         break-after: page;
+        min-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        background: none;
+        border: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      /* Table of Contents: Must begin on Recto (Page 3 - Odd) and end with Recto break */
+      .toc-section {
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
+        break-after: recto;
+        break-after: right;
+        page-break-after: right;
         background-color: transparent;
         border: none;
         padding: 0;
         margin: 0;
       }
 
-      /* Every Chapter (H2) starts on a brand-new page */
+      /* Every Chapter: Begins strictly on a Recto (Odd-Numbered) Page */
+      .chapter-container {
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
+      }
+
       .chapter-heading {
-        page-break-before: always;
-        break-before: page;
+        break-before: recto;
+        break-before: right;
+        page-break-before: right;
         padding-top: 10mm;
       }
 
@@ -345,7 +454,40 @@
 <strong>Quick Help Shortcut</strong>: Press <strong><code>H</code></strong> or <strong><code>?</code></strong> (or <strong><code>F1</code></strong>) on the spectrum canvas at any time.</p>
 </div>
 
-<div class="toc-section">
+<div class="inside-cover-page">
+  <div class="colophon">
+    <div class="colophon-title">NuTrackN Official User Manual</div>
+    <div class="colophon-meta">Release Version 2.0.1 (2026 Edition)</div>
+
+    <div class="colophon-block">
+      <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
+      High-performance analysis software designed for experimental nuclear physics research, in-beam drift tracking, and coincidence matrix analysis.
+    </div>
+
+    <div class="colophon-block">
+      <strong>Author &amp; Maintainer:</strong> Lucian Stan (<a href="mailto:lucian.stan@nipne.ro">lucian.stan@nipne.ro</a>)<br>
+      <strong>Affiliation:</strong> Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE)<br>
+      Department of Nuclear Physics • Tandem Accelerators Complex • Măgurele, Romania
+    </div>
+
+    <div class="colophon-block">
+      <strong>Open-Source Software License:</strong> GNU General Public License v3.0 (GPLv3)<br>
+      <strong>Official Repository:</strong> <a href="https://github.com/standlucian/NuGASP">https://github.com/standlucian/NuGASP</a><br>
+      <strong>Algorithmic Heritage:</strong> GASPware &amp; Xtrackn spectrometer analysis packages (D. Bazzacco, INFN Legnaro / Padova).
+    </div>
+
+    <div class="colophon-block">
+      <strong>Standard Academic Citation:</strong><br>
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.1, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+    </div>
+
+    <div class="colophon-notice">
+      <em>This page is intentionally placed on the verso (even-numbered) leaf for double-sided (duplex) book printing.</em>
+    </div>
+  </div>
+</div>
+
+<div class="toc-section" id="table-of-contents">
 <h2>Table of Contents</h2>
 <ul>
 <li><a href="#1-introduction-heritage--design-philosophy">1. Introduction, Heritage &amp; Design Philosophy</a><ul>
@@ -459,6 +601,7 @@
 </div>
 
 <div class="content-body">
+<section class="chapter-container" id="chapter-1">
 <h2 id="1-introduction-heritage--design-philosophy" class="chapter-heading">1. Introduction, Heritage & Design Philosophy</h2>
 
 <p><strong>NuTrackN</strong> (the flagship analysis environment of the <strong>NuGASP</strong> suite) is an interactive, high-performance nuclear spectroscopy application designed for experimental nuclear physicists, gamma-ray spectroscopists, and radiation detection laboratories.</p>
@@ -624,6 +767,9 @@ L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analys
 <p>D. Bazzacco, <em>The GASP Spectrometer at Legnaro</em>, International Conference on Nuclear Structure at High Angular Momentum, Ottawa, AECL-10613, pp. 376–387 (1992).</p>
 </blockquote>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-2">
 <h2 id="2-installation-deployment--quick-start" class="chapter-heading">2. Installation, Deployment & Quick Start</h2>
 
 <p>NuTrackN is distributed both as pre-compiled, self-contained standalone binary packages (with all Qt5 and CERN ROOT runtime libraries bundled inside) and as open-source code ready to compile from source.</p>
@@ -851,6 +997,9 @@ make -j$(nproc)
 Whenever you need an instant reminder of any hotkey, macro token, or command string, press <strong><code>H</code></strong>, <strong><code>?</code></strong>, or <strong><code>F1</code></strong> directly on the spectrum canvas to bring up the comprehensive, searchable in-app keyboard cheat-sheet!</p>
 </div>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-3">
 <h2 id="3-data-input-output-io--file-management" class="chapter-heading">3. Data Input, Output (I/O) & File Management</h2>
 
 <h3>3.1 Supported Nuclear Spectroscopy Formats</h3>
@@ -909,6 +1058,9 @@ To respect existing laboratory workstations and software installations (such as 
 <li><strong><code>ZF</code></strong>: Close the active area calculation logfile.</li>
 </ul>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-4">
 <h2 id="4-canvas-navigation-scaling--real-time-hud" class="chapter-heading">4. Canvas Navigation, Scaling & Real-Time HUD</h2>
 
 <h3>4.1 Display Scales &amp; Vertical Adjustments</h3>
@@ -942,6 +1094,9 @@ To respect existing laboratory workstations and software installations (such as 
   $$\langle ch \rangle = \frac{\sum_{i \in \text{win}} i \cdot C_i}{\sum_{i \in \text{win}} C_i}$$
 - <strong>Local FWHM</strong>: Instantaneous full-width at half-maximum derived from local variance.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-5">
 <h2 id="5-peak-integration--region-of-interest-roi-analysis" class="chapter-heading">5. Peak Integration & Region of Interest (ROI) Analysis</h2>
 
 <h3>5.1 Setting Boundary Markers</h3>
@@ -1015,6 +1170,9 @@ To respect existing laboratory workstations and software installations (such as 
 <h3>5.5 Output Report Logging</h3>
 <p>Use <strong><code>DF</code></strong> to open a destination logfile. Every subsequent integration (<strong><code>CI</code></strong> / <strong><code>CJ</code></strong>) or peak fit (<strong><code>CG</code></strong> / <strong><code>CV</code></strong>) automatically appends a formatted entry containing timestamp, centroid, FWHM, gross counts, net counts, and statistical error. Use <strong><code>ZF</code></strong> to close the file.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-6">
 <h2 id="6-standard-energy--efficiency-calibration" class="chapter-heading">6. Standard Energy & Efficiency Calibration</h2>
 
 <h3>6.1 Calibration Physics Formulation</h3>
@@ -1064,6 +1222,9 @@ where:
   2. <strong>Dual-Regime Power Law</strong>: Combining low-energy absorption and high-energy pair production regimes.
 - Click <strong>Apply</strong> to bind the efficiency calibration to the active session. Unknown sample activities are then calculated automatically from measured peak areas.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-7">
 <h2 id="7-advanced-peak-fitting--multiplet-deconvolution" class="chapter-heading">7. Advanced Peak Fitting & Multiplet Deconvolution</h2>
 
 <h3>7.1 Physical Peak Models (Gaussian &amp; Low-Energy Tail)</h3>
@@ -1128,6 +1289,9 @@ Minimizing the objective function $-2 \ln L$ guarantees unbiased centroid and ar
 $$\chi^2 / \text{NDF} = \frac{1}{M - K} \sum_{i=1}^M \frac{(y_i - \mu_i)^2}{\mu_i}$$
 where $M$ is the number of fitted channels and $K$ is the number of free parameters. The interactive parameter table highlights fits with $\chi^2/\text{NDF} \le 1.8$ in green, while elevated values indicate unresolved multiplets or non-standard baseline behavior.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-8">
 <h2 id="8-in-beam-run-by-run-drift-alignment-flagship-workflow" class="chapter-heading">8. In-Beam Run-by-Run Drift Alignment (Flagship Workflow)</h2>
 
 <h3>8.1 Physics of Thermal &amp; Rate Gain Drifts in Long Experiments</h3>
@@ -1249,6 +1413,9 @@ where $M$ is the number of fitted channels and $K$ is the number of free paramet
 2. <strong>Extended Multi-Order Uncertainty Format (<code>.ucal</code>)</strong>:
    Fixed-column tabular ASCII record containing the polynomial order (<code>NCoeff</code>), coefficients ($a_0, a_1, a_2$), parameter uncertainties ($\sigma_{a_0}, \sigma_{a_1}, \sigma_{a_2}$), intercept-slope covariance $\text{cov}(a_0, a_1)$, residual standard error $s_{\text{res}}$ (in keV), reduced $\chi^2/\text{NDF}$, and convergence status string (see <a href="#142-file-format-specifications">Section 14.2</a> for the exact column schema).</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-9">
 <h2 id="9-2d-coincidence-matrix-analysis" class="chapter-heading">9. 2D Coincidence Matrix Analysis</h2>
 
 <h3>9.1 Foundations of Gamma-Gamma Coincidence Matrices</h3>
@@ -1270,6 +1437,9 @@ where $M$ is the number of fitted channels and $K$ is the number of free paramet
    $$S_{net}(E_2) = S_{gate}(E_2) - \frac{A_{gate}}{A_{bg}} \cdot S_{bg}(E_2)$$
    completely eliminating random Compton coincidences and cleanly revealing the true coincident cascade.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-10">
 <h2 id="10-scripting-macros--automation" class="chapter-heading">10. Scripting, Macros & Automation</h2>
 
 <h3>10.1 Graphical Interface Focus &amp; Terminal Status Notice</h3>
@@ -1325,6 +1495,9 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <h3>10.5 Saving, Loading &amp; Distributing Macro Files (<code>.mac</code>)</h3>
 <p>Click <strong>Save to File...</strong> or <strong>Load from File...</strong> (supporting both local disk and remote SSH directories via <code>NuFileDialog</code>) to export or import all macro definitions as a pipe-delimited <code>.mac</code> file (<code>ID|COMMAND_STRING|CYCLES|DESCRIPTION</code>; see <a href="#142-file-format-specifications">Section 14.2</a>). Share standardized analysis scripts across research groups to ensure reproducible data reductions.</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-11">
 <h2 id="11-aesthetic-customization--theme-management" class="chapter-heading">11. Aesthetic Customization & Theme Management</h2>
 
 <h3>11.1 Built-in Themes</h3>
@@ -1344,6 +1517,9 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <li><strong>Import Theme</strong>: Click <strong><code>Import Theme...</code></strong> to load a colleague's custom theme file.</li>
 </ul>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-12">
 <h2 id="12-end-to-end-analysis-cookbook-workflows" class="chapter-heading">12. End-to-End Analysis Cookbook Workflows</h2>
 
 <h3>12.1 Deconvoluting an Overlapping Multiplet (<code>R</code> → <code>G</code> → <code>CV</code>)</h3>
@@ -1353,6 +1529,9 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <h3>12.3 Correcting Gain Drift Across 100+ In-Beam Runs (<code>AR</code>)</h3>
 <p>Please write me</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-13">
 <h2 id="13-troubleshooting--frequently-asked-questions-faq" class="chapter-heading">13. Troubleshooting & Frequently Asked Questions (FAQ)</h2>
 
 <h3>13.1 Zoom &amp; Marker Placement Issues (<code>E</code>, <code>CI</code>, <code>CJ</code>)</h3>
@@ -1362,6 +1541,9 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <h3>13.3 Low-Statistics Peak Fitting &amp; Baseline Instabilities</h3>
 <p>Please write me</p>
 <hr />
+</section>
+
+<section class="chapter-container" id="chapter-14">
 <h2 id="14-appendices--technical-specifications" class="chapter-heading">14. Appendices & Technical Specifications</h2>
 
 <h3>14.1 Master Keyboard Command &amp; Shortcut Reference</h3>
@@ -1777,6 +1959,7 @@ FWHM_A1 0.00184
 <li>Minimum: 2 GB RAM, 1 GHz Dual-Core CPU, $1280 \times 800$ display.</li>
 <li>Recommended: 8 GB RAM, Quad-Core CPU, OpenGL 3.3+ acceleration, 4K High-DPI display.</li>
 </ul>
+</section>
 </div>
 
   </div>
