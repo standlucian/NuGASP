@@ -251,6 +251,12 @@ To download the latest image for your platform:
 > **Zero External Dependencies Required!**  
 > Both the Linux AppImage and macOS DMG bundles embed all required CERN ROOT graphics engines, Qt runtime libraries, and mathematical solvers. You do not need to install ROOT, configure environment variables (`$ROOTSYS`), or set library paths on your machine to run the pre-built packages.
 
+#### Development Snapshots (GitHub Actions Artifacts)
+In addition to tagged releases, continuous integration snapshots compiled from the latest `main` branch commits can be downloaded directly from GitHub Actions:
+1. Visit **[GitHub Actions Workflows](https://github.com/standlucian/NuGASP/actions)**.
+2. Select the latest completed run of **Build & Package Linux** or **Build & Package macOS**.
+3. Scroll down to the **Artifacts** section at the bottom of the summary page to download the pre-built bundle (`NuTrackN-Linux-x86_64` or `NuTrackN-macOS-arm64`).
+
 ### 2.2 Linux (1-Click AppImage)
 NuTrackN is distributed as a completely self-contained Linux AppImage with embedded Qt5 and CERN ROOT runtimes:
 

@@ -637,6 +637,11 @@ L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analys
 <div class="alert alert-tip"><div class="alert-title">TIP</div><p><strong>Zero External Dependencies Required!</strong><br />
 Both the Linux AppImage and macOS DMG bundles embed all required CERN ROOT graphics engines, Qt runtime libraries, and mathematical solvers. You do not need to install ROOT, configure environment variables (<code>$ROOTSYS</code>), or set library paths on your machine to run the pre-built packages.</p>
 </div>
+<h4>Development Snapshots (GitHub Actions Artifacts)</h4>
+<p>In addition to tagged releases, continuous integration snapshots compiled from the latest <code>main</code> branch commits can be downloaded directly from GitHub Actions:
+1. Visit <strong><a href="https://github.com/standlucian/NuGASP/actions">GitHub Actions Workflows</a></strong>.
+2. Select the latest completed run of <strong>Build &amp; Package Linux</strong> or <strong>Build &amp; Package macOS</strong>.
+3. Scroll down to the <strong>Artifacts</strong> section at the bottom of the summary page to download the pre-built bundle (<code>NuTrackN-Linux-x86_64</code> or <code>NuTrackN-macOS-arm64</code>).</p>
 <h3>2.2 Linux (1-Click AppImage)</h3>
 <p>NuTrackN is distributed as a completely self-contained Linux AppImage with embedded Qt5 and CERN ROOT runtimes:</p>
 <pre><code class="language-bash"># 1. Make executable
