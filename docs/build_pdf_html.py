@@ -118,12 +118,18 @@ def build_html():
   </div>
 </div>"""
 
+    # Blank verso page after Table of Contents (Page 4), ensuring Chapter 1 begins strictly on Page 5 (Recto / Odd)
+    toc_blank_verso_html = """<div class="toc-blank-verso">
+  <p><em>This page intentionally left blank for double-sided (duplex) printing.</em></p>
+</div>"""
+
     # Combine with appropriate wrapper divs
     combined_html = (
         f'<div class="title-page">\n{title_html}\n</div>\n\n'
         f'{colophon_html}\n\n'
         f'<div class="toc-section" id="table-of-contents">\n{toc_html}\n</div>\n\n'
-        f'<div class="content-body">\n{chapters_html}\n</div>\n'
+        f'{toc_blank_verso_html}\n\n'
+        f'{chapters_html}\n'
     )
 
     # Step 5: Restore LaTeX math
@@ -312,6 +318,10 @@ def build_html():
       font-size: 8.5pt;
       border-top: 1px dashed #cbd5e1;
       padding-top: 10px;
+    }}
+
+    .toc-blank-verso {{
+      display: none;
     }}
 
     /* ----------------------------------------------------
@@ -538,53 +548,102 @@ def build_html():
         break-before: avoid;
         page-break-after: always;
         break-after: page;
-        min-height: 85vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
+        padding-top: 40mm;
+        padding-bottom: 20mm;
+        text-align: center;
+        box-sizing: border-box;
       }}
 
       /* Inside Front Cover / Colophon: Page 2 (Verso / Even) */
       .inside-cover-page {{
-        page-break-before: always;
-        break-before: page;
-        page-break-after: always;
-        break-after: page;
-        min-height: 85vh;
-        display: flex;
-        flex-direction: column;
-        justify-content: flex-end;
+        page-break-before: avoid;
+        break-before: avoid;
+        page-break-after: auto;
+        break-after: auto;
+        padding-top: 90mm;
+        padding-bottom: 15mm;
         background: none;
         border: none;
-        padding: 0;
-        margin: 0;
+        box-sizing: border-box;
       }}
 
-      /* Table of Contents: Must begin on Recto (Page 3 - Odd) and end with Recto break */
+      /* Table of Contents: Page 3 (Recto / Odd) formatted in 2 columns */
       .toc-section {{
-        break-before: recto;
-        break-before: right;
-        page-break-before: right;
-        break-after: recto;
-        break-after: right;
-        page-break-after: right;
+        page-break-before: always;
+        break-before: page;
+        page-break-after: auto;
+        break-after: auto;
         background-color: transparent;
         border: none;
         padding: 0;
         margin: 0;
       }}
 
-      /* Every Chapter: Begins strictly on a Recto (Odd-Numbered) Page */
+      .toc-section h2 {{
+        margin-top: 0;
+        margin-bottom: 12px;
+        font-size: 16pt;
+        border-bottom: 2px solid var(--accent-color);
+        padding-bottom: 6px;
+      }}
+
+      .toc-section > ul {{
+        column-count: 2;
+        column-gap: 10mm;
+        column-rule: 1px solid #e2e8f0;
+        padding-left: 0;
+        margin: 0;
+        list-style: none;
+      }}
+
+      .toc-section > ul > li {{
+        break-inside: avoid;
+        page-break-inside: avoid;
+        margin-bottom: 7px;
+        font-size: 8.5pt;
+        line-height: 1.3;
+        font-weight: 600;
+      }}
+
+      .toc-section ul ul {{
+        padding-left: 12px;
+        margin-top: 2px;
+        margin-bottom: 4px;
+        list-style: none;
+      }}
+
+      .toc-section ul ul li {{
+        margin: 1.5px 0;
+        font-size: 7.8pt;
+        line-height: 1.25;
+        font-weight: normal;
+      }}
+
+      /* Blank Verso Leaf after TOC: Page 4 (Verso / Even) */
+      .toc-blank-verso {{
+        display: block !important;
+        page-break-before: always;
+        break-before: page;
+        page-break-after: auto;
+        break-after: auto;
+        text-align: center;
+        color: #94a3b8;
+        font-size: 8.5pt;
+        font-style: italic;
+        padding-top: 120mm;
+        box-sizing: border-box;
+      }}
+
+      /* Every Chapter begins strictly on a new page (Page 5, Page 11, Page 19, Page 21) */
       .chapter-container {{
-        break-before: recto;
-        break-before: right;
+        page-break-before: always;
+        break-before: page;
         page-break-before: right;
+        break-before: right;
+        break-before: recto;
       }}
 
       .chapter-heading {{
-        break-before: recto;
-        break-before: right;
-        page-break-before: right;
         padding-top: 10mm;
       }}
 

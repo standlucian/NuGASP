@@ -237,7 +237,7 @@ collect_libs() {
                 libX11.so*|libxcb.so*|libXau.so*|libXdmcp.so*|libXext.so*)
                     continue
                     ;;
-                libselinux.so*|libpcre*.so*|libsystemd.so*|libudev.so*|libcap.so*|libgcrypt.so*|libgpg-error.so*|libaudit.so*)
+                libselinux.so*|libsystemd.so*|libudev.so*|libaudit.so*)
                     continue
                     ;;
                 *)
@@ -250,10 +250,12 @@ collect_libs() {
     done
 }
 
-# Scan binary, plugins, and bundled ROOT libraries for transitive dependencies
+# Scan binary, plugins, and bundled ROOT libraries iteratively for all transitive dependencies
 collect_libs "${APPDIR}/usr/bin/${APP_EXE}"
-find "${APPDIR}/usr/plugins" "${APPDIR}/usr/lib" -maxdepth 2 -type f -name "*.so*" | while read -r sofile; do
-    collect_libs "$sofile"
+for iter in 1 2 3; do
+    find "${APPDIR}/usr/plugins" "${APPDIR}/usr/lib" -maxdepth 2 -type f -name "*.so*" | while read -r sofile; do
+        collect_libs "$sofile"
+    done
 done
 
 # Strip debug & unneeded symbols from binary and bundled shared libraries to reduce size and speed up dynamic linking
