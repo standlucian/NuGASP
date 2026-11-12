@@ -148,6 +148,7 @@ NuTrackN is an actively maintained open-source environment. While the 2.0 releas
 #### 4. Spectra Manipulation & GASPware Tools Integration
 - **Native SADD Functionality**: Interactive and batch spectrum addition, gain-matched summing across detectors and experimental runs, and exporting combined spectra.
 - **Full CMAT Functionality Integration**: Native embedding of legacy CMAT utilities for coincidence matrix creation, projection, 2D inspection, and matrix symmetrization.
+- **Open 3D CMAT Matrices**: Direct support for opening, inspecting, slicing, and double-gating 3D $\gamma$-$\gamma$-$\gamma$ coincidence cubes (compressed 3D `.cmat` matrices) natively within NuTrackN.
 - **Direct CERN ROOT Format Data Operations**: Reading, manipulating, and exporting native ROOT format data (`TH1`, `TH2`, and `TTree`) directly without intermediate ASCII conversion.
 
 #### 5. Publication-Ready Figure & Spectra Image Generation
