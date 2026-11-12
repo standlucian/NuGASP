@@ -13,7 +13,8 @@
     - [1.3 AI Assistance & Development Disclosure](#13-ai-assistance--development-disclosure)
     - [1.4 Development Roadmap & Wishlist](#14-development-roadmap--wishlist)
     - [1.5 The NuGASP Ecosystem Scope](#15-the-nugasp-ecosystem-scope)
-    - [1.6 Software License & Academic Citation](#16-software-license--academic-citation)
+    - [1.6 Software Stack, Dependencies & Modernization Roadmap](#16-software-stack-dependencies--modernization-roadmap)
+    - [1.7 Software License & Academic Citation](#17-software-license--academic-citation)
 - [2. Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
     - [2.1 Linux (1-Click AppImage)](#21-linux-1-click-appimage)
     - [2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#22-macos-drag-and-drop-dmg-for-apple-silicon--intel)
@@ -160,7 +161,44 @@ The **NuGASP** suite is conceived as the modern C++17 / Qt5 successor to the off
 
 The sole deliberate exception to this scope is **`gsort`** (the raw event-sorting and list-mode reconstruction engine). Due to its specialized hardware-level data unpacking, real-time trigger handling, and online acquisition requirements, `gsort` remains an independent standalone program outside NuTrackN.
 
-### 1.6 Software License & Academic Citation
+### 1.6 Software Stack, Dependencies & Modernization Roadmap
+
+NuTrackN is engineered as a high-performance scientific desktop application combining the computational rigor of low-level C++ with modern graphical interfaces and nuclear physics data visualization.
+
+#### 1. Current Dependency Stack
+
+| Component | Technology / Library | Version / Target | Purpose & Scope |
+| :--- | :--- | :--- | :--- |
+| **Language Standard** | **ISO C++17** | `-std=c++17` | High-performance compiled core, filesystem access (`<filesystem>`), structured bindings, and lambda-based numerical optimization. Compatible with GCC 11–14, Clang 14+, and Apple Clang. |
+| **GUI & Application Core** | **Qt5** | `5.15 LTS` | Main window architecture, high-DPI scaling, dialog managers, multi-threading (`QThread`), networking (`QtNetwork`), and cross-platform UI event loops. |
+| **Scientific Graphics & Engine** | **CERN ROOT** | `6.24` – `6.32+` | High-throughput 1D histogramming (`TH1F`/`TH1D`), 2D coincidence matrix structures (`TH2D`), Minuit numerical minimization, peak deconvolution, and PostScript vector export (`TPostScript`). |
+| **Remote Connectivity** | **libssh2** | `1.9+` | Native SSH-2 / SFTP client protocol implementation for remote DAQ browsing, cache synchronization, and real-time beam run streaming. |
+| **Build Tooling** | **CMake** / **QMake** | `CMake 3.16+` | Dual build support enabling rapid Qt Creator IDE development (`nutrackn.pro`) and automated command-line builds (`CMakeLists.txt`). |
+
+#### 2. Modernization & Version Upgrade Plans
+
+To ensure long-term sustainability across evolving laboratory operating systems and high-performance computing clusters, the NuGASP development roadmap outlines the following upgrade milestones:
+
+##### Migration to Qt 6 (Qt 6.5+ LTS)
+- **Wayland & Native Desktop Support**: Transitioning the UI layer to Qt 6 provides seamless native support for modern Linux Wayland compositors (reducing rendering latency and eliminating fractional scaling blur) as well as updated macOS Apple Silicon windowing.
+- **Rendering Hardware Interface (RHI)**: Leveraging Qt's modern RHI abstractions (Vulkan, Metal, Direct3D 12, OpenGL) to accelerate custom canvas overlays and interactive multi-detector grid layouts.
+- **Legacy API Deprecation**: Completing the transition away from older Qt5 classes, standardizing entirely on `QRegularExpression`, `QStringView`, and type-safe compile-time signal-slot connections.
+
+##### Language Standard Evolution ($\text{C++20} \rightarrow \text{C++23}$)
+- **Zero-Copy Views with `std::span` and Ranges**: Replacing pointer-and-size buffer passes with `std::span` and standard range adaptors across spectrum parsing routines and 2D coincidence matrix slicing. This eliminates transient heap allocations during heavy gating operations.
+- **Concepts & Type Constraints**: Enhancing template metaprogramming across multi-format spectrum loaders (`LongInt32`, `ShortInt16`, `Float32`, `Double64`) with clear, compiler-enforced C++20 concepts (`std::integral`, `std::floating_point`), delivering cleaner compilation diagnostics.
+- **Type-Safe String Formatting (`std::format`)**: Phasing out legacy `printf`-style formatting and complex stream concatenation in favor of `std::format` for calibration reports, log entries, and export headers.
+
+##### CERN ROOT Modernization & Graphics Pipeline
+- **Continuous Compatibility with ROOT 6.32+ & ROOT 7**: Ensuring NuTrackN seamlessly compiles against the latest CERN ROOT releases and tracking upcoming ROOT 7 graphics and object management paradigms.
+- **Next-Generation Coincidence Rendering**: Evaluating modern hardware-accelerated shaders and WebGUI graphics integration to allow remote researchers to inspect heavy gigabyte-scale coincidence matrices directly through web-native browser canvas views.
+- **High-Throughput Batch Processing with `ROOT::RDataFrame`**: Leveraging multi-threaded columnar data processing (`RDataFrame`) for background-subtracted gating and event sorting pipelines.
+
+##### Unified Build System & Automated CI/CD
+- **CMake Single Source of Truth**: Consolidating on Modern CMake (3.25+) with `CMakePresets.json` as the single canonical build configuration, phasing out legacy `.pro` files while maintaining 1-click Qt Creator integration.
+- **Automated Multi-Platform Packaging**: Expanding automated GitHub Actions workflows to continuously package standalone Linux AppImages, Flatpaks, native Debian/RPM packages, and universal macOS DMG binaries on every tagged release.
+
+### 1.7 Software License & Academic Citation
 
 #### Software License (GNU GPLv3)
 NuTrackN is free open-source software licensed under the **GNU General Public License v3.0 (GPLv3)**.
