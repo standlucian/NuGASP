@@ -1188,7 +1188,7 @@ cat ~/.ssh/id_ed25519.pub | ssh user@192.168.1.xxx "mkdir -p ~/.ssh &amp;&amp; c
 </li>
 <li><strong>Single vs. Chained (Multi-Spectrum) Files</strong>:<ul>
 <li>Both binary and ASCII files can contain either a <strong>single spectrum</strong> or <strong>multiple chained/concatenated spectra</strong> (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).</li>
-<li><strong>Automatic Heuristic Detection</strong>: Upon selection, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10240, 16k, 32k, 64k) to determine the format, channel length, and number of chained spectra automatically.</li>
+<li><strong>Automatic Heuristic Detection &amp; User Verification</strong>: Upon selecting a file, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k) to make an educated guess of the format, channel length, and number of chained spectra. Because raw stream files lack embedded format headers, <strong>heuristic detection can occasionally guess incorrectly</strong> (e.g. distinguishing 32-bit floats from 32-bit integers, or unusual detector segment counts). Users should <strong>always double-check the suggested settings against the interactive spectrum preview curve</strong> displayed in the import dialog before accepting.</li>
 <li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the <strong><code>N</code></strong> / <strong><code>N-</code></strong> hotkeys.</li>
 <li><strong>Multi-Spectrum Export (<code>SpectrumExportDialog</code>)</strong>: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.</li>
 </ul>
@@ -1202,21 +1202,29 @@ NuTrackN registers OS-level desktop file associations <strong>exclusively for <c
 <h3>3.3 Modern File Dialog (NuFileDialog) &amp; Live Previews</h3>
 <p>NuTrackN incorporates an embedded, high-performance spectroscopy file browser (<code>NuFileDialog</code>):</p>
 <ul>
-<li><strong>Location Switching (Local vs. Remote)</strong>:</li>
+<li><strong>Location Switching (Local vs. Remote)</strong>:<ul>
 <li>The top bar features quick-toggle buttons between your local filesystem and the active remote server (<strong><code>🌐 Remote: user@host</code></strong>).</li>
 <li>Quick-navigation bookmarks provide 1-click shortcuts to the current experiment directory, USB media mount points, user home, and temporary scratch folders.</li>
-<li><strong>Bi-Directional Operation (Read &amp; Write)</strong>:</li>
+</ul>
+</li>
+<li><strong>Bi-Directional Operation (Read &amp; Write)</strong>:<ul>
 <li>Supports both loading files (1D spectra, 2D matrices, calibration tables) and saving/exporting output.</li>
 <li>When saving to a remote destination, NuTrackN transparently stages the data and performs an atomic SFTP upload, reporting real-time status.</li>
-<li><strong>Live Spectrum Mini-Preview</strong>:</li>
+</ul>
+</li>
+<li><strong>Live Spectrum Mini-Preview</strong>:<ul>
 <li>Selecting any spectrum file in the file list instantly computes and renders a thumbnail preview of the spectrum shape, total counts, and channel length in the side inspector panel before you open it.</li>
-<li><strong>Spectrum Import Dialog (<code>SpectrumImportDialog</code>)</strong>:</li>
+</ul>
+</li>
+<li><strong>Spectrum Import Dialog (<code>SpectrumImportDialog</code>)</strong>:<ul>
 <li>When opening a 1D spectrum, NuTrackN inspects the file and opens the interactive import configuration dialog:<ul>
 <li><strong>Auto-Detection Banner</strong>: Instantly displays the detected format, channel size, and total chained spectra with a confidence report.</li>
 <li><strong>Data Format Selection</strong>: Choose or override format between 32-bit Integer (<code>uint32_t</code>), 16-bit Integer (<code>uint16_t</code>), ASCII text, 32-bit Float, or 64-bit Double.</li>
 <li><strong>Channel Length Selection</strong>: Select standard nuclear spectroscopy presets (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k, all channels in file, or custom spinbox).</li>
 <li><strong>Multi-Spectrum Chained Index</strong>: For multi-spectrum files, jump directly to any detector/run index using the <code># Index</code> selector and <code>◀</code> / <code>▶</code> buttons.</li>
 <li><strong>Interactive Curve Preview</strong>: Displays a real-time graphical preview of the parsed spectrum data before loading onto the canvas.</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -1234,13 +1242,17 @@ NuTrackN registers OS-level desktop file associations <strong>exclusively for <c
 <h4>Multi-Buffer Overlays &amp; Stepping (Buffers 1–9):</h4>
 <ul>
 <li><strong>Overlay Stack (<code>HijC</code>)</strong>: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.</li>
-<li><strong>Detector / Spectrum Stepping</strong>:</li>
+<li><strong>Detector / Spectrum Stepping</strong>:<ul>
 <li>Press <strong><code>N</code></strong> (or <strong><code>N+</code></strong> / <strong><code>*1</code></strong>) to advance to the next spectrum/detector in the sequence.</li>
 <li>Press <strong><code>N-</code></strong> (or <strong><code>*2</code></strong>) to step backward to the previous spectrum/detector.</li>
-<li><strong>Run Stepping</strong>:</li>
+</ul>
+</li>
+<li><strong>Run Stepping</strong>:<ul>
 <li>Press <strong><code>*3</code></strong> (or <strong><code>R+</code></strong> / <strong><code>NR</code></strong>) to advance to the next experimental acquisition run.</li>
 <li>Press <strong><code>*4</code></strong> (or <strong><code>R-</code></strong> / <strong><code>PR</code></strong>) to step back to the previous experimental acquisition run.</li>
 <li><em>(Note: On the canvas keyboard, bare digits </em><em><code>0</code>–<code>9</code></em><em> trigger stored numeric macros; see <a href="#103-numeric-macros-0-through-9--repetition-cycles">Section 10.3</a>).</em></li>
+</ul>
+</li>
 </ul>
 <h4>Cross-Pad &amp; Overlay Synchronization:</h4>
 <ul>
