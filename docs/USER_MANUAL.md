@@ -16,10 +16,11 @@
     - [1.6 Software Stack, Dependencies & Modernization Roadmap](#16-software-stack-dependencies--modernization-roadmap)
     - [1.7 Software License & Academic Citation](#17-software-license--academic-citation)
 - [2. Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
-    - [2.1 Linux (1-Click AppImage)](#21-linux-1-click-appimage)
-    - [2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#22-macos-drag-and-drop-dmg-for-apple-silicon--intel)
-    - [2.3 Building from Source](#23-building-from-source)
-    - [2.4 First Spectrum Walkthrough in 60 Seconds](#24-first-spectrum-walkthrough-in-60-seconds)
+    - [2.1 Obtaining Pre-Built Packages (GitHub Releases)](#21-obtaining-pre-built-packages-github-releases)
+    - [2.2 Linux (1-Click AppImage)](#22-linux-1-click-appimage)
+    - [2.3 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#23-macos-drag-and-drop-dmg-for-apple-silicon--intel)
+    - [2.4 Building from Source](#24-building-from-source)
+    - [2.5 First Spectrum Walkthrough in 60 Seconds](#25-first-spectrum-walkthrough-in-60-seconds)
 - [3. Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
     - [3.1 Supported Nuclear Spectroscopy Formats](#31-supported-nuclear-spectroscopy-formats)
     - [3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#32-loading-spectra--multi-buffer-overlays-buffers-19)
@@ -230,7 +231,27 @@ For scientific attribution of the foundational algorithms and original spectrome
 
 ## 2. Installation, Deployment & Quick Start
 
-### 2.1 Linux (1-Click AppImage)
+NuTrackN is distributed both as pre-compiled, self-contained standalone binary packages (with all Qt5 and CERN ROOT runtime libraries bundled inside) and as open-source code ready to compile from source.
+
+### 2.1 Obtaining Pre-Built Packages (GitHub Releases)
+Official pre-compiled executables and disk images for Linux and macOS are hosted on the project's GitHub Releases page:
+
+> 🌐 **Official Release Portal:**  
+> **[https://github.com/standlucian/NuGASP/releases](https://github.com/standlucian/NuGASP/releases)**
+
+To download the latest image for your platform:
+1. Navigate to the **[Latest Release](https://github.com/standlucian/NuGASP/releases/latest)**.
+2. Scroll down to the **Assets** accordion at the bottom of the release notes.
+3. Select the package corresponding to your operating system:
+   - **Linux (x86_64, all distributions with glibc 2.28+)**: Download **`NuTrackN-x86_64.AppImage`**.
+   - **macOS (Apple Silicon M1 / M2 / M3 / M4)**: Download **`NuTrackN-macOS-arm64.dmg`**.
+   - **macOS (Intel Core x86_64)**: Download **`NuTrackN-macOS-x86_64.dmg`**.
+
+> [!TIP]
+> **Zero External Dependencies Required!**  
+> Both the Linux AppImage and macOS DMG bundles embed all required CERN ROOT graphics engines, Qt runtime libraries, and mathematical solvers. You do not need to install ROOT, configure environment variables (`$ROOTSYS`), or set library paths on your machine to run the pre-built packages.
+
+### 2.2 Linux (1-Click AppImage)
 NuTrackN is distributed as a completely self-contained Linux AppImage with embedded Qt5 and CERN ROOT runtimes:
 
 ```bash
@@ -245,15 +266,16 @@ nutrackn
 ```
 *(To remove: run `nutrackn --uninstall`).*
 
-### 2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)
-1. Download `NuTrackN-macOS-arm64.dmg` (Apple Silicon M1/M2/M3/M4) or `NuTrackN-macOS-x86_64.dmg` (Intel Core).
-2. Open the disk image and drag **`NuTrackN.app`** into `/Applications`.
+### 2.3 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)
+1. Download `NuTrackN-macOS-arm64.dmg` (Apple Silicon M1/M2/M3/M4) or `NuTrackN-macOS-x86_64.dmg` (Intel Core) from the [Releases page](https://github.com/standlucian/NuGASP/releases).
+2. Open the disk image and drag **`NuTrackN.app`** into your `/Applications` folder.
 3. To enable the command line shortcut in Terminal:
    ```bash
    /Applications/NuTrackN.app/Contents/MacOS/nutrackn --install-cli
    ```
+4. *(Note for macOS Gatekeeper: If prompted that the developer cannot be verified upon first launch, right-click (or Control-click) `NuTrackN.app` in `/Applications` and select **Open**, then confirm **Open**).*
 
-### 2.3 Building from Source
+### 2.4 Building from Source
 If building in a custom research laboratory environment:
 ```bash
 # Prerequisites: CMake 3.16+, Qt5 (Widgets, Network), CERN ROOT 6.24+
@@ -265,7 +287,7 @@ make -j$(nproc)
 ./nutrackn
 ```
 
-### 2.4 First Spectrum Walkthrough in 60 Seconds
+### 2.5 First Spectrum Walkthrough in 60 Seconds
 1. Launch `nutrackn`.
 2. Press **`N`** (or click the spectrum open button) and select your spectrum file (e.g. `152Eu_sample.spe`).
 3. Press **`L`** to toggle between Linear and Logarithmic scale.
