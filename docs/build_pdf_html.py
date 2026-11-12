@@ -82,23 +82,38 @@ def build_html():
     restored_body = re.sub(r"KZMATHPLACEHOLDER(\d+)ENDKZ", restore_math, combined_html)
 
     # Step 6: Convert GitHub style alert blockquotes
-    alert_patterns = [
-        (r'<blockquote>\s*<p>\s*\[!NOTE\]\s*', '<div class="alert alert-note"><div class="alert-title">NOTE</div><p>'),
-        (r'<blockquote>\s*<p>\s*\[!TIP\]\s*', '<div class="alert alert-tip"><div class="alert-title">TIP</div><p>'),
-        (r'<blockquote>\s*<p>\s*\[!IMPORTANT\]\s*', '<div class="alert alert-important"><div class="alert-title">IMPORTANT</div><p>'),
-        (r'<blockquote>\s*<p>\s*\[!WARNING\]\s*', '<div class="alert alert-warning"><div class="alert-title">WARNING</div><p>'),
-        (r'<blockquote>\s*<p>\s*\[!CAUTION\]\s*', '<div class="alert alert-caution"><div class="alert-title">CAUTION</div><p>')
-    ]
-    for pattern, replacement in alert_patterns:
-        restored_body = re.sub(pattern, replacement, restored_body)
-    restored_body = re.sub(r'(<div class="alert alert-[^>]+>[\s\S]*?)(</blockquote>)', r'\1</div>', restored_body)
+    def convert_alerts(html_content):
+        def process_blockquote(bq_match):
+            bq_inner = bq_match.group(1)
+            if not re.search(r'\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]', bq_inner):
+                return f"<blockquote>{bq_inner}</blockquote>"
+            
+            parts = re.split(r'(?=<p>\s*\[!(?:NOTE|TIP|IMPORTANT|WARNING|CAUTION)\])', bq_inner)
+            output = []
+            for part in parts:
+                part = part.strip()
+                if not part:
+                    continue
+                m = re.match(r'^<p>\s*\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*([\s\S]*)$', part)
+                if m:
+                    alert_type = m.group(1).upper()
+                    alert_class = f"alert alert-{alert_type.lower()}"
+                    rest = m.group(2)
+                    output.append(f'<div class="{alert_class}"><div class="alert-title">{alert_type}</div>\n<p>{rest}\n</div>')
+                else:
+                    output.append(f"<blockquote>\n{part}\n</blockquote>")
+            return "\n\n".join(output)
+
+        return re.sub(r'<blockquote>([\s\S]*?)</blockquote>', process_blockquote, html_content)
+
+    restored_body = convert_alerts(restored_body)
 
     # Step 7: Construct complete print-ready HTML document
     full_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0)</title>
+  <title>NuTrackN User Manual (Version 2.0.1)</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">

@@ -487,8 +487,9 @@ public slots:
     void setYMin(double yVal);
     void setLoadBehavior(LoadBehavior behavior) { m_loadBehavior = behavior; }
 
-    // GASPware Compressed Matrix slots
+    // GASPware Compressed Matrix slots & helpers
     void onOpenCMClicked();
+    bool openMatrixFile(const QString &fileName, bool isRemote = false, const QString &remotePath = QString());
     void onGateCMClicked();
     void onOpenRemoteDataClicked();
     void updateSSHButtonState();

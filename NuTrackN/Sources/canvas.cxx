@@ -2148,6 +2148,15 @@ void QMainCanvas::onOpenCMClicked()
         return;
     }
 
+    openMatrixFile(fileName, isRemote, remotePath);
+}
+
+bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const QString &remotePath)
+{
+    if (fileName.isEmpty()) {
+        return false;
+    }
+
     if (!m_currentMatrix) {
         m_currentMatrix = std::make_shared<MatrixReader>();
     }
@@ -2156,7 +2165,7 @@ void QMainCanvas::onOpenCMClicked()
     if (!m_currentMatrix->open(fileName, &errMsg)) {
         QMessageBox::critical(this, tr("Open Matrix Error"), errMsg);
         if (canvas) canvas->setFocus();
-        return;
+        return false;
     }
 
     if (isRemote) {
@@ -2195,6 +2204,7 @@ void QMainCanvas::onOpenCMClicked()
     dlg.exec();
 
     if (canvas) canvas->setFocus();
+    return true;
 }
 
 void QMainCanvas::onGateCMClicked()

@@ -7,6 +7,6 @@ Exec=nutrackn %F
 Icon=nutrackn
 Terminal=false
 Categories=Science;Physics;DataVisualization;Qt;
-MimeType=application/x-root;
+MimeType=application/x-cmat;
 StartupNotify=true
 StartupWMClass=nutrackn

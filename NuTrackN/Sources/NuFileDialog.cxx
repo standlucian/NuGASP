@@ -179,10 +179,9 @@ void NuFileDialog::setupUI(const QString &caption, const QString &initialFilter)
     m_comboTypeFilter->setFont(dlgFont);
 
     if (m_mode == NuFileMode::OpenSpectrum) {
-        m_comboTypeFilter->addItem(tr("All Supported Spectra (*.spe *.spk *.chn *.asc *.dat)"), "spectra");
-        m_comboTypeFilter->addItem(tr("GASPware Spectra (*.spe)"), "spe");
-        m_comboTypeFilter->addItem(tr("ASCII / Fortran Data (*.asc *.dat *.txt)"), "asc");
+        lblFilter->hide();
         m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
+        m_comboTypeFilter->hide();
     } else if (m_mode == NuFileMode::OpenMatrix) {
         m_comboTypeFilter->addItem(tr("Coincidence Matrices (*.cmat *.mat)"), "matrix");
         m_comboTypeFilter->addItem(tr("GASPware Compressed Matrix (*.cmat)"), "cmat");

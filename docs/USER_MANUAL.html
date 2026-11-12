@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0)</title>
+  <title>NuTrackN User Manual (Version 2.0.1)</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -340,7 +340,7 @@
   <div class="container">
     <div class="title-page">
 <h1>NuTrackN (NuGASP) Official User Manual</h1>
-<p><strong>Version 2.0</strong> — <em>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</em><br />
+<p><strong>Version 2.0.1</strong> — <em>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</em><br />
 <strong>Architecture</strong>: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine<br />
 <strong>Quick Help Shortcut</strong>: Press <strong><code>H</code></strong> or <strong><code>?</code></strong> (or <strong><code>F1</code></strong>) on the spectrum canvas at any time.</p>
 </div>
@@ -470,7 +470,8 @@
 - <strong>2D Matrix Coincidence Viewer</strong>: Fast slicing and projection of multi-gigabyte γ-γ coincidence matrices (<code>.cmat</code>).
 - <strong>Autonomous Standalone Deployment</strong>: 1-click execution without requiring users to configure compiler paths or install CERN ROOT manually.
 - <strong>Run-by-Run Drift Alignment</strong>: Automated in-beam gain tracking across hundreds of acquisition runs.</p>
-<div class="alert alert-note"><div class="alert-title">NOTE</div><p><strong>Operational Model &amp; Terminal Notice:</strong><br />
+<div class="alert alert-note"><div class="alert-title">NOTE</div>
+<p><strong>Operational Model &amp; Terminal Notice:</strong><br />
 NuTrackN keyboard commands are executed directly on the interactive spectrum canvas (hotkeys). Due to the current focus on user-friendly dialog windows, interactive parameter tables, and graphical workflows, <strong>program operation through the terminal (either the system terminal / stdin or the in-built bottom console) is not currently functional for command input.</strong> The in-built bottom console serves exclusively as an output log for calculation reports, marker moment summaries, and fit parameters. Terminal-driven command execution and headless batch processing with no GUI will be the topic of a later upgrade.</p>
 </div>
 <h3>1.2 Historical Attributions &amp; Acknowledgments</h3>
@@ -518,6 +519,11 @@ NuTrackN keyboard commands are executed directly on the interactive spectrum can
 <li><strong>Remaking the Main Interface</strong>: Redesigning the main application canvas, controls, and docking system for multi-monitor setups and flexible spectroscopy workflows.</li>
 <li><strong>Terminal Operation &amp; Headless Batch Processing</strong>: Restoring full command execution via system terminal <code>stdin</code> and enabling headless batch processing flags to execute analysis pipelines with no GUI.</li>
 <li><strong>Python &amp; Scientific Ecosystem Integration</strong>: Lightweight bindings and serialization bridges to manipulate NuTrackN calibration trajectories and spectra within NumPy, SciPy, and Jupyter environments.</li>
+</ul>
+<h4>6. In-App Auto-Updater (Future Dream)</h4>
+<ul>
+<li><strong>Seamless Release Tracking</strong>: Automated, non-intrusive checking against the GitHub Releases API upon application launch to notify researchers of new stable releases and hotfixes.</li>
+<li><strong>Zero-Friction In-Place Self-Updating</strong>: One-click download, SHA-256 integrity verification, and binary delta replacement directly within the running application (both for Linux AppImages via AppImageUpdate and macOS DMG/bundle mounts), eliminating manual re-downloads and preserving custom configurations.</li>
 </ul>
 <p>We warmly welcome ideas, feedback, and contributions from experimentalists and spectroscopy laboratories worldwide. If you have suggestions, feature requests, bug reports, or would simply like to send coffee our way, please feel free to open an issue on <a href="https://github.com/standlucian/NuGASP">GitHub</a> or reach out directly by email at <code>lucian.stan@nipne.ro</code>.</p>
 <h3>1.5 The NuGASP Ecosystem Scope</h3>
@@ -601,13 +607,13 @@ NuTrackN keyboard commands are executed directly on the interactive spectrum can
 <p>If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:</p>
 <blockquote>
 <p><strong>Text Citation:</strong><br />
-L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0, Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).</p>
+L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.1, Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).</p>
 </blockquote>
 <pre><code class="language-bibtex">@misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0},
+  version      = {2.0.1},
   institution  = {Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -631,12 +637,16 @@ L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analys
 1. Navigate to the <strong><a href="https://github.com/standlucian/NuGASP/releases/latest">Latest Release</a></strong>.
 2. Scroll down to the <strong>Assets</strong> accordion at the bottom of the release notes.
 3. Select the package corresponding to your operating system:
-   - <strong>Linux (x86_64, all distributions with glibc 2.28+)</strong>: Download <strong><code>NuTrackN-x86_64.AppImage</code></strong>.
+   - <strong>Linux (<code>x86_64</code> / AMD64 PC Architecture, glibc 2.28+)</strong>: Download <strong><code>NuTrackN-x86_64.AppImage</code></strong>.
    - <strong>macOS (Apple Silicon ARM64 — M1 / M2 / M3 / M4 / M5)</strong>: Download <strong><code>NuTrackN-macOS-arm64.dmg</code></strong>.</p>
-<div class="alert alert-note"><div class="alert-title">NOTE</div><p><strong>macOS Architecture Notice:</strong><br />
-NuTrackN exclusively targets modern Apple Silicon architecture (<code>arm64</code>). Legacy Intel-based Macs (x86_64) are neither supported nor planned for future development.</p>
-<p>[!TIP]
-<strong>Zero External Dependencies Required!</strong><br />
+<div class="alert alert-note"><div class="alert-title">NOTE</div>
+<p><strong>Understanding the Linux <code>x86_64</code> Asset vs. macOS Architecture Support:</strong><br />
+- <strong>What is <code>x86_64</code>?</strong> The <code>NuTrackN-x86_64.AppImage</code> package is the pre-compiled binary for <strong>Linux</strong> running on standard 64-bit PC and workstation hardware (Intel Core, AMD Ryzen, Xeon, EPYC). It runs on Ubuntu, Debian, Fedora, Arch, CentOS, Rocky Linux, openSUSE, and any distribution providing glibc 2.28 or newer.
+- <strong>macOS is Exclusively Apple Silicon (<code>arm64</code>)</strong>: The macOS release package is strictly <code>NuTrackN-macOS-arm64.dmg</code>. NuTrackN does not build or support legacy Intel-based Macs (x86_64), and there are no plans to add Intel Mac support in future releases.</p>
+</div>
+
+<div class="alert alert-tip"><div class="alert-title">TIP</div>
+<p><strong>Zero External Dependencies Required!</strong><br />
 Both the Linux AppImage and macOS DMG bundles embed all required CERN ROOT graphics engines, Qt runtime libraries, and mathematical solvers. You do not need to install ROOT, configure environment variables (<code>$ROOTSYS</code>), or set library paths on your machine to run the pre-built packages.</p>
 </div>
 <h4>Development Snapshots (GitHub Actions Artifacts)</h4>
@@ -645,45 +655,201 @@ Both the Linux AppImage and macOS DMG bundles embed all required CERN ROOT graph
 2. Select the latest completed run of <strong>Build &amp; Package Linux</strong> or <strong>Build &amp; Package macOS</strong>.
 3. Scroll down to the <strong>Artifacts</strong> section at the bottom of the summary page to download the pre-built bundle (<code>NuTrackN-Linux-x86_64</code> or <code>NuTrackN-macOS-arm64</code>).</p>
 <h3>2.2 Linux (1-Click AppImage)</h3>
-<p>NuTrackN is distributed as a completely self-contained Linux AppImage with embedded Qt5 and CERN ROOT runtimes:</p>
-<pre><code class="language-bash"># 1. Make executable
+<p>NuTrackN is distributed as a completely self-contained, standalone Linux AppImage bundling all required Qt5 libraries, CERN ROOT engines, and numerical solvers. It requires zero root privileges and supports two flexible operational modes:</p>
+<h4>Operational Mode A: Portable Run Anywhere (Zero Installation)</h4>
+<p>Because the AppImage incorporates a FUSE-free self-extracting runtime, it can be executed immediately from any flash drive, scratch disk, or unprivileged research cluster directory:</p>
+<pre><code class="language-bash"># 1. Make the AppImage executable
 chmod +x NuTrackN-x86_64.AppImage
 
-# 2. Add 'nutrackn' terminal command and Desktop Launcher (1-click)
-./NuTrackN-x86_64.AppImage --install
-
-# 3. Launch from anywhere in terminal
-nutrackn
+# 2. Run directly with no installation
+./NuTrackN-x86_64.AppImage
 </code></pre>
-<p><em>(To remove: run <code>nutrackn --uninstall</code>).</em></p>
-<h3>2.3 macOS (Drag-and-Drop DMG for Apple Silicon)</h3>
+<h4>Operational Mode B: Full System &amp; Desktop Integration (<code>--install</code>)</h4>
+<p>To integrate NuTrackN seamlessly into your laboratory workstation environment:</p>
+<pre><code class="language-bash">./NuTrackN-x86_64.AppImage --install
+</code></pre>
+<h5>What <code>--install</code> Configures:</h5>
 <ol>
-<li>Download <code>NuTrackN-macOS-arm64.dmg</code> (Apple Silicon M1/M2/M3/M4/M5) from the <a href="https://github.com/standlucian/NuGASP/releases">Releases page</a>.</li>
-<li>Open the disk image and drag <strong><code>NuTrackN.app</code></strong> into your <code>/Applications</code> folder.</li>
-<li>To enable the command line shortcut in Terminal:
+<li><strong>Terminal Command in PATH</strong>: Copies the launcher into <code>~/.local/bin/nutrackn</code> (and symlinks <code>~/bin/nutrackn</code>), configuring your shell profiles (<code>~/.bashrc</code>, <code>~/.zshrc</code>, <code>~/.profile</code>). You can immediately launch NuTrackN from any directory simply by typing:
    <code>bash
-   /Applications/NuTrackN.app/Contents/MacOS/nutrackn --install-cli</code></li>
-<li><em>(Note for macOS Gatekeeper: If prompted that the developer cannot be verified upon first launch, right-click (or Control-click) <code>NuTrackN.app</code> in <code>/Applications</code> and select </em><em>Open</em><em>, then confirm </em><em>Open</em><em>).</em></li>
+   nutrackn</code></li>
+<li><strong>Desktop Launcher &amp; Application Menu</strong>: Generates a native desktop shortcut (<code>~/Desktop/NuTrackN.desktop</code>) and an application menu entry under <strong>Science</strong> $\rightarrow$ <strong>NuTrackN</strong> with high-resolution 512×512 icons.</li>
+<li><strong>Exclusive <code>.cmat</code> Coincidence Matrix File Association</strong>: Registers the MIME type <code>application/x-cmat</code> with the system database (<code>~/.local/share/mime/packages/nutrackn-cmat.xml</code>). Double-clicking any <code>.cmat</code> matrix file in GNOME Files (Nautilus), KDE Dolphin, or Thunar automatically opens it in NuTrackN.</li>
 </ol>
+<h4>Clean Uninstallation (<code>--uninstall</code>)</h4>
+<p>To cleanly revert all system integration without leaving orphan files:</p>
+<pre><code class="language-bash">nutrackn --uninstall
+# Or run from the AppImage directly:
+./NuTrackN-x86_64.AppImage --uninstall
+</code></pre>
+<p>This removes the <code>nutrackn</code> binaries from <code>~/.local/bin</code>, deletes desktop shortcuts, removes the <code>.cmat</code> MIME association, and clears application caches.</p>
+<div class="alert alert-important"><div class="alert-title">IMPORTANT</div>
+<p><strong>Do Not Launch NuTrackN Over Remote SSH (<code>ssh -X</code> / <code>ssh -Y</code>):</strong><br />
+Never attempt to run the graphical interface remotely over an SSH connection with X11 forwarding. Forwarding complex Qt5 widgets and OpenGL hardware-rendered canvases across network sockets introduces severe latency, display artifacts, and GLX protocol errors.  </p>
+<p><strong>Always run NuTrackN locally on your workstation or laptop.</strong> NuTrackN includes a dedicated, high-performance native SSH-2 and SFTP client engine (<a href="#34-remote-data-acquisition--ssh-session-manager">Section 3.4</a>) designed specifically to connect to remote DAQ machines, browse remote directories, and stream live acquisition runs directly to your local canvas with zero display lag.</p>
+</div>
+<hr />
+<h3>2.3 macOS (Drag-and-Drop DMG for Apple Silicon)</h3>
+<p>NuTrackN is engineered natively for Apple Silicon ARM64 architecture (M1, M2, M3, M4, and M5 chips), providing blazing-fast execution, zero Rosetta 2 emulation overhead, and crisp High-DPI Retina antialiasing across all ROOT spectra and vector fonts.</p>
+<div class="alert alert-warning"><div class="alert-title">WARNING</div>
+<p><strong>Community Hardware Testing Notice (Call for Testers):</strong><br />
+While the macOS build and DMG packaging pipeline is fully automated and compiles cleanly on Apple Silicon ARM64, <strong>no physical testing has yet been undertaken on bare-metal ARM macOS hardware</strong> due to the lack of an Apple Silicon machine at the author's disposal.  </p>
+<p>Any assistance, feedback, or verification reports from researchers with access to Apple Silicon Macs would be greatly appreciated! If you encounter visual glitches, window scaling issues, or runtime bugs, please open an issue on <a href="https://github.com/standlucian/NuGASP/issues">GitHub</a> or reach out directly by email at <code>lucian.stan@nipne.ro</code>.</p>
+</div>
+<h4>1. Standard Installation (Drag-and-Drop)</h4>
+<ol>
+<li>Download <strong><code>NuTrackN-macOS-arm64.dmg</code></strong> from the <a href="https://github.com/standlucian/NuGASP/releases">GitHub Releases page</a>.</li>
+<li>Double-click the downloaded <code>.dmg</code> file to mount the disk image.</li>
+<li>Drag <strong><code>NuTrackN.app</code></strong> into your <strong><code>/Applications</code></strong> folder.</li>
+<li>Eject the disk image from Finder.</li>
+</ol>
+<h4>2. First-Launch Gatekeeper Walkthrough</h4>
+<p>Because NuTrackN is an academic research application distributed directly to the scientific community outside the commercial Apple App Store, macOS Gatekeeper may present an <em>"unverified developer"</em> warning upon first launch. Use any of the standard macOS verification procedures below:</p>
+<h5>Method A: One-Time Finder Approval (Recommended — 2 Clicks)</h5>
+<ol>
+<li>In Finder, navigate to your <strong><code>/Applications</code></strong> folder.</li>
+<li><strong>Right-click (or Control-click)</strong> <code>NuTrackN.app</code> and select <strong>Open</strong>.</li>
+<li>In the security dialog that appears, click <strong>Open</strong>. (macOS permanently registers this approval; subsequent launches require only a standard double-click).</li>
+</ol>
+<h5>Method B: macOS System Settings Approval</h5>
+<ol>
+<li>If the application launch was blocked, open <strong>System Settings</strong> $\rightarrow$ <strong>Privacy &amp; Security</strong>.</li>
+<li>Scroll down to the <strong>Security</strong> section where <em>"NuTrackN was blocked from use"</em> appears.</li>
+<li>Click <strong>Open Anyway</strong> and enter your administrator password.</li>
+</ol>
+<h5>Method C: Terminal Quarantine Removal</h5>
+<p>Alternatively, strip the macOS quarantine extended attribute directly via Terminal:</p>
+<pre><code class="language-bash">xattr -cr /Applications/NuTrackN.app
+</code></pre>
+<h4>3. Terminal Integration (<code>--install-cli</code>)</h4>
+<p>To enable launching NuTrackN directly from macOS Terminal or iTerm2:</p>
+<pre><code class="language-bash">/Applications/NuTrackN.app/Contents/MacOS/nutrackn --install-cli
+</code></pre>
+<p>This creates a symlink at <code>/usr/local/bin/nutrackn</code> (or <code>~/.local/bin/nutrackn</code>) and exports it in your <code>~/.zshrc</code> and <code>~/.bash_profile</code>. Once installed, you can launch NuTrackN from any terminal directory:</p>
+<pre><code class="language-bash">nutrackn
+</code></pre>
+<p><em>(To remove the terminal shortcut, run: <code>nutrackn --uninstall-cli</code>).</em></p>
+<h4>4. Native Finder <code>.cmat</code> Matrix Association</h4>
+<p>The macOS application bundle registers <code>NuTrackN.app</code> as the native viewer <strong>exclusively for <code>.cmat</code> coincidence matrices</strong> (<code>NuGASP Coincidence Matrix</code>). Double-clicking any <code>.cmat</code> file in macOS Finder automatically launches NuTrackN and presents the 2D projection and slicing interface. NuTrackN leaves all <code>.spe</code>, <code>.root</code>, and <code>.mcal</code> file associations untouched.</p>
 <h3>2.4 Building from Source</h3>
-<p>If building in a custom research laboratory environment:</p>
-<pre><code class="language-bash"># Prerequisites: CMake 3.16+, Qt5 (Widgets, Network), CERN ROOT 6.24+
-git clone https://github.com/standlucian/NuGASP.git
+<p>If deploying in a custom research laboratory environment, on high-performance computing clusters, or for contributing to development, NuTrackN can be compiled from source using standard C++17 compilers with either CMake or QMake.</p>
+<h4>1. System Dependencies by Platform</h4>
+<h5>Ubuntu / Debian</h5>
+<p>Install the build toolchain, Qt5 development packages, and <code>libssh2</code>:</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt install build-essential cmake qtbase5-dev libssh2-1-dev
+</code></pre>
+<div class="alert alert-important"><div class="alert-title">IMPORTANT</div>
+<p><strong>CERN ROOT Installation on Ubuntu / Debian:</strong><br />
+Standard Ubuntu and Debian official APT repositories do not provide a complete, modern CERN ROOT distribution with all required scientific libraries. <strong>You must install CERN ROOT on your own</strong>, either by:
+1. Downloading an official pre-compiled binary tarball from the <a href="https://root.cern/install/all_releases/">CERN ROOT Releases page</a> for your Ubuntu version, unpacking it (e.g. to <code>/opt/root</code> or <code>~/root</code>), and sourcing its environment:
+   <code>bash
+   source /opt/root/bin/thisroot.sh</code>
+   <em>(Add this line to your <code>~/.bashrc</code> to make it permanent).</em>
+2. Or compiling CERN ROOT from source with C++17 support enabled.</p>
+</div>
+<h5>Fedora / RHEL / Rocky Linux</h5>
+<p>Fedora and EPEL repositories provide official packaged CERN ROOT libraries:</p>
+<pre><code class="language-bash">sudo dnf install gcc-c++ cmake qt5-qtbase-devel libssh2-devel \
+    root root-core root-hist root-graf root-gui root-mathcore root-spectrum
+</code></pre>
+<h5>macOS (Apple Silicon via Homebrew)</h5>
+<pre><code class="language-bash">brew install cmake qt@5 root libssh2
+</code></pre>
+<hr />
+<h4>2. Compilation Workflows</h4>
+<h5>Build Method A: Modern CMake (Recommended for CLI &amp; Clusters)</h5>
+<pre><code class="language-bash">git clone https://github.com/standlucian/NuGASP.git
 cd NuGASP/NuTrackN
 mkdir build &amp;&amp; cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ./nutrackn
 </code></pre>
-<h3>2.5 First Spectrum Walkthrough in 60 Seconds</h3>
+<h5>Build Method B: Command-Line QMake</h5>
+<pre><code class="language-bash">cd NuGASP/NuTrackN
+qmake nutrackn.pro CONFIG+=release
+make -j$(nproc)
+./nutrackn
+</code></pre>
+<h5>Build Method C: Qt Creator IDE (GUI Development)</h5>
 <ol>
-<li>Launch <code>nutrackn</code>.</li>
-<li>Press <strong><code>N</code></strong> (or click the spectrum open button) and select your spectrum file (e.g. <code>152Eu_sample.spe</code>).</li>
-<li>Press <strong><code>L</code></strong> to toggle between Linear and Logarithmic scale.</li>
-<li>Hover the cursor over a photopeak; the <strong>Live Peak Inspector Box</strong> in the upper right dynamically displays centroid, channel, counts, and local FWHM.</li>
-<li>Move cursor to the left of the peak and press <strong><code>[</code></strong>; move to the right and press <strong><code>]</code></strong>. Press <strong><code>E</code></strong> to zoom between the markers.</li>
-<li>Press <strong><code>CJ</code></strong> to calculate net peak area with automatic linear background subtraction.</li>
+<li>Open Qt Creator and select <strong>Open File or Project</strong> (<code>Ctrl+O</code> / <code>Cmd+O</code>).</li>
+<li>Open <code>NuTrackN/nutrackn.pro</code>.</li>
+<li>Select your Desktop Qt 5 kit.</li>
+<li>Ensure the <code>ROOTSYS</code> environment variable is accessible in the build environment (or that ROOT's <code>bin</code> directory is in your <code>PATH</code>).</li>
+<li>Click the green <strong>Run</strong> button (or press <code>Ctrl+R</code> / <code>Cmd+R</code>) to compile and launch.</li>
 </ol>
+<hr />
+<h3>2.5 First Spectrum Walkthrough in 60 Seconds</h3>
+<p>This 60-second walkthrough introduces the core keyboard workflow and real-time inspector HUD:</p>
+<ol>
+<li><strong>Launch NuTrackN</strong>: Run <code>nutrackn</code> from your terminal or launch it from your desktop applications menu.</li>
+<li><strong>Open Your First Spectrum (<code>N</code> / Toolbar Button <code>R</code>)</strong>:<ul>
+<li>Press <strong><code>N</code></strong> on your keyboard (or click the toolbar button labelled <strong><code>R</code></strong>, for <strong>Read</strong>).</li>
+<li>An integrated file browser opens allowing you to choose your spectrum file.</li>
+<li>Upon selecting the file, NuTrackN presents a dialog to configure the file specifications alongside an interactive preview of the spectrum shape (the options of this import dialog will be explained in detail in a later chapter).</li>
+<li>Confirm the dialog, and the spectrum immediately renders on the primary canvas.</li>
+</ul>
+</li>
+<li><strong>Zoom into a Peak Region of Interest (<code>Spacebar</code> + <code>E</code> or <code>X</code>)</strong>:<ul>
+<li>Move your cursor to the baseline left of a photopeak and press <strong><code>Spacebar</code></strong> (places boundary marker 1).</li>
+<li>Move your cursor to the baseline right of the photopeak and press <strong><code>Spacebar</code></strong> (places boundary marker 2).</li>
+<li>Press <strong><code>E</code></strong> (Expand) to zoom the canvas view directly between the two markers!</li>
+<li><em>(Quick Zoom Tip: You can also hover your cursor over any peak and press </em><em><code>X</code></em><em> to instantly zoom in centered at the cursor position).</em></li>
+</ul>
+</li>
+<li><strong>Navigate &amp; Adjust Scale (<code>&lt;</code> / <code>&gt;</code>, Arrows, <code>L</code>, Mouse Wheel)</strong>:<ul>
+<li><strong>Horizontal Panning &amp; Stepping</strong>:<ul>
+<li><strong>Fine Panning (Left / Right Arrow keys)</strong>: Press <strong><code>Left Arrow</code></strong> or <strong><code>Right Arrow</code></strong> to step smoothly through the spectrum in fine increments (~3% of the window width). (Alternatively, hold <strong><code>Shift</code></strong> and scroll the mouse wheel).</li>
+<li><strong>Large Screen Shift (<code>&lt;</code> and <code>&gt;</code>)</strong>: Press <strong><code>&lt;</code></strong> (or <code>,</code>) to shift the visible window 75% to the left; press <strong><code>&gt;</code></strong> (or <code>.</code>) to shift 75% to the right.</li>
+</ul>
+</li>
+<li><strong>Linear / Log Scale (<code>L</code>)</strong>: Press <strong><code>L</code></strong> on your keyboard to toggle the vertical axis between linear and logarithmic count scaling.</li>
+<li><strong>Vertical Zoom &amp; Auto-Scale (Mouse Wheel or Up/Down Arrows)</strong>:<ul>
+<li>Scroll the mouse wheel up to expand the vertical Y-axis range (zoom out), or down to compress it (zoom in).</li>
+<li>Press <strong><code>Up Arrow</code></strong> (or type <strong><code>FY</code></strong>) to instantly auto-scale the vertical axis to the maximum peak height in the current view.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li><strong>Inspect Photopeaks with the Live Zoom HUD (<code>Ctrl</code>)</strong>:<ul>
+<li><strong>Hold <code>Ctrl</code></strong> while hovering your mouse cursor over any photopeak.</li>
+<li>The floating <strong>Zoom HUD Peak Inspector</strong> dynamically appears in the canvas corner:<ul>
+<li>Displays a high-magnification real-time zoomed sub-canvas of the photopeak region centered at the cursor.</li>
+<li>Displays the exact cursor channel, centroid, and amplitude counts.</li>
+<li>Calculates the local peak width (estimated FWHM in channels) for an instant resolution check.</li>
+</ul>
+</li>
+<li><strong>Instant 1-Click Peak Fit</strong>: While holding <strong><code>Ctrl</code></strong>, click the <strong>Left Mouse Button</strong> on a peak to instantly fit a Gaussian curve with baseline subtraction.</li>
+<li>Release <strong><code>Ctrl</code></strong> to dismiss the HUD.</li>
+</ul>
+</li>
+<li><strong>Calculate Peak Area (<code>I</code> + <code>B</code> $\rightarrow$ <code>CJ</code>, or <code>I</code> $\rightarrow$ <code>CI</code>)</strong>:<ul>
+<li><strong>Integral Markers (<code>I</code>)</strong>: Position the cursor on the left and right baseline flanking the peak and press <strong><code>I</code></strong> (places yellow peak integration markers).</li>
+<li><strong>Background Markers (<code>B</code>)</strong>: Position the cursor on background regions further to the left and right of the peak and press <strong><code>B</code></strong> (places blue background baseline markers).</li>
+<li><strong>Calculate Net Area (<code>CJ</code>)</strong>: Press <strong><code>CJ</code></strong>. NuTrackN fits a linear Compton background across the <strong><code>B</code></strong> markers, subtracts it from the peak region, and computes the Gross Area, Net Area, centroid, and statistical Poisson uncertainty ($\pm \sigma_{\text{net}}$).</li>
+<li><em>(Tip: To compute a raw gross area without background subtraction, simply place two </em><em><code>I</code></em><em> markers and press </em><em><code>CI</code></em><em>).</em></li>
+<li>The complete numerical report is immediately printed to the bottom console log panel.</li>
+</ul>
+</li>
+<li><strong>Perform an Instant 2-Point Calibration (<code>K</code>)</strong>:<ul>
+<li>Press <strong><code>K</code></strong> to enter fast two-point energy calibration mode.</li>
+<li>Click the centroid of a known low-energy peak and enter its literature energy in keV (e.g., $121.78$).</li>
+<li>Click the centroid of a high-energy peak and enter its literature energy in keV (e.g., $1408.01$).</li>
+<li>The X-axis instantly switches from raw channel numbers to calibrated <strong>Energy (keV)</strong> across all axes, markers, and HUD readouts!</li>
+</ul>
+</li>
+<li><strong>Reset the View (<code>FF</code> &amp; <code>ZA</code>)</strong>:<ul>
+<li>Press <strong><code>FF</code></strong> (Full Display) to restore the full unzoomed spectrum across both axes.</li>
+<li>Press <strong><code>ZA</code></strong> to clear all active markers from the canvas.</li>
+</ul>
+</li>
+</ol>
+<div class="alert alert-tip"><div class="alert-title">TIP</div>
+<p><strong>Built-in Keyboard Cheat-Sheet (<code>H</code>, <code>?</code>, or <code>F1</code>):</strong><br />
+Whenever you need an instant reminder of any hotkey, macro token, or command string, press <strong><code>H</code></strong>, <strong><code>?</code></strong>, or <strong><code>F1</code></strong> directly on the spectrum canvas to bring up the comprehensive, searchable in-app keyboard cheat-sheet!</p>
+</div>
 <hr />
 <h2 id="3-data-input-output-io--file-management" class="chapter-heading">3. Data Input, Output (I/O) & File Management</h2>
 
@@ -694,6 +860,10 @@ make -j$(nproc)
 - <strong>Radware (<code>.spe</code>)</strong>: Integer and floating-point Radware spectrum buffers.
 - <strong>CERN ROOT Histograms (<code>.root</code>)</strong>: 1D histograms (<code>TH1D</code>, <code>TH1F</code>, <code>TH1I</code>) and 2D matrices (<code>TH2D</code>).
 - <strong>Compressed Coincidence Matrices (<code>.cmat</code>, <code>.mat</code>)</strong>: GASPware symmetrized and raw 2D gamma coincidence matrices.</p>
+<div class="alert alert-note"><div class="alert-title">NOTE</div>
+<p><strong>Operating System File Association Policy:</strong><br />
+To respect existing laboratory workstations and software installations (such as standalone CERN ROOT distributions, Radware suites, or Ortec Maestro), NuTrackN registers OS-level desktop file associations <strong>exclusively for <code>.cmat</code> coincidence matrices</strong>. It deliberately avoids registering associations for generic <code>.spe</code>, <code>.root</code>, <code>.chn</code>, or <code>.dat</code> files. All supported spectrum and histogram formats can be loaded seamlessly at any time from within NuTrackN via the file open dialog (<code>N</code> key or toolbar button).</p>
+</div>
 <h3>3.2 Loading Spectra &amp; Multi-Buffer Overlays (Buffers 1–9)</h3>
 <p>NuTrackN supports multi-pad canvas grids alongside multi-spectrum overlays on any individual pad:
 - <strong>Multi-Pad Grid Layout</strong>:
@@ -709,8 +879,7 @@ make -j$(nproc)
 <h3>3.3 Modern File Dialog (NuFileDialog) &amp; Live Previews</h3>
 <p>NuTrackN features an embedded high-speed file browser (<code>NuFileDialog</code>):
 - <strong>Live Spectrum Mini-Preview</strong>: Click any spectrum file to inspect its raw channel count and shape in real time before opening.
-- <strong>Fast Navigation Bookmarks</strong>: Quick access to experiment data directories, USB mount points, and home directories.
-- <strong>Format Filter Filtering</strong>: Dynamic switching between <code>.spe</code>, <code>.chn</code>, <code>.root</code>, and all ASCII variations.</p>
+- <strong>Fast Navigation Bookmarks</strong>: Quick access to experiment data directories, USB mount points, and home directories.</p>
 <h3>3.4 Remote Data Acquisition &amp; SSH Session Manager</h3>
 <p>During in-beam accelerator experiments, acquisition data often resides on remote DAQ machines or storage nodes. NuTrackN includes a dedicated SSH Client and Session Manager:</p>
 <pre><code>┌────────────────────────────────────────────────────────────────────────┐
@@ -934,7 +1103,8 @@ where:
   └───────────────────────────────────────────────────&gt; Channel (x)
                    &lt;── x0 ──&gt;
 </code></pre>
-<div class="alert alert-note"><div class="alert-title">NOTE</div><p>To eliminate mathematical collinearity between the slope ($m$) and step parameter ($S$) that can produce unphysical "sawtooth" baseline artifacts, NuTrackN employs robust median sidebands and dynamically caps the physical step height to a fraction of the raw peak amplitude ($S \le 0.15 \cdot A$).</p>
+<div class="alert alert-note"><div class="alert-title">NOTE</div>
+<p>To eliminate mathematical collinearity between the slope ($m$) and step parameter ($S$) that can produce unphysical "sawtooth" baseline artifacts, NuTrackN employs robust median sidebands and dynamically caps the physical step height to a fraction of the raw peak amplitude ($S \le 0.15 \cdot A$).</p>
 </div>
 <h3>7.3 Poisson Maximum Likelihood Estimation vs. Least-Squares</h3>
 <p>Standard $\chi^2$ minimizations assume Gaussian-distributed count errors ($\sigma_i = \sqrt{C_i}$). For low-statistics peaks ($C_i < 20$ counts/bin), this approximation fails and produces a systematic negative bias in peak area.</p>
@@ -1103,7 +1273,8 @@ where $M$ is the number of fitted channels and $K$ is the number of free paramet
 <h2 id="10-scripting-macros--automation" class="chapter-heading">10. Scripting, Macros & Automation</h2>
 
 <h3>10.1 Graphical Interface Focus &amp; Terminal Status Notice</h3>
-<div class="alert alert-important"><div class="alert-title">IMPORTANT</div><p><strong>Terminal &amp; Batch Operation Notice:</strong><br />
+<div class="alert alert-important"><div class="alert-title">IMPORTANT</div>
+<p><strong>Terminal &amp; Batch Operation Notice:</strong><br />
 NuTrackN's development currently focuses on intuitive, user-friendly graphical dialog windows, interactive canvas controls, and real-time visual feedback. Consequently, <strong>program operation through the terminal (either the system terminal / stdin or typing into the in-built bottom console) is not currently functional for command input.</strong></p>
 <p>The in-built console at the bottom of the canvas operates exclusively as a <strong>read-only output logger</strong>, streaming calculation reports, marker moment tables, fit parameters, and command lists.</p>
 <p>Full program operation through the terminal and headless batch execution (processing spectra and calibration pipelines with no GUI) will be the topic of a subsequent upgrade.</p>

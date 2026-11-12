@@ -91,6 +91,12 @@ cp -a "${NUTRACKN_DIR}/${APP_EXE}" "${APPDIR}/usr/bin/${APP_EXE}"
 cp -a "${SCRIPT_DIR}/nutrackn.desktop" "${APPDIR}/nutrackn.desktop"
 cp -a "${SCRIPT_DIR}/nutrackn.desktop" "${APPDIR}/usr/share/applications/${APP_EXE}.desktop"
 
+# Copy MIME definition for .cmat
+mkdir -p "${APPDIR}/usr/share/mime/packages"
+if [ -f "${SCRIPT_DIR}/nutrackn-cmat.xml" ]; then
+    cp -a "${SCRIPT_DIR}/nutrackn-cmat.xml" "${APPDIR}/usr/share/mime/packages/nutrackn-cmat.xml"
+fi
+
 # Copy multi-resolution icons
 if [ -f "${NUTRACKN_DIR}/nutrackn.png" ]; then
     cp -a "${NUTRACKN_DIR}/nutrackn.png" "${APPDIR}/nutrackn.png"
@@ -363,7 +369,7 @@ Exec=${target_bin} %F
 Icon=${icons_dir}/nutrackn.png
 Terminal=false
 Categories=Science;Physics;DataVisualization;Qt;
-MimeType=application/x-root;
+MimeType=application/x-cmat;
 StartupNotify=true
 StartupWMClass=nutrackn"
 
@@ -389,6 +395,22 @@ StartupWMClass=nutrackn"
     echo "${desktop_entry}" > "${apps_dir}/nutrackn.desktop"
     chmod +x "${apps_dir}/nutrackn.desktop"
     echo "    ✓ Created Desktop menu shortcut: ${apps_dir}/nutrackn.desktop"
+
+    # Install custom MIME type for .cmat files (GASPware Coincidence Matrix)
+    local mime_dir="${HOME}/.local/share/mime/packages"
+    mkdir -p "${mime_dir}"
+    cat << 'EOF_MIME' > "${mime_dir}/nutrackn-cmat.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-cmat">
+        <comment>NuGASP Coincidence Matrix</comment>
+        <glob pattern="*.cmat"/>
+    </mime-type>
+</mime-info>
+EOF_MIME
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "${HOME}/.local/share/mime" 2>/dev/null || true
+    fi
 
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "${apps_dir}" 2>/dev/null || true
@@ -444,6 +466,10 @@ uninstall_shortcut() {
     for s in 16 32 48 64 128 256; do
         rm -f "${HOME}/.local/share/icons/hicolor/${s}x${s}/apps/nutrackn.png"
     done
+    rm -f "${HOME}/.local/share/mime/packages/nutrackn-cmat.xml"
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "${HOME}/.local/share/mime" 2>/dev/null || true
+    fi
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "${HOME}/.local/share/applications" 2>/dev/null || true
     fi
@@ -604,7 +630,7 @@ Exec=${bin_dir}/${APP_EXE} %F
 Icon=${icons_base}/512x512/apps/${APP_EXE}.png
 Terminal=false
 Categories=Science;Physics;DataVisualization;Qt;
-MimeType=application/x-root;
+MimeType=application/x-cmat;
 StartupNotify=true
 StartupWMClass=nutrackn"
 
@@ -630,6 +656,22 @@ StartupWMClass=nutrackn"
     echo "${desktop_entry}" > "${apps_dir}/${APP_EXE}.desktop"
     chmod +x "${apps_dir}/${APP_EXE}.desktop"
     echo "    ✓ Created application menu entry: ${apps_dir}/${APP_EXE}.desktop"
+
+    # Install custom MIME type for .cmat files (GASPware Coincidence Matrix)
+    local mime_dir="${HOME}/.local/share/mime/packages"
+    mkdir -p "${mime_dir}"
+    cat << 'EOF_MIME2' > "${mime_dir}/nutrackn-cmat.xml"
+<?xml version="1.0" encoding="UTF-8"?>
+<mime-info xmlns="http://www.freedesktop.org/standards/shared-mime-info">
+    <mime-type type="application/x-cmat">
+        <comment>NuGASP Coincidence Matrix</comment>
+        <glob pattern="*.cmat"/>
+    </mime-type>
+</mime-info>
+EOF_MIME2
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "${HOME}/.local/share/mime" 2>/dev/null || true
+    fi
 
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "${apps_dir}" 2>/dev/null || true
@@ -693,6 +735,10 @@ uninstall_system() {
     for s in 16 32 48 64 128 256; do
         rm -f "${icons_base}/${s}x${s}/apps/${APP_EXE}.png"
     done
+    rm -f "${HOME}/.local/share/mime/packages/nutrackn-cmat.xml"
+    if command -v update-mime-database >/dev/null 2>&1; then
+        update-mime-database "${HOME}/.local/share/mime" 2>/dev/null || true
+    fi
     rm -rf "${HOME}/.cache/nutrackn"
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "${apps_dir}" 2>/dev/null || true
