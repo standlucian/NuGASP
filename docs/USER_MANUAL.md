@@ -583,7 +583,7 @@ NuTrackN operates strictly and natively on the fundamental data structures of nu
 4. **Single vs. Chained (Multi-Spectrum) Files**:
     - Both binary and ASCII files can contain either a **single spectrum** or **multiple chained/concatenated spectra** (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).
     - **Automatic Heuristic Detection & User Verification**: Upon selecting a file, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k) to make an educated guess of the format, channel length, and number of chained spectra. Because raw stream files lack embedded format headers, **heuristic detection can occasionally guess incorrectly** (e.g. distinguishing 32-bit floats from 32-bit integers, or unusual detector segment counts). Users should **always double-check the suggested settings against the interactive spectrum preview curve** displayed in the import dialog before accepting.
-    - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the **`N`** / **`N-`** hotkeys.
+    - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or cycle through detectors sequentially on the canvas using the **`1`** (next detector) and **`2`** (previous detector) numeric macro hotkeys.
     - **Multi-Spectrum Export (`SpectrumExportDialog`)**: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.
 
 > [!NOTE]
@@ -625,13 +625,13 @@ NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overl
 
 #### Multi-Buffer Overlays & Stepping (Buffers 1–9):
 - **Overlay Stack (`HijC`)**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
-- **Detector / Spectrum Stepping**:
-    - Press **`N`** (or **`N+`** / **`*1`**) to advance to the next spectrum/detector in the sequence.
-    - Press **`N-`** (or **`*2`**) to step backward to the previous spectrum/detector.
+- **Detector / Spectrum Stepping in Linked Spectra**:
+    - Press **`1`** (executes Macro #1 `*1`): Advance to the next spectrum/detector in the sequence.
+    - Press **`2`** (executes Macro #2 `*2`): Step backward to the previous spectrum/detector in the sequence.
+    - *(Note: Pressing **`N`** on the canvas opens the Spectrum File Open Dialog. Within macro command strings, the tokens `*1` or `N+` advance the spectrum index, and `*2` or `N-` decrement it).*
 - **Run Stepping**:
-    - Press **`*3`** (or **`R+`** / **`NR`**) to advance to the next experimental acquisition run.
-    - Press **`*4`** (or **`R-`** / **`PR`**) to step back to the previous experimental acquisition run.
-    - *(Note: On the canvas keyboard, bare digits **`0`–`9`** trigger stored numeric macros; see [Section 10.3](#103-numeric-macros-0-through-9--repetition-cycles)).*
+    - Press **`3`** (executes Macro #3 `*3`): Advance to the next experimental acquisition run file.
+    - Press **`4`** (executes Macro #4 `*4`): Step back to the previous experimental acquisition run file.
 
 #### Cross-Pad & Overlay Synchronization:
 - **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
@@ -1029,16 +1029,16 @@ In the current release, automation and command sequencing are performed either v
 ### 10.2 Supported Automation Tokens & Command Strings
 Command strings configured in the **Macro Manager (`DM`)** accept authentic Xtrackn tokens separated by spaces, commas, or semicolons (e.g., `*1; FF; CP; CJ` or `FX; FY; L; =`):
 - **Batch Stepping & Spectrum Navigation Tokens**:
-  - **`*1` / `N+` / `N`**: Step to the next detector / spectrum buffer.
-  - **`*2` / `N-`**: Step to the previous detector / spectrum buffer.
-  - **`*3` / `R+` / `NR`**: Step to the next experimental run.
-  - **`*4` / `R-` / `PR`**: Step to the previous experimental run.
+    - **`*1` / `N+`**: Step to the next detector / spectrum index in a linked/chained file (preset to Macro key **`1`**).
+    - **`*2` / `N-`**: Step to the previous detector / spectrum index in a linked/chained file (preset to Macro key **`2`**).
+    - **`*3` / `R+` / `NR`**: Step to the next experimental run (preset to Macro key **`3`**).
+    - **`*4` / `R-` / `PR`**: Step to the previous experimental run (preset to Macro key **`4`**).
 - **Fitting & Analysis Tokens**:
-  - **`CB`**: Fit linear background across active `B` markers.
-  - **`CI` / `CJ`**: Integrate spectrum region (CI without background, CJ with linear background subtraction).
-  - **`AG` / `AJ`**: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
-  - **`CP` / `MP` / `ZP`**: Execute automated peak search (`CP`), show peak labels (`MP`), or clear peak markers (`ZP`).
-  - **`OR` / `DR` / `SSH`**: Open the Remote Data / SSH Session Manager.
+    - **`CB`**: Fit linear background across active `B` markers.
+    - **`CI` / `CJ`**: Integrate spectrum region (CI without background, CJ with linear background subtraction).
+    - **`AG` / `AJ`**: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
+    - **`CP` / `MP` / `ZP`**: Execute automated peak search (`CP`), show peak labels (`MP`), or clear peak markers (`ZP`).
+    - **`OR` / `DR` / `SSH`**: Open the Remote Data / SSH Session Manager.
 - **Nested Macro Calls**: Including a digit `0`–`9` inside a command string invokes that sub-macro (up to a recursion depth of 10).
 
 ### 10.3 Numeric Macros (0 through 9) & Repetition Cycles
@@ -1127,10 +1127,11 @@ Please write me
 #### 📂 File, Buffer & Run/Detector Stepping Operations
 | Key / Command | Action | Description |
 | :--- | :--- | :--- |
-| **`N` / `N+` / `*1`** | **Next Spectrum / Det** | Open or step to the next 1D spectrum / detector |
-| **`N-` / `*2`** | **Prev Spectrum / Det** | Step to the previous 1D spectrum / detector |
-| **`*3` / `R+` / `NR`** | **Next Run** | Increment experimental run number |
-| **`*4` / `R-` / `PR`** | **Previous Run** | Decrement experimental run number |
+| **`N`** | **Open Spectrum Dialog** | Open the spectrum file dialog (`NuFileDialog`) |
+| **`1` (Macro 1 / `*1`)** | **Next Spectrum / Det** | Advance to next spectrum / detector index in linked/chained file |
+| **`2` (Macro 2 / `*2`)** | **Prev Spectrum / Det** | Step to previous spectrum / detector index in linked/chained file |
+| **`3` (Macro 3 / `*3`)** | **Next Run** | Increment to next experimental acquisition run file |
+| **`4` (Macro 4 / `*4`)** | **Previous Run** | Decrement to previous experimental acquisition run file |
 | **`OR` / `DR` / `SSH`** | **Remote Data (SSH)** | Open Remote Data Acquisition & SSH Session Manager |
 | **`OS`** | **Output Spectrum** | Export current spectrum data to ASCII / CSV |
 | **`O=`** | **Output Plot** | Generate vector PostScript / PDF of current view |

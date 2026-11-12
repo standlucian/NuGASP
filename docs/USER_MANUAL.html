@@ -1189,7 +1189,7 @@ cat ~/.ssh/id_ed25519.pub | ssh user@192.168.1.xxx "mkdir -p ~/.ssh &amp;&amp; c
 <li><strong>Single vs. Chained (Multi-Spectrum) Files</strong>:<ul>
 <li>Both binary and ASCII files can contain either a <strong>single spectrum</strong> or <strong>multiple chained/concatenated spectra</strong> (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).</li>
 <li><strong>Automatic Heuristic Detection &amp; User Verification</strong>: Upon selecting a file, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k) to make an educated guess of the format, channel length, and number of chained spectra. Because raw stream files lack embedded format headers, <strong>heuristic detection can occasionally guess incorrectly</strong> (e.g. distinguishing 32-bit floats from 32-bit integers, or unusual detector segment counts). Users should <strong>always double-check the suggested settings against the interactive spectrum preview curve</strong> displayed in the import dialog before accepting.</li>
-<li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the <strong><code>N</code></strong> / <strong><code>N-</code></strong> hotkeys.</li>
+<li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or cycle through detectors sequentially on the canvas using the <strong><code>1</code></strong> (next detector) and <strong><code>2</code></strong> (previous detector) numeric macro hotkeys.</li>
 <li><strong>Multi-Spectrum Export (<code>SpectrumExportDialog</code>)</strong>: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.</li>
 </ul>
 </li>
@@ -1242,15 +1242,15 @@ NuTrackN registers OS-level desktop file associations <strong>exclusively for <c
 <h4>Multi-Buffer Overlays &amp; Stepping (Buffers 1–9):</h4>
 <ul>
 <li><strong>Overlay Stack (<code>HijC</code>)</strong>: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.</li>
-<li><strong>Detector / Spectrum Stepping</strong>:<ul>
-<li>Press <strong><code>N</code></strong> (or <strong><code>N+</code></strong> / <strong><code>*1</code></strong>) to advance to the next spectrum/detector in the sequence.</li>
-<li>Press <strong><code>N-</code></strong> (or <strong><code>*2</code></strong>) to step backward to the previous spectrum/detector.</li>
+<li><strong>Detector / Spectrum Stepping in Linked Spectra</strong>:<ul>
+<li>Press <strong><code>1</code></strong> (executes Macro #1 <code>*1</code>): Advance to the next spectrum/detector in the sequence.</li>
+<li>Press <strong><code>2</code></strong> (executes Macro #2 <code>*2</code>): Step backward to the previous spectrum/detector in the sequence.</li>
+<li><em>(Note: Pressing </em><em><code>N</code></em><em> on the canvas opens the Spectrum File Open Dialog. Within macro command strings, the tokens <code>*1</code> or <code>N+</code> advance the spectrum index, and <code>*2</code> or <code>N-</code> decrement it).</em></li>
 </ul>
 </li>
 <li><strong>Run Stepping</strong>:<ul>
-<li>Press <strong><code>*3</code></strong> (or <strong><code>R+</code></strong> / <strong><code>NR</code></strong>) to advance to the next experimental acquisition run.</li>
-<li>Press <strong><code>*4</code></strong> (or <strong><code>R-</code></strong> / <strong><code>PR</code></strong>) to step back to the previous experimental acquisition run.</li>
-<li><em>(Note: On the canvas keyboard, bare digits </em><em><code>0</code>–<code>9</code></em><em> trigger stored numeric macros; see <a href="#103-numeric-macros-0-through-9--repetition-cycles">Section 10.3</a>).</em></li>
+<li>Press <strong><code>3</code></strong> (executes Macro #3 <code>*3</code>): Advance to the next experimental acquisition run file.</li>
+<li>Press <strong><code>4</code></strong> (executes Macro #4 <code>*4</code>): Step back to the previous experimental acquisition run file.</li>
 </ul>
 </li>
 </ul>
@@ -1664,16 +1664,16 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <h3>10.2 Supported Automation Tokens &amp; Command Strings</h3>
 <p>Command strings configured in the <strong>Macro Manager (<code>DM</code>)</strong> accept authentic Xtrackn tokens separated by spaces, commas, or semicolons (e.g., <code>*1; FF; CP; CJ</code> or <code>FX; FY; L; =</code>):
 - <strong>Batch Stepping &amp; Spectrum Navigation Tokens</strong>:
-  - <strong><code>*1</code> / <code>N+</code> / <code>N</code></strong>: Step to the next detector / spectrum buffer.
-  - <strong><code>*2</code> / <code>N-</code></strong>: Step to the previous detector / spectrum buffer.
-  - <strong><code>*3</code> / <code>R+</code> / <code>NR</code></strong>: Step to the next experimental run.
-  - <strong><code>*4</code> / <code>R-</code> / <code>PR</code></strong>: Step to the previous experimental run.
+    - <strong><code>*1</code> / <code>N+</code></strong>: Step to the next detector / spectrum index in a linked/chained file (preset to Macro key <strong><code>1</code></strong>).
+    - <strong><code>*2</code> / <code>N-</code></strong>: Step to the previous detector / spectrum index in a linked/chained file (preset to Macro key <strong><code>2</code></strong>).
+    - <strong><code>*3</code> / <code>R+</code> / <code>NR</code></strong>: Step to the next experimental run (preset to Macro key <strong><code>3</code></strong>).
+    - <strong><code>*4</code> / <code>R-</code> / <code>PR</code></strong>: Step to the previous experimental run (preset to Macro key <strong><code>4</code></strong>).
 - <strong>Fitting &amp; Analysis Tokens</strong>:
-  - <strong><code>CB</code></strong>: Fit linear background across active <code>B</code> markers.
-  - <strong><code>CI</code> / <code>CJ</code></strong>: Integrate spectrum region (CI without background, CJ with linear background subtraction).
-  - <strong><code>AG</code> / <code>AJ</code></strong>: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
-  - <strong><code>CP</code> / <code>MP</code> / <code>ZP</code></strong>: Execute automated peak search (<code>CP</code>), show peak labels (<code>MP</code>), or clear peak markers (<code>ZP</code>).
-  - <strong><code>OR</code> / <code>DR</code> / <code>SSH</code></strong>: Open the Remote Data / SSH Session Manager.
+    - <strong><code>CB</code></strong>: Fit linear background across active <code>B</code> markers.
+    - <strong><code>CI</code> / <code>CJ</code></strong>: Integrate spectrum region (CI without background, CJ with linear background subtraction).
+    - <strong><code>AG</code> / <code>AJ</code></strong>: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
+    - <strong><code>CP</code> / <code>MP</code> / <code>ZP</code></strong>: Execute automated peak search (<code>CP</code>), show peak labels (<code>MP</code>), or clear peak markers (<code>ZP</code>).
+    - <strong><code>OR</code> / <code>DR</code> / <code>SSH</code></strong>: Open the Remote Data / SSH Session Manager.
 - <strong>Nested Macro Calls</strong>: Including a digit <code>0</code>–<code>9</code> inside a command string invokes that sub-macro (up to a recursion depth of 10).</p>
 <h3>10.3 Numeric Macros (0 through 9) &amp; Repetition Cycles</h3>
 <p>Assign frequently repeated command sequences to slots <code>0</code> through <code>9</code>:
@@ -1767,24 +1767,29 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 </thead>
 <tbody>
 <tr>
-<td style="text-align: left;"><strong><code>N</code> / <code>N+</code> / <code>*1</code></strong></td>
+<td style="text-align: left;"><strong><code>N</code></strong></td>
+<td style="text-align: left;"><strong>Open Spectrum Dialog</strong></td>
+<td style="text-align: left;">Open the spectrum file dialog (<code>NuFileDialog</code>)</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>1</code> (Macro 1 / <code>*1</code>)</strong></td>
 <td style="text-align: left;"><strong>Next Spectrum / Det</strong></td>
-<td style="text-align: left;">Open or step to the next 1D spectrum / detector</td>
+<td style="text-align: left;">Advance to next spectrum / detector index in linked/chained file</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong><code>N-</code> / <code>*2</code></strong></td>
+<td style="text-align: left;"><strong><code>2</code> (Macro 2 / <code>*2</code>)</strong></td>
 <td style="text-align: left;"><strong>Prev Spectrum / Det</strong></td>
-<td style="text-align: left;">Step to the previous 1D spectrum / detector</td>
+<td style="text-align: left;">Step to previous spectrum / detector index in linked/chained file</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong><code>*3</code> / <code>R+</code> / <code>NR</code></strong></td>
+<td style="text-align: left;"><strong><code>3</code> (Macro 3 / <code>*3</code>)</strong></td>
 <td style="text-align: left;"><strong>Next Run</strong></td>
-<td style="text-align: left;">Increment experimental run number</td>
+<td style="text-align: left;">Increment to next experimental acquisition run file</td>
 </tr>
 <tr>
-<td style="text-align: left;"><strong><code>*4</code> / <code>R-</code> / <code>PR</code></strong></td>
+<td style="text-align: left;"><strong><code>4</code> (Macro 4 / <code>*4</code>)</strong></td>
 <td style="text-align: left;"><strong>Previous Run</strong></td>
-<td style="text-align: left;">Decrement experimental run number</td>
+<td style="text-align: left;">Decrement to previous experimental acquisition run file</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong><code>OR</code> / <code>DR</code> / <code>SSH</code></strong></td>
