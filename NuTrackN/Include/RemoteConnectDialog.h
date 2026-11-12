@@ -54,8 +54,11 @@ private:
     QLineEdit    *m_editUser{nullptr};
     QRadioButton *m_radioKeyAuth{nullptr};
     QRadioButton *m_radioPassAuth{nullptr};
+    QLabel       *m_lblKey{nullptr};
+    QWidget      *m_containerKey{nullptr};
     QLineEdit    *m_editKeyFile{nullptr};
     QPushButton  *m_btnBrowseKey{nullptr};
+    QLabel       *m_lblPass{nullptr};
     QLineEdit    *m_editPassword{nullptr};
     QLineEdit    *m_editStartDir{nullptr};
 

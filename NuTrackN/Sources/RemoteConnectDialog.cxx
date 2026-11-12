@@ -58,7 +58,7 @@ void RemoteConnectDialog::setupUI()
     mainLayout->addWidget(lblTitle);
 
     // 3. Profile Selection Bar
-    QGroupBox *grpProfile = new QGroupBox(tr("Saved Profiles & Bookmarks"), this);
+    QGroupBox *grpProfile = new QGroupBox(tr("Saved Profiles && Bookmarks"), this);
     QHBoxLayout *profileLayout = new QHBoxLayout(grpProfile);
     profileLayout->setSpacing(6);
 
@@ -89,7 +89,7 @@ void RemoteConnectDialog::setupUI()
     mainLayout->addWidget(grpProfile);
 
     // 4. Connection Parameters Group
-    QGroupBox *grpParams = new QGroupBox(tr("Host & Authentication Details"), this);
+    QGroupBox *grpParams = new QGroupBox(tr("Host && Authentication Details"), this);
     QGridLayout *grid = new QGridLayout(grpParams);
     grid->setSpacing(8);
 
@@ -145,36 +145,39 @@ void RemoteConnectDialog::setupUI()
     authRadioLayout->addStretch(1);
     grid->addLayout(authRadioLayout, 3, 1, 1, 3);
 
-    // SSH Key file row
-    QLabel *lblKey = new QLabel(tr("Private Key File:"), grpParams);
-    grid->addWidget(lblKey, 4, 0);
-    QHBoxLayout *keyLayout = new QHBoxLayout();
-    m_editKeyFile = new QLineEdit(grpParams);
+    // Row 4: Private Key Widgets OR Password Widgets (swapped dynamically)
+    m_lblKey = new QLabel(tr("Private Key File:"), grpParams);
+    grid->addWidget(m_lblKey, 4, 0);
+
+    m_containerKey = new QWidget(grpParams);
+    QHBoxLayout *keyLayout = new QHBoxLayout(m_containerKey);
+    keyLayout->setContentsMargins(0, 0, 0, 0);
+    keyLayout->setSpacing(6);
+    m_editKeyFile = new QLineEdit(m_containerKey);
     m_editKeyFile->setFont(dlgFont);
     m_editKeyFile->setPlaceholderText(tr("~/.ssh/id_ed25519 or ~/.ssh/id_rsa"));
-    m_btnBrowseKey = new QPushButton(tr("Browse..."), grpParams);
+    m_btnBrowseKey = new QPushButton(tr("Browse..."), m_containerKey);
     m_btnBrowseKey->setFont(dlgFont);
     m_btnBrowseKey->setAutoDefault(false);
     connect(m_btnBrowseKey, &QPushButton::clicked, this, &RemoteConnectDialog::onBrowseKeyFileClicked);
     keyLayout->addWidget(m_editKeyFile, 1);
     keyLayout->addWidget(m_btnBrowseKey);
-    grid->addLayout(keyLayout, 4, 1, 1, 3);
+    grid->addWidget(m_containerKey, 4, 1, 1, 3);
 
-    // Password row
-    QLabel *lblPass = new QLabel(tr("Password / Passphrase:"), grpParams);
-    grid->addWidget(lblPass, 5, 0);
+    m_lblPass = new QLabel(tr("Password:"), grpParams);
+    grid->addWidget(m_lblPass, 4, 0);
     m_editPassword = new QLineEdit(grpParams);
     m_editPassword->setFont(dlgFont);
     m_editPassword->setEchoMode(QLineEdit::Password);
-    m_editPassword->setPlaceholderText(tr("Remote account password or private key passphrase"));
-    grid->addWidget(m_editPassword, 5, 1, 1, 3);
+    m_editPassword->setPlaceholderText(tr("Remote account password"));
+    grid->addWidget(m_editPassword, 4, 1, 1, 3);
 
-    // Remote Default / Last Used Folder
-    grid->addWidget(new QLabel(tr("Remote Working Dir:"), grpParams), 6, 0);
+    // Row 5: Remote Default / Last Used Folder
+    grid->addWidget(new QLabel(tr("Remote Working Dir:"), grpParams), 5, 0);
     m_editStartDir = new QLineEdit(grpParams);
     m_editStartDir->setFont(dlgFont);
     m_editStartDir->setPlaceholderText(tr("e.g. /home/data/runs"));
-    grid->addWidget(m_editStartDir, 6, 1, 1, 3);
+    grid->addWidget(m_editStartDir, 5, 1, 1, 3);
 
     mainLayout->addWidget(grpParams);
 
@@ -364,10 +367,11 @@ void RemoteConnectDialog::onBrowseKeyFileClicked()
 void RemoteConnectDialog::onAuthTypeChanged()
 {
     bool isKey = m_radioKeyAuth->isChecked();
-    m_editKeyFile->setEnabled(isKey);
-    m_btnBrowseKey->setEnabled(isKey);
-    m_editPassword->setPlaceholderText(isKey ? tr("Passphrase for private key (optional)")
-                                             : tr("Remote account password"));
+    if (m_lblKey) m_lblKey->setVisible(isKey);
+    if (m_containerKey) m_containerKey->setVisible(isKey);
+
+    if (m_lblPass) m_lblPass->setVisible(!isKey);
+    if (m_editPassword) m_editPassword->setVisible(!isKey);
 }
 
 void RemoteConnectDialog::updateSessionStateDisplay()
