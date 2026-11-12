@@ -502,7 +502,7 @@ NuTrackN eliminates these friction points by running 100% natively on your local
     - **Authentication Mode**:
         - **SSH Private Key (Recommended)**: Select this radio button. NuTrackN automatically displays the **Private Key File** field. Click **`Browse...`** and select your local private key (default: `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`).
         - **Password**: Select this option if key-based authentication is disabled on the remote server. NuTrackN dynamically switches the input field to a masked **Password** input.
-    - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`).
+    - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`). If left empty, it automatically defaults to the remote root directory (`/`).
 3. **Verify Connection (`⚡ Test / Verify Connection`)**:
     - Click **`⚡ Test / Verify Connection`**. NuTrackN performs an immediate pre-flight handshake in the background:
         - Tests socket reachability and TCP round-trip latency.

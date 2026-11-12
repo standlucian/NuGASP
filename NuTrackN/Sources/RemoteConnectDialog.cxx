@@ -176,7 +176,7 @@ void RemoteConnectDialog::setupUI()
     grid->addWidget(new QLabel(tr("Remote Working Dir:"), grpParams), 5, 0);
     m_editStartDir = new QLineEdit(grpParams);
     m_editStartDir->setFont(dlgFont);
-    m_editStartDir->setPlaceholderText(tr("e.g. /home/data/runs"));
+    m_editStartDir->setPlaceholderText(tr("Default: / (or e.g. /home/data/runs)"));
     grid->addWidget(m_editStartDir, 5, 1, 1, 3);
 
     mainLayout->addWidget(grpParams);
@@ -381,7 +381,7 @@ void RemoteConnectDialog::updateSessionStateDisplay()
         QString hostDisp = QString("%1@%2:%3").arg(prof.user, prof.host).arg(prof.port);
         QString dirDisp = m_session->getCurrentRemoteDir();
         if (dirDisp.isEmpty()) dirDisp = prof.lastUsedPath;
-        if (dirDisp.isEmpty()) dirDisp = "/home/" + prof.user;
+        if (dirDisp.isEmpty()) dirDisp = "/";
 
         m_lblSessionBanner->setText(QString("● <b>Active SSH Session:</b> <span style='color: #81c784;'>Connected to %1</span> | Directory: <i>%2</i>")
                                         .arg(hostDisp, dirDisp));

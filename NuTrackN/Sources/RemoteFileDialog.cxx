@@ -40,7 +40,7 @@ RemoteFileDialog::RemoteFileDialog(std::shared_ptr<RemoteSession> session, QWidg
             initialDir = m_session->getProfile().lastUsedPath;
         }
         if (initialDir.isEmpty()) {
-            initialDir = "/home/" + m_session->getProfile().user;
+            initialDir = "/";
         }
         loadDirectory(initialDir);
     }
@@ -301,7 +301,8 @@ void RemoteFileDialog::onNavigateUp()
 void RemoteFileDialog::onNavigateHome()
 {
     if (!m_session) return;
-    QString home = "/home/" + m_session->getProfile().user;
+    QString user = m_session->getProfile().user;
+    QString home = (user == "root") ? "/root" : ("/home/" + user);
     loadDirectory(home);
 }
 

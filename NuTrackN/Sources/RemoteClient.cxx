@@ -312,10 +312,10 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
 
     m_connected = true;
 
-    // Determine starting directory: profile.lastUsedPath or user home dir '.'
+    // Determine starting directory: profile.lastUsedPath or root '/'
     QString startDir = profile.lastUsedPath.trimmed();
     if (startDir.isEmpty()) {
-        startDir = "/home/" + profile.user;
+        startDir = "/";
     }
     m_currentRemoteDir = sanitizePath(startDir);
 
@@ -479,7 +479,7 @@ bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDet
     // Check remote working directory
     QString targetDir = profile.lastUsedPath.trimmed();
     if (targetDir.isEmpty()) {
-        targetDir = "/home/" + profile.user;
+        targetDir = "/";
     }
 
     std::vector<RemoteFileInfo> entries;
