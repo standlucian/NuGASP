@@ -568,26 +568,23 @@ Once an SSH session is authenticated, NuTrackN's remote SFTP subsystem is global
 NuTrackN operates strictly and natively on the fundamental data structures of nuclear spectroscopy without relying on bloated proprietary container formats:
 
 1. **2D Compressed Coincidence Matrices (`.cmat`)**:
-   - High-density symmetrized $\gamma$-$\gamma$ coincidence matrices from the GASP / GASPware analysis suite.
-   - Handled directly by NuTrackN's integrated C matrix compression library (`complib`).
-   - Registered as NuTrackN's official OS desktop file association (`application/x-gasp-matrix`). Double-clicking a `.cmat` file in your desktop file manager opens it directly in NuTrackN.
-
+    - High-density symmetrized $\gamma$-$\gamma$ coincidence matrices from the GASP / GASPware analysis suite.
+    - Handled directly by NuTrackN's integrated C matrix compression library (`complib`).
+    - Registered as NuTrackN's official OS desktop file association (`application/x-gasp-matrix`). Double-clicking a `.cmat` file in your desktop file manager opens it directly in NuTrackN.
 2. **1D Binary Spectra (Raw Streams / Unheadered)**:
-   - **32-bit Integer (`LongInt32` / `long`)**: Standard 4 bytes per channel (`uint32_t` / `int32_t`). The native standard for NuTrackN/XTrackN (typically 4096, 8192, 10240, 16384, 32768, or 65536 channels).
-   - **16-bit Integer (`ShortInt16` / `short`)**: Compact 2 bytes per channel (`uint16_t` / `int16_t`).
-   - **32-bit Float (`Float32` / `float`)**: Single-precision IEEE 754 floating point (4 bytes per channel), common for efficiency-corrected or background-subtracted spectra.
-   - **64-bit Float (`Double64` / `double`)**: Double-precision IEEE 754 floating point (8 bytes per channel), used for high-precision analytical calculations.
-
+    - **32-bit Integer (`LongInt32` / `long`)**: Standard 4 bytes per channel (`uint32_t` / `int32_t`). The native standard for NuTrackN/XTrackN (typically 4096, 8192, 10240, 16384, 32768, or 65536 channels).
+    - **16-bit Integer (`ShortInt16` / `short`)**: Compact 2 bytes per channel (`uint16_t` / `int16_t`).
+    - **32-bit Float (`Float32` / `float`)**: Single-precision IEEE 754 floating point (4 bytes per channel), common for efficiency-corrected or background-subtracted spectra.
+    - **64-bit Float (`Double64` / `double`)**: Double-precision IEEE 754 floating point (8 bytes per channel), used for high-precision analytical calculations.
 3. **1D ASCII Spectra (`.txt`, `.dat`, `.asc`, etc.)**:
-   - Plain text whitespace-, tab-, or comma-separated numeric counts.
-   - Supports both single-column counts ($Y$ only) and two-column channel/counts ($X, Y$).
-   - Automatic line skipping for commentary or metadata headers starting with `#`, `!`, `;`, or `$`.
-
+    - Plain text whitespace-, tab-, or comma-separated numeric counts.
+    - Supports both single-column counts ($Y$ only) and two-column channel/counts ($X, Y$).
+    - Automatic line skipping for commentary or metadata headers starting with `#`, `!`, `;`, or `$`.
 4. **Single vs. Chained (Multi-Spectrum) Files**:
-   - Both binary and ASCII files can contain either a **single spectrum** or **multiple chained/concatenated spectra** (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).
-   - **Automatic Heuristic Detection**: Upon selection, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10240, 16k, 32k, 64k) to determine the format, channel length, and number of chained spectra automatically.
-   - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the **`N`** / **`N-`** hotkeys.
-   - **Multi-Spectrum Export (`SpectrumExportDialog`)**: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.
+    - Both binary and ASCII files can contain either a **single spectrum** or **multiple chained/concatenated spectra** (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).
+    - **Automatic Heuristic Detection**: Upon selection, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10240, 16k, 32k, 64k) to determine the format, channel length, and number of chained spectra automatically.
+    - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the **`N`** / **`N-`** hotkeys.
+    - **Multi-Spectrum Export (`SpectrumExportDialog`)**: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.
 
 > [!NOTE]
 > **Operating System File Association Policy:**  

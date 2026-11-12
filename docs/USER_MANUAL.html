@@ -1167,36 +1167,32 @@ cat ~/.ssh/id_ed25519.pub | ssh user@192.168.1.xxx "mkdir -p ~/.ssh &amp;&amp; c
 <h3>3.2 Supported Nuclear Spectroscopy Formats &amp; File Types</h3>
 <p>NuTrackN operates strictly and natively on the fundamental data structures of nuclear spectroscopy without relying on bloated proprietary container formats:</p>
 <ol>
-<li><strong>2D Compressed Coincidence Matrices (<code>.cmat</code>)</strong>:</li>
+<li><strong>2D Compressed Coincidence Matrices (<code>.cmat</code>)</strong>:<ul>
 <li>High-density symmetrized $\gamma$-$\gamma$ coincidence matrices from the GASP / GASPware analysis suite.</li>
 <li>Handled directly by NuTrackN's integrated C matrix compression library (<code>complib</code>).</li>
-<li>
-<p>Registered as NuTrackN's official OS desktop file association (<code>application/x-gasp-matrix</code>). Double-clicking a <code>.cmat</code> file in your desktop file manager opens it directly in NuTrackN.</p>
+<li>Registered as NuTrackN's official OS desktop file association (<code>application/x-gasp-matrix</code>). Double-clicking a <code>.cmat</code> file in your desktop file manager opens it directly in NuTrackN.</li>
+</ul>
 </li>
-<li>
-<p><strong>1D Binary Spectra (Raw Streams / Unheadered)</strong>:</p>
-</li>
+<li><strong>1D Binary Spectra (Raw Streams / Unheadered)</strong>:<ul>
 <li><strong>32-bit Integer (<code>LongInt32</code> / <code>long</code>)</strong>: Standard 4 bytes per channel (<code>uint32_t</code> / <code>int32_t</code>). The native standard for NuTrackN/XTrackN (typically 4096, 8192, 10240, 16384, 32768, or 65536 channels).</li>
 <li><strong>16-bit Integer (<code>ShortInt16</code> / <code>short</code>)</strong>: Compact 2 bytes per channel (<code>uint16_t</code> / <code>int16_t</code>).</li>
 <li><strong>32-bit Float (<code>Float32</code> / <code>float</code>)</strong>: Single-precision IEEE 754 floating point (4 bytes per channel), common for efficiency-corrected or background-subtracted spectra.</li>
-<li>
-<p><strong>64-bit Float (<code>Double64</code> / <code>double</code>)</strong>: Double-precision IEEE 754 floating point (8 bytes per channel), used for high-precision analytical calculations.</p>
+<li><strong>64-bit Float (<code>Double64</code> / <code>double</code>)</strong>: Double-precision IEEE 754 floating point (8 bytes per channel), used for high-precision analytical calculations.</li>
+</ul>
 </li>
-<li>
-<p><strong>1D ASCII Spectra (<code>.txt</code>, <code>.dat</code>, <code>.asc</code>, etc.)</strong>:</p>
-</li>
+<li><strong>1D ASCII Spectra (<code>.txt</code>, <code>.dat</code>, <code>.asc</code>, etc.)</strong>:<ul>
 <li>Plain text whitespace-, tab-, or comma-separated numeric counts.</li>
 <li>Supports both single-column counts ($Y$ only) and two-column channel/counts ($X, Y$).</li>
-<li>
-<p>Automatic line skipping for commentary or metadata headers starting with <code>#</code>, <code>!</code>, <code>;</code>, or <code>$</code>.</p>
+<li>Automatic line skipping for commentary or metadata headers starting with <code>#</code>, <code>!</code>, <code>;</code>, or <code>$</code>.</li>
+</ul>
 </li>
-<li>
-<p><strong>Single vs. Chained (Multi-Spectrum) Files</strong>:</p>
-</li>
+<li><strong>Single vs. Chained (Multi-Spectrum) Files</strong>:<ul>
 <li>Both binary and ASCII files can contain either a <strong>single spectrum</strong> or <strong>multiple chained/concatenated spectra</strong> (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).</li>
 <li><strong>Automatic Heuristic Detection</strong>: Upon selection, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10240, 16k, 32k, 64k) to determine the format, channel length, and number of chained spectra automatically.</li>
 <li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or step through detectors sequentially on the canvas using the <strong><code>N</code></strong> / <strong><code>N-</code></strong> hotkeys.</li>
 <li><strong>Multi-Spectrum Export (<code>SpectrumExportDialog</code>)</strong>: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.</li>
+</ul>
+</li>
 </ol>
 <div class="alert alert-note"><div class="alert-title">NOTE</div>
 <p><strong>Operating System File Association Policy:</strong><br />
