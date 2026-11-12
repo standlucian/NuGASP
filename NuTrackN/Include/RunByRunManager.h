@@ -150,6 +150,9 @@ private slots:
     void onProgressUpdated(int percent, const QString &statusText);
     void onBatchFinished(bool cancelled, int totalSuccess, int totalFailures);
 
+protected:
+    void closeEvent(QCloseEvent *e) override;
+
 private:
     void setupUI();
     void discoverRuns();

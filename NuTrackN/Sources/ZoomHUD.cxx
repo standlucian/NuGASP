@@ -29,7 +29,7 @@ QZoomHUD::QZoomHUD(QWidget *parent)
       m_maxCount(1.0),
       m_hasFit(false)
 {
-    setFixedSize(320, 195);
+    setFixedSize(360, 230);
     setAttribute(Qt::WA_TransparentForMouseEvents, true);
     setAttribute(Qt::WA_ShowWithoutActivating, true);
     setAttribute(Qt::WA_TranslucentBackground, false);
@@ -40,7 +40,8 @@ void QZoomHUD::updateData(TH1F *hist, int targetBin, double energy, bool isCalib
                          const std::vector<double> &fitCurve,
                          const std::vector<double> &bkgCurve,
                          bool hasFit,
-                         const QString &fitInfo)
+                         const QString &fitInfo,
+                         int halfRange)
 {
     if (!hist || targetBin < 1 || targetBin > hist->GetNbinsX()) {
         m_targetBin = 0;
@@ -59,9 +60,9 @@ void QZoomHUD::updateData(TH1F *hist, int targetBin, double energy, bool isCalib
     m_isCalibrated = isCalibrated;
 
     const int nBins = hist->GetNbinsX();
-    const int halfRange = 25; // +/- 25 channels around target
-    m_startBin = std::max(1, targetBin - halfRange);
-    m_endBin = std::min(nBins, targetBin + halfRange);
+    const int actualHalfRange = (halfRange > 3) ? halfRange : 25; // default +/- 25 channels around target
+    m_startBin = std::max(1, targetBin - actualHalfRange);
+    m_endBin = std::min(nBins, targetBin + actualHalfRange);
 
     m_counts.clear();
     m_maxCount = 1.0;
@@ -100,37 +101,56 @@ void QZoomHUD::paintEvent(QPaintEvent *)
 
     // 1. Semi-transparent dark rounded container
     QRectF bgRect(1.0, 1.0, w - 2.0, h - 2.0);
-    painter.setPen(QPen(QColor(51, 153, 255, 220), 1.5));
-    painter.setBrush(QColor(22, 24, 29));
+    painter.setPen(QPen(QColor(51, 153, 255, 200), 1.5));
+    painter.setBrush(QColor(18, 20, 26, 245));
     painter.drawRoundedRect(bgRect, 8.0, 8.0);
 
     // 2. Top Header / Target readout
-    painter.setPen(QColor(255, 255, 255, 220));
     QFont headerFont = Design::getGraphFont();
     headerFont.setPointSize(10);
     headerFont.setBold(true);
-    painter.setFont(headerFont);
-    painter.drawText(QRectF(10, 8, 140, 20), Qt::AlignLeft | Qt::AlignVCenter, "🎯 AutoFit Target");
+    QFontMetrics fmHeader(headerFont);
 
-    // Fit status badge in top right of header
-    if (m_hasFit && !m_fitInfo.isEmpty()) {
-        QFont badgeFont = Design::getGraphFont();
-        badgeFont.setPointSize(8);
-        badgeFont.setBold(true);
-        painter.setFont(badgeFont);
-        QFontMetrics fm(badgeFont);
-        int badgeTextW = fm.horizontalAdvance(m_fitInfo);
-        int badgeW = badgeTextW + 14;
-        int badgeH = 18;
-        QRectF badgeRect(w - badgeW - 12, 8, badgeW, badgeH);
+    QFont badgeFont = Design::getGraphFont();
+    badgeFont.setPointSize(8);
+    badgeFont.setBold(true);
+    QFontMetrics fmBadge(badgeFont);
+
+    const QString titleText = m_headerTitle.isEmpty() ? "🎯 AutoFit Target" : m_headerTitle;
+
+    // Sanitize and simplify fit info to a single line
+    QString cleanFitInfo = m_fitInfo;
+    cleanFitInfo.replace('\n', "  •  ");
+    cleanFitInfo = cleanFitInfo.simplified();
+
+    int badgeW = 0;
+    if (m_hasFit && !cleanFitInfo.isEmpty()) {
+        int textW = fmBadge.horizontalAdvance(cleanFitInfo);
+        const int maxBadgeW = static_cast<int>(w * 0.45);
+        if (textW + 16 > maxBadgeW) {
+            cleanFitInfo = fmBadge.elidedText(cleanFitInfo, Qt::ElideRight, maxBadgeW - 16);
+            textW = fmBadge.horizontalAdvance(cleanFitInfo);
+        }
+        badgeW = textW + 14;
+        const int badgeH = 20;
+        QRectF badgeRect(w - badgeW - 12, 7, badgeW, badgeH);
 
         painter.setPen(QPen(QColor(255, 170, 0, 220), 1.2));
         painter.setBrush(QColor(255, 150, 0, 45));
         painter.drawRoundedRect(badgeRect, 4.0, 4.0);
         painter.setPen(QColor(255, 195, 50));
-        painter.drawText(badgeRect, Qt::AlignCenter, m_fitInfo);
+        painter.drawText(badgeRect, Qt::AlignCenter, cleanFitInfo);
     }
 
+    // Title on the left, strictly constrained so it never overlaps the badge
+    const qreal maxTitleW = (badgeW > 0) ? (w - badgeW - 28) : (w - 24);
+    QRectF titleRect(12, 7, maxTitleW, 20);
+    painter.setPen(QColor(255, 255, 255, 230));
+    painter.setFont(headerFont);
+    painter.drawText(titleRect, Qt::AlignLeft | Qt::AlignVCenter,
+                     fmHeader.elidedText(titleText, Qt::ElideRight, maxTitleW));
+
+    // Subheader readout: Target Channel, Energy, and Counts
     QFont readoutFont = Design::getGraphFont();
     readoutFont.setPointSize(9);
     painter.setFont(readoutFont);
@@ -146,14 +166,14 @@ void QZoomHUD::paintEvent(QPaintEvent *)
                       .arg(ch)
                       .arg(static_cast<long long>(std::round(m_targetCounts)));
     }
-    painter.setPen(QColor(0, 240, 255));
-    painter.drawText(QRectF(10, 28, w - 20, 18), Qt::AlignLeft | Qt::AlignVCenter, readout);
+    painter.setPen(QColor(0, 230, 255));
+    painter.drawText(QRectF(12, 29, w - 24, 18), Qt::AlignLeft | Qt::AlignVCenter, readout);
 
     // 3. Plot Area
     const qreal plotLeft = 14.0;
     const qreal plotRight = w - 14.0;
     const qreal plotTop = 50.0;
-    const qreal plotBottom = h - 26.0;
+    const qreal plotBottom = h - 25.0;
     const qreal plotW = plotRight - plotLeft;
     const qreal plotH = plotBottom - plotTop;
 

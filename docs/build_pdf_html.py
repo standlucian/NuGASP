@@ -1,0 +1,449 @@
+#!/usr/bin/env python3
+"""
+NuTrackN Manual to Print-Ready HTML & PDF Generator
+Converts docs/USER_MANUAL.md into docs/USER_MANUAL.html with:
+- KaTeX LaTeX math support
+- Forced page breaks before Table of Contents, after Table of Contents, and before every Chapter
+- Professional typography, GitHub-style alerts, and print-optimized CSS
+"""
+
+import os
+import re
+import sys
+import markdown
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+MD_PATH = os.path.join(SCRIPT_DIR, "USER_MANUAL.md")
+HTML_PATH = os.path.join(SCRIPT_DIR, "USER_MANUAL.html")
+
+def build_html():
+    if not os.path.exists(MD_PATH):
+        print(f"Error: {MD_PATH} not found.")
+        sys.exit(1)
+
+    with open(MD_PATH, "r", encoding="utf-8") as f:
+        md_text = f.read()
+
+    # Step 1: Protect LaTeX math formulas from Markdown formatting
+    math_store = []
+    def save_math(m):
+        idx = len(math_store)
+        math_store.append(m.group(0))
+        return f"KZMATHPLACEHOLDER{idx}ENDKZ"
+
+    # Display math ($$...$$) first, then inline math ($...$)
+    protected = re.sub(r"\$\$[\s\S]*?\$\$", save_math, md_text)
+    protected = re.sub(r"(?<!\\)\$([^\$\n]+?)(?<!\\)\$", save_math, protected)
+
+    # Step 2: Extract Title Page, Table of Contents, and Chapter Bodies separately
+    # This prevents Python-Markdown from failing to parse markdown inside <div> wrappers!
+    toc_match = re.search(r"(## Table of Contents[\s\S]*?)(?=\n---\n\n## 1\. )", protected)
+    if toc_match:
+        title_raw = protected[:toc_match.start()].strip()
+        # Clean trailing --- from title
+        title_raw = re.sub(r"\n---\s*$", "", title_raw).strip()
+        
+        toc_raw = toc_match.group(1).strip()
+        rest_raw = protected[toc_match.end():].strip()
+        # Clean leading --- from rest
+        rest_raw = re.sub(r"^---\s*", "", rest_raw).strip()
+    else:
+        title_raw = ""
+        toc_raw = ""
+        rest_raw = protected
+
+    # Step 3: Tag each chapter heading (## <number>. ...) with .chapter-heading
+    def tag_chapter(m):
+        num = m.group(1)
+        title = m.group(2)
+        slug = re.sub(r"[^\w\- ]", "", f"{num} {title}").strip().lower().replace(" ", "-")
+        return f'<h2 id="{slug}" class="chapter-heading">{num}. {title}</h2>'
+
+    tagged_rest = re.sub(r"^##\s+(\d+)\.\s+(.*)$", tag_chapter, rest_raw, flags=re.MULTILINE)
+
+    # Step 4: Convert Markdown pieces to HTML separately
+    md_extensions = ["tables", "fenced_code"]
+    title_html = markdown.markdown(title_raw, extensions=md_extensions)
+    toc_html = markdown.markdown(toc_raw, extensions=md_extensions)
+    rest_html = markdown.markdown(tagged_rest, extensions=md_extensions)
+
+    # Combine with appropriate wrapper divs
+    combined_html = (
+        f'<div class="title-page">\n{title_html}\n</div>\n\n'
+        f'<div class="toc-section">\n{toc_html}\n</div>\n\n'
+        f'<div class="content-body">\n{rest_html}\n</div>\n'
+    )
+
+    # Step 5: Restore LaTeX math
+    def restore_math(m):
+        idx = int(m.group(1))
+        return math_store[idx]
+
+    restored_body = re.sub(r"KZMATHPLACEHOLDER(\d+)ENDKZ", restore_math, combined_html)
+
+    # Step 6: Convert GitHub style alert blockquotes
+    alert_patterns = [
+        (r'<blockquote>\s*<p>\s*\[!NOTE\]\s*', '<div class="alert alert-note"><div class="alert-title">NOTE</div><p>'),
+        (r'<blockquote>\s*<p>\s*\[!TIP\]\s*', '<div class="alert alert-tip"><div class="alert-title">TIP</div><p>'),
+        (r'<blockquote>\s*<p>\s*\[!IMPORTANT\]\s*', '<div class="alert alert-important"><div class="alert-title">IMPORTANT</div><p>'),
+        (r'<blockquote>\s*<p>\s*\[!WARNING\]\s*', '<div class="alert alert-warning"><div class="alert-title">WARNING</div><p>'),
+        (r'<blockquote>\s*<p>\s*\[!CAUTION\]\s*', '<div class="alert alert-caution"><div class="alert-title">CAUTION</div><p>')
+    ]
+    for pattern, replacement in alert_patterns:
+        restored_body = re.sub(pattern, replacement, restored_body)
+    restored_body = re.sub(r'(<div class="alert alert-[^>]+>[\s\S]*?)(</blockquote>)', r'\1</div>', restored_body)
+
+    # Step 7: Construct complete print-ready HTML document
+    full_html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>NuTrackN User Manual (Version 2.0)</title>
+  
+  <!-- KaTeX for rendering formulas -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"
+          onload="renderMathInElement(document.body, {{
+            delimiters: [
+              {{left: '$$', right: '$$', display: true}},
+              {{left: '$', right: '$', display: false}}
+            ],
+            throwOnError: false
+          }});"></script>
+
+  <style>
+    /* ----------------------------------------------------
+       BASE TYPOGRAPHY & COLORS
+       ---------------------------------------------------- */
+    :root {{
+      --text-color: #1e293b;
+      --bg-color: #ffffff;
+      --heading-color: #0f172a;
+      --accent-color: #0284c7;
+      --border-color: #cbd5e1;
+      --table-stripe: #f8fafc;
+      --code-bg: #f1f5f9;
+    }}
+
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 11pt;
+      line-height: 1.6;
+      color: var(--text-color);
+      background-color: var(--bg-color);
+      margin: 0;
+      padding: 0;
+    }}
+
+    .container {{
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 40px 30px;
+    }}
+
+    /* ----------------------------------------------------
+       HEADINGS & SECTIONS
+       ---------------------------------------------------- */
+    h1, h2, h3, h4, h5, h6 {{
+      color: var(--heading-color);
+      font-weight: 700;
+      margin-top: 1.5em;
+      margin-bottom: 0.6em;
+      line-height: 1.3;
+    }}
+
+    h1 {{
+      font-size: 26pt;
+      border-bottom: 2px solid var(--accent-color);
+      padding-bottom: 0.3em;
+      margin-top: 0;
+    }}
+
+    h2 {{
+      font-size: 18pt;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.25em;
+      margin-top: 2em;
+    }}
+
+    h3 {{
+      font-size: 14pt;
+      color: #0369a1;
+      margin-top: 1.5em;
+    }}
+
+    h4 {{
+      font-size: 12pt;
+      color: #334155;
+      margin-top: 1.2em;
+    }}
+
+    p {{
+      margin: 0.8em 0;
+    }}
+
+    /* ----------------------------------------------------
+       TITLE PAGE STYLING
+       ---------------------------------------------------- */
+    .title-page {{
+      text-align: center;
+      padding: 60px 20px 40px 20px;
+      margin-bottom: 30px;
+    }}
+
+    .title-page h1 {{
+      font-size: 28pt;
+      color: #0f172a;
+      border-bottom: 3px solid var(--accent-color);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }}
+
+    .title-page p {{
+      font-size: 12.5pt;
+      color: #475569;
+      margin: 10px 0;
+    }}
+
+    /* ----------------------------------------------------
+       TABLE OF CONTENTS STYLING
+       ---------------------------------------------------- */
+    .toc-section {{
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 30px 40px;
+      margin: 30px 0 50px 0;
+    }}
+
+    .toc-section h2 {{
+      margin-top: 0;
+      border-bottom: 2px solid var(--accent-color);
+      color: #0f172a;
+      padding-bottom: 10px;
+    }}
+
+    .toc-section ul {{
+      list-style-type: none;
+      padding-left: 20px;
+      margin: 4px 0;
+    }}
+
+    .toc-section > ul {{
+      padding-left: 0;
+    }}
+
+    .toc-section li {{
+      margin: 5px 0;
+      line-height: 1.45;
+    }}
+
+    .toc-section a {{
+      color: #0284c7;
+      text-decoration: none;
+      font-weight: 500;
+    }}
+
+    .toc-section a:hover {{
+      text-decoration: underline;
+    }}
+
+    /* ----------------------------------------------------
+       TABLES
+       ---------------------------------------------------- */
+    table {{
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1.2em 0;
+      font-size: 10pt;
+    }}
+
+    th, td {{
+      padding: 8px 12px;
+      border: 1px solid var(--border-color);
+      text-align: left;
+    }}
+
+    th {{
+      background-color: #f1f5f9;
+      font-weight: 700;
+      color: #1e293b;
+    }}
+
+    tr:nth-child(even) {{
+      background-color: var(--table-stripe);
+    }}
+
+    /* ----------------------------------------------------
+       CODE & PRE
+       ---------------------------------------------------- */
+    code {{
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      font-size: 9.5pt;
+      background-color: var(--code-bg);
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #0f172a;
+      border: 1px solid #e2e8f0;
+    }}
+
+    pre {{
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 14px 18px;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-size: 9.5pt;
+      line-height: 1.45;
+    }}
+
+    pre code {{
+      background-color: transparent;
+      color: inherit;
+      border: none;
+      padding: 0;
+    }}
+
+    /* ----------------------------------------------------
+       ALERTS & CALLOUTS
+       ---------------------------------------------------- */
+    .alert {{
+      border-left: 4px solid #94a3b8;
+      background-color: #f8fafc;
+      padding: 12px 18px;
+      margin: 1.2em 0;
+      border-radius: 0 6px 6px 0;
+    }}
+
+    .alert-title {{
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 9pt;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }}
+
+    .alert-note {{
+      border-left-color: #3b82f6;
+      background-color: #eff6ff;
+    }}
+    .alert-note .alert-title {{ color: #1d4ed8; }}
+
+    .alert-tip {{
+      border-left-color: #10b981;
+      background-color: #ecfdf5;
+    }}
+    .alert-tip .alert-title {{ color: #047857; }}
+
+    .alert-important {{
+      border-left-color: #8b5cf6;
+      background-color: #f5f3ff;
+    }}
+    .alert-important .alert-title {{ color: #6d28d9; }}
+
+    .alert-warning {{
+      border-left-color: #f59e0b;
+      background-color: #fffbeb;
+    }}
+    .alert-warning .alert-title {{ color: #b45309; }}
+
+    .alert-caution {{
+      border-left-color: #ef4444;
+      background-color: #fef2f2;
+    }}
+    .alert-caution .alert-title {{ color: #b91c1c; }}
+
+    blockquote {{
+      border-left: 4px solid var(--border-color);
+      margin: 1em 0;
+      padding: 8px 16px;
+      color: #475569;
+      background-color: #f8fafc;
+    }}
+
+    /* ----------------------------------------------------
+       PRINT & PAGE BREAK RULES
+       ---------------------------------------------------- */
+    @media print {{
+      @page {{
+        size: A4;
+        margin: 18mm 15mm 20mm 15mm;
+      }}
+
+      body {{
+        font-size: 10pt;
+        line-height: 1.5;
+        background-color: #ffffff;
+      }}
+
+      .container {{
+        max-width: 100%;
+        padding: 0;
+      }}
+
+      /* Cover / Title Page: Ends with Page Break */
+      .title-page {{
+        page-break-before: avoid;
+        page-break-after: always;
+        break-after: page;
+        min-height: 85vh;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }}
+
+      /* Table of Contents: Starts on Page 2, Ends with Page Break */
+      .toc-section {{
+        page-break-before: always;
+        break-before: page;
+        page-break-after: always;
+        break-after: page;
+        background-color: transparent;
+        border: none;
+        padding: 0;
+        margin: 0;
+      }}
+
+      /* Every Chapter (H2) starts on a brand-new page */
+      .chapter-heading {{
+        page-break-before: always;
+        break-before: page;
+        padding-top: 10mm;
+      }}
+
+      /* Avoid awkward heading splits */
+      h1, h2, h3, h4 {{
+        page-break-after: avoid;
+        break-after: avoid;
+      }}
+
+      /* Avoid breaking inside table rows, alerts, or code blocks */
+      table, pre, blockquote, .alert, .katex-display {{
+        page-break-inside: avoid;
+        break-inside: avoid;
+      }}
+
+      /* Clean link styling for print */
+      a {{
+        color: #0f172a;
+        text-decoration: none;
+      }}
+    }}
+  </style>
+</head>
+<body>
+  <div class="container">
+    {restored_body}
+  </div>
+</body>
+</html>
+"""
+
+    with open(HTML_PATH, "w", encoding="utf-8") as f:
+        f.write(full_html)
+
+    print(f"Successfully generated print-ready manual at:\n  {HTML_PATH}")
+
+if __name__ == "__main__":
+    build_html()

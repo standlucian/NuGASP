@@ -34,6 +34,8 @@
 #include <QDir>
 #include <QFileInfo>
 #include <QApplication>
+#include <QGuiApplication>
+#include <QScreen>
 #include <QCollator>
 #include <QToolTip>
 #include <QMenu>
@@ -42,6 +44,7 @@
 #include <QPainterPath>
 #include <QMouseEvent>
 #include <QPaintEvent>
+#include <QEvent>
 #include <QRegularExpression>
 #include <QTextStream>
 #include <cmath>
@@ -960,6 +963,25 @@ void RunByRunManager::setupUI()
     anchorVBox->addWidget(m_tableAnchors);
     populateAnchorTable();
 
+    connect(m_tableAnchors, &QTableWidget::currentCellChanged, this, [this](int r, int, int, int) {
+        if (r < 0 || r >= static_cast<int>(m_anchors.size())) return;
+        if (!m_mainCanvas || !m_mainCanvas->getRootCanvas()) return;
+        syncAnchorsFromTable();
+        const auto &anc = m_anchors[r];
+        double disp = (m_spinDispersion && m_spinDispersion->value() > 0.0) ? m_spinDispersion->value() : 1.0;
+        double ch = (anc.initialChannel > 0.0) ? anc.initialChannel : (anc.physicalEnergy / disp);
+        if (ch <= 0.0) return;
+        int halfR = std::max(25, static_cast<int>(std::round(anc.searchWindowCh * 1.5)));
+        QString header = QString("🔍 Anchor Line #%1 (%2 keV)").arg(r + 1).arg(anc.physicalEnergy, 0, 'f', 1);
+        if (m_mainCanvas->getRootCanvas()->getZoomHUD()) {
+            m_mainCanvas->getRootCanvas()->getZoomHUD()->setHeaderTitle(header);
+        }
+        QString info = QString("FWHM %1 ch  •  Win \u00b1%2 ch")
+                           .arg(anc.expectedFwhmCh, 0, 'f', 1)
+                           .arg(anc.searchWindowCh, 0, 'f', 1);
+        m_mainCanvas->getRootCanvas()->showZoomHUDAtChannel(ch, info, halfR);
+    });
+
     // Bottom action bar below table (Separate dedicated button)
     QHBoxLayout *bottomActionBar = new QHBoxLayout();
     QPushButton *btnGrabParams = new QPushButton(tr("🎯 Grab Parameters from Reference Run / Detector..."), this);
@@ -1212,6 +1234,17 @@ void RunByRunManager::setupUI()
     };
     connect(m_spinDetStart, QOverload<int>::of(&QSpinBox::valueChanged), this, updateDetCombo);
     connect(m_spinDetEnd, QOverload<int>::of(&QSpinBox::valueChanged), this, updateDetCombo);
+}
+
+void RunByRunManager::closeEvent(QCloseEvent *e)
+{
+    if (m_mainCanvas && m_mainCanvas->getRootCanvas()) {
+        m_mainCanvas->getRootCanvas()->hideZoomHUD();
+        if (m_mainCanvas->getRootCanvas()->getZoomHUD()) {
+            m_mainCanvas->getRootCanvas()->getZoomHUD()->setHeaderTitle("🎯 AutoFit Target");
+        }
+    }
+    QDialog::closeEvent(e);
 }
 
 //==============================================================================
@@ -3367,14 +3400,21 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // RAII Restorer ensures the calibration manager reliably restores to normal and raises to front when inspection ends.
     struct ManagerRestorer {
         QWidget *manager;
+        QMainCanvas *mainCanvas;
         ~ManagerRestorer() {
+            if (mainCanvas && mainCanvas->getRootCanvas()) {
+                mainCanvas->getRootCanvas()->hideZoomHUD();
+                if (mainCanvas->getRootCanvas()->getZoomHUD()) {
+                    mainCanvas->getRootCanvas()->getZoomHUD()->setHeaderTitle("🎯 AutoFit Target");
+                }
+            }
             if (manager) {
                 manager->showNormal();
                 manager->raise();
                 manager->activateWindow();
             }
         }
-    } restorer{this};
+    } restorer{this, m_mainCanvas};
 
     this->showMinimized();
 
@@ -3741,6 +3781,61 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     }
 
     // Helper to update on-screen visual ROOT canvas marker guideline, fit curve, baseline, and centroid label
+    int currentInspectedPeak = 0;
+
+    auto updatePeakInspectorHUD = [&](int peakIdx) {
+        if (peakIdx < 0 || peakIdx >= nAnchors) return;
+        if (!m_mainCanvas || !m_mainCanvas->getRootCanvas()) return;
+
+        double cCh = rowWidgets[peakIdx].spinCentroid ? rowWidgets[peakIdx].spinCentroid->value() : rowWidgets[peakIdx].nominalCentroid;
+        double fCh = rowWidgets[peakIdx].spinFwhm ? rowWidgets[peakIdx].spinFwhm->value() : 3.0;
+        double wCh = rowWidgets[peakIdx].spinWindow ? rowWidgets[peakIdx].spinWindow->value() : std::clamp(fCh * 3.5, 12.0, 45.0);
+        double en = rowWidgets[peakIdx].energy;
+        double chi2 = rowWidgets[peakIdx].peakChi2;
+
+        int halfRange = std::max(25, static_cast<int>(std::round(wCh * 1.3)));
+
+        QString fitInfo = (chi2 > 0.0)
+            ? QString("FWHM %1 ch  •  \u03c7\u00b2 %2").arg(fCh, 0, 'f', 1).arg(chi2, 0, 'f', 2)
+            : QString("FWHM %1 ch").arg(fCh, 0, 'f', 1);
+
+        QString headerTitle = QString("🔍 Anchor Peak #%1 (%2 keV)")
+                                  .arg(peakIdx + 1)
+                                  .arg(en, 0, 'f', 1);
+
+        if (m_mainCanvas->getRootCanvas()->getZoomHUD()) {
+            m_mainCanvas->getRootCanvas()->getZoomHUD()->setHeaderTitle(headerTitle);
+        }
+
+        // Smart screen positioning: place HUD adjacent to dlg
+        QScreen *screen = dlg.screen();
+        if (!screen) screen = QGuiApplication::primaryScreen();
+        QRect screenGeo = screen ? screen->availableGeometry() : QRect(0, 0, 1920, 1080);
+
+        int hudW = 360;
+        int hudH = 230;
+        if (m_mainCanvas->getRootCanvas()->getZoomHUD()) {
+            hudW = m_mainCanvas->getRootCanvas()->getZoomHUD()->width();
+            hudH = m_mainCanvas->getRootCanvas()->getZoomHUD()->height();
+        }
+
+        int targetX = dlg.geometry().right() + 10;
+        int targetY = dlg.geometry().top() + 30;
+
+        if (targetX + hudW > screenGeo.right() - 10) {
+            targetX = dlg.geometry().left() - hudW - 10;
+        }
+        if (targetX < screenGeo.left() + 10) {
+            targetX = screenGeo.right() - hudW - 20;
+        }
+        if (targetY + hudH > screenGeo.bottom() - 10) {
+            targetY = std::max(screenGeo.top() + 10, screenGeo.bottom() - hudH - 10);
+        }
+        QPoint hudPos(targetX, targetY);
+
+        m_mainCanvas->getRootCanvas()->showZoomHUDAtChannel(cCh, fitInfo, halfRange, &hudPos);
+    };
+
     auto updateCanvasPeakOverlay = [&](int peakIdx) {
         if (peakIdx < 0 || peakIdx >= nAnchors) return;
         if (!m_mainCanvas) return;
@@ -3969,6 +4064,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
             m_mainCanvas->canvas->getCanvas()->Modified();
             m_mainCanvas->canvas->getCanvas()->Update();
         }
+
+        if (peakIdx == currentInspectedPeak) {
+            updatePeakInspectorHUD(peakIdx);
+        }
     };
 
     auto recalcLivePreview = [&]() {
@@ -4126,6 +4225,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Helper to perform Gaussian refit for a given peak index when user clicks "🔄 Refit Peak"
     auto executeRefit = [&](int peakIdx) {
         if (peakIdx < 0 || peakIdx >= nAnchors) return;
+        currentInspectedPeak = peakIdx;
         double cCh = rowWidgets[peakIdx].spinCentroid->value();
         double fCh = rowWidgets[peakIdx].spinFwhm->value();
         double bkgVal = rowWidgets[peakIdx].spinBkg->value();
@@ -4195,11 +4295,26 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         }
     };
 
+    // Connect peak table selection to inspect peak on the floating HUD
+    connect(tbl, &QTableWidget::currentCellChanged, &dlg, [&](int r, int, int, int) {
+        if (r >= 0 && r < nAnchors) {
+            currentInspectedPeak = r;
+            updatePeakInspectorHUD(r);
+        }
+    });
+    connect(tbl, &QTableWidget::cellClicked, &dlg, [&](int r, int) {
+        if (r >= 0 && r < nAnchors) {
+            currentInspectedPeak = r;
+            updatePeakInspectorHUD(r);
+        }
+    });
+
     // Connect spinboxes, checkboxes, and refit buttons to live recalc and on-screen canvas feedback
     for (int i = 0; i < nAnchors; ++i) {
         int peakIdx = i;
 
         connect(rowWidgets[i].chkUse, &QCheckBox::toggled, &dlg, [&, peakIdx](bool checked) {
+            currentInspectedPeak = peakIdx;
             if (!checked) {
                 rowWidgets[peakIdx].lblShift->setText(tr("(Excluded)"));
                 rowWidgets[peakIdx].lblShift->setStyleSheet("color: #78909c; font-style: italic; padding: 2px 6px;");
@@ -4209,6 +4324,7 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         });
 
         connect(rowWidgets[i].spinCentroid, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
+            currentInspectedPeak = peakIdx;
             if (rowWidgets[peakIdx].centroidErrCh <= 0.02) {
                 rowWidgets[peakIdx].centroidErrCh = std::clamp(rowWidgets[peakIdx].spinFwhm->value() / 20.0, 0.03, 0.5);
             }
@@ -4217,22 +4333,26 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         });
 
         connect(rowWidgets[i].spinWindow, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
+            currentInspectedPeak = peakIdx;
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
         connect(rowWidgets[i].spinFwhm, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
+            currentInspectedPeak = peakIdx;
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
         connect(rowWidgets[i].spinBkg, QOverload<double>::of(&QDoubleSpinBox::valueChanged), &dlg, [&, peakIdx](double) {
+            currentInspectedPeak = peakIdx;
             recalcLivePreview();
             updateCanvasPeakOverlay(peakIdx);
         });
 
         // Refit button action: manual immediate refit
         connect(rowWidgets[i].btnRefit, &QPushButton::clicked, &dlg, [&, peakIdx]() {
+            currentInspectedPeak = peakIdx;
             executeRefit(peakIdx);
         });
     }
@@ -4241,6 +4361,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     // Synchronize canvas peak overlays with current table values immediately upon opening
     for (int i = 0; i < nAnchors; ++i) {
         updateCanvasPeakOverlay(i);
+    }
+    if (nAnchors > 0) {
+        currentInspectedPeak = 0;
+        tbl->selectRow(0);
+        updatePeakInspectorHUD(0);
     }
 
     // 4. Action Buttons (Option A, Option B, Option C, Inspect on Canvas, Cancel)
@@ -4282,7 +4407,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     QPushButton *btnPeek = new QPushButton(tr("👁️ Minimize to View Canvas"), &dlg);
     btnPeek->setStyleSheet("font-weight: bold; background-color: #37474f; color: white; padding: 6px 12px;");
     btnPeek->setToolTip(tr("Temporarily minimize this dialog to the taskbar to inspect the full ROOT canvas without obstruction. Click its taskbar icon to restore."));
-    connect(btnPeek, &QPushButton::clicked, &dlg, [&dlg]() {
+    connect(btnPeek, &QPushButton::clicked, &dlg, [&dlg, this]() {
+        if (m_mainCanvas && m_mainCanvas->getRootCanvas()) {
+            m_mainCanvas->getRootCanvas()->hideZoomHUD();
+        }
         dlg.showMinimized();
     });
     actionLayout->addWidget(btnPeek);
@@ -4296,6 +4424,38 @@ void RunByRunManager::openInterventionDialog(int row, int col)
     mainVBox->addLayout(actionLayout);
 
     connect(btnCancel, &QPushButton::clicked, &dlg, &QDialog::reject);
+
+    class DialogMoveFilter : public QObject {
+    public:
+        std::function<void()> onMoved;
+        DialogMoveFilter(QObject *parent, std::function<void()> cb) : QObject(parent), onMoved(std::move(cb)) {}
+    protected:
+        bool eventFilter(QObject *obj, QEvent *ev) override {
+            if (ev->type() == QEvent::Move || ev->type() == QEvent::Resize) {
+                if (onMoved) onMoved();
+            } else if (ev->type() == QEvent::WindowStateChange) {
+                QWidget *w = qobject_cast<QWidget*>(obj);
+                if (w && !w->isMinimized() && onMoved) {
+                    onMoved();
+                }
+            }
+            return QObject::eventFilter(obj, ev);
+        }
+    };
+    dlg.installEventFilter(new DialogMoveFilter(&dlg, [&]() {
+        if (!dlg.isMinimized()) {
+            updatePeakInspectorHUD(currentInspectedPeak);
+        }
+    }));
+
+    connect(&dlg, &QDialog::finished, &dlg, [&]() {
+        if (m_mainCanvas && m_mainCanvas->getRootCanvas()) {
+            m_mainCanvas->getRootCanvas()->hideZoomHUD();
+            if (m_mainCanvas->getRootCanvas()->getZoomHUD()) {
+                m_mainCanvas->getRootCanvas()->getZoomHUD()->setHeaderTitle("🎯 AutoFit Target");
+            }
+        }
+    });
 
     // Apply Option B: Apply Adjusted Fit
     connect(btnOptionB, &QPushButton::clicked, &dlg, [&]() {

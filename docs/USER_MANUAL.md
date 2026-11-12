@@ -9,8 +9,11 @@
 ## Table of Contents
 - [1. Introduction, Heritage & Design Philosophy](#1-introduction-heritage--design-philosophy)
     - [1.1 The Heritage of Xtrackn & GASPware](#11-the-heritage-of-xtrackn--gaspware)
-    - [1.2 Historical Attributions & Acknowledgments](#13-historical-attributions--acknowledgments)
-    - [1.3 AI Assistance & Development Disclosure](#14-ai-assistance--development-disclosure)
+    - [1.2 Historical Attributions & Acknowledgments](#12-historical-attributions--acknowledgments)
+    - [1.3 AI Assistance & Development Disclosure](#13-ai-assistance--development-disclosure)
+    - [1.4 Development Roadmap & Wishlist](#14-development-roadmap--wishlist)
+    - [1.5 The NuGASP Ecosystem Scope](#15-the-nugasp-ecosystem-scope)
+    - [1.6 Software License & Academic Citation](#16-software-license--academic-citation)
 - [2. Installation, Deployment & Quick Start](#2-installation-deployment--quick-start)
     - [2.1 Linux (1-Click AppImage)](#21-linux-1-click-appimage)
     - [2.2 macOS (Drag-and-Drop DMG for Apple Silicon & Intel)](#22-macos-drag-and-drop-dmg-for-apple-silicon--intel)
@@ -51,7 +54,7 @@
     - [8.2 Sequence Preparation & Anchor Peak Configuration](#82-sequence-preparation--anchor-peak-configuration)
     - [8.3 Automated Drift Tracking Engine](#83-automated-drift-tracking-engine)
     - [8.4 Status Interpretation: OK, INTERVENE, and FAILED](#84-status-interpretation-ok-intervene-and-failed)
-    - [8.5 The Interactive Intervention Dialog](#85-the-interactive-intervention-dialog)
+    - [8.5 The Interactive Intervention Dialog & Live Floating Canvas HUD](#85-the-interactive-intervention-dialog--live-floating-canvas-hud)
     - [8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing](#86-high-statistics-chunking--hardware-jump-aware-smoothing)
     - [8.7 Export Formats: Legacy GASP .cal vs. Extended Multi-Order .ucal](#87-export-formats-legacy-gasp-cal-vs-extended-multi-order-ucal)
 - [9. 2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis)
@@ -59,10 +62,11 @@
     - [9.2 Inspecting Matrices (Q & MatrixDialog)](#92-inspecting-matrices-q--matrixdialog)
     - [9.3 Coincidence Gating (CW) & Background Subtraction (DW)](#93-coincidence-gating-cw--background-subtraction-dw)
 - [10. Scripting, Macros & Automation](#10-scripting-macros--automation)
-    - [10.1 Interactive Command Prompt & Batch Tokens](#101-interactive-command-prompt--batch-tokens)
-    - [10.2 Numeric Macros (0 through 9) & Repetition Cycles](#102-numeric-macros-0-through-9--repetition-cycles)
-    - [10.3 The Macro Manager Dialog (DM)](#103-the-macro-manager-dialog-dm)
-    - [10.4 Saving, Loading & Distributing Macro Files (.mac)](#104-saving-loading--distributing-macro-files-mac)
+    - [10.1 Graphical Interface Focus & Terminal Status Notice](#101-graphical-interface-focus--terminal-status-notice)
+    - [10.2 Supported Automation Tokens & Command Strings](#102-supported-automation-tokens--command-strings)
+    - [10.3 Numeric Macros (0 through 9) & Repetition Cycles](#103-numeric-macros-0-through-9--repetition-cycles)
+    - [10.4 The Macro Manager Dialog (DM)](#104-the-macro-manager-dialog-dm)
+    - [10.5 Saving, Loading & Distributing Macro Files (.mac)](#105-saving-loading--distributing-macro-files-mac)
 - [11. Aesthetic Customization & Theme Management](#11-aesthetic-customization--theme-management)
     - [11.1 Built-in Themes (Modern Dark, Modern Light, Classic Xtrackn)](#111-built-in-themes)
     - [11.2 Customizing Palette Colors, Gridlines & Typography](#112-customizing-palette-colors-gridlines--typography)
@@ -97,6 +101,10 @@ For decades, the classic Fortran/C software **Xtrackn** and the larger **GASPwar
 - **Autonomous Standalone Deployment**: 1-click execution without requiring users to configure compiler paths or install CERN ROOT manually.
 - **Run-by-Run Drift Alignment**: Automated in-beam gain tracking across hundreds of acquisition runs.
 
+> [!NOTE]
+> **Operational Model & Terminal Notice:**  
+> NuTrackN keyboard commands are executed directly on the interactive spectrum canvas (hotkeys). Due to the current focus on user-friendly dialog windows, interactive parameter tables, and graphical workflows, **program operation through the terminal (either the system terminal / stdin or the in-built bottom console) is not currently functional for command input.** The in-built bottom console serves exclusively as an output log for calculation reports, marker moment summaries, and fit parameters. Terminal-driven command execution and headless batch processing with no GUI will be the topic of a later upgrade.
+
 ### 1.2 Historical Attributions & Acknowledgments
 The algorithms, design philosophies, and core workflows of NuTrackN stand upon decades of foundational work by the creators and maintainers of **GASPware** and **Xtrackn**, originally created for the GASP γ-ray spectrometer at the INFN Laboratori Nazionali di Legnaro (LNL) and Padova, Italy.
 
@@ -116,6 +124,69 @@ NuTrackN was developed through human-directed, AI-assisted software engineering 
 All mathematical formulations, nuclear physics algorithms (e.g., SNIP continuum extraction, Poisson maximum likelihood estimation, covariance error propagation), and calibration procedures have been verified, scientifically reviewed, and validated against experimental gamma-ray data.
 
 However, it is important to note that, while credit for code synthesis and acceleration belongs to the AI agents, full responsibility for any errors and oversights rests solely with the human maintainers. Should you encounter unexpected behavior or software bugs, please open an issue on GitHub. Our apologies in advance for any rough edges that may crop up!
+
+### 1.4 Development Roadmap & Wishlist
+NuTrackN is an actively maintained open-source environment. While the 2.0 release delivers a high-performance modern Qt5/ROOT GUI foundation, historical command compatibility, and automated run-by-run drift alignment, the following capabilities represent key priorities for upcoming development cycles:
+
+#### 1. Rigorous End-to-End Uncertainty Propagation
+- **Coincidence Gating & Matrix Slicing**: Full bin-by-bin variance and covariance tracking through 2D background-subtracted gating ($S_{\text{net}} = S_{\text{gate}} - \frac{A_{\text{gate}}}{A_{\text{bg}}} S_{\text{bg}}$), ensuring downstream peak fits on gated projections correctly propagate Poisson counting statistics and background subtraction uncertainties.
+- **Peak Fitting & Multiplet Deconvolution**: Extracting and propagating full Minuit parameter covariance matrices ($\text{cov}(A, \mu, \sigma)$) and asymmetric confidence intervals (MINOS) to avoid underestimating peak area errors under heavy baseline coupling.
+- **Energy & Efficiency Calibrations**: Seamless propagation of polynomial parameter covariances ($\text{cov}(a_i, a_j)$), literature decay standard uncertainties, and source half-life corrections directly into calibrated energy readouts ($E \pm \sigma_E$) and detector efficiency curves.
+
+#### 2. Nuclear Reaction & Lifetime Analysis Tools
+- **Rudimentary DSAM Fitting**: Doppler Shift Attenuation Method line-shape analysis for picosecond nuclear state lifetime determinations.
+- **Rudimentary RDDS Fitting**: Recoil Distance Doppler Shift (plunger) lifetime measurements and shifted/unshifted intensity decay curve fitting.
+- **Angular Distributions, Correlations & DCO Fitting**: Directional Correlations from Oriented states (DCO) and angular distribution / correlation fitting for multipole mixing ratio and spin/parity assignments.
+
+#### 3. Advanced Calibrations & Peak Response Modeling
+- **Multi-Region Calibration Alignment**: Interactive creation, boundary alignment, and production of piecewise multi-region energy calibrations across wide dynamic ranges.
+- **Improved Efficiency Calibration Creation**: Flexible empirical efficiency curve modeling, absorption correction handling, and interactive residual inspection.
+- **Advanced Non-Gaussian Peak Response Functions**: Expanding the fitting engine beyond symmetric Gaussians to incorporate realistic detector physics (low-energy exponential tailing, high-energy neutron damage tailing, skewed Gaussians, and Voigt profiles).
+
+#### 4. Spectra Manipulation & GASPware Tools Integration
+- **Native SADD Functionality**: Interactive and batch spectrum addition, gain-matched summing across detectors and experimental runs, and exporting combined spectra.
+- **Full CMAT Functionality Integration**: Native embedding of legacy CMAT utilities for coincidence matrix creation, projection, 2D inspection, and matrix symmetrization.
+- **Direct CERN ROOT Format Data Operations**: Reading, manipulating, and exporting native ROOT format data (`TH1`, `TH2`, and `TTree`) directly without intermediate ASCII conversion.
+
+#### 5. Interface Modernization & Batch Automation
+- **Remaking the Main Interface**: Redesigning the main application canvas, controls, and docking system for multi-monitor setups and flexible spectroscopy workflows.
+- **Terminal Operation & Headless Batch Processing**: Restoring full command execution via system terminal `stdin` and enabling headless batch processing flags to execute analysis pipelines with no GUI.
+- **Python & Scientific Ecosystem Integration**: Lightweight bindings and serialization bridges to manipulate NuTrackN calibration trajectories and spectra within NumPy, SciPy, and Jupyter environments.
+
+We warmly welcome ideas, feedback, and contributions from experimentalists and spectroscopy laboratories worldwide. If you have suggestions, feature requests, bug reports, or would simply like to send coffee our way, please feel free to open an issue on [GitHub](https://github.com/standlucian/NuGASP) or reach out directly by email at `lucian.stan@nipne.ro`.
+
+### 1.5 The NuGASP Ecosystem Scope
+The **NuGASP** suite is conceived as the modern C++17 / Qt5 successor to the offline analysis ecosystem of **GASPware**. Its overarching goal is to modernize and consolidate the classic tools developed for the GASP spectrometer—including spectrum visualization (`xtrackn`), 2D matrix projection and slicing (`cmat`), spectrum arithmetic and gain-matched addition (`sadd`), efficiency parameterization (`effi`), initial polynomial calibrations (`precal`), and run-by-run drift minimization (`trackfit`)—into a unified, high-performance computing environment.
+
+The sole deliberate exception to this scope is **`gsort`** (the raw event-sorting and list-mode reconstruction engine). Due to its specialized hardware-level data unpacking, real-time trigger handling, and online acquisition requirements, `gsort` remains an independent standalone program outside NuTrackN.
+
+### 1.6 Software License & Academic Citation
+
+#### Software License (GNU GPLv3)
+NuTrackN is free open-source software licensed under the **GNU General Public License v3.0 (GPLv3)**.
+
+Under this "copyleft" license, you are free to inspect, run, modify, and redistribute the software for academic, research, or commercial purposes. However, to protect the scientific community and ensure that improvements remain permanently open, any distributed software that incorporates or derives from NuTrackN must also be licensed under the GNU GPLv3 with its full source code made publicly available.
+
+#### Academic Citation
+If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
+
+> **Text Citation:**  
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+
+```bibtex
+@misc{stan_nutrackn_2026,
+  author       = {Stan, Lucian},
+  title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
+  year         = {2026},
+  version      = {2.0},
+  institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
+  publisher    = {GitHub},
+  howpublished = {\url{https://github.com/standlucian/NuGASP}}
+}
+```
+
+For scientific attribution of the foundational algorithms and original spectrometer architecture, please also cite:
+> D. Bazzacco, *The GASP Spectrometer at Legnaro*, International Conference on Nuclear Structure at High Angular Momentum, Ottawa, AECL-10613, pp. 376–387 (1992).
 
 ---
 
@@ -303,7 +374,7 @@ NuTrackN implements the authentic Xtrackn / GASPware statistical moment and vari
    $$\sigma(\text{FWHM}) = \frac{\text{FWHM}}{2 s^2} \sqrt{4(\delta x)^2 \sigma^2(Ch_0) + \frac{D_4}{M_0^2} - \frac{2 M_2 D_2}{M_0^3} + \frac{M_2^2 D_0}{M_0^4}}$$
 
 5. **Spectroscopic Bracketed Uncertainty Formatting**:
-   Results printed to the Command Prompt and terminal use standard nuclear spectroscopy parenthetical notation for the least significant digits—for example, an energy of `1332.49(5)` keV denotes $1332.49 \pm 0.05\text{ keV}$, and an area of `14520(135)` denotes $14520 \pm 135\text{ counts}$.
+   Results printed to the output console and terminal log use standard nuclear spectroscopy parenthetical notation for the least significant digits—for example, an energy of `1332.49(5)` keV denotes $1332.49 \pm 0.05\text{ keV}$, and an area of `14520(135)` denotes $14520 \pm 135\text{ counts}$.
 
 ### 5.4 Marker Management & Clearing
 - **`ZA`**: Erase all active markers from the canvas.
@@ -486,30 +557,47 @@ Each `(Run, Detector)` cell in the sequence matrix is classified into one of thr
 | 🟠 **INTERVENE** | **Manual Review Advised** | `ExcessiveDrift`, `BadChi2`, `BadFWHM`, or `LowStatistics`: Peak converged, but exhibited drift approaching `maxAllowedDriftCh`, elevated $\chi^2/\text{NDF}$, broadened/narrowed width, or weak statistics. Click **Intervene** to inspect and approve. |
 | 🔴 **FAILED** | **Convergence Failure** | `NoPeakInWindow`, `RefAnchorFailed`, or `FileError`: Anchor peak missing, reference anchor failed, or spectrum file unreadable. Requires manual intervention or fallback to previous run. |
 
-### 8.5 The Interactive Intervention Dialog
-Clicking **Intervene** (or double-clicking a cell in the run-by-run matrix) automatically loads the spectrum onto the main canvas zoomed around the anchor region and opens the high-resolution diagnostic dialog:
+### 8.5 The Interactive Intervention Dialog & Live Floating Canvas HUD
+Clicking **Intervene** (or double-clicking a cell in the run-by-run matrix) minimizes the bulky manager window, loads the target spectrum onto the main canvas zoomed directly to the anchor region, and opens the high-resolution diagnostic dialog:
 
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│               Run-by-Run Peak Fit Intervention                         │
-├────────────────────────────────────────────────────────────────────────┤
-│ Run: run0042.spe    Detector: Ge_01    Anchor: 1332.49 keV             │
-├────────────────────────────────────────────────────────────────────────┤
-│  [Spectrum Fit Canvas with Gaussian overlay & Background step]         │
-│                                                                        │
-│  Centroid Drift Visualizer:  [-5.0 ... ──[●]── ... +5.0]  (+1.84 ch)  │
-├────────────────────────────────────────────────────────────────────────┤
-│  Centroid (ch): [ 2666.04 ] [Lock]     FWHM (ch): [ 4.82 ] [Lock]      │
-│  Baseline (cnt): [ 42.10 ] [Lock]     Slope:     [ -0.01 ] [Lock]      │
-│                                                                        │
-│  [ Exclude Peak ]    [ Re-Fit Peak ]    [ Accept & Next ]   [ Cancel ] │
-└────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                        Inspect & Tune Fit — Run: run0042.spe, Detector #01 (0.50 keV/ch)               │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Current Status: INTERVENE (High χ²)  |  Nominal: 0.50 keV/ch  |  Gain: 0.499820  |  Cutoff: ≤ 5.0      │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Peak Anchors, Flat Background Baseline & Parameter Locks                                               │
+│ ┌───────────────┬─────┬──────────────┬──────────────────┬───────────┬──────────────┬──────────┬──────┐ │
+│ │ Action        │ Use │ Energy (keV) │ Centroid (ch) 🔒 │ Shift (Δ) │ Window (±ch) │ FWHM (ch)│ Base │ │
+│ ├───────────────┼─────┼──────────────┼──────────────────┼───────────┼──────────────┼──────────┼──────┤ │
+│ │ 🔄 Refit Peak │ [✓] │ 1173.24±0.05 │ [ 2346.12 ] [🔓] │ +0.42 ch  │ [  12.0  ]   │ [ 4.20 ] │ [45] │ │
+│ │ 🔄 Refit Peak │ [✓] │ 1332.49±0.05 │ [ 2664.88 ] [🔒] │ -0.12 ch  │ [  14.0  ]   │ [ 4.50 ] │ [38] │ │
+│ └───────────────┴─────┴──────────────┴──────────────────┴───────────┴──────────────┴──────────┴──────┘ │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ Live Recalibration Preview: Gain (a1) = 0.499981 | Offset (a0) = -0.04 ch | χ²/ndf = 1.18 (GOOD)       │
+├────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ [🔄 Redraw Canvas]  [👁️ Minimize to View Canvas]   [✅ Apply Adjusted Fit]  [⚠️ Force Accept]  [Done]   │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Centroid Drift Visualizer**: A colored horizontal indicator displays the exact deviation of the peak from the reference channel.
-- **Debounced Live Refit**: Adjusting the Centroid or FWHM spinboxes triggers an automatic refit after 400ms without requiring extra clicks.
-- **Parameter Locking (`FitFixedParams`)**: For low-statistics runs, click **[Lock]** next to Centroid, FWHM, Baseline, Slope, or Step to hold that parameter constant while refitting the remaining free parameters.
-- **Independent Slope & Baseline Controls**: Fine-tune baseline sideband levels independently to handle localized Compton edges.
+#### The Live Floating Canvas HUD Inspector (`QZoomHUD`)
+During intervention, NuTrackN automatically activates the **Floating Canvas HUD Inspector** (`QZoomHUD`), projecting a real-time, high-magnification peak fit window ($360 \times 230\text{ px}$) directly over the workspace:
+
+- **Instant Parameter Feedback**: Changing any parameter (Centroid, FWHM, Window $\pm\text{ch}$, Baseline) or clicking **🔄 Refit Peak** instantly re-samples and updates the HUD's zoomed spectrum histogram, Gaussian fit curve (orange), chord-SNIP background baseline (dashed line), and centroid reticle marker.
+- **Dedicated Anchor Identity & Fit Badge**: The top bar provides a collision-proof dual-zone header displaying the anchor identity (`🔍 Anchor Peak #5 (1054.3 keV)`) on the left and a compact goodness-of-fit badge (`FWHM 4.6 ch • χ² 1.12`) on the right. A subheader readout provides real-time channel coordinate, calibrated energy, and peak counts (`Ch 2107 (1054.13 keV) | 54 cts`).
+- **Row & Main-Window Selection**: Clicking any row or cell in the intervention table immediately switches the HUD focus to that peak. Selecting anchor lines in the main Run-by-Run Manager's anchor table also previews the peak on the HUD when a spectrum is active on the ROOT canvas.
+- **Non-Intrusive Smart Positioning**: The HUD utilizes `Qt::ToolTip | Qt::FramelessWindowHint` with `Qt::WA_ShowWithoutActivating` so it never steals keyboard focus while you type values into spinboxes. It automatically positions itself adjacent to the intervention dialog (flipping left if near screen borders) and tracks along when the dialog is moved or resized.
+- **Peek Mode & Automatic Cleanup**: Clicking **👁️ Minimize to View Canvas** hides the HUD temporarily so you can view the entire ROOT canvas unobstructed; restoring the dialog re-displays the HUD. Upon accepting or canceling intervention, the HUD cleanly hides and restores its default AutoFit Target mode.
+
+#### Table Controls & Calibration Actions
+- **Shift Indicator Badge ($\Delta\text{ch}$)**: Shows the real-time difference between the current centroid and nominal position ($c - c_0$). Color-coded green ($< 2$ ch), orange ($2 - 5$ ch), and red ($> 5$ ch).
+- **Search & Fit Window ($\pm\Delta\text{ch}$)**: Sets the exact half-window around the centroid used for baseline sampling and Gaussian fitting.
+- **Parameter Locking (`FitFixedParams`)**: Click **[🔓 / 🔒]** next to Centroid, FWHM, or Baseline to lock that parameter during refitting while allowing other free parameters to adjust.
+- **Live Recalibration Preview**: Instantly recalculates the energy calibration polynomial, residual deviation $s_{\text{res}}$, and calibration line $\chi^2/\text{ndf}$ across all checked anchor lines.
+- **Action Buttons**:
+  - **✅ Apply Adjusted Fit (Mark GOOD)**: Saves the tuned parameters and recomputed calibration into the detector trajectory and updates the matrix cell to green.
+  - **⚠️ Force Accept As-Is**: Overrides strict $\chi^2$ cutoff thresholds, adopting the current parameters and marking the run as good.
+  - **❌ Reject (Make it FAIL)**: Discards the run as an unrecoverable failure and sets matrix status to red.
 
 ### 8.6 High-Statistics Chunking & Hardware Jump-Aware Smoothing
 When analyzing low-cross-section transitions or short beam runs, individual run spectra may lack sufficient counting statistics for stable peak fitting. NuTrackN provides a two-stage Pass 2 refinement system:
@@ -573,31 +661,44 @@ To isolate gamma cascades feeding or depopulating a specific nuclear level:
 
 ## 10. Scripting, Macros & Automation
 
-### 10.1 Interactive Command Prompt & Batch Tokens
-At the bottom of the interface, the **Command Prompt** accepts direct text commands. Typing authentic Xtrackn strings executes immediately without requiring mouse interaction:
-- Type `L` and press Enter to toggle log scale.
-- Type `CI` or `CJ` to integrate, or `AG` / `AJ` to auto-fit / auto-integrate at the cursor.
-- Combine multi-command chains separated by spaces, commas, or semicolons (e.g., `FX; FY; L; =` or `*1, FF, CP, CJ`).
-- **Batch Stepping & Automation Tokens**:
-  - **`*1` / `N+` / `N`**: Step to the next detector / spectrum.
-  - **`*2` / `N-`**: Step to the previous detector / spectrum.
+### 10.1 Graphical Interface Focus & Terminal Status Notice
+
+> [!IMPORTANT]
+> **Terminal & Batch Operation Notice:**  
+> NuTrackN's development currently focuses on intuitive, user-friendly graphical dialog windows, interactive canvas controls, and real-time visual feedback. Consequently, **program operation through the terminal (either the system terminal / stdin or typing into the in-built bottom console) is not currently functional for command input.**
+> 
+> The in-built console at the bottom of the canvas operates exclusively as a **read-only output logger**, streaming calculation reports, marker moment tables, fit parameters, and command lists.
+> 
+> Full program operation through the terminal and headless batch execution (processing spectra and calibration pipelines with no GUI) will be the topic of a subsequent upgrade.
+
+In the current release, automation and command sequencing are performed either via:
+1. **Interactive Spectrum Canvas Hotkeys**: Executing single- and two-character command tokens directly on the active canvas (e.g., `L`, `CI`, `CJ`, `AG`, `E`, `FX`, `K`, `AK`, `AR`).
+2. **The Macro Manager Dialog (`DM`)**: Storing, configuring, cycling, and executing multi-token automation sequences across slots `0` through `9`.
+
+### 10.2 Supported Automation Tokens & Command Strings
+Command strings configured in the **Macro Manager (`DM`)** accept authentic Xtrackn tokens separated by spaces, commas, or semicolons (e.g., `*1; FF; CP; CJ` or `FX; FY; L; =`):
+- **Batch Stepping & Spectrum Navigation Tokens**:
+  - **`*1` / `N+` / `N`**: Step to the next detector / spectrum buffer.
+  - **`*2` / `N-`**: Step to the previous detector / spectrum buffer.
   - **`*3` / `R+` / `NR`**: Step to the next experimental run.
   - **`*4` / `R-` / `PR`**: Step to the previous experimental run.
+- **Fitting & Analysis Tokens**:
   - **`CB`**: Fit linear background across active `B` markers.
+  - **`CI` / `CJ`**: Integrate spectrum region (CI without background, CJ with linear background subtraction).
   - **`AG` / `AJ`**: Execute automatic Gaussian peak fit or automatic ROI integration at the cursor.
-  - **`MP` / `ZP`**: Show or clear automated peak-search (`CP`) labels.
+  - **`CP` / `MP` / `ZP`**: Execute automated peak search (`CP`), show peak labels (`MP`), or clear peak markers (`ZP`).
   - **`OR` / `DR` / `SSH`**: Open the Remote Data / SSH Session Manager.
-  - **Nested Macro Calls**: Including a digit `0`–`9` inside a command string invokes that sub-macro (up to a recursion depth of 10).
+- **Nested Macro Calls**: Including a digit `0`–`9` inside a command string invokes that sub-macro (up to a recursion depth of 10).
 
-### 10.2 Numeric Macros (0 through 9) & Repetition Cycles
+### 10.3 Numeric Macros (0 through 9) & Repetition Cycles
 Assign frequently repeated command sequences to slots `0` through `9`:
 - **`0..9`**: Execute stored macro `n` **once** (`1x`).
 - **`D` + `0..9`**: Define a macro sequence interactively (e.g., `D1` followed by `*1; FF; CP; CJ`).
 - **`C` + `0..9`**: Cycle stored macro `n` in a loop for `#Cicli` iterations (prompts for cycle count if not preset).
-- **`M` + `0..9`**: Print the stored macro string and default cycle count in the Command Prompt.
+- **`M` + `0..9`**: Print the stored macro string and default cycle count in the output console.
 - **`Z` + `0..9`**: Clear macro `n`.
 
-### 10.3 The Macro Manager Dialog (`DM`)
+### 10.4 The Macro Manager Dialog (`DM`)
 Press **`DM`** (or click the **Macros** button) to open the graphical Macro Manager (`Automatic Command Strings & Macros (Block 4)`):
 
 ```
@@ -618,7 +719,7 @@ Press **`DM`** (or click the **Macros** button) to open the graphical Macro Mana
 - Configure sequence strings, repetition loop counts (`1`–`10000`), and laboratory notes for all 10 slots (`#0`–`#9`), with an embedded **Command Syntax & Tokens Reference** cheat sheet at the bottom of the dialog.
 - Click **[Run (1x)]** to execute a slot once, **[Cycle]** to run it for the configured number of cycles, or **[Clear]** to erase the slot.
 
-### 10.4 Saving, Loading & Distributing Macro Files (`.mac`)
+### 10.5 Saving, Loading & Distributing Macro Files (`.mac`)
 Click **Save to File...** or **Load from File...** (supporting both local disk and remote SSH directories via `NuFileDialog`) to export or import all macro definitions as a pipe-delimited `.mac` file (`ID|COMMAND_STRING|CYCLES|DESCRIPTION`; see [Section 14.2](#142-file-format-specifications)). Share standardized analysis scripts across research groups to ensure reproducible data reductions.
 
 ---
@@ -629,7 +730,7 @@ Click **Save to File...** or **Load from File...** (supporting both local disk a
 Click the **Design** button in the lower toolbar to open the Appearance Manager:
 1. **Modern Dark (Deep Space Cyan)**: Sleek Obsidian/Navy dark mode (`#0f172a`), DejaVu Sans typography, neon cyan accents, and high-visibility pastel spectrum curves. Optimized for dark experimental control rooms.
 2. **Modern Light (Crisp Clean)**: Pristine slate-light surface (`#f1f5f9`), white canvas background, and publication-ready dark curves.
-3. **Classic (Legacy Xtrackn)**: Authentic slate-gray UI (`#708090`), Times New Roman typography, high-contrast cyan command prompt, and classic primary spectrum colors.
+3. **Classic (Legacy Xtrackn)**: Authentic slate-gray UI (`#708090`), Times New Roman typography, high-contrast cyan output console, and classic primary spectrum colors.
 
 ### 11.2 Customizing Palette Colors, Gridlines & Typography
 - **Spectrum Curves**: Customize individual foreground colors and line thicknesses for Buffers 1 through 9.
@@ -749,7 +850,7 @@ Please write me
 | **`0..9`** | **Run Macro (1x)** | Execute stored command sequence `0..9` once |
 | **`D` + `0..9`** | **Define Macro** | Assign command sequence to numeric slot `0..9` |
 | **`C` + `0..9`** | **Cycle Macro** | Loop stored command sequence `0..9` for $N$ cycles |
-| **`M` + `0..9`** | **Show Macro** | Display stored command sequence in Command Prompt |
+| **`M` + `0..9`** | **Show Macro** | Display stored command sequence in output console |
 | **`Z` + `0..9`** | **Clear Macro** | Erase stored macro definition |
 | **`H` / `?` / `F1`** | **Help Dialog** | Open in-app Help and Heritage documentation |
 

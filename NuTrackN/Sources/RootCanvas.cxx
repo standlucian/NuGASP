@@ -301,6 +301,24 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
             }
         }
     }
+    TVirtualPad *activePad = gPad;
+    if (activePad && activePad->GetListOfPrimitives()) {
+        TIter next(activePad->GetListOfPrimitives());
+        while (TObject *obj = next()) {
+            if (TF1 *f = dynamic_cast<TF1*>(obj)) {
+                TString fname = f->GetName();
+                if (fname.Contains("background") && !fname.Contains("gaussianWithBackground")) {
+                    if (std::find(bkgFuncs.begin(), bkgFuncs.end(), f) == bkgFuncs.end()) {
+                        bkgFuncs.push_back(f);
+                    }
+                } else {
+                    if (std::find(fitFuncs.begin(), fitFuncs.end(), f) == fitFuncs.end()) {
+                        fitFuncs.push_back(f);
+                    }
+                }
+            }
+        }
+    }
 
     const double xLow = hist->GetXaxis()->GetBinLowEdge(startB);
     const double xUp  = hist->GetXaxis()->GetBinUpEdge(endB);
@@ -359,6 +377,7 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
         }
     }
 
+    m_zoomHUD->setPersistent(false);
     m_zoomHUD->updateData(hist, binX, energy, isCalibrated, fitCurve, bkgCurve, hasActualFit, fitInfo);
 
     // Smart placement: keep HUD in top-right, unless cursor is near top-right, then flip to top-left
@@ -373,9 +392,175 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
     m_zoomHUD->raise();
 }
 
+void QRootCanvas::showZoomHUDAtChannel(double channel, const QString &fitInfo, int halfRange, const QPoint *customGlobalPos)
+{
+    if (!m_zoomHUD) return;
+    if (!m_mainCanvas) {
+        QWidget *p = parentWidget();
+        while (p) {
+            m_mainCanvas = qobject_cast<QMainCanvas*>(p);
+            if (m_mainCanvas) break;
+            p = p->parentWidget();
+        }
+    }
+    if (!m_mainCanvas) return;
+
+    TH1F *hist = m_mainCanvas->HijF[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j];
+    if (!hist) {
+        m_zoomHUD->hide();
+        return;
+    }
+
+    const int binX = hist->FindBin(channel);
+    if (binX < 1 || binX > hist->GetNbinsX()) {
+        m_zoomHUD->hide();
+        return;
+    }
+
+    TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(hist);
+    const bool isCalibrated = (trackHist && trackHist->IsCalibrated());
+    const int targetChannel = std::max(0, binX - 1);
+    const double energy = isCalibrated ? trackHist->ChannelToEnergy(targetChannel) : -1.0;
+
+    const int actualHalfRange = (halfRange > 3) ? halfRange : 25;
+    const int startB = std::max(1, binX - actualHalfRange);
+    const int endB = std::min(hist->GetNbinsX(), binX + actualHalfRange);
+
+    std::vector<TF1*> fitFuncs;
+    std::vector<TF1*> bkgFuncs;
+
+    const int el_i = m_mainCanvas->SelectedElement_i;
+    const int el_j = m_mainCanvas->SelectedElement_j;
+    for (TObject *obj : m_mainCanvas->autoFitMarkers[el_i][el_j]) {
+        if (TF1 *f = dynamic_cast<TF1*>(obj)) {
+            TString fname = f->GetName();
+            if (fname.Contains("background") && !fname.Contains("gaussianWithBackground")) {
+                bkgFuncs.push_back(f);
+            } else {
+                fitFuncs.push_back(f);
+            }
+        }
+    }
+    if (m_mainCanvas->gaussianWithBackgroundFunction) {
+        if (std::find(fitFuncs.begin(), fitFuncs.end(), m_mainCanvas->gaussianWithBackgroundFunction) == fitFuncs.end()) {
+            fitFuncs.push_back(m_mainCanvas->gaussianWithBackgroundFunction);
+        }
+    }
+    if (m_mainCanvas->backgroundFunction) {
+        if (std::find(bkgFuncs.begin(), bkgFuncs.end(), m_mainCanvas->backgroundFunction) == bkgFuncs.end()) {
+            bkgFuncs.push_back(m_mainCanvas->backgroundFunction);
+        }
+    }
+    if (hist->GetListOfFunctions()) {
+        TIter next(hist->GetListOfFunctions());
+        while (TObject *obj = next()) {
+            if (TF1 *f = dynamic_cast<TF1*>(obj)) {
+                TString fname = f->GetName();
+                if (fname.Contains("background") && !fname.Contains("gaussianWithBackground")) {
+                    if (std::find(bkgFuncs.begin(), bkgFuncs.end(), f) == bkgFuncs.end()) {
+                        bkgFuncs.push_back(f);
+                    }
+                } else {
+                    if (std::find(fitFuncs.begin(), fitFuncs.end(), f) == fitFuncs.end()) {
+                        fitFuncs.push_back(f);
+                    }
+                }
+            }
+        }
+    }
+    TVirtualPad *activePad = gPad;
+    if (activePad && activePad->GetListOfPrimitives()) {
+        TIter next(activePad->GetListOfPrimitives());
+        while (TObject *obj = next()) {
+            if (TF1 *f = dynamic_cast<TF1*>(obj)) {
+                TString fname = f->GetName();
+                if (fname.Contains("background") && !fname.Contains("gaussianWithBackground")) {
+                    if (std::find(bkgFuncs.begin(), bkgFuncs.end(), f) == bkgFuncs.end()) {
+                        bkgFuncs.push_back(f);
+                    }
+                } else {
+                    if (std::find(fitFuncs.begin(), fitFuncs.end(), f) == fitFuncs.end()) {
+                        fitFuncs.push_back(f);
+                    }
+                }
+            }
+        }
+    }
+
+    const double xLow = hist->GetXaxis()->GetBinLowEdge(startB);
+    const double xUp  = hist->GetXaxis()->GetBinUpEdge(endB);
+
+    const int nSamples = 250;
+    std::vector<double> fitCurve(nSamples, -1.0);
+    std::vector<double> bkgCurve(nSamples, -1.0);
+    bool hasActualFit = false;
+    QString resolvedFitInfo = fitInfo;
+
+    for (TF1 *f : fitFuncs) {
+        if (!f) continue;
+        const Double_t fMin = f->GetXmin();
+        const Double_t fMax = f->GetXmax();
+        if (fMax >= xLow && fMin <= xUp) {
+            hasActualFit = true;
+            for (int k = 0; k < nSamples; ++k) {
+                const double frac = static_cast<double>(k) / static_cast<double>(nSamples - 1);
+                const double xVal = xLow + frac * (xUp - xLow);
+                if (xVal >= fMin && xVal <= fMax) {
+                    const double val = f->Eval(xVal);
+                    if (val > fitCurve[k]) {
+                        fitCurve[k] = val;
+                    }
+                }
+            }
+            if (resolvedFitInfo.isEmpty()) {
+                const double curX = hist->GetBinCenter(binX);
+                if (curX >= fMin && curX <= fMax) {
+                    if (f->GetNpar() >= 3) {
+                        const double cent = f->GetParameter(1);
+                        const double sig = std::abs(f->GetParameter(2));
+                        resolvedFitInfo = QString("Fit: μ=%1 σ=%2").arg(cent, 0, 'f', 1).arg(sig, 0, 'f', 1);
+                    }
+                }
+            }
+        }
+    }
+
+    for (TF1 *bkg : bkgFuncs) {
+        if (!bkg) continue;
+        const Double_t bMin = bkg->GetXmin();
+        const Double_t bMax = bkg->GetXmax();
+        if (bMax >= xLow && bMin <= xUp) {
+            for (int k = 0; k < nSamples; ++k) {
+                const double frac = static_cast<double>(k) / static_cast<double>(nSamples - 1);
+                const double xVal = xLow + frac * (xUp - xLow);
+                if (xVal >= bMin && xVal <= bMax) {
+                    const double val = bkg->Eval(xVal);
+                    if (val > bkgCurve[k]) {
+                        bkgCurve[k] = val;
+                    }
+                }
+            }
+        }
+    }
+
+    m_zoomHUD->setPersistent(true);
+    m_zoomHUD->updateData(hist, binX, energy, isCalibrated, fitCurve, bkgCurve, hasActualFit, resolvedFitInfo, actualHalfRange);
+
+    if (customGlobalPos) {
+        m_zoomHUD->move(*customGlobalPos);
+    } else {
+        const int hudW = m_zoomHUD->width();
+        const int targetX = std::max(10, width() - hudW - 15);
+        m_zoomHUD->move(mapToGlobal(QPoint(targetX, 15)));
+    }
+    m_zoomHUD->show();
+    m_zoomHUD->raise();
+}
+
 void QRootCanvas::hideZoomHUD()
 {
     if (m_zoomHUD) {
+        m_zoomHUD->setPersistent(false);
         m_zoomHUD->hide();
     }
 }
@@ -388,7 +573,9 @@ void QRootCanvas::enterEvent(QEvent *event)
 
 void QRootCanvas::leaveEvent(QEvent *event)
 {
-    hideZoomHUD();
+    if (!m_zoomHUD || !m_zoomHUD->isPersistent()) {
+        hideZoomHUD();
+    }
     QWidget::leaveEvent(event);
 }
 

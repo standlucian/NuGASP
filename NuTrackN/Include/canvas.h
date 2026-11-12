@@ -116,7 +116,12 @@ public:
                    const std::vector<double> &fitCurve = {},
                    const std::vector<double> &bkgCurve = {},
                    bool hasFit = false,
-                   const QString &fitInfo = QString());
+                   const QString &fitInfo = QString(),
+                   int halfRange = 25);
+   void setHeaderTitle(const QString &title) { m_headerTitle = title; update(); }
+   QString getHeaderTitle() const { return m_headerTitle; }
+   void setPersistent(bool persistent) { m_isPersistent = persistent; }
+   bool isPersistent() const { return m_isPersistent; }
 
 protected:
    void paintEvent(QPaintEvent *event) override;
@@ -134,6 +139,8 @@ private:
    std::vector<double> m_bkgCurve;
    bool                m_hasFit;
    QString             m_fitInfo;
+   QString             m_headerTitle{"🎯 AutoFit Target"};
+   bool                m_isPersistent{false};
 };
 
 class QRootCanvas : public QWidget
@@ -148,6 +155,7 @@ public:
    QZoomHUD* getZoomHUD() { return m_zoomHUD; }
    void setMainCanvas(QMainCanvas *main) { m_mainCanvas = main; }
    void updateZoomHUD(int mouseX, int mouseY);
+   void showZoomHUDAtChannel(double channel, const QString &fitInfo = QString(), int halfRange = 25, const QPoint *customGlobalPos = nullptr);
    void hideZoomHUD();
    bool eventFilter(QObject *watched, QEvent *event) override;
 
