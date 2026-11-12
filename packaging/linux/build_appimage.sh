@@ -129,10 +129,8 @@ fi
 if [ -d "${ROOTSYS}/fonts" ]; then
     mkdir -p "${APPDIR}/usr/fonts"
     cp -a "${ROOTSYS}/fonts" "${APPDIR}/usr/"
-    # Remove bulky CJK fallback and unused decorative fonts
+    # Remove bulky CJK fallback and decorative novelty fonts
     rm -f "${APPDIR}/usr/fonts/DroidSansFallback.ttf" \
-          "${APPDIR}/usr/fonts/FreeSerif"*.otf \
-          "${APPDIR}/usr/fonts/FreeMono"*.otf \
           "${APPDIR}/usr/fonts/BlackChancery.ttf" \
           "${APPDIR}/usr/fonts/comic"*.ttf \
           "${APPDIR}/usr/fonts/impact.ttf" \
@@ -152,8 +150,18 @@ if [ -d "${ROOTSYS}/include" ]; then
            "${APPDIR}/usr/include/bvh" \
            "${APPDIR}/usr/include/ROOT/RDataFrame"* \
            "${APPDIR}/usr/include/ROOT/RNTuple"* \
-           "${APPDIR}/usr/include/ROOT/REve"* \
-           "${APPDIR}/usr/include/ROOT.modulemap" 2>/dev/null || true
+           "${APPDIR}/usr/include/ROOT/REve"* 2>/dev/null || true
+fi
+
+# Bundle C++ standard library headers to ensure Cling runtime Clang modules match across any Linux host
+if [ -d "/usr/include/c++/13" ]; then
+    echo "    Bundling C++ standard library headers for Cling..."
+    mkdir -p "${APPDIR}/usr/include/c++/13"
+    cp -a /usr/include/c++/13/* "${APPDIR}/usr/include/c++/13/" 2>/dev/null || true
+    if [ -d "/usr/include/x86_64-linux-gnu/c++/13" ]; then
+        mkdir -p "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13"
+        cp -a /usr/include/x86_64-linux-gnu/c++/13/* "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13/" 2>/dev/null || true
+    fi
 fi
 
 # Copy documentation
@@ -204,18 +212,43 @@ if [ -d "${ROOTSYS}/lib" ]; then
     )
     for mod in "${ROOT_ESSENTIAL_MODULES[@]}"; do
         cp -a "${ROOTSYS}/lib/lib${mod}.so"* "${APPDIR}/usr/lib/" 2>/dev/null || true
-        cp -a "${ROOTSYS}/lib/lib${mod}_rdict.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
-        cp -a "${ROOTSYS}/lib/${mod}.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
     done
 
-    ROOT_CORE_PCMS=(
-        _Builtin_intrinsics _Builtin_stddef
-        Cling_Runtime Cling_Runtime_Extra
-        ROOT_Config ROOT_Foundation_C ROOT_Foundation_Stage1_NoRTTI ROOT_Rtypes
-        std libc
-    )
-    for pcm in "${ROOT_CORE_PCMS[@]}"; do
-        cp -a "${ROOTSYS}/lib/${pcm}.pcm" "${APPDIR}/usr/lib/" 2>/dev/null || true
+    # Bundle ALL CERN ROOT Cling precompiled modules (.pcm) to resolve all cross-module imports
+    # (e.g. MultiProc imported by Imt and MathCore, Thread, Matrix, Spectrum, Hist, etc.)
+    cp -a "${ROOTSYS}/lib/"*.pcm "${APPDIR}/usr/lib/" 2>/dev/null || true
+    ln -sf _Builtin_stddef.pcm "${APPDIR}/usr/lib/_Builtin_stddef_max_align_t.pcm" 2>/dev/null || true
+
+    # Create Cling compiler probe interceptor in usr/bin so Cling finds bundled C++ standard library
+    cat << 'INTERCEPTOR_EOF' > "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-11"
+#!/usr/bin/env bash
+SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_USR="$(dirname "$SELF_DIR")"
+
+for arg in "$@"; do
+    if [ "$arg" = "-xc++" ]; then
+        cat << PROBE_EOF
+#include <...> search starts here:
+ ${APP_USR}/include/c++/13
+ ${APP_USR}/include/x86_64-linux-gnu/c++/13
+ ${APP_USR}/include/c++/13/backward
+End of search list.
+PROBE_EOF
+        exit 0
+    fi
+done
+
+COMPILER_NAME="$(basename "$0")"
+HOST_COMPILER="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "^${SELF_DIR}" | tr '\n' ':')" which "$COMPILER_NAME" 2>/dev/null || true)"
+[ -z "$HOST_COMPILER" ] && HOST_COMPILER="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "^${SELF_DIR}" | tr '\n' ':')" which g++ 2>/dev/null || true)"
+if [ -n "$HOST_COMPILER" ] && [ -x "$HOST_COMPILER" ]; then
+    exec "$HOST_COMPILER" "$@"
+fi
+exit 0
+INTERCEPTOR_EOF
+    chmod +x "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-11"
+    for alt in x86_64-linux-gnu-g++-12 x86_64-linux-gnu-g++-13 x86_64-linux-gnu-g++-14 x86_64-linux-gnu-g++ g++ c++; do
+        ln -sf x86_64-linux-gnu-g++-11 "${APPDIR}/usr/bin/${alt}"
     done
 fi
 
@@ -308,7 +341,9 @@ export QT_STYLE_OVERRIDE="Fusion"
 # Configure embedded ROOT runtime
 export ROOTSYS="${APPDIR}/usr"
 export ROOT_CONFIG_SEARCH_PATH="${APPDIR}/usr/etc"
-export ROOT_INCLUDE_PATH="${APPDIR}/usr/include"
+export ROOT_INCLUDE_PATH="${APPDIR}/usr/include:${APPDIR}/usr/include/c++/13:${APPDIR}/usr/include/x86_64-linux-gnu/c++/13:${APPDIR}/usr/include/c++/13/backward"
+export CPLUS_INCLUDE_PATH="${APPDIR}/usr/include/c++/13:${APPDIR}/usr/include/x86_64-linux-gnu/c++/13:${APPDIR}/usr/include/c++/13/backward:${APPDIR}/usr/include:${CPLUS_INCLUDE_PATH}"
+export EXTRA_CLING_ARGS="-cxx-isystem ${APPDIR}/usr/include/c++/13 -cxx-isystem ${APPDIR}/usr/include/x86_64-linux-gnu/c++/13 -cxx-isystem ${APPDIR}/usr/include/c++/13/backward -I${APPDIR}/usr/include"
 if [ -f "${APPDIR}/usr/etc/system.rootrc" ]; then
     export ROOTRC="${APPDIR}/usr/etc/system.rootrc"
 fi

@@ -77,6 +77,12 @@ def build_html():
             )
             ch_html = markdown.markdown(ch_body_tagged, extensions=md_extensions)
             chapters_html_list.append(f'<section class="chapter-container" id="chapter-{ch_num}">\n{ch_html}\n</section>')
+            if ch_num == "2":
+                chapters_html_list.append(
+                    '<div class="toc-blank-verso">\n'
+                    '  <p><em>This page intentionally left blank for double-sided (duplex) printing.</em></p>\n'
+                    '</div>'
+                )
         else:
             ch_html = markdown.markdown(ch_raw, extensions=md_extensions)
             chapters_html_list.append(f'<div class="extra-section">\n{ch_html}\n</div>')
@@ -88,7 +94,7 @@ def build_html():
     colophon_html = """<div class="inside-cover-page">
   <div class="colophon">
     <div class="colophon-title">NuTrackN Official User Manual</div>
-    <div class="colophon-meta">Release Version 2.0.1 (2026 Edition)</div>
+    <div class="colophon-meta">Release Version 2.0.2 (2026 Edition)</div>
 
     <div class="colophon-block">
       <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
@@ -109,7 +115,7 @@ def build_html():
 
     <div class="colophon-block">
       <strong>Standard Academic Citation:</strong><br>
-      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.1, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.2, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
     </div>
 
     <div class="colophon-notice">
@@ -171,7 +177,7 @@ def build_html():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0.1)</title>
+  <title>NuTrackN User Manual (Version 2.0.2)</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -500,7 +506,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-right {{
-          content: "NuTrackN User Manual (v2.0.1)";
+          content: "NuTrackN User Manual (v2.0.2)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;
@@ -517,7 +523,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-left {{
-          content: "NuTrackN User Manual (v2.0.1)";
+          content: "NuTrackN User Manual (v2.0.2)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;

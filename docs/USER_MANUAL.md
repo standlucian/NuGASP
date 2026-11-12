@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0.1** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 2.0.2** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** (or **`F1`**) on the spectrum canvas at any time.
 
@@ -22,10 +22,10 @@
     - [2.4 Building from Source](#24-building-from-source)
     - [2.5 First Spectrum Walkthrough in 60 Seconds](#25-first-spectrum-walkthrough-in-60-seconds)
 - [3. Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
-    - [3.1 Supported Nuclear Spectroscopy Formats](#31-supported-nuclear-spectroscopy-formats)
-    - [3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#32-loading-spectra--multi-buffer-overlays-buffers-19)
+    - [3.1 Remote Data Acquisition & SSH Session Manager (`Ctrl+Shift+R`)](#31-remote-data-acquisition--ssh-session-manager-ctrlshiftr)
+    - [3.2 Supported Nuclear Spectroscopy Formats](#32-supported-nuclear-spectroscopy-formats)
     - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
-    - [3.4 Remote Data Acquisition & SSH Session Manager](#34-remote-data-acquisition--ssh-session-manager)
+    - [3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#34-loading-spectra--multi-buffer-overlays-buffers-19)
     - [3.5 Exporting Processed Data](#35-exporting-processed-data)
 - [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
     - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
@@ -150,12 +150,16 @@ NuTrackN is an actively maintained open-source environment. While the 2.0 releas
 - **Full CMAT Functionality Integration**: Native embedding of legacy CMAT utilities for coincidence matrix creation, projection, 2D inspection, and matrix symmetrization.
 - **Direct CERN ROOT Format Data Operations**: Reading, manipulating, and exporting native ROOT format data (`TH1`, `TH2`, and `TTree`) directly without intermediate ASCII conversion.
 
-#### 5. Interface Modernization & Batch Automation
+#### 5. Publication-Ready Figure & Spectra Image Generation
+- **Professional Spectra Image Creation for Publications Directly in NuTrackN**: Direct generation and export of publication-grade spectra figures formatted specifically for nuclear physics journals (Physical Review C, Physics Letters B, Nuclear Instruments and Methods in Physics Research, European Physical Journal A). Interactive design of multi-panel layouts, inset zoom cutouts, customized energy and channel dual-axes, customizable vector fonts, isotopic and decay callouts, multiplet fit decomposition curves, and publication-standard vector export (PDF, EPS, SVG) with configurable CMYK/RGB color profiles and high-resolution rasterization presets (up to 1200 DPI).
+- **Interactive Level Scheme Builder with Peak Identification**: Comprehensive nuclear decay and level scheme construction workspace embedded directly inside NuTrackN. Enables experimentalists to interactively build, modify, and render level schemes ($J^\pi$, excitation energies, branching ratios, transition multipolarities, half-lives) with automated peak identification and bidirectional cross-referencing against coincidence-gated spectra. Allows generating publication-ready vector figures of complete or partial level schemes featuring transition arrow thicknesses scaled proportionally to measured $\gamma$-ray intensities.
+
+#### 6. Interface Modernization & Batch Automation
 - **Remaking the Main Interface**: Redesigning the main application canvas, controls, and docking system for multi-monitor setups and flexible spectroscopy workflows.
 - **Terminal Operation & Headless Batch Processing**: Restoring full command execution via system terminal `stdin` and enabling headless batch processing flags to execute analysis pipelines with no GUI.
 - **Python & Scientific Ecosystem Integration**: Lightweight bindings and serialization bridges to manipulate NuTrackN calibration trajectories and spectra within NumPy, SciPy, and Jupyter environments.
 
-#### 6. In-App Auto-Updater (Future Dream)
+#### 7. In-App Auto-Updater (Future Dream)
 - **Seamless Release Tracking**: Automated, non-intrusive checking against the GitHub Releases API upon application launch to notify researchers of new stable releases and hotfixes.
 - **Zero-Friction In-Place Self-Updating**: One-click download, SHA-256 integrity verification, and binary delta replacement directly within the running application (both for Linux AppImages via AppImageUpdate and macOS DMG/bundle mounts), eliminating manual re-downloads and preserving custom configurations.
 
@@ -214,14 +218,14 @@ Under this "copyleft" license, you are free to inspect, run, modify, and redistr
 If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
 
 > **Text Citation:**  
-> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.1, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.2, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
 
 ```bibtex
 @misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.1},
+  version      = {2.0.2},
   institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -477,64 +481,129 @@ This 60-second walkthrough introduces the core keyboard workflow and real-time i
 
 ## 3. Data Input, Output (I/O) & File Management
 
-### 3.1 Supported Nuclear Spectroscopy Formats
-NuTrackN automatically detects and parses all standard nuclear physics data formats:
-- **Ortec Maestro (`.spe`, `.chn`)**: Standard multichannel analyzer ASCII and binary records with header timing and live/real time tags.
-- **Canberra Formats & Generic ASCII (`.txt`, `.dat`, `.csv`)**: Single-column counts or two-column $(Channel, Counts)$ with space, tab, or comma separation.
-- **Radware (`.spe`)**: Integer and floating-point Radware spectrum buffers.
-- **CERN ROOT Histograms (`.root`)**: 1D histograms (`TH1D`, `TH1F`, `TH1I`) and 2D matrices (`TH2D`).
-- **Compressed Coincidence Matrices (`.cmat`, `.mat`)**: GASPware symmetrized and raw 2D gamma coincidence matrices.
+### 3.1 Remote Data Acquisition & SSH Session Manager (`Ctrl+Shift+R`)
+During in-beam nuclear experiments and accelerator campaigns, raw spectrum files and calibration runs are typically acquired and stored on dedicated Data Acquisition (DAQ) computers or central storage clusters in the experimental hall. 
+
+Traditional nuclear physics analysis software required users to either manually transfer hundreds of spectrum files via external FTP/SCP tools, mount unstable network shares, or run the entire GUI over an SSH X11 forwarding tunnel (`ssh -X`). As highlighted in Chapter 2, X11 tunneling across network boundaries introduces severe rendering latency, dropped keypresses, and canvas desynchronization.
+
+NuTrackN eliminates these friction points by running 100% natively on your local workstation while embedding a high-performance **asynchronous SSH/SFTP client subsystem** directly into the interface:
+
+```text
+┌────────────────────────────────────────────────────────────────────────┐
+│           Connect to Remote Data Computer (SSH / SFTP)                 │
+├────────────────────────────────────────────────────────────────────────┤
+│ Saved Profiles: [ Tandem DAQ Node 1                ▼ ] [+ New] [Save]  │
+├────────────────────────────────────────────────────────────────────────┤
+│ Profile Name:   [ Tandem DAQ Node 1                                  ] │
+│ Host / IP:      [ 192.168.1.100              ]   Port: [ 22        ]   │
+│ Username:       [ data                                               ] │
+│ Authentication: (•) SSH Private Key (Recommended)  ( ) Password        │
+│ Key File:       [ ~/.ssh/id_ed25519                       ] [Browse..] │
+│ Passphrase:     [ ••••••••••••••••••••••••••                         ] │
+│ Remote Workdir: [ /data/exp2026/run_calib/                           ] │
+├────────────────────────────────────────────────────────────────────────┤
+│ [⚡ Test / Verify Connection]      [Disconnect]              [Connect] │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Step-by-Step Remote Connection Walkthrough:
+1. **Open the Remote Connection Manager**:
+   - Click the toolbar button labelled **`SSH Connect`** (located on the bottom action button grid of the primary canvas).
+   - Alternatively, press **`Ctrl+Shift+R`** from any active canvas.
+   - You can also click the **`🌐 Remote Server`** toggle button directly within the spectrum file open dialog (`NuFileDialog`).
+2. **Configure a Connection Profile**:
+   - **Saved Profiles**: Click **`+ New`** and enter an identifiable name in **Profile Name** (e.g., `Tandem DAQ Node 1` or `Storage Server Hall A`).
+   - **Host / IP Address & Port**: Enter the remote machine's IP address (e.g. `192.168.1.100`) or fully qualified domain name (`daq.physics.lab`), with the target SSH port (default: `22`).
+   - **Username**: Enter the remote user account name (e.g. `data`, `expuser`, or `gasp`).
+   - **Authentication Mode**:
+     - **SSH Private Key (Recommended)**: Select this radio button, click **`Browse...`**, and choose your private key file (e.g., `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`). If your key is encrypted with a passphrase, enter it in the **Password / Passphrase** field.
+     - **Password**: Select this option if key-based authentication is disabled on the remote server, and enter your account password.
+   - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`).
+3. **Verify Connection (`⚡ Test / Verify Connection`)**:
+   - Click **`⚡ Test / Verify Connection`**. NuTrackN performs an immediate pre-flight handshake in the background:
+     - Tests socket reachability and TCP latency.
+     - Validates host key fingerprint and cryptographic cipher exchange.
+     - Authenticates credentials and verifies read/execute permissions on the specified remote directory.
+   - If successful, a green verification banner confirms reachability and directory contents.
+4. **Establish Connection & Save**:
+   - Click **`Save`** to store the profile in your secure local configuration for instant 1-click access during upcoming beam shifts.
+   - Click **`Connect`**.
+5. **Live Status Badge & Tooltip**:
+   - Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: **`SSH: Tandem DAQ Node 1`**.
+   - Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.
+   - Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.
+
+#### Transparent Remote Browsing & Smart Local Caching:
+Once an SSH session is authenticated:
+- **Spectrum Reading (`N` or Toolbar `R`)**: The file open browser automatically defaults to your remote acquisition directory. You can browse remote directory trees over SFTP as smoothly as a local drive.
+- **Smart Session Caching**: When you select a remote spectrum file, NuTrackN streams the file over encrypted SFTP and caches it in a high-speed local session cache directory (`~/.cache/nutrackn/remote/...`). Subsequent operations on that spectrum execute at full native NVMe speed.
+- **Run-by-Run Calibration Integration**: Automated gain drift tracking downloads batch sequences and detector files asynchronously in background worker threads, displaying live transfer progress without ever freezing canvas rendering or GUI interaction.
+
+---
+
+### 3.2 Supported Nuclear Spectroscopy Formats
+NuTrackN automatically detects, parses, and validates all major nuclear and particle physics data formats without requiring manual format flag selection:
+- **Ortec Maestro (`.spe`, `.chn`)**: Standard multichannel analyzer ASCII and binary records with header metadata (live time, real time, acquisition date, and preset tags).
+- **Canberra Formats & Generic ASCII (`.dat`, `.txt`, `.csv`)**: Single-column integer/floating-point counts or two-column $(Channel, Counts)$ with space, tab, semicolon, or comma separation.
+- **Radware (`.spe`)**: Both 16-bit/32-bit integer and floating-point Radware spectrum buffers commonly utilized in heavy-ion γ-ray spectroscopy.
+- **CERN ROOT Histograms (`.root`)**: 1D histograms (`TH1D`, `TH1F`, `TH1I`) and 2D matrices (`TH2D`). When opening a ROOT file containing multiple histograms, an interactive object selection browser lets you choose the target spectrum.
+- **Compressed Coincidence Matrices (`.cmat`, `.mat`)**: GASPware symmetrized and raw 2D gamma-gamma coincidence matrices.
 
 > [!NOTE]
 > **Operating System File Association Policy:**  
 > To respect existing laboratory workstations and software installations (such as standalone CERN ROOT distributions, Radware suites, or Ortec Maestro), NuTrackN registers OS-level desktop file associations **exclusively for `.cmat` coincidence matrices**. It deliberately avoids registering associations for generic `.spe`, `.root`, `.chn`, or `.dat` files. All supported spectrum and histogram formats can be loaded seamlessly at any time from within NuTrackN via the file open dialog (`N` key or toolbar button).
 
-### 3.2 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)
-NuTrackN supports multi-pad canvas grids alongside multi-spectrum overlays on any individual pad:
-- **Multi-Pad Grid Layout**:
-  - Use **`Ctrl + →`** to add a new display column and **`Ctrl + ←`** to remove a column.
-  - Use **`Ctrl + ↑`** and **`Ctrl + ↓`** to add or remove display rows.
-  - Click inside any sub-window to make it the active pad (highlighted by a colored frame border).
-- **Multi-Buffer Overlays & Stepping**:
-  - Up to 9 spectra can be overlaid within the same pad (`HijC` overlay stack), each rendered with its distinct theme palette color.
-  - Use **`N` / `N+` / `*1`** and **`N-` / `*2`** to step forward or backward through spectra/detectors, and **`*3` (`R+` / `NR`)** or **`*4` (`R-` / `PR`)** to step forward or backward across experimental runs.
-  - *(Note: On the canvas keyboard, single digits **`0`–`9`** trigger stored numeric macros; see [Section 10.2](#102-numeric-macros-0-through-9--repetition-cycles)).*
-- **Cross-Pad & Overlay Synchronization**:
-  - Use **`SX`** / **`SY`** to propagate the active pad's horizontal (X) or vertical (Y) scale and linear/logarithmic mode across all visible sub-canvases and their overlaid spectra.
+---
 
 ### 3.3 Modern File Dialog (NuFileDialog) & Live Previews
-NuTrackN features an embedded high-speed file browser (`NuFileDialog`):
-- **Live Spectrum Mini-Preview**: Click any spectrum file to inspect its raw channel count and shape in real time before opening.
-- **Fast Navigation Bookmarks**: Quick access to experiment data directories, USB mount points, and home directories.
+NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`NuFileDialog`):
 
-### 3.4 Remote Data Acquisition & SSH Session Manager
-During in-beam accelerator experiments, acquisition data often resides on remote DAQ machines or storage nodes. NuTrackN includes a dedicated SSH Client and Session Manager:
+- **Location Switching (Local vs. Remote)**:
+  - The top bar features quick-toggle buttons between your local filesystem and the active remote server (**`🌐 Remote: user@host`**).
+  - Quick-navigation bookmarks provide 1-click shortcuts to the current experiment directory, USB media mount points, user home, and temporary scratch folders.
+- **Live Spectrum Mini-Preview**:
+  - Selecting any spectrum file in the file list instantly computes and renders a thumbnail preview of the spectrum shape, total counts, and channel length in the side inspector panel before you open it.
+- **Format Import Specifications Dialog**:
+  - When opening a raw or non-header ASCII data file, NuTrackN presents an interactive format specification dialog:
+    - **Channel Length**: Choose standard MCA bin sizes (1024, 2048, 4096, 8192, 16384) or autodetect from the line count.
+    - **Column Mapping**: Specify whether data is single-column (counts only) or two-column (channel index + counts).
+    - **Header Line Offset**: Set the number of leading metadata or commentary lines to skip.
+    - **Interactive Preview**: Inspect an interactive preview curve confirming that your import parameters properly unpack the spectrum shape.
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   Remote SSH Session Manager                           │
-├────────────────────────────────────────────────────────────────────────┤
-│ Host: daq-cluster.lab.internal     Port: 22     User: expuser          │
-│ Auth: [•] Private Key (~/.ssh/id_ed25519)   [ ] Password               │
-│ Remote Directory: /data/exp2026/run_calib/                              │
-│                                                                        │
-│ [Test Connection]                Status: Connected (Authenticated)     │
-└────────────────────────────────────────────────────────────────────────┘
-```
+---
 
-1. **Configuring Profiles**:
-   - Open the Remote Connect Dialog from the toolbar or calibration sequence selector.
-   - Enter Host IP/hostname, Port (default: 22), Username, and select SSH Key Authentication (`.pem`, `.id_rsa`, `id_ed25519`) or Password.
-   - Save the profile for instant 1-click reconnection in future sessions.
-2. **Browsing & Auto-Syncing**:
-   - The remote file dialog allows navigating remote directories seamlessly.
-   - When running Run-by-Run Drift Alignment, NuTrackN downloads remote run files asynchronously in background threads with live progress bars, caching them locally in your working session.
+### 3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)
+NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overlays on any individual pad:
+
+#### Multi-Pad Grid Layout:
+- **`Ctrl + →`**: Add a new display column to the canvas grid.
+- **`Ctrl + ←`**: Remove a display column.
+- **`Ctrl + ↑`**: Add a new display row.
+- **`Ctrl + ↓`**: Remove a display row.
+- **Pad Selection**: Click inside any sub-window to set it as the active pad (highlighted with an accent border). All keyboard hotkeys, marker placements, and zooms immediately apply to the active pad.
+
+#### Multi-Buffer Overlays & Stepping (Buffers 1–9):
+- **Overlay Stack (`HijC`)**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
+- **Detector / Spectrum Stepping**:
+  - Press **`N`** (or **`N+`** / **`*1`**) to advance to the next spectrum/detector in the sequence.
+  - Press **`N-`** (or **`*2`**) to step backward to the previous spectrum/detector.
+- **Run Stepping**:
+  - Press **`*3`** (or **`R+`** / **`NR`**) to advance to the next experimental acquisition run.
+  - Press **`*4`** (or **`R-`** / **`PR`**) to step back to the previous experimental acquisition run.
+  - *(Note: On the canvas keyboard, bare digits **`0`–`9`** trigger stored numeric macros; see [Section 10.3](#103-numeric-macros-0-through-9--repetition-cycles)).*
+
+#### Cross-Pad & Overlay Synchronization:
+- **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
+- **`SY`**: Propagate the active pad's vertical count scale (maximum, minimum, and linear/logarithmic mode) across all visible sub-pads.
+
+---
 
 ### 3.5 Exporting Processed Data
-- **`OS`**: Export the active spectrum data (channel, calibrated energy, counts) to a space-delimited ASCII table.
-- **`O=`**: Generate a publication-quality vector PostScript (`.ps`) or PDF graphic of the current canvas view.
-- **`DF`**: Designate an output report logfile for automated recording of peak integration areas and fit parameters.
-- **`ZF`**: Close the active area calculation logfile.
+NuTrackN provides dedicated export facilities for numerical analysis, reporting, and publication graphics:
+- **Export ASCII Table (`OS`)**: Export the active spectrum data (channel index, calibrated energy in keV, count value) to a clean, space-delimited text file.
+- **Publication Graphics (`O=`)**: Generate a publication-quality vector PostScript (`.ps`) or PDF graphic of the current canvas view, preserving high-DPI fonts and axis lines.
+- **Designate Calculation Logfile (`DF`)**: Specify an output report text file. Once opened, every subsequent peak integration area, centroid, and FWHM calculated with **`CI`** or **`CJ`** is automatically appended to this logfile.
+- **Close Calculation Logfile (`ZF`)**: Cleanly close the active peak calculation logfile.
 
 ---
 
