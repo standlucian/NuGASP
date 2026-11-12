@@ -1189,7 +1189,7 @@ cat ~/.ssh/id_ed25519.pub | ssh user@192.168.1.xxx "mkdir -p ~/.ssh &amp;&amp; c
 <li><strong>Single vs. Chained (Multi-Spectrum) Files</strong>:<ul>
 <li>Both binary and ASCII files can contain either a <strong>single spectrum</strong> or <strong>multiple chained/concatenated spectra</strong> (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).</li>
 <li><strong>Automatic Heuristic Detection &amp; User Verification</strong>: Upon selecting a file, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k) to make an educated guess of the format, channel length, and number of chained spectra. Because raw stream files lack embedded format headers, <strong>heuristic detection can occasionally guess incorrectly</strong> (e.g. distinguishing 32-bit floats from 32-bit integers, or unusual detector segment counts). Users should <strong>always double-check the suggested settings against the interactive spectrum preview curve</strong> displayed in the import dialog before accepting.</li>
-<li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or cycle through detectors sequentially on the canvas using the <strong><code>1</code></strong> (next detector) and <strong><code>2</code></strong> (previous detector) numeric macro hotkeys.</li>
+<li><strong>Index Stepping &amp; Navigation</strong>: When a chained file is opened, you can select the active spectrum index directly in the import dialog, cycle through detectors using the <strong><code>1</code></strong> (next detector) and <strong><code>2</code></strong> (previous detector) numeric macro hotkeys, or use the <strong><code># +</code></strong> / <strong><code># -</code></strong> toolbar buttons.</li>
 <li><strong>Multi-Spectrum Export (<code>SpectrumExportDialog</code>)</strong>: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.</li>
 </ul>
 </li>
@@ -1243,14 +1243,31 @@ NuTrackN registers OS-level desktop file associations <strong>exclusively for <c
 <ul>
 <li><strong>Overlay Stack (<code>HijC</code>)</strong>: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.</li>
 <li><strong>Detector / Spectrum Stepping in Linked Spectra</strong>:<ul>
-<li>Press <strong><code>1</code></strong> (executes Macro #1 <code>*1</code>): Advance to the next spectrum/detector in the sequence.</li>
-<li>Press <strong><code>2</code></strong> (executes Macro #2 <code>*2</code>): Step backward to the previous spectrum/detector in the sequence.</li>
+<li>Press <strong><code>1</code></strong> (executes Macro #1 <code>*1</code>) or click toolbar <strong><code># +</code></strong>: Advance to the next spectrum/detector in the sequence.</li>
+<li>Press <strong><code>2</code></strong> (executes Macro #2 <code>*2</code>) or click toolbar <strong><code># -</code></strong>: Step backward to the previous spectrum/detector in the sequence.</li>
 <li><em>(Note: Pressing </em><em><code>N</code></em><em> on the canvas opens the Spectrum File Open Dialog. Within macro command strings, the tokens <code>*1</code> or <code>N+</code> advance the spectrum index, and <code>*2</code> or <code>N-</code> decrement it).</em></li>
 </ul>
 </li>
 <li><strong>Run Stepping</strong>:<ul>
-<li>Press <strong><code>3</code></strong> (executes Macro #3 <code>*3</code>): Advance to the next experimental acquisition run file.</li>
-<li>Press <strong><code>4</code></strong> (executes Macro #4 <code>*4</code>): Step back to the previous experimental acquisition run file.</li>
+<li>Press <strong><code>3</code></strong> (executes Macro #3 <code>*3</code>) or <strong>Right-Click</strong> toolbar <strong><code># +</code></strong>: Advance to the next experimental acquisition run file.</li>
+<li>Press <strong><code>4</code></strong> (executes Macro #4 <code>*4</code>) or <strong>Right-Click</strong> toolbar <strong><code># -</code></strong>: Step back to the previous experimental acquisition run file.</li>
+</ul>
+</li>
+<li><strong>The Multi-Action <code>#-</code> and <code>#+</code> Toolbar Buttons</strong>:<ul>
+<li><strong><code># +</code> (Next Spectrum / Run)</strong>:<ul>
+<li><strong>Left-Click</strong>: Next detector spectrum in linked file (<code>*1</code>).</li>
+<li><strong>Right-Click</strong>: Next run file in active sequence (<code>*3</code>).</li>
+<li><strong>Ctrl + Left-Click</strong>: Execute Macro #1.</li>
+<li><strong>Ctrl + Right-Click</strong>: Execute Macro #3.</li>
+</ul>
+</li>
+<li><strong><code>#-</code> (Previous Spectrum / Run)</strong>:<ul>
+<li><strong>Left-Click</strong>: Previous detector spectrum in linked file (<code>*2</code>).</li>
+<li><strong>Right-Click</strong>: Previous run file in active sequence (<code>*4</code>).</li>
+<li><strong>Ctrl + Left-Click</strong>: Execute Macro #2.</li>
+<li><strong>Ctrl + Right-Click</strong>: Execute Macro #4.</li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -1790,6 +1807,16 @@ NuTrackN's development currently focuses on intuitive, user-friendly graphical d
 <td style="text-align: left;"><strong><code>4</code> (Macro 4 / <code>*4</code>)</strong></td>
 <td style="text-align: left;"><strong>Previous Run</strong></td>
 <td style="text-align: left;">Decrement to previous experimental acquisition run file</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code># +</code> (Toolbar)</strong></td>
+<td style="text-align: left;"><strong>Next Spectrum / Run</strong></td>
+<td style="text-align: left;">Left-click: next detector (<code>*1</code>); Right-click: next run (<code>*3</code>); Ctrl: Macro 1 / 3</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong><code>#-</code> (Toolbar)</strong></td>
+<td style="text-align: left;"><strong>Prev Spectrum / Run</strong></td>
+<td style="text-align: left;">Left-click: prev detector (<code>*2</code>); Right-click: prev run (<code>*4</code>); Ctrl: Macro 2 / 4</td>
 </tr>
 <tr>
 <td style="text-align: left;"><strong><code>OR</code> / <code>DR</code> / <code>SSH</code></strong></td>

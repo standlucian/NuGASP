@@ -583,7 +583,7 @@ NuTrackN operates strictly and natively on the fundamental data structures of nu
 4. **Single vs. Chained (Multi-Spectrum) Files**:
     - Both binary and ASCII files can contain either a **single spectrum** or **multiple chained/concatenated spectra** (e.g. multi-detector arrays where detector spectra 0, 1, 2, ... are sequentially stored in one file).
     - **Automatic Heuristic Detection & User Verification**: Upon selecting a file, NuTrackN inspects the total byte size, printable ASCII ratio, and standard channel multiples (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k) to make an educated guess of the format, channel length, and number of chained spectra. Because raw stream files lack embedded format headers, **heuristic detection can occasionally guess incorrectly** (e.g. distinguishing 32-bit floats from 32-bit integers, or unusual detector segment counts). Users should **always double-check the suggested settings against the interactive spectrum preview curve** displayed in the import dialog before accepting.
-    - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, or cycle through detectors sequentially on the canvas using the **`1`** (next detector) and **`2`** (previous detector) numeric macro hotkeys.
+    - **Index Stepping & Navigation**: When a chained file is opened, you can select the active spectrum index directly in the import dialog, cycle through detectors using the **`1`** (next detector) and **`2`** (previous detector) numeric macro hotkeys, or use the **`# +`** / **`# -`** toolbar buttons.
     - **Multi-Spectrum Export (`SpectrumExportDialog`)**: When exporting, you can choose to overwrite the file, append a new spectrum to the end of an existing file, or replace a spectrum at a specific target index.
 
 > [!NOTE]
@@ -626,12 +626,23 @@ NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overl
 #### Multi-Buffer Overlays & Stepping (Buffers 1–9):
 - **Overlay Stack (`HijC`)**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
 - **Detector / Spectrum Stepping in Linked Spectra**:
-    - Press **`1`** (executes Macro #1 `*1`): Advance to the next spectrum/detector in the sequence.
-    - Press **`2`** (executes Macro #2 `*2`): Step backward to the previous spectrum/detector in the sequence.
+    - Press **`1`** (executes Macro #1 `*1`) or click toolbar **`# +`**: Advance to the next spectrum/detector in the sequence.
+    - Press **`2`** (executes Macro #2 `*2`) or click toolbar **`# -`**: Step backward to the previous spectrum/detector in the sequence.
     - *(Note: Pressing **`N`** on the canvas opens the Spectrum File Open Dialog. Within macro command strings, the tokens `*1` or `N+` advance the spectrum index, and `*2` or `N-` decrement it).*
 - **Run Stepping**:
-    - Press **`3`** (executes Macro #3 `*3`): Advance to the next experimental acquisition run file.
-    - Press **`4`** (executes Macro #4 `*4`): Step back to the previous experimental acquisition run file.
+    - Press **`3`** (executes Macro #3 `*3`) or **Right-Click** toolbar **`# +`**: Advance to the next experimental acquisition run file.
+    - Press **`4`** (executes Macro #4 `*4`) or **Right-Click** toolbar **`# -`**: Step back to the previous experimental acquisition run file.
+- **The Multi-Action `#-` and `#+` Toolbar Buttons**:
+    - **`# +` (Next Spectrum / Run)**:
+        - **Left-Click**: Next detector spectrum in linked file (`*1`).
+        - **Right-Click**: Next run file in active sequence (`*3`).
+        - **Ctrl + Left-Click**: Execute Macro #1.
+        - **Ctrl + Right-Click**: Execute Macro #3.
+    - **`#-` (Previous Spectrum / Run)**:
+        - **Left-Click**: Previous detector spectrum in linked file (`*2`).
+        - **Right-Click**: Previous run file in active sequence (`*4`).
+        - **Ctrl + Left-Click**: Execute Macro #2.
+        - **Ctrl + Right-Click**: Execute Macro #4.
 
 #### Cross-Pad & Overlay Synchronization:
 - **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
@@ -1132,6 +1143,8 @@ Please write me
 | **`2` (Macro 2 / `*2`)** | **Prev Spectrum / Det** | Step to previous spectrum / detector index in linked/chained file |
 | **`3` (Macro 3 / `*3`)** | **Next Run** | Increment to next experimental acquisition run file |
 | **`4` (Macro 4 / `*4`)** | **Previous Run** | Decrement to previous experimental acquisition run file |
+| **`# +` (Toolbar)** | **Next Spectrum / Run** | Left-click: next detector (`*1`); Right-click: next run (`*3`); Ctrl: Macro 1 / 3 |
+| **`#-` (Toolbar)** | **Prev Spectrum / Run** | Left-click: prev detector (`*2`); Right-click: prev run (`*4`); Ctrl: Macro 2 / 4 |
 | **`OR` / `DR` / `SSH`** | **Remote Data (SSH)** | Open Remote Data Acquisition & SSH Session Manager |
 | **`OS`** | **Output Spectrum** | Export current spectrum data to ASCII / CSV |
 | **`O=`** | **Output Plot** | Generate vector PostScript / PDF of current view |
