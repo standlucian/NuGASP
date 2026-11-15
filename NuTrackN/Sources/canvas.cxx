@@ -686,8 +686,12 @@ void QMainCanvas::clicked1()
 {
     QString remotePath;
     bool isRemote = false;
+    QString initialDir;
+    if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+        initialDir = QFileInfo(m_currentSpectrumFile).absolutePath();
+    }
     QString fileName = NuFileDialog::getOpenSpectrum(
-        this, tr("Open Spectrum File"), QString(), &remotePath, &isRemote);
+        this, tr("Open Spectrum File"), initialDir, &remotePath, &isRemote);
 
     // If the dialog was cancelled or no file was chosen, keep the existing spectrum
     // untouched and restore keyboard focus to the spectrum canvas
@@ -716,9 +720,12 @@ void QMainCanvas::clicked1()
     
     double prevXMin = 0, prevXMax = 0, prevYMin = 0, prevYMax = 0;
     bool hasPrevScale = false;
+    bool wasZoomed = false;
     if (m_loadBehavior == LoadBehavior::PreserveScale && trackHist->GetXaxis()) {
-        prevXMin = trackHist->GetXaxis()->GetFirst();
-        prevXMax = trackHist->GetXaxis()->GetLast();
+        TAxis *oldXAxis = trackHist->GetXaxis();
+        wasZoomed = (oldXAxis->GetFirst() > 1 || oldXAxis->GetLast() < oldXAxis->GetNbins());
+        prevXMin = oldXAxis->GetBinLowEdge(oldXAxis->GetFirst());
+        prevXMax = oldXAxis->GetBinUpEdge(oldXAxis->GetLast());
         prevYMin = trackHist->GetMinimum();
         prevYMax = trackHist->GetMaximum();
         hasPrevScale = true;
@@ -771,11 +778,14 @@ void QMainCanvas::clicked1()
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
     if (m_loadBehavior == LoadBehavior::PreserveScale && hasPrevScale) {
-        HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(
-            trackHist->GetXaxis()->GetBinLowEdge(prevXMin), 
-            trackHist->GetXaxis()->GetBinUpEdge(prevXMax));
-        HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYMin);
-        HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYMax);
+        if (wasZoomed) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(prevXMin, prevXMax);
+        }
+        if (prevYMax > prevYMin) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(prevYMin, prevYMax);
+            HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYMin);
+            HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYMax);
+        }
     } else {
         // Autoscale behavior
         // If zoom markers are present, preserve the zoomed region and adjust Ymax
@@ -804,7 +814,8 @@ void QMainCanvas::clicked1()
     m_currentSpectrumFile = fileName;
     m_currentSpectrumIndex = importDlg.getSelectedSpectrumIndex();
     m_currentSpectrumCount = importDlg.getTotalSpectraCount();
-    m_currentSpectrumLength = importDlg.getSelectedLength();
+    const int selectedLen = importDlg.getSelectedLength();
+    m_currentSpectrumLength = (selectedLen > 0) ? selectedLen : static_cast<int>(spectrumData.size());
     m_currentSpectrumFormat = importDlg.getSelectedFormat();
 
     if (labelSpectrumFile) {
@@ -814,6 +825,11 @@ void QMainCanvas::clicked1()
             disp += QString("#%1").arg(m_currentSpectrumIndex);
         }
         labelSpectrumFile->setText(disp);
+    }
+    if (labelWorkingPath) {
+        QString dirDisp = isRemote ? QFileInfo(remotePath).path()
+                                   : QFileInfo(fileName).absolutePath();
+        labelWorkingPath->setText(dirDisp);
     }
     updateAxisStatusLabels();
 
@@ -1341,7 +1357,11 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
     maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
         HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
 
-    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    if (maxElement_i > 1 || maxElement_j > 1) {
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    } else {
+        canvas->getCanvas()->cd();
+    }
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
     // Redraw all previous spectra in HijC with "SAME" option
@@ -1349,7 +1369,11 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
         if (HijC[SelectedElement_i][SelectedElement_j][k]) {
             HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
                 colors_hist[k % colors_hist.size()]);
-            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            if (maxElement_i > 1 || maxElement_j > 1) {
+                canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            } else {
+                canvas->getCanvas()->cd();
+            }
             HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
         }
     }
@@ -1359,8 +1383,11 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
     canvas->getCanvas()->Update();
 
     if (labelSpectrumFile) {
+        QString baseDisp = !m_currentRemotePath.isEmpty()
+                               ? QString("[Remote] %1").arg(QFileInfo(m_currentRemotePath).fileName())
+                               : QFileInfo(m_currentSpectrumFile).fileName();
         QString disp = QString("%1#%2")
-                           .arg(QFileInfo(m_currentSpectrumFile).fileName())
+                           .arg(baseDisp)
                            .arg(m_currentSpectrumIndex);
         labelSpectrumFile->setText(disp);
     }
@@ -1625,11 +1652,32 @@ void QMainCanvas::stepRun(int delta)
     }
 
     // Multi-spectrum / 1D Spectrum run file
+    // Preserve the user-confirmed format and channel length from the active run sequence
     const int targetDetIndex = m_currentSpectrumIndex;
     SpectrumDetectionResult det = AutoDetectSpectrumFile(targetFilePath.toStdString());
-    SpectrumFormat fmt = !det.confidenceReason.isEmpty() ? det.guessedFormat : m_currentSpectrumFormat;
-    int length = !det.confidenceReason.isEmpty() ? det.guessedLength : m_currentSpectrumLength;
-    int totalCount = !det.confidenceReason.isEmpty() ? det.numSpectra : m_currentSpectrumCount;
+    SpectrumFormat fmt = m_currentSpectrumFormat;
+    int length = (m_currentSpectrumLength > 0) ? m_currentSpectrumLength : det.guessedLength;
+    int totalCount = m_currentSpectrumCount;
+    if (length > 0 && det.fileSize > 0) {
+        switch (fmt) {
+            case SpectrumFormat::ShortInt16:
+                totalCount = std::max(1, static_cast<int>(det.fileSize / sizeof(uint16_t)) / length);
+                break;
+            case SpectrumFormat::LongInt32:
+            case SpectrumFormat::Float32:
+                totalCount = std::max(1, static_cast<int>(det.fileSize / sizeof(uint32_t)) / length);
+                break;
+            case SpectrumFormat::Double64:
+                totalCount = std::max(1, static_cast<int>(det.fileSize / sizeof(double)) / length);
+                break;
+            case SpectrumFormat::Ascii:
+            case SpectrumFormat::Auto:
+                if (det.totalChannelsFound > 0) {
+                    totalCount = std::max(1, det.totalChannelsFound / length);
+                }
+                break;
+        }
+    }
 
     int detIndexToLoad = targetDetIndex;
     if (detIndexToLoad >= totalCount) {
@@ -1742,7 +1790,11 @@ void QMainCanvas::stepRun(int delta)
         HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
     selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
 
-    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    if (maxElement_i > 1 || maxElement_j > 1) {
+        canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    } else {
+        canvas->getCanvas()->cd();
+    }
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
     // Redraw all previous spectra in HijC with "SAME" option
@@ -1750,7 +1802,11 @@ void QMainCanvas::stepRun(int delta)
         if (HijC[SelectedElement_i][SelectedElement_j][k]) {
             HijC[SelectedElement_i][SelectedElement_j][k]->SetLineColor(
                 colors_hist[k % colors_hist.size()]);
-            canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            if (maxElement_i > 1 || maxElement_j > 1) {
+                canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+            } else {
+                canvas->getCanvas()->cd();
+            }
             HijC[SelectedElement_i][SelectedElement_j][k]->Draw("SAME");
         }
     }

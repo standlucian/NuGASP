@@ -72,13 +72,6 @@ public:
     const std::string &GetSourceFilePath() const { return fSourceFilePath; }
 
     /**
-     * @brief Loads spectrum data from a file (supports binary uint32 and ASCII formats).
-     * @param filename Path to the spectrum file.
-     * @return True if loading was successful, false otherwise.
-     */
-    bool LoadFromFile(const std::string &filename);
-
-    /**
      * @brief Loads spectrum data from an in-memory vector of channel counts.
      * @param data Vector of channel count values.
      * @param sourcePath Optional path to the source file for display/provenance.

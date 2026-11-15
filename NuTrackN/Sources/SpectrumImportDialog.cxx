@@ -22,6 +22,7 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <cstring>
 #include <algorithm>
 #include <cctype>
 
@@ -106,17 +107,51 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
         res.guessedFormat = SpectrumFormat::Ascii;
         res.totalChannelsFound = countTokens;
 
-        // Determine nearest standard 1024 multiple or exact count
-        if (countTokens <= 1024) res.guessedLength = 1024;
-        else if (countTokens <= 2048) res.guessedLength = 2048;
-        else if (countTokens <= 4096) res.guessedLength = 4096;
-        else if (countTokens <= 8192) res.guessedLength = 8192;
-        else if (countTokens <= 10240) res.guessedLength = 10240;
-        else if (countTokens <= 16384) res.guessedLength = 16384;
-        else if (countTokens <= 32768) res.guessedLength = 32768;
-        else res.guessedLength = countTokens;
+        // Check exact single-spectrum standard sizes first, then multi-spectrum multiples
+        const bool isExactSingleAscii = (countTokens == 1024 || countTokens == 2048 ||
+                                         countTokens == 4096 || countTokens == 8192 ||
+                                         countTokens == 10240 || countTokens == 16384 ||
+                                         countTokens == 32768 || countTokens == 65536);
+        if (isExactSingleAscii) {
+            res.guessedLength = countTokens;
+            res.numSpectra = 1;
+        } else if (countTokens > 1024 && countTokens % 65536 == 0 && (countTokens / 65536) <= 64) {
+            res.guessedLength = 65536;
+            res.numSpectra = countTokens / 65536;
+        } else if (countTokens > 1024 && countTokens % 32768 == 0 && (countTokens / 32768) <= 64) {
+            res.guessedLength = 32768;
+            res.numSpectra = countTokens / 32768;
+        } else if (countTokens > 1024 && countTokens % 16384 == 0 && (countTokens / 16384) <= 128) {
+            res.guessedLength = 16384;
+            res.numSpectra = countTokens / 16384;
+        } else if (countTokens > 1024 && countTokens % 10240 == 0) {
+            res.guessedLength = 10240;
+            res.numSpectra = countTokens / 10240;
+        } else if (countTokens > 1024 && countTokens % 8192 == 0 && (countTokens / 8192) <= 128) {
+            res.guessedLength = 8192;
+            res.numSpectra = countTokens / 8192;
+        } else if (countTokens > 1024 && countTokens % 4096 == 0) {
+            res.guessedLength = 4096;
+            res.numSpectra = countTokens / 4096;
+        } else if (countTokens > 1024 && countTokens % 2048 == 0) {
+            res.guessedLength = 2048;
+            res.numSpectra = countTokens / 2048;
+        } else if (countTokens > 1024 && countTokens % 1024 == 0) {
+            res.guessedLength = 1024;
+            res.numSpectra = countTokens / 1024;
+        } else {
+            if (countTokens <= 1024) res.guessedLength = 1024;
+            else if (countTokens <= 2048) res.guessedLength = 2048;
+            else if (countTokens <= 4096) res.guessedLength = 4096;
+            else if (countTokens <= 8192) res.guessedLength = 8192;
+            else if (countTokens <= 10240) res.guessedLength = 10240;
+            else if (countTokens <= 16384) res.guessedLength = 16384;
+            else if (countTokens <= 32768) res.guessedLength = 32768;
+            else if (countTokens <= 65536) res.guessedLength = 65536;
+            else res.guessedLength = countTokens;
+            res.numSpectra = 1;
+        }
 
-        res.numSpectra = std::max(1, countTokens / res.guessedLength);
         if (res.numSpectra > 1) {
             res.confidenceReason = QString("Multi-spectrum ASCII: %1 spectra of %2 channels (%3 values total)")
                                        .arg(res.numSpectra).arg(res.guessedLength).arg(countTokens);
@@ -128,7 +163,38 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
     }
 
     // 2. Binary File Heuristics
-    // Check known 32-bit integer size multiples (4 bytes per channel)
+    // Check whether 4-byte binary words represent IEEE-754 floats rather than 32-bit integers
+    SpectrumFormat fourByteFormat = SpectrumFormat::LongInt32;
+    QString fourByteFormatLabel = "32-bit int";
+    if (fileSize % 4 == 0 && probeSize >= 4) {
+        std::size_t nonZeroWords = 0;
+        std::size_t hugeIntWords = 0;
+        std::size_t validFloatWords = 0;
+        const std::size_t numWords = probeSize / 4;
+        for (std::size_t w = 0; w < numWords; ++w) {
+            uint32_t uval = 0;
+            float fval = 0.0f;
+            std::memcpy(&uval, probeBuffer.data() + w * 4, 4);
+            std::memcpy(&fval, probeBuffer.data() + w * 4, 4);
+            if (uval != 0) {
+                nonZeroWords++;
+                if (uval > 100000000U) {
+                    hugeIntWords++;
+                }
+                if (std::isfinite(fval) && std::abs(fval) >= 1e-4f && std::abs(fval) <= 1e9f) {
+                    validFloatWords++;
+                }
+            }
+        }
+        if (nonZeroWords > 0 &&
+            static_cast<double>(hugeIntWords) / nonZeroWords > 0.80 &&
+            static_cast<double>(validFloatWords) / nonZeroWords > 0.80) {
+            fourByteFormat = SpectrumFormat::Float32;
+            fourByteFormatLabel = "32-bit float";
+        }
+    }
+
+    // Check known 4-byte size multiples (4 bytes per channel)
     int candidateChannels32 = static_cast<int>(fileSize / 4);
 
     bool matchesStandard32 = false;
@@ -142,18 +208,18 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
     else if (fileSize == 262144){ res.guessedLength = 65536; matchesStandard32 = true; } // 64k channels
 
     if (matchesStandard32) {
-        res.guessedFormat = SpectrumFormat::LongInt32;
+        res.guessedFormat = fourByteFormat;
         res.totalChannelsFound = res.guessedLength;
         res.numSpectra = 1;
-        res.confidenceReason = QString("Binary: exact match for %1-channel 32-bit integer spectrum (%2 bytes)")
-                                   .arg(res.guessedLength).arg(fileSize);
-        ReadSpectrumData(filename, SpectrumFormat::LongInt32, res.guessedLength, 0, res.sampleCounts);
+        res.confidenceReason = QString("Binary: exact match for %1-channel %2 spectrum (%3 bytes)")
+                                   .arg(res.guessedLength).arg(fourByteFormatLabel).arg(fileSize);
+        ReadSpectrumData(filename, res.guessedFormat, res.guessedLength, 0, res.sampleCounts);
         return res;
     }
 
-    // Check multi-spectrum 32-bit files (divisible by 4 bytes/channel)
-    if (fileSize % 4 == 0 && candidateChannels32 > 10240) {
-        res.guessedFormat = SpectrumFormat::LongInt32;
+    // Check multi-spectrum 4-byte files (divisible by 4 bytes/channel)
+    if (fileSize % 4 == 0 && candidateChannels32 > 1024) {
+        res.guessedFormat = fourByteFormat;
         res.totalChannelsFound = candidateChannels32;
         // Check standard nuclear spectroscopy multi-spectrum detector sizes
         // Prioritize realistic array sizes (e.g. up to ~64 HPGe detectors) from 64k down to 1k
@@ -182,13 +248,13 @@ SpectrumDetectionResult AutoDetectSpectrumFile(const std::string &filename)
             res.guessedLength = 1024;
             res.numSpectra = candidateChannels32 / 1024;
         } else {
-            res.guessedLength = 4096;
-            res.numSpectra = std::max(1, candidateChannels32 / 4096);
+            res.guessedLength = (candidateChannels32 >= 4096) ? 4096 : candidateChannels32;
+            res.numSpectra = std::max(1, candidateChannels32 / res.guessedLength);
         }
 
-        res.confidenceReason = QString("Multi-spectrum binary: %1 spectra of %2 channels (32-bit int, %3 bytes)")
-                                   .arg(res.numSpectra).arg(res.guessedLength).arg(fileSize);
-        ReadSpectrumData(filename, SpectrumFormat::LongInt32, res.guessedLength, 0, res.sampleCounts);
+        res.confidenceReason = QString("Multi-spectrum binary: %1 spectra of %2 channels (%3, %4 bytes)")
+                                   .arg(res.numSpectra).arg(res.guessedLength).arg(fourByteFormatLabel).arg(fileSize);
+        ReadSpectrumData(filename, res.guessedFormat, res.guessedLength, 0, res.sampleCounts);
         return res;
     }
 
@@ -723,10 +789,49 @@ int SpectrumImportDialog::getSelectedSpectrumIndex() const
 void SpectrumImportDialog::recalculateSpectraCount()
 {
     const int len = getSelectedLength();
-    if (len <= 0 || m_detected.totalChannelsFound <= 0) {
+    const SpectrumFormat fmt = getSelectedFormat();
+
+    int totalChannelsForFormat = m_detected.totalChannelsFound;
+    if (m_detected.fileSize > 0) {
+        switch (fmt) {
+            case SpectrumFormat::ShortInt16:
+                totalChannelsForFormat = static_cast<int>(m_detected.fileSize / sizeof(uint16_t));
+                break;
+            case SpectrumFormat::LongInt32:
+            case SpectrumFormat::Float32:
+                totalChannelsForFormat = static_cast<int>(m_detected.fileSize / sizeof(uint32_t));
+                break;
+            case SpectrumFormat::Double64:
+                totalChannelsForFormat = static_cast<int>(m_detected.fileSize / sizeof(double));
+                break;
+            case SpectrumFormat::Ascii:
+            case SpectrumFormat::Auto:
+                if (m_detected.guessedFormat != SpectrumFormat::Ascii || totalChannelsForFormat <= 0) {
+                    std::ifstream asciiFile(m_filePath.toStdString());
+                    std::string line;
+                    int countTokens = 0;
+                    double val = 0.0;
+                    while (std::getline(asciiFile, line)) {
+                        if (line.empty()) continue;
+                        std::size_t firstPos = line.find_first_not_of(" \t\r\n");
+                        if (firstPos == std::string::npos) continue;
+                        char first = line[firstPos];
+                        if (first == '#' || first == '!' || first == ';' || first == '$') continue;
+                        std::istringstream iss(line);
+                        while (iss >> val) {
+                            countTokens++;
+                        }
+                    }
+                    totalChannelsForFormat = countTokens;
+                }
+                break;
+        }
+    }
+
+    if (len <= 0 || totalChannelsForFormat <= 0) {
         m_totalSpectra = 1;
     } else {
-        m_totalSpectra = std::max(1, m_detected.totalChannelsFound / len);
+        m_totalSpectra = std::max(1, totalChannelsForFormat / len);
     }
 
     const bool hasMultiple = (m_totalSpectra > 1);
