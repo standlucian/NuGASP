@@ -1399,6 +1399,26 @@ void RunByRunManager::onBrowseRunsClicked()
         } else {
             m_runFilePaths.push_back(selectedFiles.front());
         }
+    } else if (selectedFiles.size() == 1 && isRemote && !remotePaths.isEmpty()) {
+        // Single remote file selected: auto-discover sibling run sequence on remote host
+        QString singleRemote = remotePaths.front();
+        QFileInfo rfi(singleRemote);
+        QString remoteDir = rfi.dir().path();
+        QString fileName = rfi.fileName();
+        int lastDot = fileName.lastIndexOf('.');
+        m_commonPrefix = (lastDot > 0) ? fileName.left(lastDot + 1) : fileName;
+
+        auto sess = RemoteSession::globalSession();
+        std::vector<RemoteFileInfo> remoteSiblings;
+        if (sess && sess->isConnected() && sess->listRunFiles(remoteDir, fileName, remoteSiblings) && remoteSiblings.size() > 1) {
+            for (const auto &info : remoteSiblings) {
+                m_remoteRunPaths.push_back(info.fullPath);
+                m_runFilePaths.push_back(sess->getLocalCachePath(info.fullPath));
+            }
+        } else {
+            m_remoteRunPaths.push_back(singleRemote);
+            m_runFilePaths.push_back(selectedFiles.front());
+        }
     } else {
         // Multiple files selected (or remote runs): sort naturally by numeric file order
         struct RunSortItem {

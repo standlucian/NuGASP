@@ -17,7 +17,6 @@
 #include "HelpDialog.h"
 #include "RemoteClient.h"
 #include "RemoteConnectDialog.h"
-#include "RemoteFileDialog.h"
 #include "NuFileDialog.h"
 #include <QInputDialog>
 #include <QShortcut>

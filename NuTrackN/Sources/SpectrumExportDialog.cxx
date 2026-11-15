@@ -416,8 +416,16 @@ void SpectrumExportDialog::onModeChanged(int)
     updateSizeEstimate();
 }
 
-void SpectrumExportDialog::onFilePathChanged(const QString &)
+void SpectrumExportDialog::onFilePathChanged(const QString &newText)
 {
+    if (m_isRemoteSave && !m_remoteSavePath.isEmpty() && !newText.trimmed().isEmpty()) {
+        QString newFileName = QFileInfo(newText.trimmed()).fileName();
+        if (!newFileName.isEmpty()) {
+            int lastSlash = m_remoteSavePath.lastIndexOf('/');
+            QString remoteDir = (lastSlash >= 0) ? m_remoteSavePath.left(lastSlash) : "";
+            m_remoteSavePath = remoteDir.isEmpty() ? ("/" + newFileName) : (remoteDir + "/" + newFileName);
+        }
+    }
     updateSizeEstimate();
 }
 
@@ -510,10 +518,36 @@ void SpectrumExportDialog::onAcceptClicked()
     }
 
     QFileInfo fi(path);
-    if (fi.exists() && getExportMode() == SpectrumExportMode::NewOrOverwrite) {
+    bool targetExists = fi.exists();
+
+    if (m_isRemoteSave && !m_remoteSavePath.isEmpty()) {
+        auto sess = RemoteSession::globalSession();
+        if (sess && sess->isConnected()) {
+            path = sess->getLocalCachePath(m_remoteSavePath);
+            m_pathEdit->setText(path);
+            bool remoteExists = sess->fileExists(m_remoteSavePath);
+            targetExists = targetExists || remoteExists;
+
+            // If appending or writing at a specific index on an existing remote file,
+            // synchronize the remote file to the local cache first to prevent data loss!
+            if (remoteExists && getExportMode() != SpectrumExportMode::NewOrOverwrite) {
+                QString syncErr;
+                QString syncedPath;
+                if (!sess->syncRemoteFileToCache(m_remoteSavePath, syncedPath, nullptr, &syncErr, nullptr, false)) {
+                    QMessageBox::critical(this, tr("Remote Sync Failed"),
+                        tr("Could not synchronize existing remote file '%1' before modifying:\n%2")
+                            .arg(m_remoteSavePath, syncErr));
+                    return;
+                }
+                path = syncedPath;
+            }
+        }
+    }
+
+    if (targetExists && getExportMode() == SpectrumExportMode::NewOrOverwrite) {
         auto reply = QMessageBox::question(
             this, tr("Overwrite File?"),
-            tr("The file \"%1\" already exists.\nDo you want to overwrite it?").arg(fi.fileName()),
+            tr("The file \"%1\" already exists.\nDo you want to overwrite it?").arg(QFileInfo(path).fileName()),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (reply != QMessageBox::Yes) {
             return;

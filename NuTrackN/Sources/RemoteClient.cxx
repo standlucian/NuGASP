@@ -10,6 +10,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <poll.h>
 #include <errno.h>
 
 #include <QDir>
@@ -21,6 +22,8 @@
 #include <QElapsedTimer>
 #include <algorithm>
 #include <iostream>
+#include <mutex>
+#include <cmath>
 
 //==============================================================================
 // RemoteProfile Settings Serialization
@@ -115,22 +118,32 @@ std::shared_ptr<RemoteSession> RemoteSession::globalSession()
 
 RemoteSession::RemoteSession()
 {
-    libssh2_init(0);
+    static std::once_flag s_sshInitFlag;
+    std::call_once(s_sshInitFlag, []() {
+        libssh2_init(0);
+    });
 }
 
 RemoteSession::~RemoteSession()
 {
     disconnect();
-    libssh2_exit();
 }
 
 bool RemoteSession::isConnected() const
 {
+    QMutexLocker locker(&m_sessionMutex);
     return m_connected && m_session != nullptr && m_sftp != nullptr;
+}
+
+QString RemoteSession::getCurrentRemoteDir() const
+{
+    QMutexLocker locker(&m_sessionMutex);
+    return m_currentRemoteDir;
 }
 
 void RemoteSession::setCurrentRemoteDir(const QString &dir)
 {
+    QMutexLocker locker(&m_sessionMutex);
     m_currentRemoteDir = sanitizePath(dir);
     if (!m_profile.name.isEmpty()) {
         m_profile.lastUsedPath = m_currentRemoteDir;
@@ -171,12 +184,39 @@ void RemoteSession::cleanupSocketsAndSession()
 
 void RemoteSession::disconnect()
 {
+    QMutexLocker locker(&m_sessionMutex);
     cleanupSocketsAndSession();
+}
+
+bool RemoteSession::reconnectIfDropped()
+{
+    QMutexLocker locker(&m_sessionMutex);
+    if (!m_session) return false;
+
+    int lastErr = libssh2_session_last_errno(m_session);
+    // Only reconnect on transport/socket-level disconnects or timeouts, not file-not-found / permission errors
+    if (lastErr == LIBSSH2_ERROR_SOCKET_SEND ||
+        lastErr == LIBSSH2_ERROR_SOCKET_RECV ||
+        lastErr == LIBSSH2_ERROR_SOCKET_DISCONNECT ||
+        lastErr == LIBSSH2_ERROR_TIMEOUT ||
+        lastErr == LIBSSH2_ERROR_CHANNEL_CLOSED ||
+        lastErr == LIBSSH2_ERROR_CHANNEL_EOF_SENT) {
+        QString savedDir = m_currentRemoteDir;
+        RemoteProfile savedProfile = m_profile;
+        if (connectToHost(savedProfile, nullptr)) {
+            if (!savedDir.isEmpty()) {
+                m_currentRemoteDir = savedDir;
+            }
+            return true;
+        }
+    }
+    return false;
 }
 
 bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMessage)
 {
-    disconnect();
+    QMutexLocker locker(&m_sessionMutex);
+    cleanupSocketsAndSession();
     m_profile = profile;
 
     if (profile.host.trimmed().isEmpty()) {
@@ -188,7 +228,7 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         return false;
     }
 
-    // 1. Resolve host and connect TCP socket
+    // 1. Resolve host and connect TCP socket with non-blocking 5s timeout
     struct addrinfo hints{}, *res = nullptr, *rp = nullptr;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -205,16 +245,42 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sock == -1) continue;
 
-        // Set connect timeout (5 seconds)
-        struct timeval tv{};
-        tv.tv_sec = 5;
-        tv.tv_usec = 0;
-        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
-        setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
-
-        if (connect(sock, rp->ai_addr, rp->ai_addrlen) == 0) {
-            break; // Successfully connected
+        int flags = fcntl(sock, F_GETFL, 0);
+        if (flags != -1) {
+            fcntl(sock, F_SETFL, flags | O_NONBLOCK);
         }
+
+        int connRc = ::connect(sock, rp->ai_addr, rp->ai_addrlen);
+        bool connectedOk = false;
+        if (connRc == 0) {
+            connectedOk = true;
+        } else if (errno == EINPROGRESS) {
+            struct pollfd pfd{};
+            pfd.fd = sock;
+            pfd.events = POLLOUT;
+            int pollRc = poll(&pfd, 1, 5000); // 5 second connect timeout
+            if (pollRc > 0 && (pfd.revents & POLLOUT)) {
+                int soError = 0;
+                socklen_t len = sizeof(soError);
+                if (getsockopt(sock, SOL_SOCKET, SO_ERROR, &soError, &len) == 0 && soError == 0) {
+                    connectedOk = true;
+                }
+            }
+        }
+
+        if (connectedOk) {
+            // Restore blocking mode on socket and set 10s read/write timeout
+            if (flags != -1) {
+                fcntl(sock, F_SETFL, flags & ~O_NONBLOCK);
+            }
+            struct timeval tv{};
+            tv.tv_sec = 10;
+            tv.tv_usec = 0;
+            setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (const char*)&tv, sizeof(tv));
+            setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (const char*)&tv, sizeof(tv));
+            break;
+        }
+
         close(sock);
         sock = -1;
     }
@@ -234,8 +300,12 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         return false;
     }
 
-    // Handshake
+    // Set 10-second timeout on blocking libssh2 operations and enable keepalive
     libssh2_session_set_blocking(m_session, 1);
+    libssh2_session_set_timeout(m_session, 10000);
+    libssh2_keepalive_config(m_session, 1, 30);
+
+    // Handshake
     rc = libssh2_session_handshake(m_session, m_socket);
     if (rc != 0) {
         char *errStr = nullptr;
@@ -249,6 +319,27 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     QByteArray userBytes = profile.user.toUtf8();
     bool authSuccess = false;
 
+    auto trySshAgentAuth = [&]() -> bool {
+        LIBSSH2_AGENT *agent = libssh2_agent_init(m_session);
+        if (!agent) return false;
+        bool agentOk = false;
+        if (libssh2_agent_connect(agent) == 0) {
+            if (libssh2_agent_list_identities(agent) == 0) {
+                struct libssh2_agent_publickey *identity = nullptr, *prevIdentity = nullptr;
+                while (libssh2_agent_get_identity(agent, &identity, prevIdentity) == 0) {
+                    if (libssh2_agent_userauth(agent, userBytes.constData(), identity) == 0) {
+                        agentOk = true;
+                        break;
+                    }
+                    prevIdentity = identity;
+                }
+            }
+            libssh2_agent_disconnect(agent);
+        }
+        libssh2_agent_free(agent);
+        return agentOk;
+    };
+
     if (profile.authType == RemoteAuthType::KeyFile) {
         QString keyFile = profile.keyFilePath.trimmed();
         if (keyFile.isEmpty()) {
@@ -258,7 +349,8 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
             }
         }
         QString pubKeyFile = keyFile + ".pub";
-        const char *pubKeyPath = QFile::exists(pubKeyFile) ? pubKeyFile.toUtf8().constData() : nullptr;
+        QByteArray pubKeyBytes = pubKeyFile.toUtf8();
+        const char *pubKeyPath = QFile::exists(pubKeyFile) ? pubKeyBytes.constData() : nullptr;
         QByteArray privKeyBytes = keyFile.toUtf8();
         QByteArray passBytes = profile.password.toUtf8();
 
@@ -271,6 +363,8 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         );
 
         if (rc == 0) {
+            authSuccess = true;
+        } else if (trySshAgentAuth()) {
             authSuccess = true;
         } else {
             char *errStr = nullptr;
@@ -289,9 +383,14 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
             if (errorMessage) *errorMessage = QString("SSH Password Auth failed: %1").arg(errStr ? errStr : "Invalid username or password");
         }
     } else {
-        // Agent / Keyboard-interactive fallback
-        rc = libssh2_userauth_password(m_session, userBytes.constData(), profile.password.toUtf8().constData());
-        if (rc == 0) authSuccess = true;
+        // Agent or password fallback
+        if (trySshAgentAuth()) {
+            authSuccess = true;
+        } else {
+            QByteArray passBytes = profile.password.toUtf8();
+            rc = libssh2_userauth_password(m_session, userBytes.constData(), passBytes.constData());
+            if (rc == 0) authSuccess = true;
+        }
     }
 
     if (!authSuccess) {
@@ -332,7 +431,11 @@ bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteF
     }
 
     QString sanitized = sanitizePath(remotePath);
-    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_opendir(m_sftp, sanitized.toUtf8().constData());
+    QByteArray pathBytes = sanitized.toUtf8();
+    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_opendir(m_sftp, pathBytes.constData());
+    if (!handle && reconnectIfDropped()) {
+        handle = libssh2_sftp_opendir(m_sftp, pathBytes.constData());
+    }
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
@@ -443,8 +546,12 @@ bool RemoteSession::fileExists(const QString &remotePath, RemoteFileInfo *outInf
     if (!isConnected()) return false;
 
     QString clean = sanitizePath(remotePath);
+    QByteArray cleanBytes = clean.toUtf8();
     LIBSSH2_SFTP_ATTRIBUTES attrs;
-    int rc = libssh2_sftp_stat(m_sftp, clean.toUtf8().constData(), &attrs);
+    int rc = libssh2_sftp_stat(m_sftp, cleanBytes.constData(), &attrs);
+    if (rc != 0 && reconnectIfDropped()) {
+        rc = libssh2_sftp_stat(m_sftp, cleanBytes.constData(), &attrs);
+    }
     if (rc != 0) {
         return false;
     }
@@ -518,7 +625,11 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
     }
 
     QString cleanRemote = sanitizePath(remotePath);
-    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_open(m_sftp, cleanRemote.toUtf8().constData(), LIBSSH2_FXF_READ, 0);
+    QByteArray remoteBytes = cleanRemote.toUtf8();
+    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_open(m_sftp, remoteBytes.constData(), LIBSSH2_FXF_READ, 0);
+    if (!handle && reconnectIfDropped()) {
+        handle = libssh2_sftp_open(m_sftp, remoteBytes.constData(), LIBSSH2_FXF_READ, 0);
+    }
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
@@ -527,17 +638,27 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
         return false;
     }
 
-    // Get remote file size for progress reporting
-    LIBSSH2_SFTP_ATTRIBUTES attrs;
+    // Get remote file size and modification timestamp for cache verification and progress reporting
+    LIBSSH2_SFTP_ATTRIBUTES attrs{};
     qint64 totalBytes = 0;
-    if (libssh2_sftp_fstat(handle, &attrs) == 0 && (attrs.flags & LIBSSH2_SFTP_ATTR_SIZE)) {
-        totalBytes = static_cast<qint64>(attrs.filesize);
+    bool hasRemoteMtime = false;
+    qint64 remoteMtime = 0;
+    if (libssh2_sftp_fstat(handle, &attrs) == 0) {
+        if (attrs.flags & LIBSSH2_SFTP_ATTR_SIZE) {
+            totalBytes = static_cast<qint64>(attrs.filesize);
+        }
+        if (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME) {
+            hasRemoteMtime = true;
+            remoteMtime = static_cast<qint64>(attrs.mtime);
+        }
     }
 
-    // Fast-path: Check if already cached with matching file size
+    // Fast-path: Check if already cached with matching file size AND matching modification timestamp
     if (!forceReDownload && QFile::exists(localPath)) {
         QFileInfo localExisting(localPath);
-        if (totalBytes > 0 && localExisting.size() == totalBytes) {
+        qint64 localMtime = localExisting.lastModified().toSecsSinceEpoch();
+        bool mtimeMatches = !hasRemoteMtime || (std::abs(localMtime - remoteMtime) <= 1);
+        if (totalBytes > 0 && localExisting.size() == totalBytes && mtimeMatches) {
             libssh2_sftp_close(handle);
             if (progressCallback) {
                 progressCallback(totalBytes, totalBytes);
@@ -598,6 +719,10 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
         }
     }
 
+    localFile.flush();
+    if (hasRemoteMtime) {
+        localFile.setFileTime(QDateTime::fromSecsSinceEpoch(remoteMtime), QFileDevice::FileModificationTime);
+    }
     localFile.close();
     libssh2_sftp_close(handle);
 
@@ -642,7 +767,11 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
     int flags = LIBSSH2_FXF_WRITE | LIBSSH2_FXF_CREAT | LIBSSH2_FXF_TRUNC;
     long mode = LIBSSH2_SFTP_S_IRUSR | LIBSSH2_SFTP_S_IWUSR | LIBSSH2_SFTP_S_IRGRP | LIBSSH2_SFTP_S_IROTH;
 
-    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_open(m_sftp, cleanRemote.toUtf8().constData(), flags, mode);
+    QByteArray remoteBytes = cleanRemote.toUtf8();
+    LIBSSH2_SFTP_HANDLE *handle = libssh2_sftp_open(m_sftp, remoteBytes.constData(), flags, mode);
+    if (!handle && reconnectIfDropped()) {
+        handle = libssh2_sftp_open(m_sftp, remoteBytes.constData(), flags, mode);
+    }
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
@@ -679,12 +808,26 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
         }
     }
 
+    LIBSSH2_SFTP_ATTRIBUTES attrs{};
+    bool hasRemoteMtime = (libssh2_sftp_fstat(handle, &attrs) == 0) && (attrs.flags & LIBSSH2_SFTP_ATTR_ACMODTIME);
+    qint64 remoteMtime = hasRemoteMtime ? static_cast<qint64>(attrs.mtime) : 0;
+
     libssh2_sftp_close(handle);
+    localFile.close();
+
+    if (hasRemoteMtime) {
+        QFile f(localPath);
+        if (f.open(QIODevice::ReadWrite)) {
+            f.setFileTime(QDateTime::fromSecsSinceEpoch(remoteMtime), QFileDevice::FileModificationTime);
+            f.close();
+        }
+    }
     return true;
 }
 
 QString RemoteSession::getLocalCachePath(const QString &remotePath) const
 {
+    QMutexLocker locker(&m_sessionMutex);
     QString baseCache = QStandardPaths::writableLocation(QStandardPaths::CacheLocation);
     if (baseCache.isEmpty()) {
         baseCache = QDir::homePath() + "/.cache/nutrackn";

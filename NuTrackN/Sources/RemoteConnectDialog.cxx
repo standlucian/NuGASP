@@ -13,6 +13,8 @@
 #include <QPushButton>
 #include <QComboBox>
 #include <QFileDialog>
+#include <QFileInfo>
+#include <QInputDialog>
 #include <QMessageBox>
 #include <QDir>
 #include <QApplication>
@@ -279,7 +281,7 @@ RemoteProfile RemoteConnectDialog::readFormToProfile() const
     p.user = m_editUser->text().trimmed();
     p.authType = m_radioKeyAuth->isChecked() ? RemoteAuthType::KeyFile : RemoteAuthType::Password;
     p.keyFilePath = m_editKeyFile->text().trimmed();
-    p.password = m_editPassword->text();
+    p.password = (p.authType == RemoteAuthType::Password) ? m_editPassword->text() : QString();
     p.lastUsedPath = m_editStartDir->text().trimmed();
     return p;
 }
@@ -424,6 +426,18 @@ void RemoteConnectDialog::onTestConnectionClicked()
     QString details;
     QString err;
     bool ok = RemoteSession::testConnection(profile, details, &err);
+    if (!ok && profile.authType == RemoteAuthType::KeyFile && err.contains("Public Key Auth failed", Qt::CaseInsensitive)) {
+        bool askOk = false;
+        QString keyPass = QInputDialog::getText(
+            this, tr("SSH Key Passphrase"),
+            tr("Authentication failed or key is encrypted.\nIf private key '%1' requires a passphrase, enter it below (or cancel):")
+                .arg(QFileInfo(profile.keyFilePath).fileName()),
+            QLineEdit::Password, QString(), &askOk);
+        if (askOk && !keyPass.isEmpty()) {
+            profile.password = keyPass;
+            ok = RemoteSession::testConnection(profile, details, &err);
+        }
+    }
 
     m_btnTestConnection->setEnabled(true);
     m_btnTestConnection->setText(tr("⚡ Test / Verify Connection"));
@@ -468,7 +482,20 @@ void RemoteConnectDialog::onConnectClicked()
     qApp->processEvents();
 
     QString errorMsg;
-    if (!m_session->connectToHost(profile, &errorMsg)) {
+    bool connected = m_session->connectToHost(profile, &errorMsg);
+    if (!connected && profile.authType == RemoteAuthType::KeyFile && errorMsg.contains("Public Key Auth failed", Qt::CaseInsensitive)) {
+        bool askOk = false;
+        QString keyPass = QInputDialog::getText(
+            this, tr("SSH Key Passphrase"),
+            tr("Authentication failed or key is encrypted.\nIf private key '%1' requires a passphrase, enter it below (or cancel):")
+                .arg(QFileInfo(profile.keyFilePath).fileName()),
+            QLineEdit::Password, QString(), &askOk);
+        if (askOk && !keyPass.isEmpty()) {
+            profile.password = keyPass;
+            connected = m_session->connectToHost(profile, &errorMsg);
+        }
+    }
+    if (!connected) {
         m_btnConnect->setEnabled(true);
         m_btnConnect->setText(tr("Connect"));
         m_lblStatus->setStyleSheet("color: #e57373;");

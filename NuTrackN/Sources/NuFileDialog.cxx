@@ -61,10 +61,10 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
             m_currentRemoteDir = m_session->getProfile().lastUsedPath;
         }
         if (m_currentRemoteDir.isEmpty()) {
-            m_currentRemoteDir = "/home/" + m_session->getProfile().user;
+            m_currentRemoteDir = "/";
         }
     } else {
-        m_currentRemoteDir = "/home";
+        m_currentRemoteDir = "/";
     }
 
     resize(900, 620);
@@ -331,7 +331,7 @@ void NuFileDialog::onConnectSSHClicked()
 
         m_currentRemoteDir = m_session->getCurrentRemoteDir();
         if (m_currentRemoteDir.isEmpty()) m_currentRemoteDir = prof.lastUsedPath;
-        if (m_currentRemoteDir.isEmpty()) m_currentRemoteDir = "/home/" + prof.user;
+        if (m_currentRemoteDir.isEmpty()) m_currentRemoteDir = "/";
         loadDirectory(m_currentRemoteDir);
     }
 }
@@ -505,7 +505,11 @@ void NuFileDialog::onNavigateHome()
 {
     if (m_isRemoteMode) {
         if (!m_session) return;
-        QString home = "/home/" + m_session->getProfile().user;
+        QString user = m_session->getProfile().user;
+        QString home = (user == "root") ? "/root" : ("/home/" + user);
+        if (!m_session->fileExists(home)) {
+            home = "/";
+        }
         loadDirectory(home);
     } else {
         loadDirectory(QDir::homePath());
@@ -646,37 +650,6 @@ bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLoc
         return false;
     }
 
-    return true;
-}
-
-bool NuFileDialog::downloadRemoteFiles(const QStringList &remotePaths, QStringList &outLocalPaths)
-{
-    outLocalPaths.clear();
-    m_progressBar->setValue(0);
-    m_progressBar->setVisible(true);
-
-    int count = remotePaths.size();
-    for (int i = 0; i < count; ++i) {
-        const QString &rp = remotePaths[i];
-        m_lblSelectionInfo->setText(tr("Downloading remote run (%1/%2): %3 ...")
-            .arg(i + 1).arg(count).arg(QFileInfo(rp).fileName()));
-        qApp->processEvents();
-
-        QString localCached;
-        QString err;
-        bool ok = m_session->syncRemoteFileToCache(rp, localCached, nullptr, &err);
-        if (!ok) {
-            m_progressBar->setVisible(false);
-            QMessageBox::critical(this, tr("Download Error"),
-                tr("Failed to fetch file '%1':\n%2").arg(rp, err));
-            return false;
-        }
-        outLocalPaths.push_back(localCached);
-        m_progressBar->setValue(static_cast<int>((i + 1) * 100 / count));
-        qApp->processEvents();
-    }
-
-    m_progressBar->setVisible(false);
     return true;
 }
 

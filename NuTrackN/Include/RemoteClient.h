@@ -67,7 +67,7 @@ public:
     static bool testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage = nullptr);
 
     const RemoteProfile& getProfile() const { return m_profile; }
-    QString getCurrentRemoteDir() const { return m_currentRemoteDir; }
+    QString getCurrentRemoteDir() const;
     void setCurrentRemoteDir(const QString &dir);
 
     // SFTP Directory and File Operations
@@ -97,6 +97,7 @@ public:
 
 private:
     void cleanupSocketsAndSession();
+    bool reconnectIfDropped();
     static QString sanitizePath(const QString &path);
 
     mutable QMutex    m_sessionMutex{QMutex::Recursive};

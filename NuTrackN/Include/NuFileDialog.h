@@ -117,7 +117,6 @@ private:
     void loadDirectory(const QString &path);
     void populateTable();
     bool downloadRemoteFile(const QString &remotePath, QString &outLocalPath);
-    bool downloadRemoteFiles(const QStringList &remotePaths, QStringList &outLocalPaths);
 
     NuFileMode                     m_mode{NuFileMode::OpenFile};
     std::shared_ptr<RemoteSession> m_session;
