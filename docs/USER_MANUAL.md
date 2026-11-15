@@ -23,7 +23,7 @@
     - [2.5 First Spectrum Walkthrough in 60 Seconds](#25-first-spectrum-walkthrough-in-60-seconds)
 - [3. Data Input, Output (I/O) & File Management](#3-data-input-output-io--file-management)
     - [3.1 Remote Data Acquisition & SSH Session Manager (`Ctrl+Shift+R`)](#31-remote-data-acquisition--ssh-session-manager-ctrlshiftr)
-    - [3.2 Supported Nuclear Spectroscopy Formats](#32-supported-nuclear-spectroscopy-formats)
+    - [3.2 Supported Nuclear Spectroscopy Formats & File Types](#32-supported-nuclear-spectroscopy-formats--file-types)
     - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
     - [3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#34-loading-spectra--multi-buffer-overlays-buffers-19)
     - [3.5 Exporting Processed Data](#35-exporting-processed-data)
@@ -312,7 +312,7 @@ This removes the `nutrackn` binaries from `~/.local/bin`, deletes desktop shortc
 > **Do Not Launch NuTrackN Over Remote SSH (`ssh -X` / `ssh -Y`):**  
 > Never attempt to run the graphical interface remotely over an SSH connection with X11 forwarding. Forwarding complex Qt5 widgets and OpenGL hardware-rendered canvases across network sockets introduces severe latency, display artifacts, and GLX protocol errors.  
 > 
-> **Always run NuTrackN locally on your workstation or laptop.** NuTrackN includes a dedicated, high-performance native SSH-2 and SFTP client engine ([Section 3.4](#34-remote-data-acquisition--ssh-session-manager)) designed specifically to connect to remote DAQ machines, browse remote directories, and stream live acquisition runs directly to your local canvas with zero display lag.
+> **Always run NuTrackN locally on your workstation or laptop.** NuTrackN includes a dedicated, high-performance native SSH-2 and SFTP client engine ([Section 3.1](#31-remote-data-acquisition--ssh-session-manager-ctrlshiftr)) designed specifically to connect to remote DAQ machines, browse remote directories, and stream live acquisition runs directly to your local canvas with zero display lag.
 
 ---
 
@@ -501,7 +501,7 @@ NuTrackN eliminates these friction points by running 100% natively on your local
     - **Host / IP Address & Port**: Enter the remote machine's IP address (e.g. `192.168.1.100`) or fully qualified domain name (`daq.physics.lab`), with the target SSH port (default: `22`).
     - **Username**: Enter the remote user account name (e.g. `data`, `expuser`, or `gasp`).
     - **Authentication Mode**:
-        - **SSH Private Key (Recommended)**: Select this radio button. NuTrackN automatically displays the **Private Key File** field. Click **`Browse...`** and select your local private key (default: `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`).
+        - **SSH Private Key (Recommended)**: Select this radio button. NuTrackN automatically displays the **Private Key File** field. Click **`Browse...`** and select your local private key (default: `~/.ssh/id_ed25519` or `~/.ssh/id_rsa`). Both **passphrase-protected private keys** (NuTrackN prompts interactively to unlock the key if encrypted) and **`ssh-agent` identities** (authenticating automatically if your key is already loaded in your local agent) are fully supported.
         - **Password**: Select this option if key-based authentication is disabled on the remote server. NuTrackN dynamically switches the input field to a masked **Password** input.
     - **Remote Working Dir**: Enter the default remote folder housing your experiment's runs and spectra (e.g. `/home/data/runs` or `/data/exp2026/run_calib`). If left empty, it automatically defaults to the remote root directory (`/`).
 3. **Verify Connection (`⚡ Test / Verify Connection`)**:
@@ -513,10 +513,11 @@ NuTrackN eliminates these friction points by running 100% natively on your local
 4. **Establish Connection & Save**:
     - Click **`Save`** to store the profile in your secure local configuration for instant 1-click access during upcoming beam shifts.
     - Click **`Connect`**.
-5. **Live Status Badge & Tooltip**:
+5. **Live Status Badge, Tooltip & Connection Resilience**:
     - Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: **`SSH: Tandem DAQ Node 1`**.
     - Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.
     - Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.
+    - **Automatic Keepalive & Reconnection**: Active sessions enforce a fast 5-second non-blocking TCP connection timeout (so offline DAQ hosts fail immediately without freezing the GUI), transmit 30-second keepalive heartbeats, and transparently auto-reconnect if an idle network link drops between beam shifts.
 
 #### Quick Guide: Generating & Deploying an SSH Key for Remote DAQ Access
 Using cryptographic SSH key pairs eliminates repetitive password prompts during shifts, protects laboratory infrastructure from password brute-forcing, and enables seamless automated background file caching in NuTrackN.
@@ -652,8 +653,16 @@ NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overl
 ---
 
 ### 3.5 Exporting Processed Data
-NuTrackN provides dedicated export facilities for numerical analysis, reporting, and publication graphics:
-- **Export ASCII Table (`OS`)**: Export the active spectrum data (channel index, calibrated energy in keV, count value) to a clean, space-delimited text file.
+NuTrackN provides dedicated export facilities for numerical analysis, multi-spectrum writing, reporting, and publication graphics:
+
+- **Write / Export Spectrum (`W` or Toolbar `W` — `SpectrumExportDialog`)**:
+    - Write the active spectrum (or any loaded buffer `1`–`9`) to disk or directly to a connected remote SFTP server in binary (`LongInt32`, `ShortInt16`, `Float32`, `Double64`) or `ASCII` format, with selectable channel length (`1k` to `64k`, full spectrum, or custom).
+    - **Multi-Spectrum Write Modes**:
+        - **Create New / Overwrite File**: Writes a single-spectrum file (prompting for confirmation if the local or remote file already exists).
+        - **Append as Next Spectrum in File**: Appends the spectrum to the end of an existing chained multi-spectrum file.
+        - **Replace / Write at Specific Index (`#`)**: Replaces or inserts the spectrum at a specific 0-based detector/run slot (`#0`, `#1`, ...) within a multi-spectrum file, automatically zero-padding intermediate slots if needed.
+    - **Remote SFTP Synchronization**: When exporting to a remote destination in **Append** or **Replace at Index (`#`)** mode, NuTrackN automatically synchronizes the existing remote multi-spectrum file into the local cache first, modifies the target spectrum slot, and uploads the updated multi-spectrum file back to the server.
+- **Quick ASCII Table Export (`OS`)**: Export the active spectrum data (channel index, calibrated energy in keV, count value) directly to a clean, space-delimited text file.
 - **Publication Graphics (`O=`)**: Generate a publication-quality vector PostScript (`.ps`) or PDF graphic of the current canvas view, preserving high-DPI fonts and axis lines.
 - **Designate Calculation Logfile (`DF`)**: Specify an output report text file. Once opened, every subsequent peak integration area, centroid, and FWHM calculated with **`CI`** or **`CJ`** is automatically appended to this logfile.
 - **Close Calculation Logfile (`ZF`)**: Cleanly close the active peak calculation logfile.

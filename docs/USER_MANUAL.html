@@ -574,7 +574,7 @@
 </li>
 <li><a href="#3-data-input-output-io--file-management">3. Data Input, Output (I/O) &amp; File Management</a><ul>
 <li><a href="#31-remote-data-acquisition--ssh-session-manager-ctrlshiftr">3.1 Remote Data Acquisition &amp; SSH Session Manager (<code>Ctrl+Shift+R</code>)</a></li>
-<li><a href="#32-supported-nuclear-spectroscopy-formats">3.2 Supported Nuclear Spectroscopy Formats</a></li>
+<li><a href="#32-supported-nuclear-spectroscopy-formats--file-types">3.2 Supported Nuclear Spectroscopy Formats &amp; File Types</a></li>
 <li><a href="#33-modern-file-dialog-nufiledialog--live-previews">3.3 Modern File Dialog (NuFileDialog) &amp; Live Previews</a></li>
 <li><a href="#34-loading-spectra--multi-buffer-overlays-buffers-19">3.4 Loading Spectra &amp; Multi-Buffer Overlays (Buffers 1–9)</a></li>
 <li><a href="#35-exporting-processed-data">3.5 Exporting Processed Data</a></li>
@@ -905,7 +905,7 @@ chmod +x NuTrackN-x86_64.AppImage
 <div class="alert alert-important"><div class="alert-title">IMPORTANT</div>
 <p><strong>Do Not Launch NuTrackN Over Remote SSH (<code>ssh -X</code> / <code>ssh -Y</code>):</strong><br />
 Never attempt to run the graphical interface remotely over an SSH connection with X11 forwarding. Forwarding complex Qt5 widgets and OpenGL hardware-rendered canvases across network sockets introduces severe latency, display artifacts, and GLX protocol errors.  </p>
-<p><strong>Always run NuTrackN locally on your workstation or laptop.</strong> NuTrackN includes a dedicated, high-performance native SSH-2 and SFTP client engine (<a href="#34-remote-data-acquisition--ssh-session-manager">Section 3.4</a>) designed specifically to connect to remote DAQ machines, browse remote directories, and stream live acquisition runs directly to your local canvas with zero display lag.</p>
+<p><strong>Always run NuTrackN locally on your workstation or laptop.</strong> NuTrackN includes a dedicated, high-performance native SSH-2 and SFTP client engine (<a href="#31-remote-data-acquisition--ssh-session-manager-ctrlshiftr">Section 3.1</a>) designed specifically to connect to remote DAQ machines, browse remote directories, and stream live acquisition runs directly to your local canvas with zero display lag.</p>
 </div>
 <hr />
 <h3>2.3 macOS (Drag-and-Drop DMG for Apple Silicon)</h3>
@@ -1097,7 +1097,7 @@ Whenever you need an instant reminder of any hotkey, macro token, or command str
 <li><strong>Host / IP Address &amp; Port</strong>: Enter the remote machine's IP address (e.g. <code>192.168.1.100</code>) or fully qualified domain name (<code>daq.physics.lab</code>), with the target SSH port (default: <code>22</code>).</li>
 <li><strong>Username</strong>: Enter the remote user account name (e.g. <code>data</code>, <code>expuser</code>, or <code>gasp</code>).</li>
 <li><strong>Authentication Mode</strong>:<ul>
-<li><strong>SSH Private Key (Recommended)</strong>: Select this radio button. NuTrackN automatically displays the <strong>Private Key File</strong> field. Click <strong><code>Browse...</code></strong> and select your local private key (default: <code>~/.ssh/id_ed25519</code> or <code>~/.ssh/id_rsa</code>).</li>
+<li><strong>SSH Private Key (Recommended)</strong>: Select this radio button. NuTrackN automatically displays the <strong>Private Key File</strong> field. Click <strong><code>Browse...</code></strong> and select your local private key (default: <code>~/.ssh/id_ed25519</code> or <code>~/.ssh/id_rsa</code>). Both <strong>passphrase-protected private keys</strong> (NuTrackN prompts interactively to unlock the key if encrypted) and <strong><code>ssh-agent</code> identities</strong> (authenticating automatically if your key is already loaded in your local agent) are fully supported.</li>
 <li><strong>Password</strong>: Select this option if key-based authentication is disabled on the remote server. NuTrackN dynamically switches the input field to a masked <strong>Password</strong> input.</li>
 </ul>
 </li>
@@ -1119,10 +1119,11 @@ Whenever you need an instant reminder of any hotkey, macro token, or command str
 <li>Click <strong><code>Connect</code></strong>.</li>
 </ul>
 </li>
-<li><strong>Live Status Badge &amp; Tooltip</strong>:<ul>
+<li><strong>Live Status Badge, Tooltip &amp; Connection Resilience</strong>:<ul>
 <li>Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: <strong><code>SSH: Tandem DAQ Node 1</code></strong>.</li>
 <li>Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.</li>
 <li>Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.</li>
+<li><strong>Automatic Keepalive &amp; Reconnection</strong>: Active sessions enforce a fast 5-second non-blocking TCP connection timeout (so offline DAQ hosts fail immediately without freezing the GUI), transmit 30-second keepalive heartbeats, and transparently auto-reconnect if an idle network link drops between beam shifts.</li>
 </ul>
 </li>
 </ol>
@@ -1279,11 +1280,24 @@ NuTrackN registers OS-level desktop file associations <strong>exclusively for <c
 </ul>
 <hr />
 <h3>3.5 Exporting Processed Data</h3>
-<p>NuTrackN provides dedicated export facilities for numerical analysis, reporting, and publication graphics:
-- <strong>Export ASCII Table (<code>OS</code>)</strong>: Export the active spectrum data (channel index, calibrated energy in keV, count value) to a clean, space-delimited text file.
-- <strong>Publication Graphics (<code>O=</code>)</strong>: Generate a publication-quality vector PostScript (<code>.ps</code>) or PDF graphic of the current canvas view, preserving high-DPI fonts and axis lines.
-- <strong>Designate Calculation Logfile (<code>DF</code>)</strong>: Specify an output report text file. Once opened, every subsequent peak integration area, centroid, and FWHM calculated with <strong><code>CI</code></strong> or <strong><code>CJ</code></strong> is automatically appended to this logfile.
-- <strong>Close Calculation Logfile (<code>ZF</code>)</strong>: Cleanly close the active peak calculation logfile.</p>
+<p>NuTrackN provides dedicated export facilities for numerical analysis, multi-spectrum writing, reporting, and publication graphics:</p>
+<ul>
+<li><strong>Write / Export Spectrum (<code>W</code> or Toolbar <code>W</code> — <code>SpectrumExportDialog</code>)</strong>:<ul>
+<li>Write the active spectrum (or any loaded buffer <code>1</code>–<code>9</code>) to disk or directly to a connected remote SFTP server in binary (<code>LongInt32</code>, <code>ShortInt16</code>, <code>Float32</code>, <code>Double64</code>) or <code>ASCII</code> format, with selectable channel length (<code>1k</code> to <code>64k</code>, full spectrum, or custom).</li>
+<li><strong>Multi-Spectrum Write Modes</strong>:<ul>
+<li><strong>Create New / Overwrite File</strong>: Writes a single-spectrum file (prompting for confirmation if the local or remote file already exists).</li>
+<li><strong>Append as Next Spectrum in File</strong>: Appends the spectrum to the end of an existing chained multi-spectrum file.</li>
+<li><strong>Replace / Write at Specific Index (<code>#</code>)</strong>: Replaces or inserts the spectrum at a specific 0-based detector/run slot (<code>#0</code>, <code>#1</code>, ...) within a multi-spectrum file, automatically zero-padding intermediate slots if needed.</li>
+</ul>
+</li>
+<li><strong>Remote SFTP Synchronization</strong>: When exporting to a remote destination in <strong>Append</strong> or <strong>Replace at Index (<code>#</code>)</strong> mode, NuTrackN automatically synchronizes the existing remote multi-spectrum file into the local cache first, modifies the target spectrum slot, and uploads the updated multi-spectrum file back to the server.</li>
+</ul>
+</li>
+<li><strong>Quick ASCII Table Export (<code>OS</code>)</strong>: Export the active spectrum data (channel index, calibrated energy in keV, count value) directly to a clean, space-delimited text file.</li>
+<li><strong>Publication Graphics (<code>O=</code>)</strong>: Generate a publication-quality vector PostScript (<code>.ps</code>) or PDF graphic of the current canvas view, preserving high-DPI fonts and axis lines.</li>
+<li><strong>Designate Calculation Logfile (<code>DF</code>)</strong>: Specify an output report text file. Once opened, every subsequent peak integration area, centroid, and FWHM calculated with <strong><code>CI</code></strong> or <strong><code>CJ</code></strong> is automatically appended to this logfile.</li>
+<li><strong>Close Calculation Logfile (<code>ZF</code>)</strong>: Cleanly close the active peak calculation logfile.</li>
+</ul>
 <hr />
 </section>
 
