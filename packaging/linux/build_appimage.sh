@@ -142,25 +142,26 @@ fi
 if [ -d "${ROOTSYS}/include" ]; then
     mkdir -p "${APPDIR}/usr/include"
     cp -a "${ROOTSYS}/include" "${APPDIR}/usr/"
-    # Remove headers for unused heavy ROOT frameworks (TMVA, RooFit, Eve, RGL, etc.)
-    rm -rf "${APPDIR}/usr/include/TMVA" \
-           "${APPDIR}/usr/include/RooFit"* \
-           "${APPDIR}/usr/include/RooStats" \
-           "${APPDIR}/usr/include/Minuit2" \
-           "${APPDIR}/usr/include/bvh" \
-           "${APPDIR}/usr/include/ROOT/RDataFrame"* \
-           "${APPDIR}/usr/include/ROOT/RNTuple"* \
-           "${APPDIR}/usr/include/ROOT/REve"* 2>/dev/null || true
 fi
 
+# Detect the GCC major version that CERN ROOT was compiled with (e.g. 11 on Ubuntu 22.04 CI, 13 on Ubuntu 24.04)
+ROOT_CXX_VER=""
+if [ -f "${ROOTSYS}/include/compiledata.h" ]; then
+    ROOT_CXX_VER="$(sed -n 's/.*COMPILERVERS "gcc\([0-9][0-9]\).*/\1/p' "${ROOTSYS}/include/compiledata.h" | head -n 1)"
+fi
+if [ -z "${ROOT_CXX_VER}" ] || [ ! -d "/usr/include/c++/${ROOT_CXX_VER}" ]; then
+    ROOT_CXX_VER="$(ls -1 /usr/include/c++ 2>/dev/null | grep -E '^[0-9]+$' | sort -n | tail -n 1)"
+fi
+[ -z "${ROOT_CXX_VER}" ] && ROOT_CXX_VER="11"
+
 # Bundle C++ standard library headers to ensure Cling runtime Clang modules match across any Linux host
-if [ -d "/usr/include/c++/13" ]; then
-    echo "    Bundling C++ standard library headers for Cling..."
-    mkdir -p "${APPDIR}/usr/include/c++/13"
-    cp -a /usr/include/c++/13/* "${APPDIR}/usr/include/c++/13/" 2>/dev/null || true
-    if [ -d "/usr/include/x86_64-linux-gnu/c++/13" ]; then
-        mkdir -p "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13"
-        cp -a /usr/include/x86_64-linux-gnu/c++/13/* "${APPDIR}/usr/include/x86_64-linux-gnu/c++/13/" 2>/dev/null || true
+if [ -d "/usr/include/c++/${ROOT_CXX_VER}" ]; then
+    echo "    Bundling C++ standard library headers (v${ROOT_CXX_VER}) for Cling..."
+    mkdir -p "${APPDIR}/usr/include/c++/${ROOT_CXX_VER}"
+    cp -a "/usr/include/c++/${ROOT_CXX_VER}/"* "${APPDIR}/usr/include/c++/${ROOT_CXX_VER}/" 2>/dev/null || true
+    if [ -d "/usr/include/x86_64-linux-gnu/c++/${ROOT_CXX_VER}" ]; then
+        mkdir -p "${APPDIR}/usr/include/x86_64-linux-gnu/c++/${ROOT_CXX_VER}"
+        cp -a "/usr/include/x86_64-linux-gnu/c++/${ROOT_CXX_VER}/"* "${APPDIR}/usr/include/x86_64-linux-gnu/c++/${ROOT_CXX_VER}/" 2>/dev/null || true
     fi
 fi
 
@@ -217,26 +218,48 @@ if [ -d "${ROOTSYS}/lib" ]; then
     # Bundle ALL CERN ROOT Cling precompiled modules (.pcm) to resolve all cross-module imports
     # (e.g. MultiProc imported by Imt and MathCore, Thread, Matrix, Spectrum, Hist, etc.)
     cp -a "${ROOTSYS}/lib/"*.pcm "${APPDIR}/usr/lib/" 2>/dev/null || true
-    ln -sf _Builtin_stddef.pcm "${APPDIR}/usr/lib/_Builtin_stddef_max_align_t.pcm" 2>/dev/null || true
+    if [ ! -e "${APPDIR}/usr/lib/_Builtin_stddef_max_align_t.pcm" ] && [ -f "${APPDIR}/usr/lib/_Builtin_stddef.pcm" ]; then
+        ln -s _Builtin_stddef.pcm "${APPDIR}/usr/lib/_Builtin_stddef_max_align_t.pcm" 2>/dev/null || true
+    elif [ ! -e "${APPDIR}/usr/lib/_Builtin_stddef.pcm" ] && [ -f "${APPDIR}/usr/lib/_Builtin_stddef_max_align_t.pcm" ]; then
+        ln -s _Builtin_stddef_max_align_t.pcm "${APPDIR}/usr/lib/_Builtin_stddef.pcm" 2>/dev/null || true
+    fi
 
     # Create Cling compiler probe interceptor in usr/bin so Cling finds bundled C++ standard library
     cat << 'INTERCEPTOR_EOF' > "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-11"
 #!/usr/bin/env bash
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_USR="$(dirname "$SELF_DIR")"
+CXX_VER="@@ROOT_CXX_VER@@"
 
+HAS_V=false
+HAS_DM=false
 for arg in "$@"; do
-    if [ "$arg" = "-xc++" ]; then
-        cat << PROBE_EOF
+    if [ "$arg" = "-v" ]; then HAS_V=true; fi
+    if [ "$arg" = "-dM" ]; then HAS_DM=true; fi
+done
+
+if [ "$HAS_DM" = true ]; then
+    cat >/dev/null 2>&1 || true
+    echo "#define __cplusplus 201703L"
+    echo "#define _GLIBCXX_RELEASE ${CXX_VER}"
+    echo "#define __GLIBCXX__ 20230528"
+    exit 0
+fi
+
+if [ "$HAS_V" = true ]; then
+    cat >&2 << PROBE_EOF
 #include <...> search starts here:
- ${APP_USR}/include/c++/13
- ${APP_USR}/include/x86_64-linux-gnu/c++/13
- ${APP_USR}/include/c++/13/backward
+ ${APP_USR}/include/c++/${CXX_VER}
+ ${APP_USR}/include/x86_64-linux-gnu/c++/${CXX_VER}
+ ${APP_USR}/include/c++/${CXX_VER}/backward
+ ${APP_USR}/include
+ /usr/local/include
+ /usr/include/x86_64-linux-gnu
+ /usr/include
 End of search list.
 PROBE_EOF
-        exit 0
-    fi
-done
+    exit 0
+fi
 
 COMPILER_NAME="$(basename "$0")"
 HOST_COMPILER="$(PATH="$(echo "$PATH" | tr ':' '\n' | grep -v "^${SELF_DIR}" | tr '\n' ':')" which "$COMPILER_NAME" 2>/dev/null || true)"
@@ -246,6 +269,7 @@ if [ -n "$HOST_COMPILER" ] && [ -x "$HOST_COMPILER" ]; then
 fi
 exit 0
 INTERCEPTOR_EOF
+    sed -i "s/@@ROOT_CXX_VER@@/${ROOT_CXX_VER}/g" "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-11"
     chmod +x "${APPDIR}/usr/bin/x86_64-linux-gnu-g++-11"
     for alt in x86_64-linux-gnu-g++-12 x86_64-linux-gnu-g++-13 x86_64-linux-gnu-g++-14 x86_64-linux-gnu-g++ g++ c++; do
         ln -sf x86_64-linux-gnu-g++-11 "${APPDIR}/usr/bin/${alt}"
@@ -291,11 +315,12 @@ for iter in 1 2 3; do
     done
 done
 
-# Strip debug & unneeded symbols from binary and bundled shared libraries to reduce size and speed up dynamic linking
+# Strip debug & unneeded symbols from non-JIT shared libraries (never strip main executable, libCling, or libCore, which export atexit/at_quick_exit for Cling ORC JIT)
 if command -v strip >/dev/null 2>&1; then
-    echo "    Stripping unneeded symbols from bundled binaries and libraries..."
-    strip --strip-unneeded "${APPDIR}/usr/bin/${APP_EXE}" 2>/dev/null || true
-    find "${APPDIR}/usr/lib" "${APPDIR}/usr/plugins" -type f -name "*.so*" -exec strip --strip-unneeded {} + 2>/dev/null || true
+    echo "    Stripping unneeded symbols from non-JIT shared libraries..."
+    find "${APPDIR}/usr/lib" "${APPDIR}/usr/plugins" -type f -name "*.so*" \
+        ! -name "libCling*" ! -name "libCore*" \
+        -exec strip --strip-unneeded {} + 2>/dev/null || true
 fi
 
 # Bundle backward-compatibility glibc runtime to support older distributions (e.g. Ubuntu 22.04 with glibc 2.35)
@@ -332,18 +357,20 @@ export PATH="${APPDIR}/usr/bin:${PATH}"
 # Strictly isolate library paths to bundled runtime
 export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
 unset LD_PRELOAD
-export QT_QPA_PLATFORM=xcb
+export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
 export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
 export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
 export QT_QPA_PLATFORMTHEME=""
 export QT_STYLE_OVERRIDE="Fusion"
 
 # Configure embedded ROOT runtime
+CXX_VER="$(ls -1 "${APPDIR}/usr/include/c++" 2>/dev/null | grep -E '^[0-9]+$' | head -n 1)"
+[ -z "${CXX_VER}" ] && CXX_VER="11"
 export ROOTSYS="${APPDIR}/usr"
 export ROOT_CONFIG_SEARCH_PATH="${APPDIR}/usr/etc"
-export ROOT_INCLUDE_PATH="${APPDIR}/usr/include:${APPDIR}/usr/include/c++/13:${APPDIR}/usr/include/x86_64-linux-gnu/c++/13:${APPDIR}/usr/include/c++/13/backward"
-export CPLUS_INCLUDE_PATH="${APPDIR}/usr/include/c++/13:${APPDIR}/usr/include/x86_64-linux-gnu/c++/13:${APPDIR}/usr/include/c++/13/backward:${APPDIR}/usr/include:${CPLUS_INCLUDE_PATH}"
-export EXTRA_CLING_ARGS="-cxx-isystem ${APPDIR}/usr/include/c++/13 -cxx-isystem ${APPDIR}/usr/include/x86_64-linux-gnu/c++/13 -cxx-isystem ${APPDIR}/usr/include/c++/13/backward -I${APPDIR}/usr/include"
+export ROOT_INCLUDE_PATH="${APPDIR}/usr/include:${APPDIR}/usr/include/c++/${CXX_VER}:${APPDIR}/usr/include/x86_64-linux-gnu/c++/${CXX_VER}:${APPDIR}/usr/include/c++/${CXX_VER}/backward"
+export CPLUS_INCLUDE_PATH="${APPDIR}/usr/include/c++/${CXX_VER}:${APPDIR}/usr/include/x86_64-linux-gnu/c++/${CXX_VER}:${APPDIR}/usr/include/c++/${CXX_VER}/backward:${APPDIR}/usr/include:${CPLUS_INCLUDE_PATH}"
+export EXTRA_CLING_ARGS="-cxx-isystem ${APPDIR}/usr/include/c++/${CXX_VER} -cxx-isystem ${APPDIR}/usr/include/x86_64-linux-gnu/c++/${CXX_VER} -cxx-isystem ${APPDIR}/usr/include/c++/${CXX_VER}/backward -I${APPDIR}/usr/include"
 if [ -f "${APPDIR}/usr/etc/system.rootrc" ]; then
     export ROOTRC="${APPDIR}/usr/etc/system.rootrc"
 fi
@@ -833,11 +860,12 @@ esac
 
 # Direct execution (without --install)
 CACHE_DIR="${HOME}/.cache/nutrackn/${BUILD_ID}"
-if [ ! -f "${CACHE_DIR}/AppRun" ]; then
+if [ ! -f "${CACHE_DIR}/.extracted_ok" ] || [ ! -x "${CACHE_DIR}/usr/bin/${APP_EXE}" ]; then
     echo "==> [NuTrackN] Preparing standalone environment (one-time setup, ~4s)..."
     rm -rf "${HOME}/.cache/nutrackn"/*
     extract_payload "${CACHE_DIR}"
     chmod +x "${CACHE_DIR}/AppRun" "${CACHE_DIR}/usr/bin/${APP_EXE}"
+    touch "${CACHE_DIR}/.extracted_ok"
 fi
 
 if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/${APP_EXE}" ]; then
