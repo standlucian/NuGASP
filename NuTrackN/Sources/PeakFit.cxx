@@ -256,7 +256,42 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     }
 
     if (mainCanvas->backgroundFunction) {
+        // Erase from every pad's autoFitMarkers and pad primitive list before deleting
+        // so clearing another pad or the screen never double-frees this TF1.
+        for (int z = 0; z < 12; ++z) {
+            for (int g = 0; g < 12; ++g) {
+                auto &markers = mainCanvas->autoFitMarkers[z][g];
+                markers.erase(
+                    std::remove(markers.begin(), markers.end(),
+                                static_cast<TObject*>(mainCanvas->backgroundFunction)),
+                    markers.end());
+            }
+        }
+        if (mainCanvas->canvas && mainCanvas->canvas->getCanvas()) {
+            TCanvas *rootCanvas = mainCanvas->canvas->getCanvas();
+            if (rootCanvas->GetListOfPrimitives()) {
+                rootCanvas->GetListOfPrimitives()->Remove(mainCanvas->backgroundFunction);
+            }
+            const Int_t activePadIdx =
+                (mainCanvas->SelectedElement_i - 1) * mainCanvas->maxElement_j + mainCanvas->SelectedElement_j;
+            if (TVirtualPad *activePad = rootCanvas->GetPad(activePadIdx)) {
+                if (activePad->GetListOfPrimitives()) {
+                    activePad->GetListOfPrimitives()->Remove(mainCanvas->backgroundFunction);
+                }
+            }
+            if (mainCanvas->maxElement_i > 1 || mainCanvas->maxElement_j > 1) {
+                const Int_t totalPads = mainCanvas->maxElement_i * mainCanvas->maxElement_j;
+                for (Int_t p = 1; p <= totalPads; ++p) {
+                    if (TVirtualPad *subPad = rootCanvas->GetPad(p)) {
+                        if (subPad->GetListOfPrimitives()) {
+                            subPad->GetListOfPrimitives()->Remove(mainCanvas->backgroundFunction);
+                        }
+                    }
+                }
+            }
+        }
         delete mainCanvas->backgroundFunction;
+        mainCanvas->backgroundFunction = nullptr;
     }
     if (mainCanvas->background) {
         delete mainCanvas->background;

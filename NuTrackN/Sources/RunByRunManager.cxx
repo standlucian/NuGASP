@@ -2886,8 +2886,19 @@ void RunByRunManager::inspectSpectrumOnCanvas(int row, int col)
             }
         }
     }
+    std::vector<TObject*> deletedObjs;
     for (auto *obj : m_mainCanvas->autoFitMarkers[sel_i][sel_j]) {
-        delete obj;
+        if (!obj) continue;
+        if (obj == m_mainCanvas->gaussianWithBackgroundFunction) {
+            m_mainCanvas->gaussianWithBackgroundFunction = nullptr;
+        }
+        if (obj == m_mainCanvas->backgroundFunction) {
+            m_mainCanvas->backgroundFunction = nullptr;
+        }
+        if (std::find(deletedObjs.begin(), deletedObjs.end(), obj) == deletedObjs.end()) {
+            deletedObjs.push_back(obj);
+            delete obj;
+        }
     }
     m_mainCanvas->autoFitMarkers[sel_i][sel_j].clear();
     m_mainCanvas->gaussCenters[sel_i][sel_j].clear();
@@ -3895,7 +3906,9 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 3. Visual Guideline TLine at current centroid
         TLine *guideLine = rowWidgets[peakIdx].guideLine;
-        if (guideLine && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(guideLine)) {
+        const auto &padMarkers = m_mainCanvas->autoFitMarkers[s_i][s_j];
+        if (guideLine && (std::find(padMarkers.begin(), padMarkers.end(), static_cast<TObject*>(guideLine)) == padMarkers.end()
+                          || (activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(guideLine)))) {
             guideLine = nullptr;
             rowWidgets[peakIdx].guideLine = nullptr;
         }
@@ -3950,7 +3963,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         };
 
         TF1 *fFit = rowWidgets[peakIdx].fitFunc;
-        if (fFit && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fFit)) {
+        if (fFit && (std::find(m_mainCanvas->autoFitMarkers[s_i][s_j].begin(),
+                               m_mainCanvas->autoFitMarkers[s_i][s_j].end(),
+                               static_cast<TObject*>(fFit)) == m_mainCanvas->autoFitMarkers[s_i][s_j].end()
+                     || (activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fFit)))) {
             fFit = nullptr;
             rowWidgets[peakIdx].fitFunc = nullptr;
         }
@@ -3983,7 +3999,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 5. Local Straight-Chord SNIP Baseline Background Function TF1
         TF1 *fBkg = rowWidgets[peakIdx].bkgFunc;
-        if (fBkg && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fBkg)) {
+        if (fBkg && (std::find(m_mainCanvas->autoFitMarkers[s_i][s_j].begin(),
+                               m_mainCanvas->autoFitMarkers[s_i][s_j].end(),
+                               static_cast<TObject*>(fBkg)) == m_mainCanvas->autoFitMarkers[s_i][s_j].end()
+                     || (activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(fBkg)))) {
             fBkg = nullptr;
             rowWidgets[peakIdx].bkgFunc = nullptr;
         }
@@ -4013,7 +4032,10 @@ void RunByRunManager::openInterventionDialog(int row, int col)
 
         // 6. Centroid Text Label TLatex directly over peak
         TLatex *peakLabel = rowWidgets[peakIdx].peakLabel;
-        if (peakLabel && activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(peakLabel)) {
+        if (peakLabel && (std::find(m_mainCanvas->autoFitMarkers[s_i][s_j].begin(),
+                                    m_mainCanvas->autoFitMarkers[s_i][s_j].end(),
+                                    static_cast<TObject*>(peakLabel)) == m_mainCanvas->autoFitMarkers[s_i][s_j].end()
+                          || (activePad && activePad->GetListOfPrimitives() && !activePad->GetListOfPrimitives()->FindObject(peakLabel)))) {
             peakLabel = nullptr;
             rowWidgets[peakIdx].peakLabel = nullptr;
         }
@@ -4217,6 +4239,11 @@ void RunByRunManager::openInterventionDialog(int row, int col)
         // Live update the displayed energy text on existing peak labels for all anchors
         for (int k = 0; k < nAnchors; ++k) {
             TLatex *lbl = rowWidgets[k].peakLabel;
+            const auto &markers = m_mainCanvas->autoFitMarkers[s_i][s_j];
+            if (lbl && std::find(markers.begin(), markers.end(), static_cast<TObject*>(lbl)) == markers.end()) {
+                rowWidgets[k].peakLabel = nullptr;
+                lbl = nullptr;
+            }
             if (lbl && activePad && activePad->GetListOfPrimitives() && activePad->GetListOfPrimitives()->FindObject(lbl)) {
                 double cent = rowWidgets[k].spinCentroid ? rowWidgets[k].spinCentroid->value() : rowWidgets[k].nominalCentroid;
                 double dispEnergy = (tHist && tHist->IsCalibrated()) ? tHist->ChannelToEnergy(cent) : (cent * dispersion);

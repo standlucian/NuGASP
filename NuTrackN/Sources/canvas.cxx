@@ -767,6 +767,52 @@ void QMainCanvas::clicked1()
     HijC[SelectedElement_i][SelectedElement_j].push_back(
         (TH1F*)HijF[SelectedElement_i][SelectedElement_j]->Clone());
 
+    // Clear stale markers, fit curves, peak labels, and Zoom-HUD fit pointers for this pad
+    clearDrawnObjects();
+    if (fitParamsDialog && fitParamsDialog->isVisible()) {
+        fitParamsDialog->hide();
+    }
+    if (peakSearchParamsDialog && peakSearchParamsDialog->isVisible()) {
+        peakSearchParamsDialog->hide();
+    }
+    if (bkgDebounceTimer && bkgDebounceTimer->isActive()) {
+        bkgDebounceTimer->stop();
+    }
+    m_bkgFixed = false;
+    m_peakFixedStates.clear();
+
+    TVirtualPad *activePad = (maxElement_i > 1 || maxElement_j > 1)
+        ? canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j)
+        : canvas->getCanvas()->cd();
+
+    std::vector<TObject*> deletedObjs;
+    for (TObject *obj : autoFitMarkers[SelectedElement_i][SelectedElement_j]) {
+        if (!obj) continue;
+        if (activePad && activePad->GetListOfPrimitives()) {
+            activePad->GetListOfPrimitives()->Remove(obj);
+        }
+        bool alreadyDeleted = false;
+        for (TObject *d : deletedObjs) {
+            if (d == obj) {
+                alreadyDeleted = true;
+                break;
+            }
+        }
+        if (!alreadyDeleted) {
+            deletedObjs.push_back(obj);
+            delete obj;
+        }
+    }
+    gaussianWithBackgroundFunction = nullptr;
+    backgroundFunction = nullptr;
+    autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
+    gaussCenters[SelectedElement_i][SelectedElement_j].clear();
+    gaussCentersHeight[SelectedElement_i][SelectedElement_j].clear();
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
+    peakSearchCenters[SelectedElement_i][SelectedElement_j].clear();
+    peakSearchHeights[SelectedElement_i][SelectedElement_j].clear();
+    renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+
     // Set line color and draw to active pad
     HijF[SelectedElement_i][SelectedElement_j]->SetLineColor(colors_hist[0]);
     HijC[SelectedElement_i][SelectedElement_j].back()->SetLineColor(colors_hist[0]);
@@ -1291,10 +1337,26 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
         HijC[SelectedElement_i][SelectedElement_j].push_back(baseClone);
     }
 
+    // Preserve active pad energy calibration across spectrum stepping (*1/*2);
+    // TracknHistogram::LoadFromData() resets calibration unconditionally.
+    const bool wasCalibrated = trackHist->IsCalibrated();
+    const auto prevCalibSegments = trackHist->GetCalibrationSegments();
+    const Double_t prevA0 = trackHist->GetCalibA0();
+    const Double_t prevA1 = trackHist->GetCalibA1();
+    const Double_t prevA2 = trackHist->GetCalibA2();
+
     if (!trackHist->LoadFromData(spectrumData, m_currentSpectrumFile.toStdString())) {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Failed to load spectrum data for #%1.\n").arg(targetIndex));
         return;
+    }
+
+    if (wasCalibrated) {
+        if (!prevCalibSegments.empty()) {
+            trackHist->SetSegmentedCalibration(prevCalibSegments);
+        } else {
+            trackHist->SetCalibration(prevA0, prevA1, prevA2);
+        }
     }
 
     m_currentSpectrumIndex = targetIndex;
@@ -1708,10 +1770,26 @@ void QMainCanvas::stepRun(int delta)
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
     if (!trackHist) return;
 
+    // Preserve active pad energy calibration across run stepping (*3/*4);
+    // TracknHistogram::LoadFromData() resets calibration unconditionally.
+    const bool wasCalibrated = trackHist->IsCalibrated();
+    const auto prevCalibSegments = trackHist->GetCalibrationSegments();
+    const Double_t prevA0 = trackHist->GetCalibA0();
+    const Double_t prevA1 = trackHist->GetCalibA1();
+    const Double_t prevA2 = trackHist->GetCalibA2();
+
     if (!trackHist->LoadFromData(spectrumData, targetFilePath.toStdString())) {
         CommandPrompt::getInstance()->appendPlainText(
             QString("Failed to load spectrum data for run %1.\n").arg(displayFileName));
         return;
+    }
+
+    if (wasCalibrated) {
+        if (!prevCalibSegments.empty()) {
+            trackHist->SetSegmentedCalibration(prevCalibSegments);
+        } else {
+            trackHist->SetCalibration(prevA0, prevA1, prevA2);
+        }
     }
 
     // Ensure baseline spectrum is present in HijC if it was previously empty

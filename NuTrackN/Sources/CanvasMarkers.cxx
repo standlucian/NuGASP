@@ -361,7 +361,31 @@ void QMainCanvas::clearTheScreen()
     m_bkgFixed = false;
     m_peakFixedStates.clear();
 
+    TVirtualPad *activePad = (maxElement_i > 1 || maxElement_j > 1)
+        ? canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j)
+        : canvas->getCanvas()->cd();
+
     // Clear fit markers and peak search markers (matching Xtrackn CleanPlot)
+    std::vector<TObject*> deletedObjs;
+    for (TObject *obj : autoFitMarkers[SelectedElement_i][SelectedElement_j]) {
+        if (!obj) continue;
+        if (activePad && activePad->GetListOfPrimitives()) {
+            activePad->GetListOfPrimitives()->Remove(obj);
+        }
+        bool alreadyDeleted = false;
+        for (TObject *d : deletedObjs) {
+            if (d == obj) {
+                alreadyDeleted = true;
+                break;
+            }
+        }
+        if (!alreadyDeleted) {
+            deletedObjs.push_back(obj);
+            delete obj;
+        }
+    }
+    gaussianWithBackgroundFunction = nullptr;
+    backgroundFunction = nullptr;
     autoFitMarkers[SelectedElement_i][SelectedElement_j].clear();
     gaussCenters[SelectedElement_i][SelectedElement_j].clear();
     gaussCentersHeight[SelectedElement_i][SelectedElement_j].clear();
