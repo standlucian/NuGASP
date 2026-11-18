@@ -88,8 +88,6 @@ public:
 private slots:
     void onFormatOrLengthChanged();
     void onSpectrumIndexChanged(int index);
-    void onPrevSpectrumClicked();
-    void onNextSpectrumClicked();
     void updatePreview();
 
 private:
@@ -111,8 +109,6 @@ private:
     QWidget     *m_specIndexContainer;
     QLabel      *m_lblSpectrumIndex;
     QSpinBox    *m_spinSpectrumIndex;
-    QPushButton *m_btnPrevSpec;
-    QPushButton *m_btnNextSpec;
     QLabel      *m_lblSpectrumCount;
 
     QLabel               *m_lblPreviewSummary;

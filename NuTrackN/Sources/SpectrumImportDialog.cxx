@@ -612,7 +612,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
         QString("border: 1px solid %1; border-radius: 5px; padding: 8px 12px; font-weight: bold; color: %1;")
             .arg(Design::getDialogAccentColor().name())
     );
-    m_lblDetectedBanner->setText(QString("🎯 Auto-Detected: %1").arg(m_detected.confidenceReason));
+    m_lblDetectedBanner->setText(QString("Auto-Detected: %1").arg(m_detected.confidenceReason));
     mainLayout->addWidget(m_lblDetectedBanner);
 
     // 3. Settings GroupBox
@@ -683,28 +683,16 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
 
     m_lblSpectrumIndex = new QLabel(tr("Spectrum Index:"), settingsGroup);
 
-    m_btnPrevSpec = new QPushButton(tr("◀"), m_specIndexContainer);
-    m_btnPrevSpec->setFont(Design::getDialogFont());
-    m_btnPrevSpec->setFixedWidth(32);
-    m_btnPrevSpec->setFixedHeight(28);
-
     m_spinSpectrumIndex = new QSpinBox(m_specIndexContainer);
     m_spinSpectrumIndex->setRange(0, 0);
     m_spinSpectrumIndex->setValue(0);
     m_spinSpectrumIndex->setPrefix("# ");
     m_spinSpectrumIndex->setFixedWidth(90);
 
-    m_btnNextSpec = new QPushButton(tr("▶"), m_specIndexContainer);
-    m_btnNextSpec->setFont(Design::getDialogFont());
-    m_btnNextSpec->setFixedWidth(32);
-    m_btnNextSpec->setFixedHeight(28);
-
     m_lblSpectrumCount = new QLabel(m_specIndexContainer);
     m_lblSpectrumCount->setStyleSheet("font-style: italic;");
 
-    specIndexLayout->addWidget(m_btnPrevSpec);
     specIndexLayout->addWidget(m_spinSpectrumIndex);
-    specIndexLayout->addWidget(m_btnNextSpec);
     specIndexLayout->addWidget(m_lblSpectrumCount);
     specIndexLayout->addStretch(1);
 
@@ -757,10 +745,6 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
 
     connect(m_spinSpectrumIndex, QOverload<int>::of(&QSpinBox::valueChanged),
             this, &SpectrumImportDialog::onSpectrumIndexChanged);
-    connect(m_btnPrevSpec, &QPushButton::clicked,
-            this, &SpectrumImportDialog::onPrevSpectrumClicked);
-    connect(m_btnNextSpec, &QPushButton::clicked,
-            this, &SpectrumImportDialog::onNextSpectrumClicked);
 
     // Initial setup
     recalculateSpectraCount();
@@ -849,9 +833,6 @@ void SpectrumImportDialog::recalculateSpectraCount()
     m_lblSpectrumCount->setText(QString(tr("(Spectrum %1 of %2)"))
                                     .arg(currentIdx + 1)
                                     .arg(m_totalSpectra));
-
-    m_btnPrevSpec->setEnabled(currentIdx > 0);
-    m_btnNextSpec->setEnabled(currentIdx < m_totalSpectra - 1);
 }
 
 void SpectrumImportDialog::onFormatOrLengthChanged()
@@ -864,26 +845,10 @@ void SpectrumImportDialog::onFormatOrLengthChanged()
 
 void SpectrumImportDialog::onSpectrumIndexChanged(int index)
 {
-    m_btnPrevSpec->setEnabled(index > 0);
-    m_btnNextSpec->setEnabled(index < m_totalSpectra - 1);
     m_lblSpectrumCount->setText(QString(tr("(Spectrum %1 of %2)"))
                                     .arg(index + 1)
                                     .arg(m_totalSpectra));
     updatePreview();
-}
-
-void SpectrumImportDialog::onPrevSpectrumClicked()
-{
-    if (m_spinSpectrumIndex->value() > 0) {
-        m_spinSpectrumIndex->setValue(m_spinSpectrumIndex->value() - 1);
-    }
-}
-
-void SpectrumImportDialog::onNextSpectrumClicked()
-{
-    if (m_spinSpectrumIndex->value() < m_totalSpectra - 1) {
-        m_spinSpectrumIndex->setValue(m_spinSpectrumIndex->value() + 1);
-    }
 }
 
 void SpectrumImportDialog::updatePreview()

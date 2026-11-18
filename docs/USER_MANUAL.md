@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0.2** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 2.0.3** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** (or **`F1`**) on the spectrum canvas at any time.
 
@@ -219,14 +219,14 @@ Under this "copyleft" license, you are free to inspect, run, modify, and redistr
 If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
 
 > **Text Citation:**  
-> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.2, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.3, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
 
 ```bibtex
 @misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.2},
+  version      = {2.0.3},
   institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -610,7 +610,7 @@ NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`
         - **Auto-Detection Banner**: Instantly displays the detected format, channel size, and total chained spectra with a confidence report.
         - **Data Format Selection**: Choose or override format between 32-bit Integer (`uint32_t`), 16-bit Integer (`uint16_t`), ASCII text, 32-bit Float, or 64-bit Double.
         - **Channel Length Selection**: Select standard nuclear spectroscopy presets (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k, all channels in file, or custom spinbox).
-        - **Multi-Spectrum Chained Index**: For multi-spectrum files, jump directly to any detector/run index using the `# Index` selector and `◀` / `▶` buttons.
+        - **Multi-Spectrum Chained Index**: For multi-spectrum files, jump directly to any detector/run index using the `# Index` spinbox selector.
         - **Interactive Curve Preview**: Displays a real-time graphical preview of the parsed spectrum data before loading onto the canvas.
 
 ---
