@@ -384,12 +384,12 @@ fi
 # Smart Desktop & CLI Shortcut Integration Helper
 # ------------------------------------------------------------------------------
 install_shortcut() {
+    local install_dir="${HOME}/.local/share/nutrackn"
     local target_bin="${HOME}/.local/bin/nutrackn"
     local bin_dir="${HOME}/.local/bin"
     local apps_dir="${HOME}/.local/share/applications"
     local icons_dir="${HOME}/.local/share/icons/hicolor/512x512/apps"
     local icons_base="${HOME}/.local/share/icons/hicolor"
-    local source_appimage="${APPIMAGE:-$SELF}"
 
     mkdir -p "${bin_dir}"
     mkdir -p "${apps_dir}"
@@ -398,14 +398,30 @@ install_shortcut() {
 
     echo "==> Integrating NuTrackN with your system..."
 
-    # Install executable binary / copy AppImage
+    rm -f "${target_bin}" "${HOME}/bin/nutrackn"
+
+    # Install executable binary / copy permanent runtime payload
     if [ -n "${APPIMAGE}" ] && [ -f "${APPIMAGE}" ]; then
         cp -a "${APPIMAGE}" "${target_bin}"
         chmod +x "${target_bin}"
         echo "    ✓ Installed 'nutrackn' command to: ${target_bin}"
     else
-        ln -sf "${SELF}" "${target_bin}"
-        echo "    ✓ Created launcher: ${target_bin} -> ${SELF}"
+        local appdir_real install_real
+        mkdir -p "$(dirname "${install_dir}")"
+        appdir_real="$(readlink -f "${APPDIR}" 2>/dev/null || echo "${APPDIR}")"
+        install_real="$(readlink -m "${install_dir}" 2>/dev/null || echo "${install_dir}")"
+        if [ "${appdir_real}" != "${install_real}" ]; then
+            rm -rf "${install_dir}"
+            mkdir -p "${install_dir}"
+            cp -a "${APPDIR}/." "${install_dir}/"
+            chmod +x "${install_dir}/AppRun" "${install_dir}/usr/bin/nutrackn"
+        fi
+        cat << RUNNER > "${target_bin}"
+#!/usr/bin/env bash
+exec "${install_dir}/AppRun" "\$@"
+RUNNER
+        chmod +x "${target_bin}"
+        echo "    ✓ Created launcher command: ${target_bin} -> ${install_dir}/AppRun"
     fi
 
     # Also symlink into ~/bin/nutrackn
@@ -538,6 +554,7 @@ uninstall_shortcut() {
     if command -v update-desktop-database >/dev/null 2>&1; then
         update-desktop-database "${HOME}/.local/share/applications" 2>/dev/null || true
     fi
+    rm -rf "${HOME}/.local/share/nutrackn"
     echo "    ✓ NuTrackN terminal command and desktop shortcuts removed successfully."
 }
 
@@ -566,7 +583,7 @@ case "$1" in
 esac
 
 # If running directly from terminal and not yet installed in ~/.local/bin/nutrackn, display helpful tip
-if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/nutrackn" ]; then
+if [ -t 0 ] && [ -z "${NUTRACKN_FROM_WRAPPER}" ] && [ ! -f "${HOME}/.local/bin/nutrackn" ]; then
     echo "----------------------------------------------------------------------"
     echo " 💡 Tip: Add the 'nutrackn' terminal command (just like xtrackn) with:"
     echo "         $0 --install"
@@ -655,6 +672,7 @@ install_system() {
     echo "    ✓ Application runtime and libraries installed"
 
     echo "==> [2/4] Setting up 'nutrackn' terminal command in ${bin_dir}..."
+    rm -f "${bin_dir}/${APP_EXE}" "${HOME}/bin/${APP_EXE}"
     cat << RUNNER > "${bin_dir}/${APP_EXE}"
 #!/usr/bin/env bash
 exec "${install_dir}/AppRun" "\$@"
@@ -863,10 +881,15 @@ esac
 CACHE_DIR="${HOME}/.cache/nutrackn/${BUILD_ID}"
 if [ ! -f "${CACHE_DIR}/.extracted_ok" ] || [ ! -x "${CACHE_DIR}/usr/bin/${APP_EXE}" ]; then
     echo "==> [NuTrackN] Preparing standalone environment (one-time setup, ~4s)..."
-    rm -rf "${HOME}/.cache/nutrackn"/*
+    mkdir -p "${HOME}/.cache/nutrackn"
+    rm -rf "${HOME}/.cache/nutrackn"/nutrackn-*
     extract_payload "${CACHE_DIR}"
     chmod +x "${CACHE_DIR}/AppRun" "${CACHE_DIR}/usr/bin/${APP_EXE}"
     touch "${CACHE_DIR}/.extracted_ok"
+fi
+
+if [ -L "${HOME}/.local/bin/${APP_EXE}" ] && [ ! -e "${HOME}/.local/bin/${APP_EXE}" ]; then
+    rm -f "${HOME}/.local/bin/${APP_EXE}"
 fi
 
 if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/${APP_EXE}" ]; then
@@ -876,6 +899,7 @@ if [ -t 0 ] && [ ! -f "${HOME}/.local/bin/${APP_EXE}" ]; then
     echo "----------------------------------------------------------------------"
 fi
 
+export NUTRACKN_FROM_WRAPPER=1
 exec "${CACHE_DIR}/AppRun" "$@"
 
 __NUTRACKN_PAYLOAD_BELOW__
