@@ -517,7 +517,7 @@ NuTrackN eliminates these friction points by running 100% natively on your local
     - Upon successful authentication, the canvas button immediately transforms into a highlighted status indicator: **`SSH: Tandem DAQ Node 1`**.
     - Hovering over the button reveals a rich tooltip displaying the connected user, remote IP, port, active working directory, and connection state.
     - Clicking this button allows instant session inspection, changing remote directories, or disconnecting cleanly.
-    - **Automatic Keepalive & Reconnection**: Active sessions enforce a fast 5-second non-blocking TCP connection timeout (so offline DAQ hosts fail immediately without freezing the GUI), transmit 30-second keepalive heartbeats, and transparently auto-reconnect if an idle network link drops between beam shifts.
+    - **Automatic Timeout & Reconnection**: Active sessions enforce a fast 5-second non-blocking TCP connection timeout (so offline DAQ hosts fail immediately without freezing the GUI) and transparently auto-reconnect if an idle network link drops between beam shifts.
 
 #### Quick Guide: Generating & Deploying an SSH Key for Remote DAQ Access
 Using cryptographic SSH key pairs eliminates repetitive password prompts during shifts, protects laboratory infrastructure from password brute-forcing, and enables seamless automated background file caching in NuTrackN.

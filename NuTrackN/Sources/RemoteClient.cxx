@@ -300,10 +300,9 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         return false;
     }
 
-    // Set 10-second timeout on blocking libssh2 operations and enable keepalive
+    // Set 10-second timeout on blocking libssh2 operations
     libssh2_session_set_blocking(m_session, 1);
     libssh2_session_set_timeout(m_session, 10000);
-    libssh2_keepalive_config(m_session, 1, 30);
 
     // Handshake
     rc = libssh2_session_handshake(m_session, m_socket);
