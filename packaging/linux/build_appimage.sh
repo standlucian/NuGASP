@@ -358,6 +358,7 @@ export PATH="${APPDIR}/usr/bin:${PATH}"
 export LD_LIBRARY_PATH="${APPDIR}/usr/lib"
 unset LD_PRELOAD
 export QT_QPA_PLATFORM="${QT_QPA_PLATFORM:-xcb}"
+export QT_XCB_GL_INTEGRATION="${QT_XCB_GL_INTEGRATION:-none}"
 export QT_QPA_PLATFORM_PLUGIN_PATH="${APPDIR}/usr/plugins/platforms"
 export QT_PLUGIN_PATH="${APPDIR}/usr/plugins"
 export QT_QPA_PLATFORMTHEME=""

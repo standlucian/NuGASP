@@ -48,6 +48,12 @@ private:
 };
 
 int main(int argc, char **argv) {
+  // NuTrackN uses Qt 2D raster rendering and ROOT's 2D X11 backend; disable XCB GLX
+  // integration to avoid SingleBuffer FBConfig warnings on X11/XWayland drivers.
+  if (qEnvironmentVariableIsEmpty("QT_XCB_GL_INTEGRATION")) {
+    qputenv("QT_XCB_GL_INTEGRATION", "none");
+  }
+
   // Initialize CERN ROOT application environment embedded within Qt
   TApplication rootapp("NuTrackN", &argc, argv);
 
