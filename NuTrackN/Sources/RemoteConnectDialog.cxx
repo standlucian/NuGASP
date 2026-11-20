@@ -296,6 +296,10 @@ void RemoteConnectDialog::onProfileSelected(int index)
 
 void RemoteConnectDialog::onNewProfileClicked()
 {
+    m_comboProfiles->blockSignals(true);
+    m_comboProfiles->setCurrentIndex(-1);
+    m_comboProfiles->blockSignals(false);
+
     RemoteProfile newProfile;
     newProfile.name = tr("New Connection Profile");
     newProfile.host = "";
@@ -326,15 +330,21 @@ void RemoteConnectDialog::onSaveProfileClicked()
         current.name = current.host;
     }
 
+    int savedIdx = -1;
     int currentIdx = m_comboProfiles->currentIndex();
     if (currentIdx >= 0 && currentIdx < static_cast<int>(m_profiles.size())) {
         m_profiles[currentIdx] = current;
+        savedIdx = currentIdx;
     } else {
         m_profiles.push_back(current);
+        savedIdx = static_cast<int>(m_profiles.size()) - 1;
     }
 
     RemoteProfile::saveAllProfiles(m_profiles);
     loadProfilesToCombo();
+    if (savedIdx >= 0 && savedIdx < m_comboProfiles->count()) {
+        m_comboProfiles->setCurrentIndex(savedIdx);
+    }
     m_lblStatus->setStyleSheet("color: #81c784;");
     m_lblStatus->setText(tr("Profile '%1' saved successfully.").arg(current.name));
     CommandPrompt::logInfo("SSH", QString("Saved profile '%1' (%2@%3:%4).")
@@ -530,8 +540,6 @@ void RemoteConnectDialog::onConnectClicked()
         m_session->setCurrentRemoteDir(profile.lastUsedPath.trimmed());
     }
 
-    // Auto-save the profile upon successful connection
-    onSaveProfileClicked();
     m_activeProfile = profile;
 
     m_btnConnect->setEnabled(true);
