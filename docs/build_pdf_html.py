@@ -95,7 +95,7 @@ def build_html():
     colophon_html = """<div class="inside-cover-page">
   <div class="colophon">
     <div class="colophon-title">NuTrackN Official User Manual</div>
-    <div class="colophon-meta">Release Version 2.0.3 (2026 Edition)</div>
+    <div class="colophon-meta">Release Version 2.0.4 (2026 Edition)</div>
 
     <div class="colophon-block">
       <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
@@ -116,7 +116,7 @@ def build_html():
 
     <div class="colophon-block">
       <strong>Standard Academic Citation:</strong><br>
-      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.3, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.4, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
     </div>
 
     <div class="colophon-notice">
@@ -178,7 +178,7 @@ def build_html():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0.3)</title>
+  <title>NuTrackN User Manual (Version 2.0.4)</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -518,7 +518,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-right {{
-          content: "NuTrackN User Manual (v2.0.3)";
+          content: "NuTrackN User Manual (v2.0.4)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;
@@ -535,7 +535,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-left {{
-          content: "NuTrackN User Manual (v2.0.3)";
+          content: "NuTrackN User Manual (v2.0.4)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;

@@ -60,6 +60,30 @@ int MatrixReader::getSegmentIndex(int tx, int ty) const
     }
 }
 
+namespace {
+constexpr int kMaxTotalSegments = 10000000;
+constexpr int kMaxResolution = 1048576;
+constexpr int kMaxSegmentSize = 67108864;     // 64M int32 entries
+constexpr int kMaxCompressedBlocks = 131072;  // 64 MB per segment
+
+bool seekBlockChecked(FILE *f, int64_t block1Based, int64_t numBlocks, qint64 fileSize)
+{
+    if (!f || block1Based <= 0 || numBlocks <= 0 || numBlocks > kMaxCompressedBlocks) {
+        return false;
+    }
+    const int64_t offset = (block1Based - 1) * 512LL;
+    const int64_t bytes = numBlocks * 512LL;
+    if (offset < 0 || bytes <= 0 || offset > fileSize || bytes > (fileSize - offset)) {
+        return false;
+    }
+#if defined(_WIN32)
+    return _fseeki64(f, offset, SEEK_SET) == 0;
+#else
+    return fseeko(f, static_cast<off_t>(offset), SEEK_SET) == 0;
+#endif
+}
+} // namespace
+
 bool MatrixReader::open(const QString &filePath, QString *errorMessage)
 {
     close();
@@ -67,6 +91,11 @@ bool MatrixReader::open(const QString &filePath, QString *errorMessage)
     QFileInfo fi(filePath);
     if (!fi.exists() || !fi.isFile()) {
         if (errorMessage) *errorMessage = QString("Matrix file does not exist: %1").arg(filePath);
+        return false;
+    }
+
+    if (fi.size() < 512) {
+        if (errorMessage) *errorMessage = QString("File is too small to be a valid .cmat matrix (%1 bytes).").arg(fi.size());
         return false;
     }
 
@@ -83,6 +112,7 @@ bool MatrixReader::open(const QString &filePath, QString *errorMessage)
     int32_t h0[128];
     if (fread(h0, sizeof(int32_t), 128, f) != 128) {
         fclose(f);
+        close();
         if (errorMessage) *errorMessage = "Failed to read matrix header block 0.";
         return false;
     }
@@ -91,30 +121,43 @@ bool MatrixReader::open(const QString &filePath, QString *errorMessage)
     m_ntotseg = h0[1];
     m_ndescblk = h0[10];
 
-    if (m_ntotseg <= 0 || m_ndescblk <= 0) {
+    if (m_ntotseg <= 0 || m_ntotseg > kMaxTotalSegments ||
+        m_ndescblk <= 0 ||
+        static_cast<int64_t>(m_ntotseg) * 8LL > (m_fileSize - 512LL) ||
+        static_cast<int64_t>(m_ndescblk) * 512LL > (m_fileSize - 512LL)) {
         fclose(f);
-        if (errorMessage) *errorMessage = "Invalid matrix header: non-positive segment or descriptor count.";
+        close();
+        if (errorMessage) *errorMessage = "Invalid or unsupported matrix header (not a valid GASPware .cmat file).";
         return false;
     }
 
     // 2. Read IVF Descriptors
-    if (!readDescriptorTable(f)) {
+    if (!readDescriptorTable(f, errorMessage)) {
         fclose(f);
-        if (errorMessage) *errorMessage = "Failed to read IVF descriptor table.";
+        close();
+        if (errorMessage && errorMessage->isEmpty()) {
+            *errorMessage = "Failed to read IVF descriptor table.";
+        }
         return false;
     }
 
     // 3. Read CMT Header (Segment 0)
-    if (!readCmtHeader(f)) {
+    if (!readCmtHeader(f, errorMessage)) {
         fclose(f);
-        if (errorMessage) *errorMessage = "Failed to parse CMT matrix header metadata.";
+        close();
+        if (errorMessage && errorMessage->isEmpty()) {
+            *errorMessage = "Failed to parse CMT matrix header metadata.";
+        }
         return false;
     }
 
     // 4. Read 1D Projections (Segment 2 for X, Segment 3 for Y in asymmetric)
-    if (!readProjections(f)) {
+    if (!readProjections(f, errorMessage)) {
         fclose(f);
-        if (errorMessage) *errorMessage = "Failed to decompress 1D projection spectra.";
+        close();
+        if (errorMessage && errorMessage->isEmpty()) {
+            *errorMessage = "Failed to decompress 1D projection spectra.";
+        }
         return false;
     }
 
@@ -123,25 +166,35 @@ bool MatrixReader::open(const QString &filePath, QString *errorMessage)
     return true;
 }
 
-bool MatrixReader::readDescriptorTable(FILE *f)
+bool MatrixReader::readDescriptorTable(FILE *f, QString *errorMessage)
 {
     // IVF Table starts at block 1 (byte offset 512)
-    fseek(f, 512, SEEK_SET);
+#if defined(_WIN32)
+    if (_fseeki64(f, 512, SEEK_SET) != 0)
+#else
+    if (fseeko(f, 512, SEEK_SET) != 0)
+#endif
+    {
+        if (errorMessage) *errorMessage = "Failed to seek to IVF descriptor table.";
+        return false;
+    }
 
-    m_descriptors.resize(m_ntotseg);
-    std::vector<int32_t> raw(m_ntotseg * 2);
-    if (fread(raw.data(), sizeof(int32_t), m_ntotseg * 2, f) != static_cast<size_t>(m_ntotseg * 2)) {
+    const size_t totalInts = static_cast<size_t>(m_ntotseg) * 2U;
+    m_descriptors.resize(static_cast<size_t>(m_ntotseg));
+    std::vector<int32_t> raw(totalInts);
+    if (fread(raw.data(), sizeof(int32_t), totalInts, f) != totalInts) {
+        if (errorMessage) *errorMessage = "Truncated IVF descriptor table in matrix file.";
         return false;
     }
 
     for (int i = 0; i < m_ntotseg; ++i) {
-        m_descriptors[i].nblocks = raw[i * 2];
-        m_descriptors[i].startblk = raw[i * 2 + 1];
+        m_descriptors[i].nblocks = raw[static_cast<size_t>(i) * 2U];
+        m_descriptors[i].startblk = raw[static_cast<size_t>(i) * 2U + 1U];
     }
     return true;
 }
 
-bool MatrixReader::readCmtHeader(FILE *f)
+bool MatrixReader::readCmtHeader(FILE *f, QString *errorMessage)
 {
     if (m_descriptors.empty()) return false;
 
@@ -151,9 +204,14 @@ bool MatrixReader::readCmtHeader(FILE *f)
         startblk = 1 + m_ndescblk;
     }
 
-    fseek(f, static_cast<long>(startblk - 1) * 512, SEEK_SET);
+    if (!seekBlockChecked(f, startblk, 1, m_fileSize)) {
+        if (errorMessage) *errorMessage = "CMT header block offset is out of file bounds.";
+        return false;
+    }
+
     int32_t hCmt[128];
     if (fread(hCmt, sizeof(int32_t), 128, f) != 128) {
+        if (errorMessage) *errorMessage = "Failed to read CMT header block.";
         return false;
     }
 
@@ -168,31 +226,77 @@ bool MatrixReader::readCmtHeader(FILE *f)
     m_segsize = hCmt[123];
     m_nextra = hCmt[125];
 
-    // Sanity / Fallback checks
-    if (m_resX <= 0) m_resX = 8192;
-    if (m_resY <= 0) m_resY = m_resX;
-    if (m_ndivX <= 0) m_ndivX = 16;
-    if (m_ndivY <= 0) m_ndivY = m_ndivX;
-    if (m_stepX <= 0) m_stepX = m_resX / m_ndivX;
-    if (m_stepY <= 0) m_stepY = m_resY / m_ndivY;
-    if (m_segsize <= 0) m_segsize = m_stepX * m_stepY;
-    if (m_nextra <= 0) m_nextra = (m_matmode == 1) ? 5 : 8;
+    if (m_ndim != 2) {
+        if (errorMessage) {
+            *errorMessage = QString("Unsupported matrix dimensionality (%1D); only 2D GASPware .cmat matrices are supported.")
+                                .arg(m_ndim);
+        }
+        return false;
+    }
+
+    if (m_matmode != 0 && m_matmode != 1) {
+        if (errorMessage) {
+            *errorMessage = QString("Invalid matrix symmetry mode (%1) in CMT header.").arg(m_matmode);
+        }
+        return false;
+    }
+
+    if (m_resX <= 0 || m_resX > kMaxResolution ||
+        m_resY <= 0 || m_resY > kMaxResolution ||
+        m_ndivX <= 0 || m_ndivX > m_resX ||
+        m_ndivY <= 0 || m_ndivY > m_resY ||
+        m_stepX <= 0 || m_stepY <= 0) {
+        if (errorMessage) {
+            *errorMessage = QString("Invalid matrix dimensions in CMT header (%1x%2, step %3x%4, div %5x%6).")
+                                .arg(m_resX).arg(m_resY).arg(m_stepX).arg(m_stepY).arg(m_ndivX).arg(m_ndivY);
+        }
+        return false;
+    }
+
+    const int64_t tileCells = static_cast<int64_t>(m_stepX) * static_cast<int64_t>(m_stepY);
+    if (m_segsize <= 0) {
+        if (tileCells <= 0 || tileCells > kMaxSegmentSize) {
+            if (errorMessage) *errorMessage = "Invalid tile segment size in CMT header.";
+            return false;
+        }
+        m_segsize = static_cast<int>(tileCells);
+    } else if (m_segsize > kMaxSegmentSize || tileCells > m_segsize) {
+        if (errorMessage) {
+            *errorMessage = QString("Invalid or inconsistent tile segment size (%1) in CMT header.").arg(m_segsize);
+        }
+        return false;
+    }
+
+    if (m_nextra < 0) {
+        m_nextra = (m_matmode == 1) ? 5 : 8;
+    }
+    if (m_nextra >= m_ntotseg) {
+        if (errorMessage) *errorMessage = "Invalid extra segment count in CMT header.";
+        return false;
+    }
 
     return true;
 }
 
-bool MatrixReader::readProjections(FILE *f)
+bool MatrixReader::readProjections(FILE *f, QString *errorMessage)
 {
-    if (m_descriptors.size() <= 2) return false;
+    if (m_descriptors.size() <= 2) {
+        if (errorMessage) *errorMessage = "Matrix file is missing projection descriptors.";
+        return false;
+    }
 
     // Segment 2: Projection X
     int nbX = m_descriptors[2].nblocks;
     int sbX = m_descriptors[2].startblk;
-    if (nbX <= 0 || sbX <= 0) return false;
+    if (!seekBlockChecked(f, sbX, nbX, m_fileSize)) {
+        if (errorMessage) *errorMessage = "Projection X segment is missing or out of file bounds.";
+        return false;
+    }
 
-    std::vector<uint8_t> cbufX(nbX * 512);
-    fseek(f, static_cast<long>(sbX - 1) * 512, SEEK_SET);
+    const size_t bytesX = static_cast<size_t>(nbX) * 512U;
+    std::vector<uint8_t> cbufX(bytesX);
     if (fread(cbufX.data(), 1, cbufX.size(), f) != cbufX.size()) {
+        if (errorMessage) *errorMessage = "Failed to read compressed Projection X segment.";
         return false;
     }
 
@@ -201,11 +305,14 @@ bool MatrixReader::readProjections(FILE *f)
     int nchX = m_resX;
     int dnbytesX = static_cast<int>(cbufX.size()) - 8;
 
-    std::vector<int32_t> projIntX(m_resX, 0);
+    std::vector<int32_t> projIntX(static_cast<size_t>(m_resX), 0);
     int statusX = comp_decompress_(projIntX.data(), &nchX, cbufX.data() + 8, &dnbytesX, &cmodeX, &cminvalX);
-    if (statusX < 0) return false;
+    if (statusX < 0) {
+        if (errorMessage) *errorMessage = "Failed to decompress Projection X spectrum.";
+        return false;
+    }
 
-    m_projectionX.resize(m_resX);
+    m_projectionX.resize(static_cast<size_t>(m_resX));
     m_totalCounts = 0;
     for (int i = 0; i < m_resX; ++i) {
         m_projectionX[i] = static_cast<double>(projIntX[i]);
@@ -214,22 +321,21 @@ bool MatrixReader::readProjections(FILE *f)
 
     // Segment 3: Projection Y (if asymmetric)
     if (m_matmode != 1) { // Asymmetric matrix
-        if (m_descriptors.size() > 3 && m_descriptors[3].nblocks > 0 && m_descriptors[3].startblk > 0) {
+        if (m_descriptors.size() > 3 &&
+            seekBlockChecked(f, m_descriptors[3].startblk, m_descriptors[3].nblocks, m_fileSize)) {
             int nbY = m_descriptors[3].nblocks;
-            int sbY = m_descriptors[3].startblk;
-
-            std::vector<uint8_t> cbufY(nbY * 512);
-            fseek(f, static_cast<long>(sbY - 1) * 512, SEEK_SET);
+            const size_t bytesY = static_cast<size_t>(nbY) * 512U;
+            std::vector<uint8_t> cbufY(bytesY);
             if (fread(cbufY.data(), 1, cbufY.size(), f) == cbufY.size()) {
                 int32_t cmodeY = *reinterpret_cast<const int32_t*>(cbufY.data());
                 int32_t cminvalY = *reinterpret_cast<const int32_t*>(cbufY.data() + 4);
                 int nchY = m_resY;
                 int dnbytesY = static_cast<int>(cbufY.size()) - 8;
 
-                std::vector<int32_t> projIntY(m_resY, 0);
+                std::vector<int32_t> projIntY(static_cast<size_t>(m_resY), 0);
                 int statusY = comp_decompress_(projIntY.data(), &nchY, cbufY.data() + 8, &dnbytesY, &cmodeY, &cminvalY);
                 if (statusY >= 0) {
-                    m_projectionY.resize(m_resY);
+                    m_projectionY.resize(static_cast<size_t>(m_resY));
                     for (int i = 0; i < m_resY; ++i) {
                         m_projectionY[i] = static_cast<double>(projIntY[i]);
                     }
@@ -252,7 +358,11 @@ bool MatrixReader::readProjections(FILE *f)
 
 std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gateAxis) const
 {
-    if (!m_isOpen || m_resX <= 0 || m_resY <= 0) return {};
+    if (!m_isOpen || m_resX <= 0 || m_resY <= 0 ||
+        m_stepX <= 0 || m_stepY <= 0 || m_segsize <= 0 ||
+        m_ndivX <= 0 || m_ndivY <= 0) {
+        return {};
+    }
 
     FILE *f = fopen(m_filePath.toLocal8Bit().constData(), "rb");
     if (!f) return {};
@@ -263,15 +373,16 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
         chMax = std::max(0, std::min(chMax, m_resY - 1));
         if (chMin > chMax) std::swap(chMin, chMax);
 
-        std::vector<double> slice(m_resX, 0.0);
+        std::vector<double> slice(static_cast<size_t>(m_resX), 0.0);
         const int stepX = m_stepX;
         const int stepY = m_stepY;
         const int ndivX = m_ndivX;
+        const int tileSize = m_segsize;
 
         const int gBlockMin = chMin / stepY;
         const int gBlockMax = chMax / stepY;
 
-        std::vector<int32_t> tileData(m_segsize, 0);
+        std::vector<int32_t> tileData(static_cast<size_t>(tileSize), 0);
         std::vector<uint8_t> cbuf(128 * 512);
 
         for (int gb = gBlockMin; gb <= gBlockMax; ++gb) {
@@ -284,41 +395,51 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
 
                 int nblocks = m_descriptors[segIdx].nblocks;
                 int startblk = m_descriptors[segIdx].startblk;
-                if (nblocks <= 0 || startblk <= 0) continue;
+                if (!seekBlockChecked(f, startblk, nblocks, m_fileSize)) continue;
 
-                size_t reqBytes = static_cast<size_t>(nblocks * 512);
+                size_t reqBytes = static_cast<size_t>(nblocks) * 512U;
                 if (cbuf.size() < reqBytes) {
                     cbuf.resize(reqBytes);
                 }
 
-                fseek(f, static_cast<long>(startblk - 1) * 512, SEEK_SET);
                 if (fread(cbuf.data(), 1, reqBytes, f) != reqBytes) continue;
 
                 int32_t cmode = *reinterpret_cast<const int32_t*>(cbuf.data());
                 int32_t cminval = *reinterpret_cast<const int32_t*>(cbuf.data() + 4);
-                int nch = m_segsize;
+                int nch = tileSize;
                 int dnbytes = static_cast<int>(reqBytes) - 8;
 
-                comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval);
+                if (comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval) < 0) {
+                    continue;
+                }
 
+                const int baseOut = tx * stepX;
                 for (int g = gateChStart; g <= gateChEnd; ++g) {
                     const int goff = g % stepY;
 
                     if (tx < gb) {
                         for (int i = 0; i < stepX; ++i) {
-                            slice[tx * stepX + i] += tileData[i + goff * stepX];
+                            const int outIdx = baseOut + i;
+                            const int tileIdx = i + goff * stepX;
+                            if (outIdx >= 0 && outIdx < m_resX && tileIdx >= 0 && tileIdx < tileSize) {
+                                slice[outIdx] += tileData[tileIdx];
+                            }
                         }
                     } else if (tx > gb) {
                         for (int i = 0; i < stepX; ++i) {
-                            slice[tx * stepX + i] += tileData[goff + i * stepX];
+                            const int outIdx = baseOut + i;
+                            const int tileIdx = goff + i * stepX;
+                            if (outIdx >= 0 && outIdx < m_resX && tileIdx >= 0 && tileIdx < tileSize) {
+                                slice[outIdx] += tileData[tileIdx];
+                            }
                         }
                     } else {
                         // Diagonal tile
                         for (int i = 0; i < stepX; ++i) {
-                            if (i <= goff) {
-                                slice[tx * stepX + i] += tileData[i + goff * stepX];
-                            } else {
-                                slice[tx * stepX + i] += tileData[goff + i * stepX];
+                            const int outIdx = baseOut + i;
+                            const int tileIdx = (i <= goff) ? (i + goff * stepX) : (goff + i * stepX);
+                            if (outIdx >= 0 && outIdx < m_resX && tileIdx >= 0 && tileIdx < tileSize) {
+                                slice[outIdx] += tileData[tileIdx];
                             }
                         }
                     }
@@ -336,15 +457,16 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
             chMax = std::max(0, std::min(chMax, m_resY - 1));
             if (chMin > chMax) std::swap(chMin, chMax);
 
-            std::vector<double> slice(m_resX, 0.0);
+            std::vector<double> slice(static_cast<size_t>(m_resX), 0.0);
             const int stepX = m_stepX;
             const int stepY = m_stepY;
             const int ndivX = m_ndivX;
+            const int tileSize = m_segsize;
 
             const int gBlockMin = chMin / stepY;
             const int gBlockMax = chMax / stepY;
 
-            std::vector<int32_t> tileData(m_segsize, 0);
+            std::vector<int32_t> tileData(static_cast<size_t>(tileSize), 0);
             std::vector<uint8_t> cbuf(128 * 512);
 
             for (int gb = gBlockMin; gb <= gBlockMax; ++gb) {
@@ -357,25 +479,31 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
 
                     int nblocks = m_descriptors[segIdx].nblocks;
                     int startblk = m_descriptors[segIdx].startblk;
-                    if (nblocks <= 0 || startblk <= 0) continue;
+                    if (!seekBlockChecked(f, startblk, nblocks, m_fileSize)) continue;
 
-                    size_t reqBytes = static_cast<size_t>(nblocks * 512);
+                    size_t reqBytes = static_cast<size_t>(nblocks) * 512U;
                     if (cbuf.size() < reqBytes) cbuf.resize(reqBytes);
 
-                    fseek(f, static_cast<long>(startblk - 1) * 512, SEEK_SET);
                     if (fread(cbuf.data(), 1, reqBytes, f) != reqBytes) continue;
 
                     int32_t cmode = *reinterpret_cast<const int32_t*>(cbuf.data());
                     int32_t cminval = *reinterpret_cast<const int32_t*>(cbuf.data() + 4);
-                    int nch = m_segsize;
+                    int nch = tileSize;
                     int dnbytes = static_cast<int>(reqBytes) - 8;
 
-                    comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval);
+                    if (comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval) < 0) {
+                        continue;
+                    }
 
+                    const int baseOut = tx * stepX;
                     for (int g = gateChStart; g <= gateChEnd; ++g) {
                         const int goff = g % stepY;
                         for (int i = 0; i < stepX; ++i) {
-                            slice[tx * stepX + i] += tileData[i + goff * stepX];
+                            const int outIdx = baseOut + i;
+                            const int tileIdx = i + goff * stepX;
+                            if (outIdx >= 0 && outIdx < m_resX && tileIdx >= 0 && tileIdx < tileSize) {
+                                slice[outIdx] += tileData[tileIdx];
+                            }
                         }
                     }
                 }
@@ -389,15 +517,16 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
             chMax = std::max(0, std::min(chMax, m_resX - 1));
             if (chMin > chMax) std::swap(chMin, chMax);
 
-            std::vector<double> slice(m_resY, 0.0);
+            std::vector<double> slice(static_cast<size_t>(m_resY), 0.0);
             const int stepX = m_stepX;
             const int stepY = m_stepY;
             const int ndivY = m_ndivY;
+            const int tileSize = m_segsize;
 
             const int gBlockMin = chMin / stepX;
             const int gBlockMax = chMax / stepX;
 
-            std::vector<int32_t> tileData(m_segsize, 0);
+            std::vector<int32_t> tileData(static_cast<size_t>(tileSize), 0);
             std::vector<uint8_t> cbuf(128 * 512);
 
             for (int gb = gBlockMin; gb <= gBlockMax; ++gb) {
@@ -410,25 +539,31 @@ std::vector<double> MatrixReader::getRawGateSlice(int chMin, int chMax, int gate
 
                     int nblocks = m_descriptors[segIdx].nblocks;
                     int startblk = m_descriptors[segIdx].startblk;
-                    if (nblocks <= 0 || startblk <= 0) continue;
+                    if (!seekBlockChecked(f, startblk, nblocks, m_fileSize)) continue;
 
-                    size_t reqBytes = static_cast<size_t>(nblocks * 512);
+                    size_t reqBytes = static_cast<size_t>(nblocks) * 512U;
                     if (cbuf.size() < reqBytes) cbuf.resize(reqBytes);
 
-                    fseek(f, static_cast<long>(startblk - 1) * 512, SEEK_SET);
                     if (fread(cbuf.data(), 1, reqBytes, f) != reqBytes) continue;
 
                     int32_t cmode = *reinterpret_cast<const int32_t*>(cbuf.data());
                     int32_t cminval = *reinterpret_cast<const int32_t*>(cbuf.data() + 4);
-                    int nch = m_segsize;
+                    int nch = tileSize;
                     int dnbytes = static_cast<int>(reqBytes) - 8;
 
-                    comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval);
+                    if (comp_decompress_(tileData.data(), &nch, cbuf.data() + 8, &dnbytes, &cmode, &cminval) < 0) {
+                        continue;
+                    }
 
+                    const int baseOut = ty * stepY;
                     for (int g = gateChStart; g <= gateChEnd; ++g) {
                         const int goff = g % stepX;
                         for (int i = 0; i < stepY; ++i) {
-                            slice[ty * stepY + i] += tileData[goff + i * stepX];
+                            const int outIdx = baseOut + i;
+                            const int tileIdx = goff + i * stepX;
+                            if (outIdx >= 0 && outIdx < m_resY && tileIdx >= 0 && tileIdx < tileSize) {
+                                slice[outIdx] += tileData[tileIdx];
+                            }
                         }
                     }
                 }

@@ -3,6 +3,7 @@
 #include <QFileOpenEvent>
 #include <QIcon>
 #include <QStringList>
+#include <QTimer>
 
 #include "Design.h"
 #include "TApplication.h"
@@ -96,7 +97,9 @@ int main(int argc, char **argv) {
     const QString &arg = args.at(i);
     if (!arg.startsWith("-") && QFileInfo::exists(arg)) {
       if (arg.endsWith(".cmat", Qt::CaseInsensitive)) {
-        mainWindow.openMatrixFile(arg);
+        QTimer::singleShot(0, &mainWindow, [&mainWindow, arg]() {
+          mainWindow.openMatrixFile(arg);
+        });
         break;
       }
     }

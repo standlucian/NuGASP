@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0.3** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 2.0.4** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** (or **`F1`**) on the spectrum canvas at any time.
 
@@ -26,12 +26,14 @@
     - [3.2 Supported Nuclear Spectroscopy Formats & File Types](#32-supported-nuclear-spectroscopy-formats--file-types)
     - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
     - [3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#34-loading-spectra--multi-buffer-overlays-buffers-19)
-    - [3.5 Exporting Processed Data](#35-exporting-processed-data)
+    - [3.5 Opening 2D Coincidence Matrices (`.cmat`)](#35-opening-2d-coincidence-matrices-cmat)
+    - [3.6 Exporting Processed Data](#36-exporting-processed-data)
 - [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
     - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
     - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
     - [4.3 Mouse Navigation & Interactive Marker Dragging](#43-mouse-navigation--interactive-marker-dragging)
     - [4.4 Real-Time HUD Peak Inspector](#44-real-time-hud-peak-inspector)
+    - [4.5 Multi-Pad Grid Layout & Cross-Pad Synchronization](#45-multi-pad-grid-layout--cross-pad-synchronization)
 - [5. Peak Integration & Region of Interest (ROI) Analysis](#5-peak-integration--region-of-interest-roi-analysis)
     - [5.1 Setting Boundary Markers](#51-setting-boundary-markers)
     - [5.2 Mathematical Formulation of Gross & Net Peak Area](#52-mathematical-formulation-of-gross--net-peak-area)
@@ -73,19 +75,25 @@
     - [11.1 Built-in Themes (Modern Dark, Modern Light, Classic Xtrackn)](#111-built-in-themes)
     - [11.2 Customizing Palette Colors, Gridlines & Typography](#112-customizing-palette-colors-gridlines--typography)
     - [11.3 Theme Import and Export (.nugasp-theme)](#113-theme-import-and-export-nugasp-theme)
-- [12. End-to-End Analysis Cookbook Workflows](#12-end-to-end-analysis-cookbook-workflows)
-    - [12.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)](#121-deconvoluting-an-overlapping-multiplet-r--g--cv)
-    - [12.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)](#122-batch-integrating-across-detectors-with-a-macro-1--cj)
-    - [12.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)](#123-correcting-gain-drift-across-100-in-beam-runs-ar)
-- [13. Troubleshooting & Frequently Asked Questions (FAQ)](#13-troubleshooting--frequently-asked-questions-faq)
-    - [13.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)](#131-zoom--marker-placement-issues-e-ci-cj)
-    - [13.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment](#132-resolving-intervene-and-failed-states-in-run-by-run-alignment)
-    - [13.3 Low-Statistics Peak Fitting & Baseline Instabilities](#133-low-statistics-peak-fitting--baseline-instabilities)
-- [14. Appendices & Technical Specifications](#14-appendices--technical-specifications)
-    - [14.1 Master Keyboard Command & Shortcut Reference](#141-master-keyboard-command--shortcut-reference)
-    - [14.2 File Format Specifications](#142-file-format-specifications)
-    - [14.3 Coordinate System & Binning Conventions (0-Indexed Channels)](#143-coordinate-system--binning-conventions-0-indexed-channels)
-    - [14.4 System Requirements & Supported Platforms](#144-system-requirements--supported-platforms)
+- [12. Diagnostic Logging, Output Console & Log Management](#12-diagnostic-logging-output-console--log-management)
+    - [12.1 Three-Tier Logging Architecture (Console, Terminal & Disk)](#121-three-tier-logging-architecture-console-terminal--disk)
+    - [12.2 Single-Line Console Coalescing (Detector & Run Stepping)](#122-single-line-console-coalescing-detector--run-stepping)
+    - [12.3 Per-Session Local Disk Logs & Privacy Policy](#123-per-session-local-disk-logs--privacy-policy)
+    - [12.4 The Log Settings & Cleanup Dialog (`LOG` Button)](#124-the-log-settings--cleanup-dialog-log-button)
+    - [12.5 Diagnostic Log Format & Troubleshooting Workflow](#125-diagnostic-log-format--troubleshooting-workflow)
+- [13. End-to-End Analysis Cookbook Workflows](#13-end-to-end-analysis-cookbook-workflows)
+    - [13.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)](#131-deconvoluting-an-overlapping-multiplet-r--g--cv)
+    - [13.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)](#132-batch-integrating-across-detectors-with-a-macro-1--cj)
+    - [13.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)](#133-correcting-gain-drift-across-100-in-beam-runs-ar)
+- [14. Troubleshooting & Frequently Asked Questions (FAQ)](#14-troubleshooting--frequently-asked-questions-faq)
+    - [14.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)](#141-zoom--marker-placement-issues-e-ci-cj)
+    - [14.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment](#142-resolving-intervene-and-failed-states-in-run-by-run-alignment)
+    - [14.3 Low-Statistics Peak Fitting & Baseline Instabilities](#143-low-statistics-peak-fitting--baseline-instabilities)
+- [15. Appendices & Technical Specifications](#15-appendices--technical-specifications)
+    - [15.1 Master Keyboard Command & Shortcut Reference](#151-master-keyboard-command--shortcut-reference)
+    - [15.2 File Format Specifications](#152-file-format-specifications)
+    - [15.3 Coordinate System & Binning Conventions (0-Indexed Channels)](#153-coordinate-system--binning-conventions-0-indexed-channels)
+    - [15.4 System Requirements & Supported Platforms](#154-system-requirements--supported-platforms)
 
 ---
 
@@ -219,14 +227,14 @@ Under this "copyleft" license, you are free to inspect, run, modify, and redistr
 If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
 
 > **Text Citation:**  
-> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.3, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.4, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
 
 ```bibtex
 @misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.3},
+  version      = {2.0.4},
   institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -600,33 +608,26 @@ NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`
 - **Location Switching (Local vs. Remote)**:
     - The top bar features quick-toggle buttons between your local filesystem and the active remote server (**`🌐 Remote: user@host`**).
     - Quick-navigation bookmarks provide 1-click shortcuts to the current experiment directory, USB media mount points, user home, and temporary scratch folders.
-- **Bi-Directional Operation (Read & Write)**:
-    - Supports both loading files (1D spectra, 2D matrices, calibration tables) and saving/exporting output.
-    - When saving to a remote destination, NuTrackN transparently stages the data and performs an atomic SFTP upload, reporting real-time status.
-- **Live Spectrum Mini-Preview**:
-    - Selecting any spectrum file in the file list instantly computes and renders a thumbnail preview of the spectrum shape, total counts, and channel length in the side inspector panel before you open it.
 - **Spectrum Import Dialog (`SpectrumImportDialog`)**:
     - When opening a 1D spectrum, NuTrackN inspects the file and opens the interactive import configuration dialog:
         - **Auto-Detection Banner**: Instantly displays the detected format, channel size, and total chained spectra with a confidence report.
         - **Data Format Selection**: Choose or override format between 32-bit Integer (`uint32_t`), 16-bit Integer (`uint16_t`), ASCII text, 32-bit Float, or 64-bit Double.
         - **Channel Length Selection**: Select standard nuclear spectroscopy presets (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k, all channels in file, or custom spinbox).
-        - **Multi-Spectrum Chained Index**: For multi-spectrum files, jump directly to any detector/run index using the `# Index` spinbox selector.
-        - **Interactive Curve Preview**: Displays a real-time graphical preview of the parsed spectrum data before loading onto the canvas.
+        - **Spectrum Index**: For multi-spectrum files, jump directly to any detector/run index using the **`Spectrum Index`** spinbox selector.
+        - **Live Data Preview**: Displays a real-time graphical preview of the parsed spectrum curves before clicking **`Load Spectrum`**.
+
+![NuTrackN Open Spectrum Dialog (SpectrumImportDialog)](images/open_spectra_dialog.png)
+
+> [!TIP]
+> **Verify Auto-Detected Parameters:**  
+> Because raw binary and ASCII spectrum files do not contain format headers, the **`Auto-Detected`** data format, channel length, and spectrum count are **educated guesses** based on file-size and byte-pattern heuristics. Always double-check these parameters using the **Live Data Preview** and your knowledge of your data before clicking **`Load Spectrum`** (hovering over the **`Auto-Detected`** banner or format/length fields in the dialog shows this reminder as a tooltip).
 
 ---
 
 ### 3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)
-NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overlays on any individual pad:
+NuTrackN supports loading individual spectra, stepping sequentially through chained detector or run files, and overlaying multiple spectra on the active pad for visual comparison:
 
-#### Multi-Pad Grid Layout:
-- **`Ctrl + →`**: Add a new display column to the canvas grid.
-- **`Ctrl + ←`**: Remove a display column.
-- **`Ctrl + ↑`**: Add a new display row.
-- **`Ctrl + ↓`**: Remove a display row.
-- **Pad Selection**: Click inside any sub-window to set it as the active pad (highlighted with an accent border). All keyboard hotkeys, marker placements, and zooms immediately apply to the active pad.
-
-#### Multi-Buffer Overlays & Stepping (Buffers 1–9):
-- **Overlay Stack (`HijC`)**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
+- **Overlay Stack**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
 - **Detector / Spectrum Stepping in Linked Spectra**:
     - Press **`1`** (executes Macro #1 `*1`) or click toolbar **`# +`**: Advance to the next spectrum/detector in the sequence.
     - Press **`2`** (executes Macro #2 `*2`) or click toolbar **`# -`**: Step backward to the previous spectrum/detector in the sequence.
@@ -645,14 +646,27 @@ NuTrackN supports flexible multi-pad canvas grids alongside multi-spectrum overl
         - **Right-Click**: Previous run file in active sequence (`*4`).
         - **Ctrl + Left-Click**: Execute Macro #2.
         - **Ctrl + Right-Click**: Execute Macro #4.
-
-#### Cross-Pad & Overlay Synchronization:
-- **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
-- **`SY`**: Propagate the active pad's vertical count scale (maximum, minimum, and linear/logarithmic mode) across all visible sub-pads.
+    - *(Note: Out of the box, Macros `#1`–`#4` are preset to `*1`–`*4`, so the **`Ctrl + Click`** shortcuts are only useful if you have redefined Macros `#1`–`#4` with custom command strings via **`DM`** or **`D1`**–**`D4`**.)*
 
 ---
 
-### 3.5 Exporting Processed Data
+### 3.5 Opening 2D Coincidence Matrices (`.cmat`)
+NuTrackN natively opens GASPware compressed 2D $\gamma$-$\gamma$ coincidence matrices (`.cmat`) from either your local filesystem or a connected remote SSH/SFTP server:
+
+- **How to Open a Matrix**:
+    - **Toolbar (`Open CM`)**: Click **`Open CM`** in the lower-left button grid to launch `NuFileDialog` filtered for GASPware compressed coincidence matrices (`.cmat`).
+    - **Desktop File Association & Command Line**: On Linux (after `--install`) and macOS, double-clicking any `.cmat` file in your file manager—or passing it as a CLI argument (`nutrackn matrix.cmat`)—launches NuTrackN and opens the matrix directly.
+    - **Remote SSH/SFTP Access**: When an SSH session is active, `Open CM` lets you browse remote DAQ directories and caches the selected `.cmat` file locally before opening; the status bar displays `[Remote CM] <filename>`.
+- **Inspection & Total Projection (`MatrixDialog` & `Q`)**:
+    - Upon opening, NuTrackN parses the compressed matrix header, tile descriptor table, symmetry mode (symmetric vs. asymmetric), axis resolutions, compression ratio, total counts, and 1D projections, then enables **`Gate CM`** and opens **`MatrixDialog`**.
+    - Load the **Total Projection** (X or Y axis) onto the active canvas pad directly from **`MatrixDialog`**, or press **`Q`** on the canvas at any time to display the total projection of the active matrix. Any existing energy calibration on the active pad is preserved when inspecting or loading the matrix projection.
+- *(Note: Detector stepping (`*1`/`*2`) and run stepping (`*3`/`*4`) are disabled while viewing a 2D matrix. For detailed coincidence gating (`W`, `CW`, `Gate CM`) and background subtraction modes (`DW`), see [Chapter 9: 2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis).)*
+
+![NuTrackN Open Compressed Matrix Dialog](images/open_matrix_dialog.png)
+
+---
+
+### 3.6 Exporting Processed Data
 NuTrackN provides dedicated export facilities for numerical analysis, multi-spectrum writing, reporting, and publication graphics:
 
 - **Write / Export Spectrum (`W` or Toolbar `W` — `SpectrumExportDialog`)**:
@@ -698,6 +712,20 @@ Located in the upper right quadrant of the spectrum canvas, the **HUD Inspector*
 - **Local Centroid**: Moment-calculated peak center within cursor proximity:
   $$\langle ch \rangle = \frac{\sum_{i \in \text{win}} i \cdot C_i}{\sum_{i \in \text{win}} C_i}$$
 - **Local FWHM**: Instantaneous full-width at half-maximum derived from local variance.
+
+### 4.5 Multi-Pad Grid Layout & Cross-Pad Synchronization
+NuTrackN supports flexible multi-pad canvas grids alongside cross-pad axis synchronization across all visible windows:
+
+#### Multi-Pad Grid Layout:
+- **`Ctrl + →`**: Add a new display column to the canvas grid.
+- **`Ctrl + ←`**: Remove a display column.
+- **`Ctrl + ↑`**: Add a new display row.
+- **`Ctrl + ↓`**: Remove a display row.
+- **Pad Selection**: Click inside any sub-window to set it as the active pad (highlighted with an accent border). All keyboard hotkeys, marker placements, and zooms immediately apply to the active pad.
+
+#### Cross-Pad & Overlay Synchronization:
+- **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
+- **`SY`**: Propagate the active pad's vertical count scale (maximum, minimum, and linear/logarithmic mode) across all visible sub-pads.
 
 ---
 
@@ -761,6 +789,8 @@ NuTrackN implements the authentic Xtrackn / GASPware statistical moment and vari
 
 ### 5.5 Output Report Logging
 Use **`DF`** to open a destination logfile. Every subsequent integration (**`CI`** / **`CJ`**) or peak fit (**`CG`** / **`CV`**) automatically appends a formatted entry containing timestamp, centroid, FWHM, gross counts, net counts, and statistical error. Use **`ZF`** to close the file.
+
+*(Note: `DF`/`ZF` writes tabular physics calculation results to a user-specified report file. Application status messages, SSH/SFTP diagnostics, and per-session disk logs are managed separately via the **`LOG`** button; see [Chapter 12](#12-diagnostic-logging-output-console--log-management).)*
 
 ---
 
@@ -1003,7 +1033,7 @@ Once all runs are validated, export calibrations locally or directly to a remote
    2        1      -0.511850      0.499834
    ```
 2. **Extended Multi-Order Uncertainty Format (`.ucal`)**:
-   Fixed-column tabular ASCII record containing the polynomial order (`NCoeff`), coefficients ($a_0, a_1, a_2$), parameter uncertainties ($\sigma_{a_0}, \sigma_{a_1}, \sigma_{a_2}$), intercept-slope covariance $\text{cov}(a_0, a_1)$, residual standard error $s_{\text{res}}$ (in keV), reduced $\chi^2/\text{NDF}$, and convergence status string (see [Section 14.2](#142-file-format-specifications) for the exact column schema).
+   Fixed-column tabular ASCII record containing the polynomial order (`NCoeff`), coefficients ($a_0, a_1, a_2$), parameter uncertainties ($\sigma_{a_0}, \sigma_{a_1}, \sigma_{a_2}$), intercept-slope covariance $\text{cov}(a_0, a_1)$, residual standard error $s_{\text{res}}$ (in keV), reduced $\chi^2/\text{NDF}$, and convergence status string (see [Section 15.2](#152-file-format-specifications) for the exact column schema).
 
 ---
 
@@ -1092,7 +1122,7 @@ Press **`DM`** (or click the **Macros** button) to open the graphical Macro Mana
 - Click **[Run (1x)]** to execute a slot once, **[Cycle]** to run it for the configured number of cycles, or **[Clear]** to erase the slot.
 
 ### 10.5 Saving, Loading & Distributing Macro Files (`.mac`)
-Click **Save to File...** or **Load from File...** (supporting both local disk and remote SSH directories via `NuFileDialog`) to export or import all macro definitions as a pipe-delimited `.mac` file (`ID|COMMAND_STRING|CYCLES|DESCRIPTION`; see [Section 14.2](#142-file-format-specifications)). Share standardized analysis scripts across research groups to ensure reproducible data reductions.
+Click **Save to File...** or **Load from File...** (supporting both local disk and remote SSH directories via `NuFileDialog`) to export or import all macro definitions as a pipe-delimited `.mac` file (`ID|COMMAND_STRING|CYCLES|DESCRIPTION`; see [Section 15.2](#152-file-format-specifications)). Share standardized analysis scripts across research groups to ensure reproducible data reductions.
 
 ---
 
@@ -1115,35 +1145,161 @@ Click the **Design** button in the lower toolbar to open the Appearance Manager:
 
 ---
 
-## 12. End-to-End Analysis Cookbook Workflows
+## 12. Diagnostic Logging, Output Console & Log Management
 
-### 12.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)
+NuTrackN maintains two complementary forms of logging with distinct purposes:
+- **Physics Calculation Report Logging (`DF` / `ZF`)**: Appends formatted tabular results (timestamps, centroids, FWHM values, gross/net peak areas, and statistical uncertainties) for integrations and fits to a user-selected analysis file (see [Section 5.5](#55-output-report-logging)).
+- **Diagnostic & Session Logging (This Chapter)**: Records application lifecycle events, spectrum and matrix loading, detector/run stepping, SSH/SFTP network activity, macro execution traces, warnings, and errors across the in-built console, system terminal, and per-session disk log files.
+
+### 12.1 Three-Tier Logging Architecture (Console, Terminal & Disk)
+Diagnostic messages are dispatched through a centralized, mutex-synchronized logging engine (`CommandPrompt`) to three output sinks simultaneously, balancing an uncluttered workspace against complete post-mortem traceability:
+
+1. **In-Built Output Console**: The scrollable, read-only panel (`max 10,000 lines`) located directly beneath the bottom toolbar. Its typography and colors automatically follow your active theme (Chapter 11). As noted in [Section 10.1](#101-graphical-interface-focus--terminal-status-notice), this panel does not accept typed command input.
+2. **System Terminal (`stdout` / `stderr`)**: Active whenever NuTrackN is launched from a terminal emulator. `Info` events print to `stdout`, while `Warning` and `Error` messages print to `stderr`.
+3. **Per-Session Local Disk Log File**: Enabled by default. Every log entry across **all four severity levels** is written immediately in UTF-8 with millisecond precision and flushed on every line for crash resilience.
+
+To keep the interactive workspace clean while still capturing deep diagnostics when needed, each severity level routes differently across the three sinks:
+
+| Severity Level | In-Built Console | System Terminal | Local Disk Log (`Tag`) | Typical Events Recorded |
+| :--- | :--- | :--- | :--- | :--- |
+| **`Debug`** | No | No | Yes (`[DEBUG]`) | SSH connection steps & key-probe traces, `ssh-agent` fallback, passphrase retry details, SFTP cache hits, background batch run downloads, `NuFileDialog` directory switches & selected paths, `SpectrumImportDialog` auto-detection details, cancelled open/import dialogs, and `"Executing Macro #N"` dispatch notices |
+| **`Info`** | Yes | `stdout` | Yes (`[INFO ]`) | Minimal high-signal operational milestones: SSH `Connected` / `Disconnected` / `[SSH Test] Verified`, saved or deleted SSH profiles, actual SFTP file downloads/uploads and remote directory creation, `[Spectrum] Loaded ...` summaries, detector (`*1`/`*2`) & run (`*3`/`*4`) stepping updates, and manual log cleanup summaries |
+| **`Warning`** | Yes | `stderr` | Yes (`[WARN ]`) | Non-fatal conditions: missing SSH host or username fields, cancelled key-passphrase prompts or SFTP downloads, remote tab selection while offline, or stepping when no spectrum is loaded |
+| **`Error`** | Yes | `stderr` | Yes (`[ERROR]`) | Actionable failures: SSH/SFTP authentication, directory, or transfer errors; unreadable spectrum or matrix files; and failed local directory creation |
+
+#### Message Formatting & Thread Safety
+- **In-Built Console & System Terminal**: Uses compact, plain-ASCII tags without timestamps so calculation results and live readouts stay easy to scan:
+  - `Info`: `[Source] <message>`
+  - `Warning`: `[Source] WARNING: <message>`
+  - `Error`: `[Source] ERROR: <message>`
+- **Local Disk Log**: Prepends a millisecond timestamp and fixed-width severity column:
+  `[YYYY-MM-DD HH:MM:SS.mmm] [LEVEL] [Source] <message>`
+- **Common Source Tags**: `[SSH]`, `[SSH Test]`, `[SFTP]`, `[Spectrum]`, `[OpenSpectrum]`, `[FileDialog]`, `[Macro]`, and `[Log]`.
+- **Thread-Safe Dispatch**: Background worker threads (such as multi-run batch SFTP downloads) write safely under an internal I/O mutex (`s_logIOMutex`) and marshal in-built console updates onto the main GUI thread via queued Qt events (`Qt::QueuedConnection`).
+
+---
+
+### 12.2 Single-Line Console Coalescing (Detector & Run Stepping)
+When stepping rapidly through multi-detector arrays (`1` / `2`, `*1` / `*2`) or long in-beam run sequences (`3` / `4`, `*3` / `*4`), appending a separate line per keypress would quickly bury prior integration areas, fit centroids, and calibration outputs.
+
+To keep the workspace scannable, NuTrackN enables **single-line in-place coalescing** exclusively inside the **in-built output console**:
+- **Detector Stepping Group (`step_spectrum`)**: Consecutive `*1`/`*2` actions replace the last line of the in-built console in place (for example, updating `[Spectrum] Loaded run042.spe#5 (6/64, 4096 ch)` directly to `#6`, `#7`, etc., or boundary notices such as `Already at first spectrum (1/64).`).
+- **Run Stepping Group (`step_run`)**: Consecutive `*3`/`*4` actions update their single status line in place (for example, `[Spectrum] Loaded run run043.spe#5 (run 43/120, 4096 ch, remote)` or matrix run switches). Routine per-run SFTP downloads during `*3`/`*4` stepping log at `Debug` level (`quietSuccess`), and `"Executing Macro #N"` notices also route to `Debug`, ensuring an unbroken single-line readout when pressing `1`–`4`.
+- **Full Terminal & Disk Preservation**: Coalescing applies **only** to the visual in-built console widget. Both the **system terminal** and the **local disk log** always retain every line chronologically and never overwrite previous entries.
+- **Automatic Streak Reset**: Switching between detector stepping and run stepping, triggering any warning or error, or running another command (`CI`, `CJ`, `CG`, `AK`, etc.) automatically closes the coalesce streak so subsequent messages appear on a fresh line.
+
+---
+
+### 12.3 Per-Session Local Disk Logs & Privacy Policy
+NuTrackN automatically opens a fresh session log at application launch and seals it upon exit:
+- **Session Lifecycle & Crash Safety**: Startup writes a header banner (`=== NuTrackN session started (YYYY-MM-DD HH:MM:SS, PID <pid>) ===`), every line is immediately flushed to disk (`flush()`), and clean exit writes `=== NuTrackN session ended (YYYY-MM-DD HH:MM:SS) ===`. Even if an unexpected crash occurs, all log entries emitted up to that moment are preserved on disk.
+- **Per-Session Filename Convention**:
+  `nutrackn_YYYYMMDD_HHMMSS_<pid>.log` (appending `_2`, `_3`, ... only if a name collision occurs within the same second). Including the OS process ID (`PID`) allows multiple NuTrackN instances to run concurrently without file contention.
+- **Default Log Directories**:
+  - **Linux**: `~/.local/share/NuGASP/NuTrackN/logs/`
+  - **macOS**: `~/Library/Application Support/NuGASP/NuTrackN/logs/`
+
+> [!IMPORTANT]
+> **Local-Only Storage & Credential Privacy:**
+> - **Always Stored Locally (Never Over SSH)**: Even when analyzing spectra directly from a remote acquisition workstation via SSH/SFTP, diagnostic logs are written strictly to the **local computer**. Keeping logs local guarantees that SSH connection or network failures are still captured, eliminates per-line SFTP latency, and avoids cluttering shared DAQ servers.
+> - **No Secrets Logged**: SSH account passwords and private-key passphrases are **never** written to the terminal, in-built console, or disk log. When probing an encrypted SSH private key prior to showing the passphrase dialog, initial probe attempts are logged silently at `Debug` level and only surface as `Warning`/`Error` if you cancel the prompt or authentication fails.
+
+---
+
+### 12.4 The Log Settings & Cleanup Dialog (`LOG` Button)
+Click the **`LOG`** button in the bottom-right utility bar—located directly between **`MAC`** and **`?`** above the output console—to open **Diagnostic Log Settings & Cleanup**:
+
+```text
+┌──────────────────────────────────────────────────────────────────────┐
+│                 Diagnostic Log Settings & Cleanup                    │
+├──────────────────────────────────────────────────────────────────────┤
+│ Session Log Status                                                   │
+│   Active Session Log: nutrackn_20261120_101500_48210.log   [Open Folder]
+│   Folder Usage: 12 log file(s) (11 archived), 184.6 KB total         │
+├──────────────────────────────────────────────────────────────────────┤
+│ Local Disk Logging                                                   │
+│   [x] Write full timestamped diagnostic logs to local disk           │
+│   Log Folder: [ ~/.local/share/NuGASP/NuTrackN/logs ] [Browse...] [Default]
+├──────────────────────────────────────────────────────────────────────┤
+│ Retention & Pruning                                                  │
+│   [ ] Automatically prune old logs on startup                        │
+│   [x] Keep at most:          [  20 files ]                           │
+│   [ ] Delete logs older than: [  30 days  ]                           │
+│   [ Prune by Rules Now ]   [ Clear All Old Logs ]                    │
+│   Note: Only NuTrackN session files (nutrackn_*.log) are managed;    │
+│   the active session log is always preserved.                        │
+├──────────────────────────────────────────────────────────────────────┤
+│                                         [ Cancel ]  [ Save & Close ] │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+- **Session Log Status**: Displays the active session filename (or `Disabled (disk logging off)`), total and archived session log counts, combined disk usage, and **`Open Folder`** to launch your system file manager directly inside the configured directory.
+- **Local Disk Logging**: Toggle disk logging on or off, choose any custom local folder via **`Browse...`**, or restore the platform default with **`Default`**. When you click **`Save & Close`**, any folder or enablement change takes effect immediately—cleanly closing the previous log file and opening a new session file in the updated directory—and persists across restarts in NuTrackN's `Logging` preferences (`QSettings("NuGASP", "NuTrackN")`).
+- **Retention & Auto-Pruning**:
+  - **`Automatically prune old logs on startup`** is **Off by default**: session logs are retained indefinitely unless you opt in to automatic cleanup or prune manually.
+  - Configure **`Keep at most`** (`1`–`1000` files, default `20`, active session log included in the cap) and/or **`Delete logs older than`** (`1`–`3650` days, default `30`). When both rules are checked, any archived log exceeding either limit is eligible for deletion.
+- **Manual Cleanup Controls**:
+  - **`Prune by Rules Now`**: Applies whichever count/age rules are currently checked immediately—even when startup auto-pruning is disabled—showing the exact number of matching archived files and bytes to be freed for confirmation before deletion.
+  - **`Clear All Old Logs`**: Deletes every archived session log in the selected folder after a confirmation prompt.
+- **Strict Cleanup Safety Guard**: Both automated and manual pruning operate exclusively on files matching the exact NuTrackN session filename pattern (`^nutrackn_\d{8}_\d{6}(_\d+)*\.log$`) and **always preserve the currently active session log**. Other files stored in the same directory are never modified or deleted.
+
+---
+
+### 12.5 Diagnostic Log Format & Troubleshooting Workflow
+Below is an excerpt from a typical session log recorded while connecting to a remote DAQ host, stepping across detector spectra, running a macro, and disconnecting:
+
+```text
+=== NuTrackN session started (2026-11-20 10:15:02, PID 48210) ===
+[2026-11-20 10:15:08.114] [DEBUG] [SSH] Connecting to daq@192.168.10.42:22 (Key)...
+[2026-11-20 10:15:08.392] [DEBUG] [SSH] Key file '/home/user/.ssh/id_ed25519' declined; authenticated via ssh-agent.
+[2026-11-20 10:15:08.455] [INFO ] [SSH] Connected to daq@192.168.10.42:22 (Key) in 341 ms.
+[2026-11-20 10:15:11.004] [DEBUG] [OpenSpectrum] Switched to Remote: daq@192.168.10.42 (/data/exp2026).
+[2026-11-20 10:15:14.220] [INFO ] [SFTP] Downloaded '/data/exp2026/run042.spe' (1.00 MB in 84 ms).
+[2026-11-20 10:15:14.241] [INFO ] [Spectrum] Loaded run042.spe#0 (1 of 64, 4096 ch, GASP .spe (4B int)) (remote: /data/exp2026/run042.spe)
+[2026-11-20 10:15:16.105] [DEBUG] [Macro] Executing Macro #1: "*1"
+[2026-11-20 10:15:16.108] [INFO ] [Spectrum] Loaded run042.spe#1 (2/64, 4096 ch)
+[2026-11-20 10:15:16.412] [DEBUG] [Macro] Executing Macro #1: "*1"
+[2026-11-20 10:15:16.415] [INFO ] [Spectrum] Loaded run042.spe#2 (3/64, 4096 ch)
+[2026-11-20 10:18:40.719] [WARN ] [SFTP] Download cancelled for '/data/exp2026/run099.spe'.
+[2026-11-20 10:22:03.901] [INFO ] [SSH] Disconnected from daq@192.168.10.42:22.
+=== NuTrackN session ended (2026-11-20 10:22:04) ===
+```
+
+> [!TIP]
+> **Reporting SSH, Import, or Analysis Issues:**  
+> If you encounter an unexpected file-format failure or SSH authentication error during an experiment, click **`LOG`** → **`Open Folder`** and attach the matching `nutrackn_*.log` session file to your bug report. The `[DEBUG]` entries provide exact timestamps, file paths, and handshake steps without exposing any passwords or key passphrases.
+
+---
+
+## 13. End-to-End Analysis Cookbook Workflows
+
+### 13.1 Deconvoluting an Overlapping Multiplet (`R` → `G` → `CV`)
 Please write me
 
-### 12.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)
+### 13.2 Batch Integrating Across Detectors with a Macro (`*1` + `CJ`)
 Please write me
 
-### 12.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)
+### 13.3 Correcting Gain Drift Across 100+ In-Beam Runs (`AR`)
 Please write me
 
 ---
 
-## 13. Troubleshooting & Frequently Asked Questions (FAQ)
+## 14. Troubleshooting & Frequently Asked Questions (FAQ)
 
-### 13.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)
+### 14.1 Zoom & Marker Placement Issues (`E`, `CI`, `CJ`)
 Please write me
 
-### 13.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment
+### 14.2 Resolving `INTERVENE` and `FAILED` States in Run-by-Run Alignment
 Please write me
 
-### 13.3 Low-Statistics Peak Fitting & Baseline Instabilities
+### 14.3 Low-Statistics Peak Fitting & Baseline Instabilities
 Please write me
 
 ---
 
-## 14. Appendices & Technical Specifications
+## 15. Appendices & Technical Specifications
 
-### 14.1 Master Keyboard Command & Shortcut Reference
+### 15.1 Master Keyboard Command & Shortcut Reference
 
 #### 📂 File, Buffer & Run/Detector Stepping Operations
 | Key / Command | Action | Description |
@@ -1227,11 +1383,12 @@ Please write me
 | **`C` + `0..9`** | **Cycle Macro** | Loop stored command sequence `0..9` for $N$ cycles |
 | **`M` + `0..9`** | **Show Macro** | Display stored command sequence in output console |
 | **`Z` + `0..9`** | **Clear Macro** | Erase stored macro definition |
+| **`LOG` (Toolbar)** | **Log Settings** | Open Diagnostic Log Settings, folder stats, retention rules & cleanup |
 | **`H` / `?` / `F1`** | **Help Dialog** | Open in-app Help and Heritage documentation |
 
 ---
 
-### 14.2 File Format Specifications
+### 15.2 File Format Specifications
 
 #### Calibration File (`.mcal`)
 ```text
@@ -1271,7 +1428,7 @@ FWHM_A1 0.00184
 
 ---
 
-### 14.3 Coordinate System & Binning Conventions (0-Indexed Channels)
+### 15.3 Coordinate System & Binning Conventions (0-Indexed Channels)
 NuTrackN strictly enforces **0-indexed channel numbering** across all data structures, canvas cursors, HUD inspector readouts, and export routines:
 - Channel 0 corresponds to the interval $[-0.5, +0.5)$ in continuous coordinate space.
 - A 4096-channel spectrum spans channels $0$ through $4095$ (inclusive).
@@ -1281,7 +1438,7 @@ NuTrackN strictly enforces **0-indexed channel numbering** across all data struc
 
 ---
 
-### 14.4 System Requirements & Supported Platforms
+### 15.4 System Requirements & Supported Platforms
 - **Linux**: Ubuntu 20.04+, Debian 11+, Fedora 36+, Arch Linux, CentOS/RHEL 8+ (AppImage or Native CMake build).
 - **macOS**: macOS 11.0 (Big Sur) through macOS 15.0+ (Sequoia) exclusively on Apple Silicon (M1/M2/M3/M4/M5). Legacy Intel Core Macs are neither supported nor planned.
 - **Hardware**:

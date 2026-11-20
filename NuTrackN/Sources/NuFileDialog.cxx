@@ -183,7 +183,6 @@ void NuFileDialog::setupUI(const QString &caption, const QString &initialFilter)
         m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
         m_comboTypeFilter->hide();
     } else if (m_mode == NuFileMode::OpenMatrix) {
-        m_comboTypeFilter->addItem(tr("Coincidence Matrices (*.cmat *.mat)"), "matrix");
         m_comboTypeFilter->addItem(tr("GASPware Compressed Matrix (*.cmat)"), "cmat");
         m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
     } else if (m_mode == NuFileMode::SelectDirectory) {

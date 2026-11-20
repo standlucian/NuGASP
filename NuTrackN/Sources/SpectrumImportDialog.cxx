@@ -633,12 +633,18 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
                 .arg(m_detected.confidenceReason));
     }
 
+    const QString autoDetectTooltip = tr(
+        "The detected parameters (data format, channel length, and spectrum count) are educated guesses "
+        "based on file-size and byte-pattern heuristics.\n"
+        "Always double-check them using the Live Data Preview and your knowledge of your data before loading.");
+
     m_lblDetectedBanner = new QLabel(this);
     m_lblDetectedBanner->setStyleSheet(
         QString("border: 1px solid %1; border-radius: 5px; padding: 8px 12px; font-weight: bold; color: %1;")
             .arg(Design::getDialogAccentColor().name())
     );
     m_lblDetectedBanner->setText(QString("Auto-Detected: %1").arg(m_detected.confidenceReason));
+    m_lblDetectedBanner->setToolTip(autoDetectTooltip);
     mainLayout->addWidget(m_lblDetectedBanner);
 
     // 3. Settings GroupBox
@@ -649,7 +655,9 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
 
     // Format selection
     QLabel *lblFormat = new QLabel(tr("Data Format:"), settingsGroup);
+    lblFormat->setToolTip(autoDetectTooltip);
     m_comboFormat = new QComboBox(settingsGroup);
+    m_comboFormat->setToolTip(autoDetectTooltip);
     m_comboFormat->addItem(tr("32-bit Integer (Long / uint32_t)"), static_cast<int>(SpectrumFormat::LongInt32));
     m_comboFormat->addItem(tr("16-bit Integer (Short / uint16_t)"), static_cast<int>(SpectrumFormat::ShortInt16));
     m_comboFormat->addItem(tr("ASCII Text (Whitespace/Column)"), static_cast<int>(SpectrumFormat::Ascii));
@@ -667,7 +675,9 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
 
     // Length selection
     QLabel *lblLength = new QLabel(tr("Channels (Length):"), settingsGroup);
+    lblLength->setToolTip(autoDetectTooltip);
     m_comboLength = new QComboBox(settingsGroup);
+    m_comboLength->setToolTip(autoDetectTooltip);
     m_comboLength->addItem(tr("1024 channels (1k)"), 1024);
     m_comboLength->addItem(tr("2048 channels (2k)"), 2048);
     m_comboLength->addItem(tr("4096 channels (4k)"), 4096);
@@ -683,6 +693,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     m_spinCustomLength = new QSpinBox(settingsGroup);
     m_spinCustomLength->setRange(16, 1048576);
     m_spinCustomLength->setValue(m_detected.guessedLength);
+    m_spinCustomLength->setToolTip(autoDetectTooltip);
     m_spinCustomLength->setVisible(false);
 
     // Pre-select guessed length

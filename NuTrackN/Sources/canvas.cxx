@@ -949,9 +949,14 @@ void QMainCanvas::clickedW()
     }
 
     QString suggestedPath = m_currentOutputFile;
-    if (suggestedPath.isEmpty() && !m_currentSpectrumFile.isEmpty()) {
-        QFileInfo fi(m_currentSpectrumFile);
-        suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+    if (suggestedPath.isEmpty()) {
+        if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+            QFileInfo fi(m_currentSpectrumFile);
+            suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+        } else if (m_currentMatrix && m_currentMatrix->isOpen() && !m_currentMatrix->getFilePath().isEmpty()) {
+            QFileInfo fi(m_currentMatrix->getFilePath());
+            suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+        }
     }
 
     SpectrumExportDialog exportDlg(data, suggestedPath, m_currentSpectrumFormat, trackHist->GetNbinsX(), this);
@@ -1312,6 +1317,13 @@ void QMainCanvas::executeCommandString(const QString &cmdStr)
 void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
 {
     if (m_currentSpectrumFile.isEmpty()) {
+        if (m_currentMatrix && m_currentMatrix->isOpen()) {
+            CommandPrompt::logInfo(
+                "Spectrum",
+                "Detector stepping is disabled while viewing a 2D matrix.",
+                "step_spectrum");
+            return;
+        }
         CommandPrompt::logWarning("Spectrum", "No spectrum file currently loaded.");
         return;
     }
@@ -1523,11 +1535,14 @@ void QMainCanvas::stepRun(int delta)
     int targetFileIndex = -1;
     int totalRunFiles = 0;
     QString displayFileName;
-    bool isMatrixMode = false;
     bool isRemoteStep = false;
 
     if (m_currentSpectrumFile.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
-        isMatrixMode = true;
+        CommandPrompt::logInfo(
+            "Spectrum",
+            "Run stepping is disabled while viewing a 2D matrix.",
+            "step_run");
+        return;
     }
 
     // 1. Check if we are operating in a remote SSH/SFTP session
@@ -1603,12 +1618,9 @@ void QMainCanvas::stepRun(int delta)
     } else {
         // 2. Discover local sibling run files matching the same parameter prefix & extension
         QString currentFilePath = m_currentSpectrumFile;
-        if (currentFilePath.isEmpty() && isMatrixMode && m_currentMatrix) {
-            currentFilePath = m_currentMatrix->getFilePath();
-        }
 
         if (currentFilePath.isEmpty()) {
-            CommandPrompt::logWarning("Spectrum", "No spectrum or matrix file currently loaded.");
+            CommandPrompt::logWarning("Spectrum", "No spectrum file currently loaded.");
             return;
         }
 
@@ -1752,30 +1764,6 @@ void QMainCanvas::stepRun(int delta)
         targetFileIndex = targetIdx;
         totalRunFiles = static_cast<int>(candidateFilePaths.size());
         displayFileName = QFileInfo(targetFilePath).fileName();
-    }
-
-    if (isMatrixMode) {
-        QString errMsg;
-        if (!m_currentMatrix->open(targetFilePath, &errMsg)) {
-            CommandPrompt::logError(
-                "Spectrum",
-                QString("Failed to open matrix run %1: %2").arg(displayFileName, errMsg));
-            return;
-        }
-        std::vector<double> proj = m_currentMatrix->getProjectionX();
-        if (proj.empty()) proj = m_currentMatrix->getProjectionY();
-        if (!proj.empty()) {
-            loadSpectrumDataToPad(proj, QString("Matrix Proj: %1").arg(displayFileName), false);
-        }
-        CommandPrompt::logInfo(
-            "Spectrum",
-            QString("Switched to matrix run %1 (run %2/%3%4)")
-                .arg(displayFileName)
-                .arg(targetFileIndex + 1)
-                .arg(totalRunFiles)
-                .arg(isRemoteStep ? ", remote" : ""),
-            "step_run");
-        return;
     }
 
     // Multi-spectrum / 1D Spectrum run file
@@ -2343,9 +2331,14 @@ bool QMainCanvas::eventFilter(QObject *watched, QEvent *event)
 
 void QMainCanvas::onOpenCMClicked()
 {
-    QString initialDir = m_currentSpectrumFile.isEmpty()
-        ? QDir::currentPath()
-        : QFileInfo(m_currentSpectrumFile).absolutePath();
+    QString initialDir;
+    if (m_currentMatrix && m_currentMatrix->isOpen() && !m_currentMatrix->getFilePath().isEmpty()) {
+        initialDir = QFileInfo(m_currentMatrix->getFilePath()).absolutePath();
+    } else if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+        initialDir = QFileInfo(m_currentSpectrumFile).absolutePath();
+    } else {
+        initialDir = QDir::currentPath();
+    }
 
     QString remotePath;
     bool isRemote = false;
@@ -2366,16 +2359,15 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
         return false;
     }
 
-    if (!m_currentMatrix) {
-        m_currentMatrix = std::make_shared<MatrixReader>();
-    }
-
+    auto candidateMatrix = std::make_shared<MatrixReader>();
     QString errMsg;
-    if (!m_currentMatrix->open(fileName, &errMsg)) {
+    if (!candidateMatrix->open(fileName, &errMsg)) {
         QMessageBox::critical(this, tr("Open Matrix Error"), errMsg);
         if (canvas) canvas->setFocus();
         return false;
     }
+
+    m_currentMatrix = std::move(candidateMatrix);
 
     if (isRemote) {
         m_currentRemotePath = remotePath;
@@ -2397,6 +2389,9 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
     connect(&dlg, &MatrixDialog::loadProjectionRequested, this,
             [this, isRemote, remotePath](const std::vector<double> &data, const QString &title,
                    const std::vector<double> &bgData, const QString &bgTitle) {
+                m_currentSpectrumFile.clear();
+                m_currentSpectrumCount = 0;
+                m_currentSpectrumIndex = 0;
                 loadSpectrumDataToPad(data, title, false);
                 if (!bgData.empty()) {
                     loadSpectrumDataToPad(bgData, bgTitle, true);
@@ -2405,7 +2400,7 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
                     if (isRemote) {
                         labelSpectrumFile->setText(QString("[Remote CM] %1").arg(QFileInfo(remotePath).fileName()));
                     } else {
-                        labelSpectrumFile->setText(QFileInfo(title).fileName());
+                        labelSpectrumFile->setText(title);
                     }
                 }
             });
@@ -2485,10 +2480,25 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
     if (!trackHist) return;
 
+    // Preserve active pad energy calibration across LoadFromData()
+    const bool wasCalibrated = trackHist->IsCalibrated();
+    const auto prevCalibSegments = trackHist->GetCalibrationSegments();
+    const Double_t prevA0 = trackHist->GetCalibA0();
+    const Double_t prevA1 = trackHist->GetCalibA1();
+    const Double_t prevA2 = trackHist->GetCalibA2();
+
     if (!asOverlay) {
         if (!trackHist->LoadFromData(data, title.toStdString())) {
             std::cerr << "Failed to load spectrum into active histogram: " << title.toStdString() << std::endl;
             return;
+        }
+
+        if (wasCalibrated) {
+            if (!prevCalibSegments.empty()) {
+                trackHist->SetSegmentedCalibration(prevCalibSegments);
+            } else {
+                trackHist->SetCalibration(prevA0, prevA1, prevA2);
+            }
         }
 
         canvas->getCanvas()->SetBorderMode(0);
@@ -2524,10 +2534,8 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
             labelSpectrumFile->setText(title);
         }
 
-        m_currentSpectrumFile = title;
-        m_currentSpectrumCount = 1;
-        m_currentSpectrumIndex = 0;
         m_currentSpectrumLength = static_cast<int>(data.size());
+        updateAxisStatusLabels();
 
         CommandPrompt *prompt = CommandPrompt::getInstance();
         if (prompt) {
@@ -2540,6 +2548,13 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
         if (!overlayHist) return;
 
         overlayHist->LoadFromData(data, title.toStdString());
+        if (wasCalibrated) {
+            if (!prevCalibSegments.empty()) {
+                overlayHist->SetSegmentedCalibration(prevCalibSegments);
+            } else {
+                overlayHist->SetCalibration(prevA0, prevA1, prevA2);
+            }
+        }
         const int colorIdx = HijC[SelectedElement_i][SelectedElement_j].size() % colors_hist.size();
         overlayHist->SetLineColor(colors_hist[colorIdx]);
         HijC[SelectedElement_i][SelectedElement_j].push_back(overlayHist);

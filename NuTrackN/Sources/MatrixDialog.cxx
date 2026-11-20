@@ -489,8 +489,8 @@ void MatrixDialog::setupUI()
 
     mainLayout->addWidget(grpPreview, 1);
 
-    // 4. Coincidence Background Subtraction Configuration (Xtrackn)
-    QGroupBox *grpBg = new QGroupBox(tr("Coincidence Background Subtraction (Xtrackn)"), this);
+    // 4. Coincidence Background Subtraction Configuration
+    QGroupBox *grpBg = new QGroupBox(tr("Coincidence Background Subtraction"), this);
     QVBoxLayout *bgLayout = new QVBoxLayout(grpBg);
     bgLayout->setSpacing(8);
     bgLayout->setContentsMargins(14, 14, 14, 12);
@@ -507,9 +507,9 @@ void MatrixDialog::setupUI()
 
     m_comboBgMode = new QComboBox(grpBg);
     // User requested order: Normal -> Auto -> Common
-    m_comboBgMode->addItem(tr("Normal / Local (Gate boundary baseline)"), static_cast<int>(MatrixBgMode::Normal));
-    m_comboBgMode->addItem(tr("Auto / SNIP (Iterative peak clipping)"), static_cast<int>(MatrixBgMode::Auto));
-    m_comboBgMode->addItem(tr("Common / Projection (GASPware default)"), static_cast<int>(MatrixBgMode::Common));
+    m_comboBgMode->addItem(tr("Normal / Local"), static_cast<int>(MatrixBgMode::Normal));
+    m_comboBgMode->addItem(tr("Auto / SNIP"), static_cast<int>(MatrixBgMode::Auto));
+    m_comboBgMode->addItem(tr("Common / Projection"), static_cast<int>(MatrixBgMode::Common));
 
     if (m_reader) {
         MatrixBgMode mode = m_reader->getBackgroundConfig().mode;
@@ -552,7 +552,7 @@ void MatrixDialog::setupUI()
     // 5. Matrix Storage Details & Metrics
     if (m_reader && m_reader->isOpen()) {
         const double compRatio = m_reader->getCompressionRatio();
-        const double spaceSavings = (1.0 - 1.0 / compRatio) * 100.0;
+        const double spaceSavings = (compRatio > 0.0) ? (1.0 - 1.0 / compRatio) * 100.0 : 0.0;
         QString details = QString("File Size: %1 MB | Uncompressed: %2 MB (%3x compression, %4% saved) | Grid: %5x%6 tiles")
             .arg(m_reader->getFileSize() / 1048576.0, 0, 'f', 1)
             .arg(m_reader->getUncompressedSize() / 1048576.0, 0, 'f', 1)

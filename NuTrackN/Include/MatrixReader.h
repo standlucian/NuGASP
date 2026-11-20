@@ -132,9 +132,9 @@ public:
                                               double factor = 1.0) const;
 
 private:
-    bool readDescriptorTable(FILE *f);
-    bool readCmtHeader(FILE *f);
-    bool readProjections(FILE *f);
+    bool readDescriptorTable(FILE *f, QString *errorMessage = nullptr);
+    bool readCmtHeader(FILE *f, QString *errorMessage = nullptr);
+    bool readProjections(FILE *f, QString *errorMessage = nullptr);
 
     int getSegmentIndex(int tx, int ty) const;
 
