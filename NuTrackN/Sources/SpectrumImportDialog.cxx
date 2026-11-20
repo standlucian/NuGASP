@@ -26,6 +26,19 @@
 #include <algorithm>
 #include <cctype>
 
+QString spectrumFormatToString(SpectrumFormat format)
+{
+    switch (format) {
+        case SpectrumFormat::LongInt32:  return "32-bit int";
+        case SpectrumFormat::ShortInt16: return "16-bit int";
+        case SpectrumFormat::Ascii:      return "ASCII";
+        case SpectrumFormat::Float32:    return "32-bit float";
+        case SpectrumFormat::Double64:   return "64-bit double";
+        case SpectrumFormat::Auto:       return "Auto";
+    }
+    return "Unknown";
+}
+
 //==============================================================================
 // AutoDetectSpectrumFile
 //==============================================================================
@@ -607,6 +620,19 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
     // 2. Auto-Detection Banner
     m_detected = AutoDetectSpectrumFile(filePath.toStdString());
 
+    if (m_detected.fileSize == 0) {
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Cannot inspect '%1': %2").arg(fi.fileName(), m_detected.confidenceReason));
+    } else {
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Inspecting '%1' (%2 bytes) - Auto-Detected: %3")
+                .arg(fi.fileName())
+                .arg(m_detected.fileSize)
+                .arg(m_detected.confidenceReason));
+    }
+
     m_lblDetectedBanner = new QLabel(this);
     m_lblDetectedBanner->setStyleSheet(
         QString("border: 1px solid %1; border-radius: 5px; padding: 8px 12px; font-weight: bold; color: %1;")
@@ -862,6 +888,13 @@ void SpectrumImportDialog::updatePreview()
 
     if (!ok || m_loadedData.empty()) {
         m_lblPreviewSummary->setText(tr("⚠️ Failed to parse spectrum with chosen settings"));
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Preview failed for '%1' (format: %2, length: %3, index: #%4): %5")
+                .arg(QFileInfo(m_filePath).fileName(), spectrumFormatToString(fmt))
+                .arg(len)
+                .arg(specIdx)
+                .arg(err.isEmpty() ? "No readable numeric data" : err));
         if (m_plotPreview) m_plotPreview->clear();
         m_btnLoad->setEnabled(false);
         return;

@@ -1,4 +1,5 @@
 #include "RemoteClient.h"
+#include "Design.h"
 
 #include <libssh2.h>
 #include <libssh2_sftp.h>
@@ -110,6 +111,14 @@ void RemoteProfile::updateLastUsedPath(const QString &profileName, const QString
 // RemoteSession Implementation
 //==============================================================================
 
+static QString formatTransferSize(qint64 bytes)
+{
+    if (bytes < 1024) return QString("%1 B").arg(bytes);
+    if (bytes < 1024 * 1024) return QString("%1 KB").arg(bytes / 1024.0, 0, 'f', 1);
+    if (bytes < 1024LL * 1024 * 1024) return QString("%1 MB").arg(bytes / (1024.0 * 1024.0), 0, 'f', 2);
+    return QString("%1 GB").arg(bytes / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2);
+}
+
 std::shared_ptr<RemoteSession> RemoteSession::globalSession()
 {
     static std::shared_ptr<RemoteSession> s_instance = std::make_shared<RemoteSession>();
@@ -184,8 +193,23 @@ void RemoteSession::cleanupSocketsAndSession()
 
 void RemoteSession::disconnect()
 {
-    QMutexLocker locker(&m_sessionMutex);
-    cleanupSocketsAndSession();
+    bool wasConnected = false;
+    bool isTest = false;
+    QString hostDesc;
+    QString logSrc;
+    {
+        QMutexLocker locker(&m_sessionMutex);
+        wasConnected = m_connected;
+        isTest = m_isTestSession;
+        hostDesc = QString("%1@%2:%3")
+                       .arg(m_profile.user, m_profile.host)
+                       .arg(m_profile.port > 0 ? m_profile.port : 22);
+        logSrc = m_logSource;
+        cleanupSocketsAndSession();
+    }
+    if (wasConnected && !isTest) {
+        CommandPrompt::logInfo(logSrc, QString("Disconnected from %1.").arg(hostDesc));
+    }
 }
 
 bool RemoteSession::reconnectIfDropped()
@@ -201,6 +225,12 @@ bool RemoteSession::reconnectIfDropped()
         lastErr == LIBSSH2_ERROR_TIMEOUT ||
         lastErr == LIBSSH2_ERROR_CHANNEL_CLOSED ||
         lastErr == LIBSSH2_ERROR_CHANNEL_EOF_SENT) {
+        CommandPrompt::logWarning(
+            m_logSource,
+            QString("SSH transport dropped (libssh2 errno=%1); attempting reconnect to %2@%3:%4...")
+                .arg(lastErr)
+                .arg(m_profile.user, m_profile.host)
+                .arg(m_profile.port > 0 ? m_profile.port : 22));
         QString savedDir = m_currentRemoteDir;
         RemoteProfile savedProfile = m_profile;
         if (connectToHost(savedProfile, nullptr)) {
@@ -209,6 +239,7 @@ bool RemoteSession::reconnectIfDropped()
             }
             return true;
         }
+        CommandPrompt::logError(m_logSource, "Automatic SSH reconnect failed.");
     }
     return false;
 }
@@ -220,23 +251,50 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     m_profile = profile;
 
     if (profile.host.trimmed().isEmpty()) {
-        if (errorMessage) *errorMessage = "Host/IP address cannot be empty.";
+        const QString err = "Host/IP address cannot be empty.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         return false;
     }
     if (profile.user.trimmed().isEmpty()) {
-        if (errorMessage) *errorMessage = "Username cannot be empty.";
+        const QString err = "Username cannot be empty.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         return false;
     }
+
+    const int targetPort = profile.port > 0 ? profile.port : 22;
+    QString resolvedKeyFile = profile.keyFilePath.trimmed();
+    if (profile.authType == RemoteAuthType::KeyFile && resolvedKeyFile.isEmpty()) {
+        resolvedKeyFile = QDir::homePath() + "/.ssh/id_ed25519";
+        if (!QFile::exists(resolvedKeyFile)) {
+            resolvedKeyFile = QDir::homePath() + "/.ssh/id_rsa";
+        }
+    }
+    QString authDesc = "SSH Agent";
+    if (profile.authType == RemoteAuthType::KeyFile) {
+        authDesc = QString("Public Key: %1").arg(QFileInfo(resolvedKeyFile).fileName());
+    } else if (profile.authType == RemoteAuthType::Password) {
+        authDesc = "Password";
+    }
+    CommandPrompt::logInfo(
+        m_logSource,
+        QString("Connecting to %1@%2:%3 (%4)...")
+            .arg(profile.user, profile.host)
+            .arg(targetPort)
+            .arg(authDesc));
 
     // 1. Resolve host and connect TCP socket with non-blocking 5s timeout
     struct addrinfo hints{}, *res = nullptr, *rp = nullptr;
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    QString portStr = QString::number(profile.port > 0 ? profile.port : 22);
+    QString portStr = QString::number(targetPort);
     int rc = getaddrinfo(profile.host.toUtf8().constData(), portStr.toUtf8().constData(), &hints, &res);
     if (rc != 0 || !res) {
-        if (errorMessage) *errorMessage = QString("Cannot resolve host '%1': %2").arg(profile.host, gai_strerror(rc));
+        const QString err = QString("Cannot resolve host '%1': %2").arg(profile.host, gai_strerror(rc));
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         return false;
     }
 
@@ -287,7 +345,11 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     freeaddrinfo(res);
 
     if (sock < 0) {
-        if (errorMessage) *errorMessage = QString("Could not connect to %1:%2 (Connection refused or timed out).").arg(profile.host).arg(profile.port);
+        const QString err = QString("Could not connect to %1:%2 (Connection refused or timed out).")
+                                .arg(profile.host)
+                                .arg(targetPort);
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         return false;
     }
     m_socket = sock;
@@ -296,7 +358,9 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     m_session = libssh2_session_init();
     if (!m_session) {
         cleanupSocketsAndSession();
-        if (errorMessage) *errorMessage = "Failed to initialize SSH session structure.";
+        const QString err = "Failed to initialize SSH session structure.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         return false;
     }
 
@@ -309,7 +373,9 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     if (rc != 0) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-        if (errorMessage) *errorMessage = QString("SSH Handshake failed: %1").arg(errStr ? errStr : "Unknown handshake error");
+        const QString err = QString("SSH Handshake failed: %1").arg(errStr ? errStr : "Unknown handshake error");
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         cleanupSocketsAndSession();
         return false;
     }
@@ -340,13 +406,7 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     };
 
     if (profile.authType == RemoteAuthType::KeyFile) {
-        QString keyFile = profile.keyFilePath.trimmed();
-        if (keyFile.isEmpty()) {
-            keyFile = QDir::homePath() + "/.ssh/id_ed25519";
-            if (!QFile::exists(keyFile)) {
-                keyFile = QDir::homePath() + "/.ssh/id_rsa";
-            }
-        }
+        QString keyFile = resolvedKeyFile;
         QString pubKeyFile = keyFile + ".pub";
         QByteArray pubKeyBytes = pubKeyFile.toUtf8();
         const char *pubKeyPath = QFile::exists(pubKeyFile) ? pubKeyBytes.constData() : nullptr;
@@ -365,11 +425,17 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
             authSuccess = true;
         } else if (trySshAgentAuth()) {
             authSuccess = true;
+            CommandPrompt::logInfo(
+                m_logSource,
+                QString("Key file '%1' declined; authenticated via ssh-agent.")
+                    .arg(QFileInfo(keyFile).fileName()));
         } else {
             char *errStr = nullptr;
             libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-            if (errorMessage) *errorMessage = QString("SSH Public Key Auth failed (%1): %2")
-                .arg(QFileInfo(keyFile).fileName(), errStr ? errStr : "Access denied");
+            const QString err = QString("SSH Public Key Auth failed (%1): %2")
+                                    .arg(QFileInfo(keyFile).fileName(), errStr ? errStr : "Access denied");
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logError(m_logSource, err);
         }
     } else if (profile.authType == RemoteAuthType::Password) {
         QByteArray passBytes = profile.password.toUtf8();
@@ -379,7 +445,9 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         } else {
             char *errStr = nullptr;
             libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-            if (errorMessage) *errorMessage = QString("SSH Password Auth failed: %1").arg(errStr ? errStr : "Invalid username or password");
+            const QString err = QString("SSH Password Auth failed: %1").arg(errStr ? errStr : "Invalid username or password");
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logError(m_logSource, err);
         }
     } else {
         // Agent or password fallback
@@ -388,7 +456,16 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
         } else {
             QByteArray passBytes = profile.password.toUtf8();
             rc = libssh2_userauth_password(m_session, userBytes.constData(), passBytes.constData());
-            if (rc == 0) authSuccess = true;
+            if (rc == 0) {
+                authSuccess = true;
+            } else {
+                char *errStr = nullptr;
+                libssh2_session_last_error(m_session, &errStr, nullptr, 0);
+                const QString err = QString("SSH Agent/Password Auth failed: %1")
+                                        .arg(errStr ? errStr : "Access denied");
+                if (errorMessage) *errorMessage = err;
+                CommandPrompt::logError(m_logSource, err);
+            }
         }
     }
 
@@ -402,8 +479,10 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     if (!m_sftp) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-        if (errorMessage) *errorMessage = QString("Failed to initialize SFTP subsystem on remote host: %1")
-            .arg(errStr ? errStr : "SFTP not available on server");
+        const QString err = QString("Failed to initialize SFTP subsystem on remote host: %1")
+                                .arg(errStr ? errStr : "SFTP not available on server");
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError(m_logSource, err);
         cleanupSocketsAndSession();
         return false;
     }
@@ -417,6 +496,13 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     }
     m_currentRemoteDir = sanitizePath(startDir);
 
+    CommandPrompt::logInfo(
+        m_logSource,
+        QString("Connected to %1@%2:%3 (SFTP ready, dir: %4).")
+            .arg(profile.user, profile.host)
+            .arg(targetPort)
+            .arg(m_currentRemoteDir));
+
     return true;
 }
 
@@ -425,7 +511,9 @@ bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteF
     QMutexLocker locker(&m_sessionMutex);
     outList.clear();
     if (!isConnected()) {
-        if (errorMessage) *errorMessage = "Not connected to remote host.";
+        const QString err = "Not connected to remote host.";
+        if (errorMessage) *errorMessage = err;
+        if (!m_isTestSession) CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -438,8 +526,10 @@ bool RemoteSession::listDirectory(const QString &remotePath, std::vector<RemoteF
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-        if (errorMessage) *errorMessage = QString("Failed to open remote directory '%1': %2")
-            .arg(sanitized, errStr ? errStr : "Directory not found or permission denied");
+        const QString err = QString("Failed to open remote directory '%1': %2")
+                                .arg(sanitized, errStr ? errStr : "Directory not found or permission denied");
+        if (errorMessage) *errorMessage = err;
+        if (!m_isTestSession) CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -495,7 +585,9 @@ bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMes
 {
     QMutexLocker locker(&m_sessionMutex);
     if (!isConnected()) {
-        if (errorMessage) *errorMessage = "Not connected to remote host.";
+        const QString err = "Not connected to remote host.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -518,7 +610,9 @@ bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMes
         RemoteFileInfo stepInfo;
         if (fileExists(cur, &stepInfo)) {
             if (!stepInfo.isDirectory) {
-                if (errorMessage) *errorMessage = QString("Path '%1' exists but is not a directory.").arg(cur);
+                const QString err = QString("Path '%1' exists but is not a directory.").arg(cur);
+                if (errorMessage) *errorMessage = err;
+                CommandPrompt::logError("SFTP", err);
                 return false;
             }
             continue;
@@ -530,10 +624,13 @@ bool RemoteSession::createDirectory(const QString &remotePath, QString *errorMes
         if (rc != 0) {
             char *errStr = nullptr;
             libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-            if (errorMessage) *errorMessage = QString("Failed to create remote directory '%1': %2")
-                .arg(cur, errStr ? errStr : "Permission denied");
+            const QString err = QString("Failed to create remote directory '%1': %2")
+                                    .arg(cur, errStr ? errStr : "Permission denied");
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logError("SFTP", err);
             return false;
         }
+        CommandPrompt::logInfo("SFTP", QString("Created remote directory '%1'.").arg(cur));
     }
 
     return true;
@@ -574,6 +671,9 @@ bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDet
     timer.start();
 
     RemoteSession testSession;
+    testSession.m_logSource = "SSH Test";
+    testSession.m_isTestSession = true;
+
     QString err;
     if (!testSession.connectToHost(profile, &err)) {
         if (errorMessage) *errorMessage = err;
@@ -601,9 +701,24 @@ bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDet
     if (dirOk) {
         outDetails += QString("• Remote Directory '%1': Verified (%2 items found)")
                           .arg(targetDir).arg(entries.size());
+        CommandPrompt::logInfo(
+            "SSH Test",
+            QString("Verified %1@%2:%3 in %4 ms (dir '%5': %6 items).")
+                .arg(profile.user, profile.host)
+                .arg(profile.port > 0 ? profile.port : 22)
+                .arg(connectMs)
+                .arg(targetDir)
+                .arg(entries.size()));
     } else {
         outDetails += QString("• Remote Directory '%1': Note: %2")
                           .arg(targetDir, listErr);
+        CommandPrompt::logWarning(
+            "SSH Test",
+            QString("Connected to %1@%2:%3 in %4 ms, but directory '%5' failed: %6")
+                .arg(profile.user, profile.host)
+                .arg(profile.port > 0 ? profile.port : 22)
+                .arg(connectMs)
+                .arg(targetDir, listErr));
     }
 
     testSession.disconnect();
@@ -614,12 +729,17 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
                                  std::function<void(qint64, qint64)> progressCallback,
                                  QString *errorMessage,
                                  std::function<bool()> cancelCheck,
-                                 bool forceReDownload)
+                                 bool forceReDownload,
+                                 bool quietSuccess)
 {
     QMutexLocker locker(&m_sessionMutex);
+    QElapsedTimer timer;
+    timer.start();
 
     if (!isConnected()) {
-        if (errorMessage) *errorMessage = "Not connected to remote host.";
+        const QString err = "Not connected to remote host.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -632,8 +752,10 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-        if (errorMessage) *errorMessage = QString("Failed to open remote file '%1': %2")
-            .arg(cleanRemote, errStr ? errStr : "File not found or permission denied");
+        const QString err = QString("Failed to open remote file '%1': %2")
+                                .arg(cleanRemote, errStr ? errStr : "File not found or permission denied");
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -662,6 +784,12 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
             if (progressCallback) {
                 progressCallback(totalBytes, totalBytes);
             }
+            if (!quietSuccess) {
+                CommandPrompt::logInfo(
+                    "SFTP",
+                    QString("Cache hit for '%1' (%2).")
+                        .arg(cleanRemote, formatTransferSize(totalBytes)));
+            }
             return true;
         }
     }
@@ -674,7 +802,9 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
     QFile localFile(tempLocalPath);
     if (!localFile.open(QIODevice::WriteOnly)) {
         libssh2_sftp_close(handle);
-        if (errorMessage) *errorMessage = QString("Cannot create local destination file: %1").arg(localFile.errorString());
+        const QString err = QString("Cannot create local destination file: %1").arg(localFile.errorString());
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -687,7 +817,9 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
             localFile.close();
             QFile::remove(tempLocalPath);
             libssh2_sftp_close(handle);
-            if (errorMessage) *errorMessage = "Download cancelled by user.";
+            const QString err = "Download cancelled by user.";
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logWarning("SFTP", QString("Download cancelled for '%1'.").arg(cleanRemote));
             return false;
         }
 
@@ -696,7 +828,9 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
             localFile.close();
             QFile::remove(tempLocalPath);
             libssh2_sftp_close(handle);
-            if (errorMessage) *errorMessage = QString("SFTP read error while downloading '%1'").arg(cleanRemote);
+            const QString err = QString("SFTP read error while downloading '%1'").arg(cleanRemote);
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logError("SFTP", err);
             return false;
         }
         if (rc == 0) {
@@ -708,7 +842,9 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
             localFile.close();
             QFile::remove(tempLocalPath);
             libssh2_sftp_close(handle);
-            if (errorMessage) *errorMessage = "Local disk write error.";
+            const QString err = "Local disk write error.";
+            if (errorMessage) *errorMessage = err;
+            CommandPrompt::logError("SFTP", err);
             return false;
         }
 
@@ -730,8 +866,18 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
         QFile::remove(localPath);
     }
     if (!QFile::rename(tempLocalPath, localPath)) {
-        if (errorMessage) *errorMessage = "Failed to finalize downloaded file in local cache.";
+        const QString err = "Failed to finalize downloaded file in local cache.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
+    }
+
+    if (!quietSuccess) {
+        CommandPrompt::logInfo(
+            "SFTP",
+            QString("Downloaded '%1' (%2 in %3 ms).")
+                .arg(cleanRemote, formatTransferSize(bytesDone))
+                .arg(timer.elapsed()));
     }
 
     return true;
@@ -742,14 +888,21 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
                                QString *errorMessage)
 {
     QMutexLocker locker(&m_sessionMutex);
+    QElapsedTimer timer;
+    timer.start();
+
     if (!isConnected()) {
-        if (errorMessage) *errorMessage = "Not connected to remote host.";
+        const QString err = "Not connected to remote host.";
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
     QFile localFile(localPath);
     if (!localFile.open(QIODevice::ReadOnly)) {
-        if (errorMessage) *errorMessage = QString("Cannot open local file '%1' for reading.").arg(localPath);
+        const QString err = QString("Cannot open local file '%1' for reading.").arg(localPath);
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -774,8 +927,10 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
     if (!handle) {
         char *errStr = nullptr;
         libssh2_session_last_error(m_session, &errStr, nullptr, 0);
-        if (errorMessage) *errorMessage = QString("Failed to open remote destination '%1' for writing: %2")
-            .arg(cleanRemote, errStr ? errStr : "Permission denied");
+        const QString err = QString("Failed to open remote destination '%1' for writing: %2")
+                                .arg(cleanRemote, errStr ? errStr : "Permission denied");
+        if (errorMessage) *errorMessage = err;
+        CommandPrompt::logError("SFTP", err);
         return false;
     }
 
@@ -794,7 +949,9 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
             ssize_t written = libssh2_sftp_write(handle, ptr, toWrite);
             if (written < 0) {
                 libssh2_sftp_close(handle);
-                if (errorMessage) *errorMessage = QString("SFTP error writing to remote file '%1'").arg(cleanRemote);
+                const QString err = QString("SFTP error writing to remote file '%1'").arg(cleanRemote);
+                if (errorMessage) *errorMessage = err;
+                CommandPrompt::logError("SFTP", err);
                 return false;
             }
             toWrite -= written;
@@ -821,6 +978,13 @@ bool RemoteSession::uploadFile(const QString &localPath, const QString &remotePa
             f.close();
         }
     }
+
+    CommandPrompt::logInfo(
+        "SFTP",
+        QString("Uploaded '%1' (%2 in %3 ms).")
+            .arg(cleanRemote, formatTransferSize(bytesDone))
+            .arg(timer.elapsed()));
+
     return true;
 }
 
@@ -848,10 +1012,11 @@ bool RemoteSession::syncRemoteFileToCache(const QString &remotePath, QString &ou
                                          std::function<void(qint64, qint64)> progressCallback,
                                          QString *errorMessage,
                                          std::function<bool()> cancelCheck,
-                                         bool forceReDownload)
+                                         bool forceReDownload,
+                                         bool quietSuccess)
 {
     outLocalPath = getLocalCachePath(remotePath);
-    return downloadFile(remotePath, outLocalPath, progressCallback, errorMessage, cancelCheck, forceReDownload);
+    return downloadFile(remotePath, outLocalPath, progressCallback, errorMessage, cancelCheck, forceReDownload, quietSuccess);
 }
 
 bool RemoteSession::listRunFiles(const QString &remoteDirPath, const QString &currentFileName,

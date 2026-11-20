@@ -78,7 +78,8 @@ public:
                       std::function<void(qint64 bytesDone, qint64 bytesTotal)> progressCallback = nullptr,
                       QString *errorMessage = nullptr,
                       std::function<bool()> cancelCheck = nullptr,
-                      bool forceReDownload = false);
+                      bool forceReDownload = false,
+                      bool quietSuccess = false);
     bool uploadFile(const QString &localPath, const QString &remotePath,
                     std::function<void(qint64 bytesDone, qint64 bytesTotal)> progressCallback = nullptr,
                     QString *errorMessage = nullptr);
@@ -89,7 +90,8 @@ public:
                               std::function<void(qint64, qint64)> progressCallback = nullptr,
                               QString *errorMessage = nullptr,
                               std::function<bool()> cancelCheck = nullptr,
-                              bool forceReDownload = false);
+                              bool forceReDownload = false,
+                              bool quietSuccess = false);
 
     // Query remote files in same directory matching run pattern (for next/prev run cycling)
     bool listRunFiles(const QString &remoteDirPath, const QString &currentFileName,
@@ -107,6 +109,8 @@ private:
     LIBSSH2_SFTP     *m_sftp{nullptr};
     bool              m_connected{false};
     QString           m_currentRemoteDir;
+    QString           m_logSource{"SSH"};
+    bool              m_isTestSession{false};
 };
 
 #endif // REMOTECLIENT_H

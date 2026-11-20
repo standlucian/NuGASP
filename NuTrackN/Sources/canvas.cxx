@@ -696,6 +696,7 @@ void QMainCanvas::clicked1()
     // If the dialog was cancelled or no file was chosen, keep the existing spectrum
     // untouched and restore keyboard focus to the spectrum canvas
     if (fileName.isEmpty()) {
+        CommandPrompt::logInfo("Spectrum", "Open spectrum cancelled.");
         if (canvas) {
             canvas->setFocus();
         }
@@ -711,7 +712,7 @@ void QMainCanvas::clicked1()
     // Delegate format detection, length configuration, and parsing to SpectrumImportDialog
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
     if (!trackHist) {
-        std::cerr << "Active histogram is null or invalid." << std::endl;
+        CommandPrompt::logError("Spectrum", "Active histogram is null or invalid.");
         if (canvas) {
             canvas->setFocus();
         }
@@ -733,6 +734,9 @@ void QMainCanvas::clicked1()
 
     SpectrumImportDialog importDlg(fileName, this);
     if (importDlg.exec() != QDialog::Accepted) {
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Import cancelled for '%1'.").arg(QFileInfo(fileName).fileName()));
         if (canvas) {
             canvas->setFocus();
         }
@@ -741,7 +745,9 @@ void QMainCanvas::clicked1()
 
     const std::vector<double> &spectrumData = importDlg.getLoadedData();
     if (spectrumData.empty() || !trackHist->LoadFromData(spectrumData, fileName.toStdString())) {
-        std::cerr << "Failed to load spectrum from: " << fileName.toStdString() << std::endl;
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Failed to load spectrum from '%1'.").arg(fileName));
         if (canvas) {
             canvas->setFocus();
         }
@@ -879,19 +885,27 @@ void QMainCanvas::clicked1()
     }
     updateAxisStatusLabels();
 
+    const QString fmtLabel = spectrumFormatToString(m_currentSpectrumFormat);
+    const QString sourceLabel = isRemote
+        ? QString("%1 (remote: %2)").arg(QFileInfo(remotePath).fileName(), remotePath)
+        : QFileInfo(fileName).fileName();
     if (m_currentSpectrumCount > 1) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Loaded spectrum %1#%2 (%3 of %4, %5 channels)\n")
-                .arg(QFileInfo(fileName).fileName())
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Loaded %1#%2 (%3 of %4, %5 ch, %6)")
+                .arg(sourceLabel)
                 .arg(m_currentSpectrumIndex)
                 .arg(m_currentSpectrumIndex + 1)
                 .arg(m_currentSpectrumCount)
-                .arg(spectrumData.size()));
+                .arg(spectrumData.size())
+                .arg(fmtLabel));
     } else {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Loaded spectrum %1 (%2 channels)\n")
-                .arg(QFileInfo(fileName).fileName())
-                .arg(spectrumData.size()));
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Loaded %1 (%2 ch, %3)")
+                .arg(sourceLabel)
+                .arg(spectrumData.size())
+                .arg(fmtLabel));
     }
 
     // Ensure keyboard focus returns to the canvas so spacebar immediately places markers
@@ -1283,24 +1297,31 @@ void QMainCanvas::executeCommandString(const QString &cmdStr)
 void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
 {
     if (m_currentSpectrumFile.isEmpty()) {
-        CommandPrompt::getInstance()->appendPlainText("No spectrum file currently loaded.\n");
+        CommandPrompt::logWarning("Spectrum", "No spectrum file currently loaded.");
         return;
     }
 
     if (m_currentSpectrumCount <= 1) {
-        CommandPrompt::getInstance()->appendPlainText("Current file is a single spectrum (no other spectra in file).\n");
+        CommandPrompt::logInfo(
+            "Spectrum",
+            "Current file is a single spectrum (no other spectra in file).",
+            "step_spectrum");
         return;
     }
 
     const int targetIndex = m_currentSpectrumIndex + delta;
     if (targetIndex < 0) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at first spectrum (1 of %1).\n").arg(m_currentSpectrumCount));
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Already at first spectrum (1/%1).").arg(m_currentSpectrumCount),
+            "step_spectrum");
         return;
     }
     if (targetIndex >= m_currentSpectrumCount) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Already at last spectrum (%1 of %1).\n").arg(m_currentSpectrumCount));
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Already at last spectrum (%1/%1).").arg(m_currentSpectrumCount),
+            "step_spectrum");
         return;
     }
 
@@ -1313,8 +1334,9 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
     QString err;
     if (!ReadSpectrumData(m_currentSpectrumFile.toStdString(), m_currentSpectrumFormat,
                           m_currentSpectrumLength, targetIndex, spectrumData, &err) || spectrumData.empty()) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Failed to read spectrum #%1: %2\n").arg(targetIndex).arg(err));
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Failed to read spectrum #%1: %2").arg(targetIndex).arg(err));
         return;
     }
 
@@ -1346,8 +1368,9 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
     const Double_t prevA2 = trackHist->GetCalibA2();
 
     if (!trackHist->LoadFromData(spectrumData, m_currentSpectrumFile.toStdString())) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Failed to load spectrum data for #%1.\n").arg(targetIndex));
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Failed to load spectrum data for #%1.").arg(targetIndex));
         return;
     }
 
@@ -1455,13 +1478,18 @@ void QMainCanvas::stepSpectrumIndex(int delta, bool preserveScale)
     }
     updateAxisStatusLabels();
 
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Loaded spectrum %1#%2 (%3 of %4, %5 channels)\n")
-            .arg(QFileInfo(m_currentSpectrumFile).fileName())
+    const QString stepName = !m_currentRemotePath.isEmpty()
+        ? QFileInfo(m_currentRemotePath).fileName()
+        : QFileInfo(m_currentSpectrumFile).fileName();
+    CommandPrompt::logInfo(
+        "Spectrum",
+        QString("Loaded %1#%2 (%3/%4, %5 ch)")
+            .arg(stepName)
             .arg(m_currentSpectrumIndex)
             .arg(m_currentSpectrumIndex + 1)
             .arg(m_currentSpectrumCount)
-            .arg(spectrumData.size()));
+            .arg(spectrumData.size()),
+        "step_spectrum");
 
     if (canvas) {
         canvas->setFocus();
@@ -1481,6 +1509,7 @@ void QMainCanvas::stepRun(int delta)
     int totalRunFiles = 0;
     QString displayFileName;
     bool isMatrixMode = false;
+    bool isRemoteStep = false;
 
     if (m_currentSpectrumFile.isEmpty() && m_currentMatrix && m_currentMatrix->isOpen()) {
         isMatrixMode = true;
@@ -1488,14 +1517,17 @@ void QMainCanvas::stepRun(int delta)
 
     // 1. Check if we are operating in a remote SSH/SFTP session
     if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+        isRemoteStep = true;
         QFileInfo remoteInfo(m_currentRemotePath);
         QString remoteDir = remoteInfo.dir().path();
 
         std::vector<RemoteFileInfo> remoteRunFiles;
         QString err;
         if (!m_remoteSession->listRunFiles(remoteDir, remoteInfo.fileName(), remoteRunFiles, &err) || remoteRunFiles.empty()) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Failed to query remote run files in %1: %2\n").arg(remoteDir, err));
+            CommandPrompt::logError(
+                "Spectrum",
+                QString("Failed to query remote run files in %1: %2")
+                    .arg(remoteDir, err.isEmpty() ? "No matching run files found" : err));
             return;
         }
 
@@ -1509,32 +1541,41 @@ void QMainCanvas::stepRun(int delta)
         }
 
         if (currentIndex == -1) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Could not locate active file %1 in remote directory list.\n").arg(remoteInfo.fileName()));
+            CommandPrompt::logError(
+                "Spectrum",
+                QString("Could not locate active file %1 in remote directory list.").arg(remoteInfo.fileName()));
             return;
         }
 
         int targetIndex = currentIndex + delta;
         if (targetIndex < 0) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at first run file (%1).\n").arg(remoteInfo.fileName()));
+            CommandPrompt::logInfo(
+                "Spectrum",
+                QString("Already at first run file (%1).").arg(remoteInfo.fileName()),
+                "step_run");
             return;
         }
         if (targetIndex >= static_cast<int>(remoteRunFiles.size())) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at last run file (%1).\n").arg(remoteInfo.fileName()));
+            CommandPrompt::logInfo(
+                "Spectrum",
+                QString("Already at last run file (%1).").arg(remoteInfo.fileName()),
+                "step_run");
             return;
         }
 
         QString targetRemotePath = remoteRunFiles[targetIndex].fullPath;
         QString targetLocalPath;
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Fetching remote run %1 ...\n").arg(remoteRunFiles[targetIndex].name));
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Fetching remote run %1 (%2/%3)...")
+                .arg(remoteRunFiles[targetIndex].name)
+                .arg(targetIndex + 1)
+                .arg(remoteRunFiles.size()),
+            "step_run");
         qApp->processEvents();
 
-        if (!m_remoteSession->syncRemoteFileToCache(targetRemotePath, targetLocalPath, nullptr, &err)) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Failed to download remote run %1: %2\n").arg(remoteRunFiles[targetIndex].name, err));
+        if (!m_remoteSession->syncRemoteFileToCache(
+                targetRemotePath, targetLocalPath, nullptr, &err, nullptr, false, true)) {
             return;
         }
 
@@ -1552,14 +1593,14 @@ void QMainCanvas::stepRun(int delta)
         }
 
         if (currentFilePath.isEmpty()) {
-            CommandPrompt::getInstance()->appendPlainText("No spectrum or matrix file currently loaded.\n");
+            CommandPrompt::logWarning("Spectrum", "No spectrum or matrix file currently loaded.");
             return;
         }
 
         QFileInfo currentInfo(currentFilePath);
         QDir dir = currentInfo.dir();
         if (!dir.exists()) {
-            CommandPrompt::getInstance()->appendPlainText("Error: Current data directory does not exist.\n");
+            CommandPrompt::logError("Spectrum", "Current data directory does not exist.");
             return;
         }
 
@@ -1670,20 +1711,25 @@ void QMainCanvas::stepRun(int delta)
         }
 
         if (currentIndex == -1) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Could not locate current file %1 in run list.\n").arg(currentInfo.fileName()));
+            CommandPrompt::logError(
+                "Spectrum",
+                QString("Could not locate current file %1 in run list.").arg(currentInfo.fileName()));
             return;
         }
 
         int targetIdx = currentIndex + delta;
         if (targetIdx < 0) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at first run file (%1).\n").arg(currentInfo.fileName()));
+            CommandPrompt::logInfo(
+                "Spectrum",
+                QString("Already at first run file (%1).").arg(currentInfo.fileName()),
+                "step_run");
             return;
         }
         if (targetIdx >= static_cast<int>(candidateFilePaths.size())) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Already at last run file (%1).\n").arg(currentInfo.fileName()));
+            CommandPrompt::logInfo(
+                "Spectrum",
+                QString("Already at last run file (%1).").arg(currentInfo.fileName()),
+                "step_run");
             return;
         }
 
@@ -1696,8 +1742,9 @@ void QMainCanvas::stepRun(int delta)
     if (isMatrixMode) {
         QString errMsg;
         if (!m_currentMatrix->open(targetFilePath, &errMsg)) {
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Failed to open matrix run %1: %2\n").arg(displayFileName).arg(errMsg));
+            CommandPrompt::logError(
+                "Spectrum",
+                QString("Failed to open matrix run %1: %2").arg(displayFileName, errMsg));
             return;
         }
         std::vector<double> proj = m_currentMatrix->getProjectionX();
@@ -1705,11 +1752,14 @@ void QMainCanvas::stepRun(int delta)
         if (!proj.empty()) {
             loadSpectrumDataToPad(proj, QString("Matrix Proj: %1").arg(displayFileName), false);
         }
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Switched to matrix run %1 (%2 of %3)\n")
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Switched to matrix run %1 (run %2/%3%4)")
                 .arg(displayFileName)
                 .arg(targetFileIndex + 1)
-                .arg(totalRunFiles));
+                .arg(totalRunFiles)
+                .arg(isRemoteStep ? ", remote" : ""),
+            "step_run");
         return;
     }
 
@@ -1749,9 +1799,12 @@ void QMainCanvas::stepRun(int delta)
     std::vector<double> spectrumData;
     QString err;
     if (!ReadSpectrumData(targetFilePath.toStdString(), fmt, length, detIndexToLoad, spectrumData, &err) || spectrumData.empty()) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Failed to read run file %1 (detector #%2): %3\n")
-                .arg(displayFileName).arg(detIndexToLoad).arg(err));
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Failed to read run file %1 (detector #%2): %3")
+                .arg(displayFileName)
+                .arg(detIndexToLoad)
+                .arg(err));
         return;
     }
 
@@ -1779,8 +1832,9 @@ void QMainCanvas::stepRun(int delta)
     const Double_t prevA2 = trackHist->GetCalibA2();
 
     if (!trackHist->LoadFromData(spectrumData, targetFilePath.toStdString())) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Failed to load spectrum data for run %1.\n").arg(displayFileName));
+        CommandPrompt::logError(
+            "Spectrum",
+            QString("Failed to load spectrum data for run %1.").arg(displayFileName));
         return;
     }
 
@@ -1895,21 +1949,28 @@ void QMainCanvas::stepRun(int delta)
         canvas->getCanvas()->Update();
     }
 
+    const QString remoteSuffix = isRemoteStep ? ", remote" : "";
     if (m_currentSpectrumCount > 1) {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Loaded run %1 [Detector #%2] (run %3 of %4, %5 channels)\n")
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Loaded run %1#%2 (run %3/%4, %5 ch%6)")
                 .arg(displayFileName)
                 .arg(m_currentSpectrumIndex)
                 .arg(targetFileIndex + 1)
                 .arg(totalRunFiles)
-                .arg(spectrumData.size()));
+                .arg(spectrumData.size())
+                .arg(remoteSuffix),
+            "step_run");
     } else {
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Loaded run %1 (run %2 of %3, %4 channels)\n")
+        CommandPrompt::logInfo(
+            "Spectrum",
+            QString("Loaded run %1 (run %2/%3, %4 ch%5)")
                 .arg(displayFileName)
                 .arg(targetFileIndex + 1)
                 .arg(totalRunFiles)
-                .arg(spectrumData.size()));
+                .arg(spectrumData.size())
+                .arg(remoteSuffix),
+            "step_run");
     }
 
     if (canvas) {

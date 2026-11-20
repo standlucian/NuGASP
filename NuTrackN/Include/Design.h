@@ -194,16 +194,37 @@ class CommandPrompt : public QPlainTextEdit
     Q_OBJECT
 
 public:
+    enum class LogLevel {
+        Info = 0,
+        Warning = 1,
+        Error = 2
+    };
+
     static CommandPrompt* getInstance();
     static void setMainCanvas(QMainCanvas* m);
+
+    static void log(const QString &source,
+                    const QString &message,
+                    LogLevel level = LogLevel::Info,
+                    const QString &coalesceKey = QString());
+    static void logInfo(const QString &source,
+                        const QString &message,
+                        const QString &coalesceKey = QString());
+    static void logWarning(const QString &source,
+                           const QString &message,
+                           const QString &coalesceKey = QString());
+    static void logError(const QString &source, const QString &message);
 
     virtual ~CommandPrompt() override;
 
 private:
     explicit CommandPrompt(QWidget *parent = nullptr);
+    void appendLogLine(const QString &formatted, const QString &coalesceKey);
 
     static CommandPrompt* instance;
     static QMainCanvas* mainCanvas;
+    QString m_lastCoalesceKey;
+    QString m_lastCoalesceText;
 
     // Prevent copying
     CommandPrompt(const CommandPrompt&) = delete;

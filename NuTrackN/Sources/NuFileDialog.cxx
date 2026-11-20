@@ -338,8 +338,10 @@ void NuFileDialog::onConnectSSHClicked()
 
 void NuFileDialog::onLocationToggled()
 {
+    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
     if (sender() == m_btnRemoteTab) {
         if (!m_session || !m_session->isConnected()) {
+            CommandPrompt::logWarning(logSrc, "Remote location selected while SSH is offline; opening SSH connection dialog.");
             QMessageBox::information(this, tr("SSH Not Connected"),
                 tr("There is currently no active SSH connection.\nPlease configure host parameters and connect."));
             onConnectSSHClicked();
@@ -348,17 +350,22 @@ void NuFileDialog::onLocationToggled()
         m_isRemoteMode = true;
         m_btnRemoteTab->setChecked(true);
         m_btnLocalTab->setChecked(false);
+        const RemoteProfile &prof = m_session->getProfile();
+        CommandPrompt::logInfo(logSrc, QString("Switched to Remote: %1@%2 (%3).")
+                                           .arg(prof.user, prof.host, m_currentRemoteDir));
         loadDirectory(m_currentRemoteDir);
     } else {
         m_isRemoteMode = false;
         m_btnLocalTab->setChecked(true);
         m_btnRemoteTab->setChecked(false);
+        CommandPrompt::logInfo(logSrc, QString("Switched to Local filesystem (%1).").arg(m_currentLocalDir));
         loadDirectory(m_currentLocalDir);
     }
 }
 
 void NuFileDialog::loadDirectory(const QString &dirPath)
 {
+    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
     m_lblSelectionInfo->setText(tr("Loading directory: %1 ...").arg(dirPath));
     qApp->processEvents();
 
@@ -378,6 +385,10 @@ void NuFileDialog::loadDirectory(const QString &dirPath)
     } else {
         QDir dir(dirPath);
         if (!dir.exists()) {
+            CommandPrompt::logWarning(
+                logSrc,
+                QString("Directory '%1' does not exist; falling back to '%2'.")
+                    .arg(dirPath, QDir::currentPath()));
             dir = QDir::current();
         }
         m_currentLocalDir = dir.canonicalPath();
@@ -534,6 +545,7 @@ void NuFileDialog::onNewFolder()
     QString cur = m_editCurrentPath->text().trimmed();
     QString fullPath = cur.endsWith('/') ? cur + folderName : cur + "/" + folderName;
 
+    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
     if (m_isRemoteMode) {
         QString err;
         if (!m_session->createDirectory(fullPath, &err)) {
@@ -543,9 +555,11 @@ void NuFileDialog::onNewFolder()
     } else {
         QDir d(cur);
         if (!d.mkdir(folderName)) {
+            CommandPrompt::logError(logSrc, QString("Failed to create local directory '%1'.").arg(fullPath));
             QMessageBox::critical(this, tr("Directory Error"), tr("Failed to create local directory '%1'.").arg(fullPath));
             return;
         }
+        CommandPrompt::logInfo(logSrc, QString("Created local directory '%1'.").arg(fullPath));
     }
 
     loadDirectory(fullPath);
@@ -622,6 +636,9 @@ void NuFileDialog::onTableItemDoubleClicked(int row, int /*col*/)
 
 bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLocalPath)
 {
+    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    CommandPrompt::logInfo(logSrc, QString("Fetching remote file '%1'...").arg(remotePath));
+
     m_progressBar->setValue(0);
     m_progressBar->setVisible(true);
     m_lblSelectionInfo->setText(tr("Downloading %1 from remote DAQ host...").arg(QFileInfo(remotePath).fileName()));
@@ -655,15 +672,19 @@ bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLoc
 
 void NuFileDialog::onAcceptActionClicked()
 {
+    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+
     // Mode 1: Select Directory
     if (m_mode == NuFileMode::SelectDirectory) {
         if (m_isRemoteMode) {
             m_selectedRemotePath = m_currentRemoteDir;
             m_selectedPath = m_session->getLocalCachePath(m_currentRemoteDir);
             QDir().mkpath(m_selectedPath);
+            CommandPrompt::logInfo(logSrc, QString("Selected remote directory '%1'.").arg(m_selectedRemotePath));
         } else {
             m_selectedPath = m_currentLocalDir;
             m_selectedRemotePath.clear();
+            CommandPrompt::logInfo(logSrc, QString("Selected directory '%1'.").arg(m_selectedPath));
         }
         accept();
         return;
@@ -673,6 +694,7 @@ void NuFileDialog::onAcceptActionClicked()
     if (m_mode == NuFileMode::SaveFile) {
         QString fileName = m_editSaveFileName ? m_editSaveFileName->text().trimmed() : QString();
         if (fileName.isEmpty()) {
+            CommandPrompt::logWarning(logSrc, "Target file name cannot be empty.");
             QMessageBox::warning(this, tr("File Name Required"), tr("Please specify a target file name to save."));
             return;
         }
@@ -682,11 +704,13 @@ void NuFileDialog::onAcceptActionClicked()
                 ? m_currentRemoteDir + fileName
                 : m_currentRemoteDir + "/" + fileName;
             m_selectedPath = m_session->getLocalCachePath(m_selectedRemotePath);
+            CommandPrompt::logInfo(logSrc, QString("Selected remote save path '%1'.").arg(m_selectedRemotePath));
         } else {
             m_selectedPath = m_currentLocalDir.endsWith('/')
                 ? m_currentLocalDir + fileName
                 : m_currentLocalDir + "/" + fileName;
             m_selectedRemotePath.clear();
+            CommandPrompt::logInfo(logSrc, QString("Selected save path '%1'.").arg(m_selectedPath));
         }
         QDir().mkpath(QFileInfo(m_selectedPath).absolutePath());
         accept();
@@ -697,6 +721,7 @@ void NuFileDialog::onAcceptActionClicked()
     if (m_mode == NuFileMode::OpenMultipleFiles) {
         QModelIndexList selectedRows = m_tableFiles->selectionModel()->selectedRows();
         if (selectedRows.isEmpty()) {
+            CommandPrompt::logWarning(logSrc, "No files selected.");
             QMessageBox::warning(this, tr("No Files Selected"), tr("Please select at least one run file."));
             return;
         }
@@ -724,6 +749,11 @@ void NuFileDialog::onAcceptActionClicked()
             m_selectedPaths = chosenPaths;
             m_selectedRemotePaths.clear();
         }
+        CommandPrompt::logInfo(
+            logSrc,
+            QString("Selected %1 %2 file(s).")
+                .arg(chosenPaths.size())
+                .arg(m_isRemoteMode ? "remote" : "local"));
         accept();
         return;
     }
@@ -749,9 +779,13 @@ void NuFileDialog::onAcceptActionClicked()
             return;
         }
         m_selectedPath = localCached;
+        CommandPrompt::logInfo(
+            logSrc,
+            QString("Selected remote file '%1' (cached: %2).").arg(m_selectedRemotePath, m_selectedPath));
     } else {
         m_selectedPath = path;
         m_selectedRemotePath.clear();
+        CommandPrompt::logInfo(logSrc, QString("Selected local file '%1'.").arg(m_selectedPath));
     }
 
     accept();
@@ -886,9 +920,11 @@ bool NuFileDialog::finishRemoteSave(const QString &localStagedPath,
 
     auto session = RemoteSession::globalSession();
     if (!session || !session->isConnected()) {
-        if (errorMessage) *errorMessage = tr("Cannot upload to remote destination: SSH session is not active.");
+        const QString warnMsg = tr("Cannot upload to remote destination '%1': SSH session is not active.").arg(remoteDestPath);
+        if (errorMessage) *errorMessage = warnMsg;
+        CommandPrompt::logWarning("FileDialog", warnMsg);
         if (parent) {
-            QMessageBox::warning(parent, tr("Upload Warning"), *errorMessage);
+            QMessageBox::warning(parent, tr("Upload Warning"), warnMsg);
         }
         return false;
     }

@@ -318,6 +318,7 @@ void RemoteConnectDialog::onSaveProfileClicked()
 {
     RemoteProfile current = readFormToProfile();
     if (current.host.isEmpty()) {
+        CommandPrompt::logWarning("SSH", "Cannot save profile: Host/IP address is empty.");
         QMessageBox::warning(this, tr("Missing Host"), tr("Please provide a Host or IP address to save."));
         return;
     }
@@ -336,6 +337,9 @@ void RemoteConnectDialog::onSaveProfileClicked()
     loadProfilesToCombo();
     m_lblStatus->setStyleSheet("color: #81c784;");
     m_lblStatus->setText(tr("Profile '%1' saved successfully.").arg(current.name));
+    CommandPrompt::logInfo("SSH", QString("Saved profile '%1' (%2@%3:%4).")
+                                      .arg(current.name, current.user, current.host)
+                                      .arg(current.port));
 }
 
 void RemoteConnectDialog::onDeleteProfileClicked()
@@ -350,6 +354,7 @@ void RemoteConnectDialog::onDeleteProfileClicked()
         m_profiles.erase(m_profiles.begin() + currentIdx);
         RemoteProfile::saveAllProfiles(m_profiles);
         loadProfilesToCombo();
+        CommandPrompt::logInfo("SSH", QString("Deleted profile '%1'.").arg(name));
     }
 }
 
@@ -409,11 +414,13 @@ void RemoteConnectDialog::onTestConnectionClicked()
     if (profile.host.isEmpty()) {
         m_lblTestResults->setStyleSheet("background-color: rgba(239, 83, 80, 0.15); color: #ef9a9a; padding: 8px; border: 1px solid #c62828; border-radius: 4px;");
         m_lblTestResults->setText(tr("✗ Error: Host address cannot be empty."));
+        CommandPrompt::logWarning("SSH Test", "Host address cannot be empty.");
         return;
     }
     if (profile.user.isEmpty()) {
         m_lblTestResults->setStyleSheet("background-color: rgba(239, 83, 80, 0.15); color: #ef9a9a; padding: 8px; border: 1px solid #c62828; border-radius: 4px;");
         m_lblTestResults->setText(tr("✗ Error: Username cannot be empty."));
+        CommandPrompt::logWarning("SSH Test", "Username cannot be empty.");
         return;
     }
 
@@ -434,8 +441,14 @@ void RemoteConnectDialog::onTestConnectionClicked()
                 .arg(QFileInfo(profile.keyFilePath).fileName()),
             QLineEdit::Password, QString(), &askOk);
         if (askOk && !keyPass.isEmpty()) {
+            CommandPrompt::logInfo(
+                "SSH Test",
+                QString("Retrying key '%1' with passphrase...")
+                    .arg(QFileInfo(profile.keyFilePath).fileName()));
             profile.password = keyPass;
             ok = RemoteSession::testConnection(profile, details, &err);
+        } else {
+            CommandPrompt::logWarning("SSH Test", "Key passphrase prompt cancelled.");
         }
     }
 
@@ -459,6 +472,7 @@ void RemoteConnectDialog::onDisconnectClicked()
     updateSessionStateDisplay();
     m_lblStatus->setStyleSheet("color: #ffb74d;");
     m_lblStatus->setText(tr("SSH session disconnected. NuGASP returned to local mode."));
+    CommandPrompt::logInfo("SSH", "Returned to local filesystem mode.");
 }
 
 void RemoteConnectDialog::onConnectClicked()
@@ -469,11 +483,13 @@ void RemoteConnectDialog::onConnectClicked()
     if (profile.host.isEmpty()) {
         m_lblStatus->setStyleSheet("color: #e57373;");
         m_lblStatus->setText(tr("Error: Host address cannot be empty."));
+        CommandPrompt::logWarning("SSH", "Host address cannot be empty.");
         return;
     }
     if (profile.user.isEmpty()) {
         m_lblStatus->setStyleSheet("color: #e57373;");
         m_lblStatus->setText(tr("Error: Username cannot be empty."));
+        CommandPrompt::logWarning("SSH", "Username cannot be empty.");
         return;
     }
 
@@ -491,8 +507,14 @@ void RemoteConnectDialog::onConnectClicked()
                 .arg(QFileInfo(profile.keyFilePath).fileName()),
             QLineEdit::Password, QString(), &askOk);
         if (askOk && !keyPass.isEmpty()) {
+            CommandPrompt::logInfo(
+                "SSH",
+                QString("Retrying key '%1' with passphrase...")
+                    .arg(QFileInfo(profile.keyFilePath).fileName()));
             profile.password = keyPass;
             connected = m_session->connectToHost(profile, &errorMsg);
+        } else {
+            CommandPrompt::logWarning("SSH", "Key passphrase prompt cancelled.");
         }
     }
     if (!connected) {

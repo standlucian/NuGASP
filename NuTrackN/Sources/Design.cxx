@@ -33,8 +33,15 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QMetaObject>
+#include <QPointer>
+#include <QScrollBar>
+#include <QTextBlock>
+#include <QTextCursor>
+#include <QThread>
 #include "NuFileDialog.h"
 #include <iostream>
+#include <mutex>
 #include <cmath>
 
 #include <TCanvas.h>
@@ -1009,6 +1016,97 @@ CommandPrompt *CommandPrompt::getInstance() {
     instance = new CommandPrompt(mainCanvas);
   }
   return instance;
+}
+
+void CommandPrompt::appendLogLine(const QString &formatted, const QString &coalesceKey) {
+  QTextBlock lastBlock = document()->lastBlock();
+  if (!coalesceKey.isEmpty() && !formatted.contains('\n') &&
+      coalesceKey == m_lastCoalesceKey && !m_lastCoalesceText.isEmpty() &&
+      lastBlock.isValid() && lastBlock.text() == m_lastCoalesceText) {
+    QTextCursor cursor(lastBlock);
+    cursor.movePosition(QTextCursor::StartOfBlock);
+    cursor.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+    cursor.insertText(formatted);
+    m_lastCoalesceText = formatted;
+  } else {
+    appendPlainText(formatted);
+    if (!coalesceKey.isEmpty() && !formatted.contains('\n')) {
+      m_lastCoalesceKey = coalesceKey;
+      m_lastCoalesceText = formatted;
+    } else {
+      m_lastCoalesceKey.clear();
+      m_lastCoalesceText.clear();
+    }
+  }
+  if (QScrollBar *sb = verticalScrollBar()) {
+    sb->setValue(sb->maximum());
+  }
+}
+
+void CommandPrompt::log(const QString &source,
+                        const QString &message,
+                        LogLevel level,
+                        const QString &coalesceKey) {
+  QString cleanMsg = message;
+  while (cleanMsg.endsWith('\n') || cleanMsg.endsWith('\r')) {
+    cleanMsg.chop(1);
+  }
+  if (cleanMsg.trimmed().isEmpty()) {
+    return;
+  }
+
+  QString prefix;
+  if (!source.isEmpty()) {
+    prefix = QString("[%1] ").arg(source);
+  }
+  if (level == LogLevel::Warning) {
+    prefix += "WARNING: ";
+  } else if (level == LogLevel::Error) {
+    prefix += "ERROR: ";
+  }
+  const QString formatted = prefix + cleanMsg;
+
+  {
+    static std::mutex s_terminalLogMutex;
+    std::lock_guard<std::mutex> lock(s_terminalLogMutex);
+    std::ostream &out = (level == LogLevel::Info) ? std::cout : std::cerr;
+    out << formatted.toStdString() << std::endl;
+  }
+
+  CommandPrompt *prompt = CommandPrompt::instance;
+  if (!prompt || !QCoreApplication::instance()) {
+    return;
+  }
+
+  if (QThread::currentThread() == prompt->thread()) {
+    prompt->appendLogLine(formatted, coalesceKey);
+  } else {
+    QPointer<CommandPrompt> guard(prompt);
+    QMetaObject::invokeMethod(
+        prompt,
+        [guard, formatted, coalesceKey]() {
+          if (guard) {
+            guard->appendLogLine(formatted, coalesceKey);
+          }
+        },
+        Qt::QueuedConnection);
+  }
+}
+
+void CommandPrompt::logInfo(const QString &source,
+                            const QString &message,
+                            const QString &coalesceKey) {
+  log(source, message, LogLevel::Info, coalesceKey);
+}
+
+void CommandPrompt::logWarning(const QString &source,
+                               const QString &message,
+                               const QString &coalesceKey) {
+  log(source, message, LogLevel::Warning, coalesceKey);
+}
+
+void CommandPrompt::logError(const QString &source, const QString &message) {
+  log(source, message, LogLevel::Error);
 }
 
 //==============================================================================

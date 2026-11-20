@@ -21,6 +21,8 @@ enum class SpectrumFormat {
     Double64     // 64-bit IEEE 754 double (8 bytes/channel)
 };
 
+QString spectrumFormatToString(SpectrumFormat format);
+
 struct SpectrumDetectionResult {
     std::string    filename;
     uint64_t       fileSize{0};
