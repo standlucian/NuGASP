@@ -1006,12 +1006,7 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
             case Qt::Key_L:
                 // Z + F / Z + L: Close Area Output File
                 if (m_mainCanvas) {
-                    QString logName = m_mainCanvas->getAreaLogFileName();
-                    if (m_mainCanvas->stopAreaLogging()) {
-                        CommandPrompt::getInstance()->appendPlainText("Area output logging closed: " + logName + "\n");
-                    } else {
-                        CommandPrompt::getInstance()->appendPlainText("No area output file currently open.\n");
-                    }
+                    m_mainCanvas->closeAreaLogFile();
                 }
                 break;
             case Qt::Key_N:
@@ -1185,27 +1180,12 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 emit requestMatrixSetup();
                 break;
             case Qt::Key_F:
-            case Qt::Key_L: {
+            case Qt::Key_L:
                 // D + F / D + L: Define Area Output File
                 if (m_mainCanvas) {
-                    QString remotePath;
-                    bool isRemote = false;
-                    QString fileName = NuFileDialog::getSaveFileName(
-                        this, "Define Area Output File", "",
-                        "Area Log (*.area);;Text Files (*.txt);;All Files (*)",
-                        nullptr, &remotePath, &isRemote);
-                    if (!fileName.isEmpty()) {
-                        if (m_mainCanvas->startAreaLogging(fileName, remotePath)) {
-                            CommandPrompt::getInstance()->appendPlainText(
-                                "Area output logging enabled -> " + (isRemote ? remotePath : fileName) + "\n");
-                        } else {
-                            CommandPrompt::getInstance()->appendPlainText(
-                                "Error: Failed to open area output file: " + fileName + "\n");
-                        }
-                    }
+                    m_mainCanvas->defineAreaLogFile();
                 }
                 break;
-            }
             case Qt::Key_N: {
                 // D + N: Open dialog to set display behavior
                 if (m_mainCanvas) {

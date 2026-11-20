@@ -344,8 +344,10 @@ public:
 
    enum class AreaLogContext { None, Integration, Fitting };
 
-   bool startAreaLogging(const QString& fileName, const QString& remotePath = QString());
+   bool startAreaLogging(const QString& fileName, const QString& remotePath = QString(), bool appendMode = true);
    bool stopAreaLogging();
+   void defineAreaLogFile();
+   void closeAreaLogFile();
    bool isAreaLoggingEnabled() const { return m_isAreaLoggingEnabled; }
    QString getAreaLogFileName() const { return m_areaLogRemotePath.isEmpty() ? m_areaLogFile.fileName() : m_areaLogRemotePath; }
    QString getAreaLogRemotePath() const { return m_areaLogRemotePath; }
@@ -382,7 +384,7 @@ public slots:
    void clicked1();
    void clickedW();
    void areaFunction();
-   void areaFunctionWithBackground(bool openDialog = true);
+   void areaFunctionWithBackground(bool openDialog = true, bool logResult = true);
    void handle_root_events();
    void autoFit(int, int);
    void clearTheScreen();
@@ -629,6 +631,7 @@ protected:
     QPushButton                   *btnDT{nullptr};
     QPushButton                   *btnInc{nullptr};
     QPushButton                   *btnDec{nullptr};
+    QPushButton                   *btnRec{nullptr};
     QPushButton                   *btnOpenCM{nullptr};
     QPushButton                   *btnGateCM{nullptr};
     QPushButton                   *btnRemote{nullptr};
@@ -639,6 +642,7 @@ protected:
     // Area Output Logging
     bool            m_isAreaLoggingEnabled{false};
     AreaLogContext  m_lastAreaLogContext{AreaLogContext::None};
+    QString         m_lastAreaLogTarget;
     QFile           m_areaLogFile;
     QTextStream     m_areaLogStream;
     QString         m_areaLogRemotePath;

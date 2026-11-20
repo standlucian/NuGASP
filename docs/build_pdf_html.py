@@ -104,10 +104,13 @@ def build_html():
 
     # Step 4: Inside Front Cover (Colophon / Publication Details)
     # Serves as Page 2 (Verso / Even page) in duplex printing, ensuring TOC starts on Page 3 (Recto / Odd page)
-    colophon_html = """<div class="inside-cover-page">
+    ver_match = re.search(r"\*\*Version\s+([0-9]+\.[0-9]+\.[0-9]+)\*\*", md_text)
+    doc_version = ver_match.group(1) if ver_match else "2.0.5"
+
+    colophon_html = f"""<div class="inside-cover-page">
   <div class="colophon">
     <div class="colophon-title">NuTrackN Official User Manual</div>
-    <div class="colophon-meta">Release Version 2.0.4 (2026 Edition)</div>
+    <div class="colophon-meta">Release Version {doc_version} (2026 Edition)</div>
 
     <div class="colophon-block">
       <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
@@ -128,7 +131,7 @@ def build_html():
 
     <div class="colophon-block">
       <strong>Standard Academic Citation:</strong><br>
-      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.4, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version {doc_version}, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
     </div>
 
     <div class="colophon-notice">
@@ -190,7 +193,7 @@ def build_html():
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0.4)</title>
+  <title>NuTrackN User Manual (Version {doc_version})</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -530,7 +533,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-right {{
-          content: "NuTrackN User Manual (v2.0.4)";
+          content: "NuTrackN User Manual (v{doc_version})";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;
@@ -547,7 +550,7 @@ def build_html():
           color: #64748b;
         }}
         @bottom-left {{
-          content: "NuTrackN User Manual (v2.0.4)";
+          content: "NuTrackN User Manual (v{doc_version})";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;

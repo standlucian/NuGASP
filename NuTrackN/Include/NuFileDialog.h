@@ -42,7 +42,8 @@ public:
                           const QString &initialDir = QString(),
                           const QString &filter = QString(),
                           QWidget *parent = nullptr,
-                          int initialRemoteOverride = -1);
+                          int initialRemoteOverride = -1,
+                          bool promptOverwrite = true);
     ~NuFileDialog() override = default;
 
     bool isRemoteSelected() const { return m_isRemoteMode; }
@@ -50,6 +51,7 @@ public:
     QString getSelectedRemotePath() const;        // Target remote path (empty if local)
     QStringList getSelectedPaths() const;         // Local paths (cached if remote)
     QStringList getSelectedRemotePaths() const;   // Target remote paths
+    QString getSelectedFilter() const;            // Currently selected filter string
 
     // High-level static convenience methods
     static QString getOpenSpectrum(QWidget *parent = nullptr,
@@ -87,7 +89,8 @@ public:
                                    QString *selectedFilter = nullptr,
                                    QString *outRemotePath = nullptr,
                                    bool *outIsRemote = nullptr,
-                                   int initialRemoteOverride = -1);
+                                   int initialRemoteOverride = -1,
+                                   bool promptOverwrite = true);
 
     static QString getExistingDirectory(QWidget *parent = nullptr,
                                         const QString &caption = QString(),
@@ -123,6 +126,7 @@ private:
     NuFileMode                     m_mode{NuFileMode::OpenFile};
     std::shared_ptr<RemoteSession> m_session;
     bool                           m_isRemoteMode{false};
+    bool                           m_promptOverwrite{true};
 
     // Paths
     QString                        m_currentLocalDir;

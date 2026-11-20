@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QGroupBox>
 #include <QString>
+#include <QCloseEvent>
 
 IntegralDialog::IntegralDialog(QMainCanvas *canvas, QWidget *parent)
     : QDialog(parent), m_canvas(canvas), m_isUpdating(false)
@@ -114,11 +115,31 @@ void IntegralDialog::updateFromCanvas()
 
     m_isUpdating = false;
     recalculate();
+    m_hasUserModified = false;
+}
+
+void IntegralDialog::closeEvent(QCloseEvent *event)
+{
+    if (m_hasUserModified && m_canvas) {
+        m_canvas->areaFunctionWithBackground(false, true);
+        m_hasUserModified = false;
+    }
+    QDialog::closeEvent(event);
+}
+
+void IntegralDialog::done(int r)
+{
+    if (m_hasUserModified && m_canvas) {
+        m_canvas->areaFunctionWithBackground(false, true);
+        m_hasUserModified = false;
+    }
+    QDialog::done(r);
 }
 
 void IntegralDialog::recalculate()
 {
     if (m_isUpdating) return;
+    m_hasUserModified = true;
 
     // Update canvas markers
     m_canvas->background_markers.clear();
@@ -154,9 +175,9 @@ void IntegralDialog::recalculate()
         m_fwhmLabel->setText("-");
     }
 
-    // Redraw
+    // Redraw without appending intermediate spinbox ticks to the calculation logfile
     m_canvas->clearDrawnObjects();
     m_canvas->showBackgroundMarkers();
     m_canvas->showIntegralMarkers();
-    m_canvas->areaFunctionWithBackground(false);
+    m_canvas->areaFunctionWithBackground(false, false);
 }

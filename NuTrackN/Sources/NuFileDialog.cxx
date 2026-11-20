@@ -17,6 +17,7 @@
 #include <QApplication>
 #include <QDir>
 #include <QCollator>
+#include <QRegularExpression>
 
 static QString logSourceForMode(NuFileMode mode)
 {
@@ -38,8 +39,9 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
                            const QString &initialDir,
                            const QString &filter,
                            QWidget *parent,
-                           int initialRemoteOverride)
-    : QDialog(parent), m_mode(mode)
+                           int initialRemoteOverride,
+                           bool promptOverwrite)
+    : QDialog(parent), m_mode(mode), m_promptOverwrite(promptOverwrite)
 {
     m_session = RemoteSession::globalSession();
 
@@ -224,7 +226,9 @@ void NuFileDialog::setupUI(const QString &caption, const QString &initialFilter)
                 m_comboTypeFilter->addItem(f.trimmed(), f.trimmed());
             }
         }
-        m_comboTypeFilter->addItem(tr("All Nuclear Data (*.spe *.spk *.mat *.cmat *.chn *.cal *.root)"), "data");
+        if (m_mode != NuFileMode::SaveFile) {
+            m_comboTypeFilter->addItem(tr("All Nuclear Data (*.spe *.spk *.mat *.cmat *.chn *.cal *.root)"), "data");
+        }
         m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
     }
     connect(m_comboTypeFilter, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &NuFileDialog::onFilterChanged);
@@ -277,7 +281,7 @@ void NuFileDialog::setupUI(const QString &caption, const QString &initialFilter)
 
         m_editSaveFileName = new QLineEdit(this);
         m_editSaveFileName->setFont(dlgFont);
-        m_editSaveFileName->setPlaceholderText(tr("Enter target filename (e.g. output.spe)..."));
+        m_editSaveFileName->setPlaceholderText(tr("Enter target filename..."));
         saveRow->addWidget(m_editSaveFileName, 1);
         mainLayout->addLayout(saveRow);
     }
@@ -483,6 +487,18 @@ void NuFileDialog::populateTable()
                     suffix != "asc" && suffix != "dat") {
                     continue;
                 }
+            } else if (filterType.contains("*.")) {
+                if (!filterType.contains("*.*")) {
+                    QRegularExpression re("\\*\\.([A-Za-z0-9_]+)");
+                    QRegularExpressionMatchIterator it = re.globalMatch(filterType);
+                    QStringList allowedExts;
+                    while (it.hasNext()) {
+                        allowedExts.push_back(it.next().captured(1).toLower());
+                    }
+                    if (!allowedExts.isEmpty() && !allowedExts.contains(suffix)) {
+                        continue;
+                    }
+                }
             }
         }
 
@@ -604,6 +620,37 @@ void NuFileDialog::onPathEntered()
 
 void NuFileDialog::onFilterChanged()
 {
+    if (m_mode == NuFileMode::SaveFile && m_editSaveFileName && m_comboTypeFilter) {
+        const QString filterData = m_comboTypeFilter->currentData().toString();
+        if (filterData != "all" && !filterData.contains("*.*")) {
+            QRegularExpression re("\\*\\.([A-Za-z0-9_]+)");
+            QRegularExpressionMatch match = re.match(filterData);
+            if (match.hasMatch()) {
+                const QString newExt = match.captured(1).toLower();
+                QString curName = m_editSaveFileName->text().trimmed();
+                if (!curName.isEmpty()) {
+                    // Collect all known extensions from the filter combo so we only swap a filter-managed suffix
+                    QStringList filterExts;
+                    for (int i = 0; i < m_comboTypeFilter->count(); ++i) {
+                        QRegularExpressionMatchIterator it = re.globalMatch(m_comboTypeFilter->itemData(i).toString());
+                        while (it.hasNext()) {
+                            filterExts.push_back(it.next().captured(1).toLower());
+                        }
+                    }
+                    QFileInfo fi(curName);
+                    const QString curExt = fi.suffix().toLower();
+                    if (curExt.isEmpty()) {
+                        m_editSaveFileName->setText(curName + "." + newExt);
+                    } else if (curExt != newExt && filterExts.contains(curExt)) {
+                        const int dotIdx = curName.lastIndexOf('.');
+                        if (dotIdx > 0) {
+                            m_editSaveFileName->setText(curName.left(dotIdx + 1) + newExt);
+                        }
+                    }
+                }
+            }
+        }
+    }
     populateTable();
 }
 
@@ -733,12 +780,26 @@ void NuFileDialog::onAcceptActionClicked()
                 ? m_currentRemoteDir + fileName
                 : m_currentRemoteDir + "/" + fileName;
             m_selectedPath = m_session->getLocalCachePath(m_selectedRemotePath);
+            if (m_promptOverwrite && m_session && m_session->fileExists(m_selectedRemotePath)) {
+                auto ans = QMessageBox::question(
+                    this, tr("Confirm Overwrite"),
+                    tr("The remote file '%1' already exists.\nDo you want to replace it?").arg(fileName),
+                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                if (ans != QMessageBox::Yes) return;
+            }
             CommandPrompt::logDebug(logSrc, QString("Selected remote save path '%1'.").arg(m_selectedRemotePath));
         } else {
             m_selectedPath = m_currentLocalDir.endsWith('/')
                 ? m_currentLocalDir + fileName
                 : m_currentLocalDir + "/" + fileName;
             m_selectedRemotePath.clear();
+            if (m_promptOverwrite && QFileInfo::exists(m_selectedPath)) {
+                auto ans = QMessageBox::question(
+                    this, tr("Confirm Overwrite"),
+                    tr("The file '%1' already exists.\nDo you want to replace it?").arg(fileName),
+                    QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+                if (ans != QMessageBox::Yes) return;
+            }
             CommandPrompt::logDebug(logSrc, QString("Selected save path '%1'.").arg(m_selectedPath));
         }
         QDir().mkpath(QFileInfo(m_selectedPath).absolutePath());
@@ -908,18 +969,25 @@ QStringList NuFileDialog::getOpenFileNames(QWidget *parent,
     return dlg.getSelectedPaths();
 }
 
+QString NuFileDialog::getSelectedFilter() const
+{
+    return m_comboTypeFilter ? m_comboTypeFilter->currentText() : QString();
+}
+
 QString NuFileDialog::getSaveFileName(QWidget *parent,
                                       const QString &caption,
                                       const QString &dir,
                                       const QString &filter,
-                                      QString * /*selectedFilter*/,
+                                      QString *selectedFilter,
                                       QString *outRemotePath,
                                       bool *outIsRemote,
-                                      int initialRemoteOverride)
+                                      int initialRemoteOverride,
+                                      bool promptOverwrite)
 {
-    NuFileDialog dlg(NuFileMode::SaveFile, caption, dir, filter, parent, initialRemoteOverride);
+    NuFileDialog dlg(NuFileMode::SaveFile, caption, dir, filter, parent, initialRemoteOverride, promptOverwrite);
     if (dlg.exec() != QDialog::Accepted) return QString();
 
+    if (selectedFilter) *selectedFilter = dlg.getSelectedFilter();
     if (outIsRemote) *outIsRemote = dlg.isRemoteSelected();
     if (outRemotePath) *outRemotePath = dlg.getSelectedRemotePath();
     return dlg.getSelectedPath();

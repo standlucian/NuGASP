@@ -238,7 +238,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnInt->setFixedHeight(36);
     btnInt->setToolTip(tr("Integrate peak area with or without background subtraction [Shortcuts: C+I (gross), C+J (net)]"));
     rightBar->addWidget(btnInt);
-    connect(btnInt, &QPushButton::clicked, this, &QMainCanvas::areaFunctionWithBackground);
+    connect(btnInt, &QPushButton::clicked, this, [this]() { areaFunctionWithBackground(true, true); });
 
     QPushButton *btnFit = makeButton("Fit", topContainer, true);
     btnFit->setFixedWidth(93);
@@ -332,17 +332,17 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     QGridLayout *bottomBtnGrid = new QGridLayout();
     bottomBtnGrid->setSpacing(2);
 
-    QPushButton *btnR = makeButton("R", topContainer, true);
-    btnR->setFixedWidth(54);
+    QPushButton *btnR = makeButton("Read", topContainer, true);
+    btnR->setFixedWidth(64);
     btnR->setFixedHeight(36);
-    btnR->setToolTip(tr("Opens histogram spectra in multiple formats or sizes."));
+    btnR->setToolTip(tr("Open / read histogram spectra in multiple formats or sizes [Shortcut: N]"));
     connect(btnR, &QPushButton::clicked, this, &QMainCanvas::clicked1);
     bottomBtnGrid->addWidget(btnR, 0, 0);
 
-    QPushButton *btnW = makeButton("W", topContainer, true);
-    btnW->setFixedWidth(54);
+    QPushButton *btnW = makeButton("Write", topContainer, true);
+    btnW->setFixedWidth(66);
     btnW->setFixedHeight(36);
-    btnW->setToolTip(tr("Write / export current spectrum to a file."));
+    btnW->setToolTip(tr("Write / export current spectrum to a file [Shortcut: O+S]"));
     connect(btnW, &QPushButton::clicked, this, &QMainCanvas::clickedW);
     bottomBtnGrid->addWidget(btnW, 0, 1);
 
@@ -353,13 +353,36 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnPrint, &QPushButton::clicked, this, &QMainCanvas::printPlot);
     bottomBtnGrid->addWidget(btnPrint, 0, 2);
 
+    btnRec = makeButton("Rec", topContainer, true);
+    btnRec->setFixedWidth(66);
+    btnRec->setFixedHeight(36);
+    btnRec->setCheckable(true);
+    btnRec->setStyleSheet(Design::getButtonStyleSheet() +
+        "QPushButton:checked { background-color: #b71c1c; color: #ffffff; border: 1px solid #ef5350; }");
+    btnRec->setToolTip(tr("Record peak integration & fit results to a calculation logfile\n"
+                          "Click: Start (choose file) / Stop & close\n"
+                          "Ctrl+Click: Switch to a new logfile\n"
+                          "[Shortcuts: D+F / Z+F]"));
+    connect(btnRec, &QPushButton::clicked, this, [this]() {
+        const bool ctrlHeld = (QApplication::keyboardModifiers() & Qt::ControlModifier);
+        if (ctrlHeld || !m_isAreaLoggingEnabled) {
+            defineAreaLogFile();
+        } else {
+            closeAreaLogFile();
+        }
+        if (btnRec) {
+            btnRec->setChecked(m_isAreaLoggingEnabled);
+        }
+    });
+    bottomBtnGrid->addWidget(btnRec, 0, 3);
+
     btnDec = makeButton("# -", topContainer, true);
     btnDec->setFixedWidth(54);
     btnDec->setFixedHeight(36);
     btnDec->setToolTip(tr("Previous spectrum / run:\nLeft click: Previous detector (*2)\nRight click: Previous run (same detector) (*4)\nCtrl + Left click: Macro 2\nCtrl + Right click: Macro 4"));
     btnDec->installEventFilter(this);
     connect(btnDec, &QPushButton::clicked, this, &QMainCanvas::onSpectrumDecrement);
-    bottomBtnGrid->addWidget(btnDec, 0, 3);
+    bottomBtnGrid->addWidget(btnDec, 0, 4);
 
     btnInc = makeButton("# +", topContainer, true);
     btnInc->setFixedWidth(54);
@@ -367,7 +390,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnInc->setToolTip(tr("Next spectrum / run:\nLeft click: Next detector (*1)\nRight click: Next run (same detector) (*3)\nCtrl + Left click: Macro 1\nCtrl + Right click: Macro 3"));
     btnInc->installEventFilter(this);
     connect(btnInc, &QPushButton::clicked, this, &QMainCanvas::onSpectrumIncrement);
-    bottomBtnGrid->addWidget(btnInc, 0, 4);
+    bottomBtnGrid->addWidget(btnInc, 0, 5);
 
     btnOpenCM = makeButton("Open CM", topContainer, true);
     btnOpenCM->setFixedHeight(36);
@@ -385,7 +408,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnRemote->setFixedHeight(36);
     btnRemote->setToolTip(tr("Configure parameters and connect to Remote DAQ Computer over SSH/SFTP (Ctrl+Shift+R)."));
     connect(btnRemote, &QPushButton::clicked, this, &QMainCanvas::onOpenRemoteDataClicked);
-    bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 3);
+    bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 4);
 
     bottomLayout->addLayout(bottomBtnGrid);
 
@@ -1266,6 +1289,10 @@ bool QMainCanvas::executeMacroCommand(const QString &token)
         clickedW();
     } else if (t == "O=") {
         printPlot();
+    } else if (t == "DF" || t == "DL") {
+        defineAreaLogFile();
+    } else if (t == "ZF" || t == "ZL") {
+        closeAreaLogFile();
     } else if (t == "MZ") {
         drawZeroLine();
     } else {
@@ -2678,7 +2705,8 @@ void QMainCanvas::printPlot()
     }
 
     QString suggestedPath;
-    if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+    const bool preferRemote = (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty());
+    if (preferRemote) {
         QFileInfo rInfo(m_currentRemotePath);
         QString rDir = rInfo.dir().path();
         if (rDir == ".") rDir = "";
@@ -2702,21 +2730,28 @@ void QMainCanvas::printPlot()
     QString fileName = NuFileDialog::getSaveFileName(
         this, tr("Save Plot as Postscript/PDF"), suggestedPath,
         tr("PDF Files (*.pdf);;Postscript (*.ps);;PNG Image (*.png)"),
-        &selectedFilter, &remotePath, &isRemote);
+        &selectedFilter, &remotePath, &isRemote, preferRemote ? 1 : 0);
 
     if (fileName.isEmpty()) {
         CommandPrompt::logDebug("Print", "Plot export cancelled.");
         return;
     }
 
-    auto ensureKnownExt = [](const QString &path) -> QString {
+    QString defaultExt = QStringLiteral(".pdf");
+    if (selectedFilter.contains("*.ps", Qt::CaseInsensitive)) {
+        defaultExt = QStringLiteral(".ps");
+    } else if (selectedFilter.contains("*.png", Qt::CaseInsensitive)) {
+        defaultExt = QStringLiteral(".png");
+    }
+
+    auto ensureKnownExt = [&defaultExt](const QString &path) -> QString {
         const QString lower = path.toLower();
         if (lower.endsWith(".pdf") || lower.endsWith(".ps") ||
             lower.endsWith(".eps") || lower.endsWith(".png") ||
             lower.endsWith(".svg")) {
             return path;
         }
-        return path + ".pdf";
+        return path + defaultExt;
     };
     fileName = ensureKnownExt(fileName);
     if (isRemote && !remotePath.isEmpty()) {
@@ -2728,7 +2763,10 @@ void QMainCanvas::printPlot()
     const Color_t rootBg = TColor::GetColor(bgColor.name().toUtf8().constData());
     const Color_t axisCol = (bgColor.lightness() > 130) ? kBlack : kWhite;
 
+    tc->SetBorderMode(0);
     tc->SetFillColor(rootBg);
+    tc->SetFrameFillColor(rootBg);
+    tc->SetFrameLineColor(axisCol);
     if (tc->GetFrame()) {
         tc->GetFrame()->SetFillColor(rootBg);
         tc->GetFrame()->SetLineColor(axisCol);
@@ -2739,8 +2777,10 @@ void QMainCanvas::printPlot()
         while ((obj = next())) {
             if (obj && obj->InheritsFrom(TPad::Class())) {
                 TPad *pad = static_cast<TPad*>(obj);
+                pad->SetBorderMode(0);
                 pad->SetFillColor(rootBg);
                 pad->SetFrameFillColor(rootBg);
+                pad->SetFrameLineColor(axisCol);
                 if (pad->GetFrame()) {
                     pad->GetFrame()->SetFillColor(rootBg);
                     pad->GetFrame()->SetLineColor(axisCol);
@@ -2748,8 +2788,15 @@ void QMainCanvas::printPlot()
             }
         }
     }
+
+    // Flush Qt/X11 expose events after modal dialog closes so raster (PNG) exports capture a clean canvas
+    qApp->processEvents();
     tc->Modified();
     tc->Update();
+    gSystem->ProcessEvents();
+
+    // Remove any pre-existing local/staged file so a failed SaveAs cannot mask as stale success
+    QFile::remove(fileName);
 
     // Guard LC_NUMERIC="C" so ROOT's TPDF/TPostScript never emits locale commas,
     // and scale PS/PDF line widths from ROOT's default 3.0x down to 0.75pt/px (1px @ 96dpi)
@@ -2916,24 +2963,156 @@ void QMainCanvas::setYMin(double yVal)
     }
 }
 
-bool QMainCanvas::startAreaLogging(const QString& fileName, const QString& remotePath) {
+void QMainCanvas::defineAreaLogFile() {
+    QString suggestedPath;
+    const bool preferRemote = (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty());
+    if (preferRemote) {
+        QFileInfo rInfo(m_currentRemotePath);
+        QString rDir = rInfo.dir().path();
+        if (rDir == ".") rDir = "";
+        const QString base = rInfo.baseName().isEmpty() ? QStringLiteral("calculations") : (rInfo.baseName() + "_calc");
+        suggestedPath = rDir.isEmpty()
+            ? ("/" + base + ".area")
+            : (rDir.endsWith('/') ? rDir + base + ".area" : rDir + "/" + base + ".area");
+    } else if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+        QFileInfo fi(m_currentSpectrumFile);
+        suggestedPath = fi.dir().filePath(fi.baseName() + "_calc.area");
+    } else if (m_currentMatrix && m_currentMatrix->isOpen() && !m_currentMatrix->getFilePath().isEmpty()) {
+        QFileInfo fi(m_currentMatrix->getFilePath());
+        suggestedPath = fi.dir().filePath(fi.baseName() + "_calc.area");
+    } else {
+        suggestedPath = QDir::current().filePath(QStringLiteral("calculations.area"));
+    }
+
+    QString selectedFilter = tr("Area Log (*.area)");
+    QString remotePath;
+    bool isRemote = false;
+    QString fileName = NuFileDialog::getSaveFileName(
+        this, tr("Define Area Output File"), suggestedPath,
+        tr("Area Log (*.area);;Text Files (*.txt)"),
+        &selectedFilter, &remotePath, &isRemote, preferRemote ? 1 : 0, false);
+
+    if (fileName.isEmpty()) {
+        CommandPrompt::logDebug("CalcLog", "Calculation logfile selection cancelled.");
+        if (canvas) canvas->setFocus();
+        return;
+    }
+
+    const QString defaultExt = selectedFilter.contains("*.txt", Qt::CaseInsensitive)
+        ? QStringLiteral(".txt")
+        : QStringLiteral(".area");
+    auto ensureLogExt = [&defaultExt](const QString &path) -> QString {
+        const QString lower = path.toLower();
+        if (lower.endsWith(".area") || lower.endsWith(".txt") || lower.endsWith(".log")) {
+            return path;
+        }
+        return path + defaultExt;
+    };
+    fileName = ensureLogExt(fileName);
+    if (isRemote && !remotePath.isEmpty()) {
+        remotePath = ensureLogExt(remotePath);
+    }
+
+    bool appendMode = true;
+    const bool existsAlready = (isRemote && !remotePath.isEmpty())
+        ? (m_remoteSession && m_remoteSession->isConnected() && m_remoteSession->fileExists(remotePath))
+        : QFileInfo::exists(fileName);
+
+    if (existsAlready) {
+        const QString displayName = (isRemote && !remotePath.isEmpty())
+            ? QFileInfo(remotePath).fileName()
+            : QFileInfo(fileName).fileName();
+        QMessageBox msgBox(this);
+        msgBox.setWindowTitle(tr("Calculation Logfile Exists"));
+        msgBox.setIcon(QMessageBox::Question);
+        msgBox.setText(tr("The calculation logfile '%1' already exists.\nWould you like to append new results or overwrite it?")
+                           .arg(displayName));
+        QPushButton *btnAppend = msgBox.addButton(tr("Append"), QMessageBox::AcceptRole);
+        QPushButton *btnOverwrite = msgBox.addButton(tr("Overwrite"), QMessageBox::DestructiveRole);
+        QPushButton *btnCancel = msgBox.addButton(QMessageBox::Cancel);
+        msgBox.setDefaultButton(btnAppend);
+        msgBox.exec();
+
+        if (msgBox.clickedButton() == btnCancel || !msgBox.clickedButton()) {
+            CommandPrompt::logDebug("CalcLog", "Calculation logfile selection cancelled.");
+            if (canvas) canvas->setFocus();
+            return;
+        }
+        appendMode = (msgBox.clickedButton() != btnOverwrite);
+    }
+
+    if (startAreaLogging(fileName, remotePath, appendMode)) {
+        const QString destLabel = isRemote && !remotePath.isEmpty() ? remotePath : fileName;
+        CommandPrompt::logInfo("CalcLog",
+            QString("Calculation logging enabled (%1) -> '%2'.")
+                .arg(appendMode ? "append" : "overwrite", destLabel));
+    } else {
+        CommandPrompt::logError("CalcLog", QString("Failed to open calculation logfile '%1'.").arg(fileName));
+    }
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::closeAreaLogFile() {
+    QString logName = getAreaLogFileName();
+    if (stopAreaLogging()) {
+        CommandPrompt::logInfo("CalcLog", QString("Calculation logging closed: '%1'.").arg(logName));
+    } else {
+        CommandPrompt::logWarning("CalcLog", "No calculation logfile is currently open.");
+    }
+    if (canvas) canvas->setFocus();
+}
+
+bool QMainCanvas::startAreaLogging(const QString& fileName, const QString& remotePath, bool appendMode) {
     if (m_areaLogFile.isOpen()) {
         m_areaLogStream.flush();
         m_areaLogFile.close();
         if (!m_areaLogRemotePath.isEmpty()) {
-            NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath);
+            QString prevErr;
+            if (!NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath, &prevErr, this)) {
+                CommandPrompt::logError("CalcLog",
+                    QString("Failed to upload previous calculation logfile '%1': %2").arg(m_areaLogRemotePath, prevErr));
+            }
         }
     }
+
+    // If appending to an existing remote logfile, synchronize it to local cache first
+    // so new entries append rather than overwriting prior results.
+    if (appendMode && !remotePath.isEmpty() && m_remoteSession && m_remoteSession->isConnected() &&
+        m_remoteSession->fileExists(remotePath)) {
+        QString syncedLocal;
+        QString syncErr;
+        if (m_remoteSession->syncRemoteFileToCache(remotePath, syncedLocal, nullptr, &syncErr)) {
+            CommandPrompt::logDebug("CalcLog",
+                QString("Synchronized existing remote logfile '%1' for append.").arg(remotePath));
+        } else {
+            CommandPrompt::logWarning("CalcLog",
+                QString("Could not sync existing remote logfile '%1' (%2); appending locally.")
+                    .arg(remotePath, syncErr));
+        }
+    }
+
     m_areaLogRemotePath = remotePath;
     m_areaLogFile.setFileName(fileName);
-    if (m_areaLogFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+    const QIODevice::OpenMode openFlags = QIODevice::WriteOnly | QIODevice::Text |
+                                          (appendMode ? QIODevice::Append : QIODevice::Truncate);
+    if (m_areaLogFile.open(openFlags)) {
         m_areaLogStream.setDevice(&m_areaLogFile);
         m_isAreaLoggingEnabled = true;
         m_lastAreaLogContext = AreaLogContext::None;
+        m_lastAreaLogTarget.clear();
+        if (btnRec) {
+            btnRec->setChecked(true);
+            btnRec->setText("● Rec");
+        }
         return true;
     }
     m_isAreaLoggingEnabled = false;
     m_lastAreaLogContext = AreaLogContext::None;
+    m_lastAreaLogTarget.clear();
+    if (btnRec) {
+        btnRec->setChecked(false);
+        btnRec->setText("Rec");
+    }
     return false;
 }
 
@@ -2943,12 +3122,25 @@ bool QMainCanvas::stopAreaLogging() {
         m_areaLogStream.flush();
         m_areaLogFile.close();
         if (!m_areaLogRemotePath.isEmpty()) {
-            NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath);
+            QString uploadErr;
+            if (!NuFileDialog::finishRemoteSave(m_areaLogFile.fileName(), m_areaLogRemotePath, &uploadErr, this)) {
+                CommandPrompt::logError("CalcLog",
+                    QString("Failed to upload calculation logfile to '%1': %2")
+                        .arg(m_areaLogRemotePath, uploadErr));
+            } else {
+                CommandPrompt::logDebug("CalcLog",
+                    QString("Uploaded calculation logfile to '%1'.").arg(m_areaLogRemotePath));
+            }
             m_areaLogRemotePath.clear();
         }
     }
     m_isAreaLoggingEnabled = false;
     m_lastAreaLogContext = AreaLogContext::None;
+    m_lastAreaLogTarget.clear();
+    if (btnRec) {
+        btnRec->setChecked(false);
+        btnRec->setText("Rec");
+    }
     return wasOpen;
 }
 
@@ -2956,19 +3148,43 @@ void QMainCanvas::writeAreaLogHeader(bool isFitting) {
     if (!m_isAreaLoggingEnabled || !m_areaLogFile.isOpen()) return;
 
     AreaLogContext targetContext = isFitting ? AreaLogContext::Fitting : AreaLogContext::Integration;
-    if (m_lastAreaLogContext == targetContext) return;
+
+    TracknHistogram *activeHist = getActiveTracknHistogram();
+    const bool isCalib = (activeHist && activeHist->IsCalibrated());
+    const QString unitTag = isCalib ? QStringLiteral("keV") : QStringLiteral("ch");
+
+    QString specName;
+    if (!m_currentRemotePath.isEmpty()) {
+        specName = QFileInfo(m_currentRemotePath).fileName();
+    } else if (!m_currentSpectrumFile.isEmpty()) {
+        specName = QFileInfo(m_currentSpectrumFile).fileName();
+    } else if (labelSpectrumFile && !labelSpectrumFile->text().isEmpty() &&
+               labelSpectrumFile->text() != "<none>") {
+        specName = labelSpectrumFile->text();
+    } else if (activeHist && strlen(activeHist->GetTitle()) > 0) {
+        specName = QString::fromUtf8(activeHist->GetTitle());
+    } else {
+        specName = QStringLiteral("Active Spectrum");
+    }
+
+    const QString targetTag = QString("%1 | %2").arg(specName, unitTag);
+    if (m_lastAreaLogContext == targetContext && m_lastAreaLogTarget == targetTag) return;
 
     m_lastAreaLogContext = targetContext;
+    m_lastAreaLogTarget = targetTag;
+
     const QString sepLine = QString(98, '-') + "\n";
     m_areaLogStream << sepLine;
     if (isFitting) {
-        m_areaLogStream << "Gauss Fit Results:\n";
+        m_areaLogStream << QString("Gauss Fit Results [%1]:\n").arg(targetTag);
     } else {
-        m_areaLogStream << "Integration Results:\n";
+        m_areaLogStream << QString("Integration Results [%1]:\n").arg(targetTag);
     }
+    const QString centCol = QString("Centroid (%1)").arg(unitTag);
+    const QString fwhmCol = QString("FWHM (%1)").arg(unitTag);
     const QString headerRow = QString("%1%2%3%4%5%6\n")
-        .arg("Centroid", -16, QChar(' '))
-        .arg("FWHM",     -14, QChar(' '))
+        .arg(centCol,    -16, QChar(' '))
+        .arg(fwhmCol,    -14, QChar(' '))
         .arg("Gross",    -18, QChar(' '))
         .arg("Net",      -18, QChar(' '))
         .arg("Bkg",      -18, QChar(' '))

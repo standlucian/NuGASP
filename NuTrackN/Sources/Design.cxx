@@ -487,6 +487,7 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
       "QPushButton { background-color: %7; color: %2; border: 1px solid %5; border-radius: 4px; padding: 5px 14px; font-weight: bold; font-family: \"%3\"; font-size: %4pt; }\n"
       "QPushButton:hover { background-color: %5; }\n"
       "QPushButton:pressed { background-color: %6; color: #ffffff; }\n"
+      "QPushButton:checked { background-color: #b71c1c; color: #ffffff; border: 1px solid #ef5350; }\n"
       "QPushButton:disabled { color: #888888; background-color: %8; border: 1px solid %5; }\n"
       "QPushButton:default { background-color: %7; color: %2; border: 1px solid %6; }\n"
       "QTextBrowser, QTextEdit, QPlainTextEdit { background-color: %8; color: %2; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"

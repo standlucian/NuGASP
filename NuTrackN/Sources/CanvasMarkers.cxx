@@ -132,7 +132,7 @@ void QMainCanvas::areaFunction()
 // if no background markers exist, gracefully falls back to gross peak integration.
 // Labels peak index above peak centroid on the canvas.
 //==============================================================================
-void QMainCanvas::areaFunctionWithBackground(bool openDialog)
+void QMainCanvas::areaFunctionWithBackground(bool openDialog, bool logResult)
 {
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
@@ -189,7 +189,7 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog)
         listOfObjectsDrawnOnScreen.Add(lbl);
     }
 
-    if (m_isAreaLoggingEnabled && !peaks.empty()) {
+    if (logResult && m_isAreaLoggingEnabled && !peaks.empty()) {
         writeAreaLogHeader(false);
         for (const auto &peak : peaks) {
             double dispCentroid = peak.isCalibrated ? peak.energy : peak.centroid;

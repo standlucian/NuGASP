@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0.4** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 2.0.6** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** (or **`F1`**) on the spectrum canvas at any time.
 
@@ -8,6 +8,7 @@
 
 ## Table of Contents
 - [1. Introduction, Heritage & Design Philosophy](#1-introduction-heritage--design-philosophy)
+    - [1.0 How to Use This Manual & Notation Conventions](#10-how-to-use-this-manual--notation-conventions)
     - [1.1 The Heritage of Xtrackn & GASPware](#11-the-heritage-of-xtrackn--gaspware)
     - [1.2 Historical Attributions & Acknowledgments](#12-historical-attributions--acknowledgments)
     - [1.3 AI Assistance & Development Disclosure](#13-ai-assistance--development-disclosure)
@@ -27,9 +28,9 @@
     - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
     - [3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#34-loading-spectra--multi-buffer-overlays-buffers-19)
     - [3.5 Opening 2D Coincidence Matrices (`.cmat`)](#35-opening-2d-coincidence-matrices-cmat)
-    - [3.6 Exporting Processed Spectra (`OS` / `W` Button)](#36-exporting-processed-spectra-os--w-button)
+    - [3.6 Exporting Processed Spectra (`OS` / `Write` Button)](#36-exporting-processed-spectra-os--write-button)
     - [3.7 Publication Graphics (`O=` / `Print` Button)](#37-publication-graphics-o--print-button)
-    - [3.8 Calculation Logfiles (`DF` / `ZF`)](#38-calculation-logfiles-df--zf)
+    - [3.8 Calculation Logfiles (`DF` / `ZF` / `Rec` Button)](#38-calculation-logfiles-df--zf--rec-button)
 - [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
     - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
     - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
@@ -103,13 +104,25 @@
 
 **NuTrackN** (the flagship analysis environment of the **NuGASP** suite) is an interactive, high-performance nuclear spectroscopy application designed for experimental nuclear physicists, gamma-ray spectroscopists, and radiation detection laboratories.
 
+### 1.0 How to Use This Manual & Notation Conventions
+To read commands, shortcuts, and physics formulas consistently across this manual:
+
+- **Sequential Two-Key Canvas Commands (e.g., `DF`, `OS`, `CG`)**: Commands written as two adjacent letters without `+` are **sequential keystrokes** pressed on the spectrum canvas—press the first key, release it, then press the second key (for example, **`DF`** means press **`D`** then **`F`**).
+- **Simultaneous Modifier Shortcuts (e.g., `Ctrl+Shift+R`, `Ctrl+Click`)**: Keys joined with **`+`** are held together at the same time (e.g., hold `Ctrl` while clicking **`Rec`** or **`# +`**).
+- **Canvas Hotkeys vs. Toolbar Buttons vs. Macro Tokens**:
+    - **Canvas Hotkeys** act directly at the mouse cursor position on the active histogram pad (e.g., `B`, `I`, `G`, `R`, `W` place markers; `N` opens a spectrum).
+    - **Toolbar Buttons** (such as **`Read`**, **`Write`**, **`Print`**, **`Rec`**, **`Open CM`**, **`Gate CM`**) trigger dialogs or global actions regardless of cursor coordinates.
+    - **Macro Tokens** (e.g., `*1`–`*4`, `CJ`, `DF`) are text commands executed sequentially inside [Chapter 10](#10-scripting-macros--automation).
+- **0-Indexed Channel Convention**: NuTrackN adopts the classic GASPware / Xtrackn 0-indexed channel convention (`0` to `N-1`). See [Section 15.3](#153-coordinate-system--binning-conventions-0-indexed-channels) for details on how channels map to CERN ROOT 1-based histogram bins.
+- **Callout Boxes**: **`> [!NOTE]`** highlights important operational context or caveats, while **`> [!TIP]`** provides practical workflow shortcuts and best practices.
+
 ### 1.1 The Heritage of Xtrackn & GASPware
 For decades, the classic Fortran/C software **Xtrackn** and the larger **GASPware suite** (developed across European and international heavy-ion and gamma-ray facilities like GASP, AGATA, and EUROBALL) served as the gold standard for high-throughput gamma-gamma matrix gating and spectrum analysis. Experimentalists developed deep muscle memory for its single-character and two-character command strings.
 
-**NuTrackN preserves 100% of authentic Xtrack keyboard commands**, while re-engineering the underlying platform into modern C++17 with:
-- **CERN ROOT Graphics Engine**: Sub-millisecond rendering of high-statistics histograms and logarithmic axes.
+**NuTrackN preserves the core Xtrackn keyboard command set**, while re-engineering the underlying platform into modern C++17 with:
+- **CERN ROOT Graphics Engine**: Fast, responsive rendering of high-statistics histograms and logarithmic axes.
 - **Modern Qt5 User Interface**: High-DPI screen support, responsive dialogs, live parameter tables, and curated dark/light themes.
-- **2D Matrix Coincidence Viewer**: Fast slicing and projection of multi-gigabyte γ-γ coincidence matrices (`.cmat`).
+- **2D Matrix Coincidence Viewer**: Fast slicing and projection of large 2D γ-γ coincidence matrices (`.cmat`).
 - **Autonomous Standalone Deployment**: 1-click execution without requiring users to configure compiler paths or install CERN ROOT manually.
 - **Run-by-Run Drift Alignment**: Automated in-beam gain tracking across hundreds of acquisition runs.
 
@@ -131,54 +144,56 @@ Special thanks are also due to the authors of key open-source utilities and algo
 - The authors at **M.S.I. Stockholm** and the **Niels Bohr Institute (NBI)** for the **laslib** PostScript plotting packages.
 
 ### 1.3 AI Assistance & Development Disclosure
-NuTrackN was developed through human-directed, AI-assisted software engineering using Google DeepMind's Antigravity (Gemini) coding agent. AI assistance was utilized for porting legacy Fortran and C routines into modern C++17/Qt5, designing UI dialogs and graphics canvas integrations, structuring automated packaging scripts, and drafting documentation.
+NuTrackN was developed through human-directed, AI-assisted software engineering using modern AI coding agents (including Google's Antigravity platform). AI assistance was utilized for porting legacy Fortran and C routines into modern C++17/Qt5, designing UI dialogs and graphics canvas integrations, structuring automated packaging scripts, and drafting documentation.
 
 All mathematical formulations, nuclear physics algorithms (e.g., SNIP continuum extraction, Poisson maximum likelihood estimation, covariance error propagation), and calibration procedures have been verified, scientifically reviewed, and validated against experimental gamma-ray data.
 
-However, it is important to note that, while credit for code synthesis and acceleration belongs to the AI agents, full responsibility for any errors and oversights rests solely with the human maintainers. Should you encounter unexpected behavior or software bugs, please open an issue on GitHub. Our apologies in advance for any rough edges that may crop up!
+AI tools accelerated code synthesis and documentation, while full responsibility for correctness, scientific validity, and any errors or oversights rests solely with the human maintainers. Should you encounter unexpected behavior or software bugs, please open an issue on GitHub (attaching a diagnostic session log as described in [Section 12.5](#125-diagnostic-log-format--troubleshooting-workflow)). Our apologies in advance for any rough edges that may crop up!
 
 ### 1.4 Development Roadmap & Wishlist
 NuTrackN is an actively maintained open-source environment. While the 2.0 release delivers a high-performance modern Qt5/ROOT GUI foundation, historical command compatibility, and automated run-by-run drift alignment, the following capabilities represent key priorities for upcoming development cycles:
 
-#### 1. Rigorous End-to-End Uncertainty Propagation
+#### 1. Rigorous End-to-End Uncertainty Propagation *(Near-Term)*
 - **Coincidence Gating & Matrix Slicing**: Full bin-by-bin variance and covariance tracking through 2D background-subtracted gating ($S_{\text{net}} = S_{\text{gate}} - \frac{A_{\text{gate}}}{A_{\text{bg}}} S_{\text{bg}}$), ensuring downstream peak fits on gated projections correctly propagate Poisson counting statistics and background subtraction uncertainties.
 - **Peak Fitting & Multiplet Deconvolution**: Extracting and propagating full Minuit parameter covariance matrices ($\text{cov}(A, \mu, \sigma)$) and asymmetric confidence intervals (MINOS) to avoid underestimating peak area errors under heavy baseline coupling.
 - **Energy & Efficiency Calibrations**: Seamless propagation of polynomial parameter covariances ($\text{cov}(a_i, a_j)$), literature decay standard uncertainties, and source half-life corrections directly into calibrated energy readouts ($E \pm \sigma_E$) and detector efficiency curves.
 
-#### 2. Nuclear Reaction & Lifetime Analysis Tools
+#### 2. Nuclear Reaction & Lifetime Analysis Tools *(Long-Term)*
 - **Rudimentary DSAM Fitting**: Doppler Shift Attenuation Method line-shape analysis for picosecond nuclear state lifetime determinations.
 - **Rudimentary RDDS Fitting**: Recoil Distance Doppler Shift (plunger) lifetime measurements and shifted/unshifted intensity decay curve fitting.
 - **Angular Distributions, Correlations & DCO Fitting**: Directional Correlations from Oriented states (DCO) and angular distribution / correlation fitting for multipole mixing ratio and spin/parity assignments.
 
-#### 3. Advanced Calibrations & Peak Response Modeling
+#### 3. Advanced Calibrations & Peak Response Modeling *(Medium-Term)*
 - **Multi-Region Calibration Alignment**: Interactive creation, boundary alignment, and production of piecewise multi-region energy calibrations across wide dynamic ranges.
 - **Improved Efficiency Calibration Creation**: Flexible empirical efficiency curve modeling, absorption correction handling, and interactive residual inspection.
 - **Advanced Non-Gaussian Peak Response Functions**: Expanding the fitting engine beyond symmetric Gaussians to incorporate realistic detector physics (low-energy exponential tailing, high-energy neutron damage tailing, skewed Gaussians, and Voigt profiles).
 
-#### 4. Spectra Manipulation & GASPware Tools Integration
+#### 4. Spectra Manipulation & GASPware Tools Integration *(Near-Term / Medium-Term)*
 - **Native SADD Functionality**: Interactive and batch spectrum addition, gain-matched summing across detectors and experimental runs, and exporting combined spectra.
 - **Full CMAT Functionality Integration**: Native embedding of legacy CMAT utilities for coincidence matrix creation, projection, 2D inspection, and matrix symmetrization.
 - **Open 3D CMAT Matrices**: Direct support for opening, inspecting, slicing, and double-gating 3D $\gamma$-$\gamma$-$\gamma$ coincidence cubes (compressed 3D `.cmat` matrices) natively within NuTrackN.
 - **Direct CERN ROOT Format Data Operations**: Reading, manipulating, and exporting native ROOT format data (`TH1`, `TH2`, and `TTree`) directly without intermediate ASCII conversion.
+- **Structured Calculation Report Exports (CSV, JSON, ODS)**: Extending `DF` / `Rec` calculation logging beyond classic `.area` plain-text tables to structured machine- and spreadsheet-ready formats (`.csv`, `.json`, `.ods`) with full uncertainty columns (`Centroid Error`, `FWHM Error`, `Net Area Error`) and spectrum/run metadata.
 
-#### 5. Publication-Ready Figure & Spectra Image Generation
+#### 5. Publication-Ready Figure & Spectra Image Generation *(Medium-Term)*
 - **Professional Spectra Image Creation for Publications Directly in NuTrackN**: Direct generation and export of publication-grade spectra figures formatted specifically for nuclear physics journals (Physical Review C, Physics Letters B, Nuclear Instruments and Methods in Physics Research, European Physical Journal A). Interactive design of multi-panel layouts, inset zoom cutouts, customized energy and channel dual-axes, customizable vector fonts, isotopic and decay callouts, multiplet fit decomposition curves, and publication-standard vector export (PDF, EPS, SVG) with configurable CMYK/RGB color profiles and high-resolution rasterization presets (up to 1200 DPI).
 - **Interactive Level Scheme Builder with Peak Identification**: Comprehensive nuclear decay and level scheme construction workspace embedded directly inside NuTrackN. Enables experimentalists to interactively build, modify, and render level schemes ($J^\pi$, excitation energies, branching ratios, transition multipolarities, half-lives) with automated peak identification and bidirectional cross-referencing against coincidence-gated spectra. Allows generating publication-ready vector figures of complete or partial level schemes featuring transition arrow thicknesses scaled proportionally to measured $\gamma$-ray intensities.
 
-#### 6. Interface Modernization & Batch Automation
+#### 6. Interface Modernization & Batch Automation *(Medium-Term / Long-Term)*
 - **Remaking the Main Interface**: Redesigning the main application canvas, controls, and docking system for multi-monitor setups and flexible spectroscopy workflows.
 - **Terminal Operation & Headless Batch Processing**: Restoring full command execution via system terminal `stdin` and enabling headless batch processing flags to execute analysis pipelines with no GUI.
 - **Python & Scientific Ecosystem Integration**: Lightweight bindings and serialization bridges to manipulate NuTrackN calibration trajectories and spectra within NumPy, SciPy, and Jupyter environments.
 
-#### 7. In-App Auto-Updater (Future Dream)
+#### 7. In-App Auto-Updater *(Long-Term / Future Dream)*
 - **Seamless Release Tracking**: Automated, non-intrusive checking against the GitHub Releases API upon application launch to notify researchers of new stable releases and hotfixes.
 - **Zero-Friction In-Place Self-Updating**: One-click download, SHA-256 integrity verification, and binary delta replacement directly within the running application (both for Linux AppImages via AppImageUpdate and macOS DMG/bundle mounts), eliminating manual re-downloads and preserving custom configurations.
 
-#### 8. Session Persistence, Comprehensive Logging & In-App Support
+#### 8. Session Persistence, Comprehensive Logging & In-App Support *(Near-Term)*
 - **Full Program Logging & Previous State Resumption**: Comprehensive, structured logging of all user actions, calculations, and system events paired with automatic workspace state snapshots—allowing NuTrackN to restore loaded spectra, matrices, grid layout, zoom regions, calibrations, and active settings upon reopening the program.
 - **In-App Feedback & Bug Reporting with Log File Transfers**: Built-in bug report and feature feedback dialog directly inside NuTrackN, with optional one-click attachment and transfer of diagnostic session log files and system/build metadata to aid rapid troubleshooting.
 
-We warmly welcome ideas, feedback, and contributions from experimentalists and spectroscopy laboratories worldwide. If you have suggestions, feature requests, bug reports, or would simply like to send coffee our way, please feel free to open an issue on [GitHub](https://github.com/standlucian/NuGASP) or reach out directly by email at `lucian.stan@nipne.ro`.
+#### Reporting Bugs & Getting Help
+We warmly welcome ideas, feedback, and contributions from experimentalists and spectroscopy laboratories worldwide. If you have suggestions, feature requests, bug reports, or would simply like to send coffee our way, please open an issue on [GitHub](https://github.com/standlucian/NuGASP) or reach out directly by email at `lucian.stan@nipne.ro`. When reporting a bug, please attach the relevant per-session diagnostic log file (see [Section 12.5: Diagnostic Log Format & Troubleshooting Workflow](#125-diagnostic-log-format--troubleshooting-workflow)) along with your OS and NuTrackN version.
 
 ### 1.5 The NuGASP Ecosystem Scope
 The **NuGASP** suite is conceived as the modern C++17 / Qt5 successor to the offline analysis ecosystem of **GASPware**. Its overarching goal is to modernize and consolidate the classic tools developed for the GASP spectrometer—including spectrum visualization (`xtrackn`), 2D matrix projection and slicing (`cmat`), spectrum arithmetic and gain-matched addition (`sadd`), efficiency parameterization (`effi`), initial polynomial calibrations (`precal`), and run-by-run drift minimization (`trackfit`)—into a unified, high-performance computing environment.
@@ -194,9 +209,9 @@ NuTrackN is engineered as a high-performance scientific desktop application comb
 | Component | Technology / Library | Version / Target | Purpose & Scope |
 | :--- | :--- | :--- | :--- |
 | **Language Standard** | **ISO C++17** | `-std=c++17` | High-performance compiled core, filesystem access (`<filesystem>`), structured bindings, and lambda-based numerical optimization. Compatible with GCC 11–14, Clang 14+, and Apple Clang. |
-| **GUI & Application Core** | **Qt5** | `5.15 LTS` | Main window architecture, high-DPI scaling, dialog managers, multi-threading (`QThread`), networking (`QtNetwork`), and cross-platform UI event loops. |
-| **Scientific Graphics & Engine** | **CERN ROOT** | `6.24` – `6.32+` | High-throughput 1D histogramming (`TH1F`/`TH1D`), 2D coincidence matrix structures (`TH2D`), Minuit numerical minimization, peak deconvolution, and PostScript vector export (`TPostScript`). |
-| **Remote Connectivity** | **libssh2** | `1.9+` | Native SSH-2 / SFTP client protocol implementation for remote DAQ browsing, cache synchronization, and real-time beam run streaming. |
+| **GUI & Application Core** | **Qt5** | `5.15 LTS` | Main window architecture, high-DPI scaling, dialog managers, multi-threading (`QThread`), and cross-platform UI event loops. |
+| **Scientific Graphics & Engine** | **CERN ROOT** | `6.24` – `6.32+` | High-throughput 1D histogramming (`TH1F`/`TH1D`), Minuit numerical minimization, peak deconvolution, and PostScript/PDF vector export (`TPostScript`/`TPDF`). *(2D `.cmat` matrices are handled natively via `MatrixReader` / `complib`.)* |
+| **Remote Connectivity** | **libssh2** | `1.9+` | Native SSH-2 / SFTP client protocol implementation for remote DAQ browsing, SFTP transfer, and local session caching. |
 | **Build Tooling** | **CMake** / **QMake** | `CMake 3.16+` | Dual build support enabling rapid Qt Creator IDE development (`nutrackn.pro`) and automated command-line builds (`CMakeLists.txt`). |
 
 #### 2. Modernization & Version Upgrade Plans
@@ -233,19 +248,21 @@ Under this "copyleft" license, you are free to inspect, run, modify, and redistr
 If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
 
 > **Text Citation:**  
-> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.4, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.6, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
 
 ```bibtex
 @misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.4},
+  version      = {2.0.6},
   institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
 }
 ```
+
+*(Note: A versioned Zenodo archival DOI for NuGASP releases is planned for upcoming releases.)*
 
 For scientific attribution of the foundational algorithms and original spectrometer architecture, please also cite:
 > D. Bazzacco, *The GASP Spectrometer at Legnaro*, International Conference on Nuclear Structure at High Angular Momentum, Ottawa, AECL-10613, pp. 376–387 (1992).
@@ -447,8 +464,8 @@ make -j$(nproc)
 This 60-second walkthrough introduces the core keyboard workflow and real-time inspector HUD:
 
 1. **Launch NuTrackN**: Run `nutrackn` from your terminal or launch it from your desktop applications menu.
-2. **Open Your First Spectrum (`N` / Toolbar Button `R`)**:
-    - Press **`N`** on your keyboard (or click the toolbar button labelled **`R`**, for **Read**).
+2. **Open Your First Spectrum (`N` / Toolbar Button `Read`)**:
+    - Press **`N`** on your keyboard (or click the toolbar button labelled **`Read`**).
     - An integrated file browser opens allowing you to choose your spectrum file.
     - Upon selecting the file, NuTrackN presents a dialog to configure the file specifications alongside an interactive preview of the spectrum shape (the options of this import dialog will be explained in detail in a later chapter).
     - Confirm the dialog, and the spectrum immediately renders on the primary canvas.
@@ -572,9 +589,9 @@ Once connected without entering a password, launch NuTrackN, open the **Remote C
 #### Transparent Remote Browsing, Bi-Directional Transfer & Smart Local Caching:
 Once an SSH session is authenticated, NuTrackN's remote SFTP subsystem is globally integrated across the entire application—not just for reading raw 1D spectra:
 
-- **1D Spectrum Reading (`R`, `N`, or Toolbar `R`)**: The spectrum browser automatically defaults to your remote acquisition directory. Remote files are streamed over SFTP and staged in your high-speed local session cache (`~/.cache/nutrackn/remote/...`), allowing subsequent calculations, fits, and display zooms to execute at native NVMe speed.
-- **2D Coincidence Matrices (`OpenCM`, `M`, or `Ctrl+M`)**: Select and load 2D coincidence matrices (`.cmat`, `.mat`) directly from remote DAQ clusters or central experimental storage.
-- **Writing, Exporting & Uploading Spectra / Reports**: Saving or exporting processed spectra (`OS`, `SpectrumExportDialog`), peak integration logfiles (`DF`), or peak fit parameters to a remote directory automatically stages the file locally and seamlessly uploads it to the remote destination over SFTP.
+- **1D Spectrum Reading (`N` or Toolbar `Read`)**: The spectrum browser automatically defaults to your remote acquisition directory. Remote files are streamed over SFTP and staged in your high-speed local session cache (`~/.cache/nutrackn/remote/...`), allowing subsequent calculations, fits, and display zooms to execute at native NVMe speed.
+- **2D Coincidence Matrices (`Open CM` or `DQ`)**: Select and load 2D coincidence matrices (`.cmat`, `.mat`) directly from remote DAQ clusters or central experimental storage.
+- **Writing, Exporting & Uploading Spectra / Graphics / Reports**: Saving or exporting processed spectra (`OS` / **`Write`**), publication graphics (`O=` / **`Print`**), calculation logfiles (`DF` / **`Rec`**), or peak fit parameters to a remote directory automatically stages the file locally and uploads it to the remote destination over SFTP.
 - **Calibration & Efficiency File Management**: Load and save energy calibration files (`.cal`, `.ucal`), polynomial coefficient tables, efficiency spectra, and isotope energy reference libraries directly across the remote filesystem.
 - **Run-by-Run Gain Drift Calibration Integration**: The Run-by-Run Calibration Manager downloads batch run sequences and multi-detector spectra asynchronously in background worker threads, featuring live multi-file progress tracking without ever freezing GUI interaction or canvas rendering.
 
@@ -611,14 +628,15 @@ NuTrackN operates strictly and natively on the fundamental data structures of nu
 ### 3.3 Modern File Dialog (NuFileDialog) & Live Previews
 NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`NuFileDialog`):
 
-- **Location Switching (Local vs. Remote)**:
-    - The top bar features quick-toggle buttons between your local filesystem and the active remote server (**`🌐 Remote: user@host`**).
-    - Quick-navigation bookmarks provide 1-click shortcuts to the current experiment directory, USB media mount points, user home, and temporary scratch folders.
+- **Location & Navigation Controls**:
+    - **Location Bar**: Quick-toggle buttons between **`💻 Local Filesystem`** and the active remote server (**`🌐 Remote: user@host`**), plus **`SSH Parameters...`** to configure or connect an SSH session.
+    - **Navigation Bar**: **`▲ Up`**, **`⌂ Home`**, **`↻ Refresh`**, **`+ Folder`** (create directory), and an editable **Path** bar.
+    - **Filter & Search Bar**: File-type filter dropdown and live filename search box.
 - **Spectrum Import Dialog (`SpectrumImportDialog`)**:
     - When opening a 1D spectrum, NuTrackN inspects the file and opens the interactive import configuration dialog:
         - **Auto-Detection Banner**: Instantly displays the detected format, channel size, and total chained spectra with a confidence report.
         - **Data Format Selection**: Choose or override format between 32-bit Integer (`uint32_t`), 16-bit Integer (`uint16_t`), ASCII text, 32-bit Float, or 64-bit Double.
-        - **Channel Length Selection**: Select standard nuclear spectroscopy presets (1k, 2k, 4k, 8k, 10k, 16k, 32k, 64k, all channels in file, or custom spinbox).
+        - **Channel Length Selection**: Select standard nuclear spectroscopy presets (`1k`, `2k`, `4k`, `8k`, `10k`, `16k`, `32k`, `64k`) or **`Custom...`** to enter any channel count.
         - **Spectrum Index**: For multi-spectrum files, jump directly to any detector/run index using the **`Spectrum Index`** spinbox selector.
         - **Live Data Preview**: Displays a real-time graphical preview of the parsed spectrum curves before clicking **`Load Spectrum`**.
 
@@ -633,7 +651,7 @@ NuTrackN incorporates an embedded, high-performance spectroscopy file browser (`
 ### 3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)
 NuTrackN supports loading individual spectra, stepping sequentially through chained detector or run files, and overlaying multiple spectra on the active pad for visual comparison:
 
-- **Overlay Stack**: Up to 9 spectra can be overlaid simultaneously within the same pad, each rendered with a distinct theme palette color for immediate visual comparison.
+- **Overlay Stack (`HijC`)**: Opening a spectrum with **`N`** / **`Read`** loads a fresh baseline spectrum on the active pad (clearing previous overlays). Stepping **forward** through detectors or runs automatically overlays each newly loaded spectrum on the same pad in a distinct theme palette color (up to 9+ buffered overlays). Stepping **backward** pops the most recent overlay from the stack, and pressing **`=`** clears overlays back to the active spectrum.
 - **Detector / Spectrum Stepping in Linked Spectra**:
     - Press **`1`** (executes Macro #1 `*1`) or click toolbar **`# +`**: Advance to the next spectrum/detector in the sequence.
     - Press **`2`** (executes Macro #2 `*2`) or click toolbar **`# -`**: Step backward to the previous spectrum/detector in the sequence.
@@ -660,7 +678,7 @@ NuTrackN supports loading individual spectra, stepping sequentially through chai
 NuTrackN natively opens GASPware compressed 2D $\gamma$-$\gamma$ coincidence matrices (`.cmat`) from either your local filesystem or a connected remote SSH/SFTP server:
 
 - **How to Open a Matrix**:
-    - **Toolbar (`Open CM`)**: Click **`Open CM`** in the lower-left button grid to launch `NuFileDialog` filtered for GASPware compressed coincidence matrices (`.cmat`).
+    - **Toolbar (`Open CM`) & Shortcut (`DQ`)**: Click **`Open CM`** in the lower-left button grid (or press **`D`** then **`Q`**) to launch `NuFileDialog` filtered for GASPware compressed coincidence matrices (`.cmat`).
     - **Desktop File Association & Command Line**: On Linux (after `--install`) and macOS, double-clicking any `.cmat` file in your file manager—or passing it as a CLI argument (`nutrackn matrix.cmat`)—launches NuTrackN and opens the matrix directly.
     - **Remote SSH/SFTP Access**: When an SSH session is active, `Open CM` lets you browse remote DAQ directories and caches the selected `.cmat` file locally before opening; the status bar displays `[Remote CM] <filename>`.
 - **Inspection & Total Projection (`MatrixDialog` & `Q`)**:
@@ -674,8 +692,8 @@ NuTrackN natively opens GASPware compressed 2D $\gamma$-$\gamma$ coincidence mat
 
 ---
 
-### 3.6 Exporting Processed Spectra (`OS` / `W` Button)
-Press **`OS`** (`O` then `S`) or click the **`W`** toolbar button to open `SpectrumExportDialog` and export the active spectrum on the selected pad. *(Note: Pressing **`W`** directly on the canvas places a coincidence Gate Marker).*
+### 3.6 Exporting Processed Spectra (`OS` / `Write` Button)
+Press **`OS`** (`O` then `S`) or click the **`Write`** toolbar button to open `SpectrumExportDialog` and export the active spectrum on the selected pad. *(Note: Pressing **`W`** directly on the canvas places a coincidence Gate Marker).*
 
 - **Destination Switching (`Remote` vs. `Local`)**: The top **Destination** bar clearly shows whether you are exporting to **`💻 Local Filesystem`** or **`🌐 Remote: user@host`** and lets you switch modes or open **`SSH Parameters...`** at any time. NuTrackN auto-generates a default filename (`<name>_out`, or `spectrum_out`), and **`Browse...`** opens `NuFileDialog` in the active Local/Remote mode with **`All Files (*.*)`** so you are not restricted to `.spe` or `.dat` extensions.
 - **Formats & Channel Length**: Choose between **Long (`32-bit Integer`, GASPware `L`)**, **Float (`32-bit Float`, GASPware `R`)**, **Double (`64-bit Float`, GASPware `D`)**, **ASCII Fortran (`10I9`, GASPware `A`)**, or **Short (`16-bit Integer`)**, with standard channel presets (`1k`–`64k`) or any custom channel count (`1`–`1,048,576`). A compact status line reports the estimated file size, truncation/zero-padding, negative-count clamping warnings (when exporting negative counts to unsigned integer formats), and binary alignment warnings.
@@ -692,17 +710,27 @@ Press **`OS`** (`O` then `S`) or click the **`W`** toolbar button to open `Spect
 ### 3.7 Publication Graphics (`O=` / `Print` Button)
 Press **`O`** then **`=`** or click the **`Print`** toolbar button to export the current canvas view as **PDF (`.pdf`)**, **PostScript (`.ps`)**, or **PNG (`.png`)** locally or to a remote SSH directory:
 
-- **Default Filename & Formats**: NuTrackN pre-populates `<name>_plot.pdf` (or `spectrum_plot.pdf`) in the active directory; if no known extension (`.pdf`, `.ps`, `.eps`, `.png`, `.svg`) is typed, `.pdf` is appended automatically.
+- **Default Filename & Formats**: NuTrackN pre-populates `<name>_plot.pdf` (or `spectrum_plot.pdf`) in the active directory; switching the format dropdown (`PDF Files (*.pdf)`, `Postscript (*.ps)`, `PNG Image (*.png)`) updates the filename suffix automatically, and if no known extension (`.pdf`, `.ps`, `.eps`, `.png`, `.svg`) is typed, the selected format's extension is appended.
 - **Matches Current Window Graphics**: Exported files preserve NuTrackN's currently configured color settings (canvas background, axis/frame contrast, spectrum colors, and fit/marker overlays) along with screen-matched line widths (`0.75 pt` per `1 px`).
-- *(Note: Additional publication-formatting controls—such as dedicated light/print figure themes, custom page sizing, and layout options—are planned for future releases.)*
+- *(Note: Additional publication-formatting controls—such as dedicated light/print figure themes, custom page sizing, and layout options—are planned for future releases; see [Section 1.4, Item 5](#5-publication-ready-figure--spectra-image-generation-medium-term).)*
 
 ---
 
-### 3.8 Calculation Logfiles (`DF` / `ZF`)
-NuTrackN can record peak integration and Gaussian fit outputs directly to a structured calculation report file (separate from the diagnostic session logs described in Chapter 12):
+### 3.8 Calculation Logfiles (`DF` / `ZF` / `Rec` Button)
+NuTrackN can record peak integration and Gaussian fit outputs directly to a structured calculation report file (distinct from the diagnostic session logs configured via **`LOG`** in [Chapter 12](#12-diagnostic-logging-output-console--log-management)):
 
-- **Designate Calculation Logfile (`DF` / `DL`)**: Specify an output report file (`.area`, `.txt`, local or remote). Every subsequent peak integration (**`CI`**, **`CJ`**, **`AJ`**) or Gaussian fit (**`CG`**, **`CV`**, **`AG`**) automatically appends formatted tabular results.
-- **Close Calculation Logfile (`ZF` / `ZL`)**: Cleanly flush, close, and (if remote) upload the active peak calculation logfile.
+- **Start Recording (`DF` / `DL` or Toolbar `Rec`)**:
+    - Click **`Rec`** (or press **`DF`** / **`DL`**, also usable in macros) to open `NuFileDialog` and choose a destination file (`.area` or `.txt`, local or remote). NuTrackN pre-populates `<name>_calc.area` (or `calculations.area`) in the active directory and opens in Local or Remote mode to match the active spectrum.
+    - While recording is active, the button highlights red as **`● Rec`**.
+    - **Ctrl+Click `Rec`**: Switch directly to a new calculation logfile (automatically flushing, closing, and uploading the previous one).
+- **Append vs. Overwrite & Remote SFTP Sync**:
+    - If the chosen local or remote file already exists, NuTrackN prompts you to **`Append`**, **`Overwrite`**, or **`Cancel`**.
+    - When **`Append`** is chosen for an existing remote file, NuTrackN downloads the remote file into the local cache first so new results append cleanly rather than overwriting earlier entries.
+- **Table Format & Smart Headers**:
+    - Every peak integration (**`CI`**, **`CJ`**, **`AJ`**, **`Int`**) or Gaussian fit (**`CG`**, **`CV`**, **`AG`**) appends a row with six Xtrackn-compatible columns: **`Centroid`**, **`FWHM`**, **`Gross`**, **`Net`**, **`Bkg`**, and **`Error`** (Net Area uncertainty).
+    - Section headers (`Integration Results [<spectrum> | ch/keV]:` or `Gauss Fit Results [<spectrum> | ch/keV]:`) are automatically inserted whenever you switch between integration and fitting, load/step to a different spectrum, or toggle energy calibration.
+    - When tweaking markers in `IntegralDialog`, NuTrackN logs the initial calculation and—if you adjust any marker spinboxes—logs the final calculation once when the dialog closes, avoiding intermediate spinbox spam.
+- **Stop & Close (`ZF` / `ZL` or Click `● Rec`)**: Click **`● Rec`** (or press **`ZF`** / **`ZL`**) to flush, close, and—when using a remote destination—upload the calculation logfile over SFTP.
 
 ---
 
@@ -1337,7 +1365,7 @@ Please write me
 | **`# +` (Toolbar)** | **Next Spectrum / Run** | Left-click: next detector (`*1`); Right-click: next run (`*3`); Ctrl: Macro 1 / 3 |
 | **`#-` (Toolbar)** | **Prev Spectrum / Run** | Left-click: prev detector (`*2`); Right-click: prev run (`*4`); Ctrl: Macro 2 / 4 |
 | **`OR` / `DR` / `SSH`** | **Remote Data (SSH)** | Open Remote Data Acquisition & SSH Session Manager |
-| **`OS`** | **Output Spectrum** | Open Export Spectrum dialog (`W` button; binary or ASCII `10I9`) |
+| **`OS`** | **Output Spectrum** | Open Export Spectrum dialog (`Write` button; binary or ASCII `10I9`) |
 | **`O=`** | **Output Plot** | Generate vector PostScript / PDF of current view |
 | **`Ctrl + →`** | **Add Column** | Add an additional spectrum display column to canvas |
 | **`Ctrl + ←`** | **Delete Column** | Remove last spectrum display column from canvas |

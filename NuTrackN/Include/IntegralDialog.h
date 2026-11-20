@@ -18,12 +18,17 @@ public:
 
     void updateFromCanvas();
 
+protected:
+    void closeEvent(QCloseEvent *event) override;
+    void done(int r) override;
+
 private slots:
     void recalculate();
 
 private:
     QMainCanvas *m_canvas;
     bool m_isUpdating;
+    bool m_hasUserModified{false};
 
     QSpinBox *m_bgLeftStart;
     QSpinBox *m_bgLeftEnd;
