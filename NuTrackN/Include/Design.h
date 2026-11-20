@@ -5,6 +5,7 @@
 #include <QColor>
 #include <QPlainTextEdit>
 #include <QString>
+#include <QStringList>
 #include <vector>
 
 // Forward declarations to avoid circular dependencies
@@ -195,9 +196,26 @@ class CommandPrompt : public QPlainTextEdit
 
 public:
     enum class LogLevel {
-        Info = 0,
-        Warning = 1,
-        Error = 2
+        Debug = 0,
+        Info = 1,
+        Warning = 2,
+        Error = 3
+    };
+
+    struct LogConfig {
+        bool    diskLoggingEnabled{true};
+        QString logDirectory;
+        bool    autoPruneEnabled{false};
+        bool    pruneByCount{true};
+        int     maxLogFiles{20};
+        bool    pruneByAge{false};
+        int     maxLogAgeDays{30};
+    };
+
+    struct LogDirectoryStats {
+        int    totalFiles{0};
+        int    oldFiles{0};
+        qint64 totalBytes{0};
     };
 
     static CommandPrompt* getInstance();
@@ -207,6 +225,7 @@ public:
                     const QString &message,
                     LogLevel level = LogLevel::Info,
                     const QString &coalesceKey = QString());
+    static void logDebug(const QString &source, const QString &message);
     static void logInfo(const QString &source,
                         const QString &message,
                         const QString &coalesceKey = QString());
@@ -214,6 +233,21 @@ public:
                            const QString &message,
                            const QString &coalesceKey = QString());
     static void logError(const QString &source, const QString &message);
+
+    // Per-session disk logging configuration & pruning
+    static void initializeFileLogging();
+    static void shutdownFileLogging();
+    static QString getDefaultLogDirectory();
+    static LogConfig getLogConfig();
+    static void setLogConfig(const LogConfig &config);
+    static QString getCurrentLogFilePath();
+    static LogDirectoryStats getLogDirectoryStats(const QString &dirOverride = QString());
+    static QStringList findPrunableLogs(const LogConfig &config,
+                                        bool clearAllOld = false,
+                                        qint64 *outTotalBytes = nullptr);
+    static int pruneLogs(const LogConfig &config,
+                         bool clearAllOld = false,
+                         qint64 *outFreedBytes = nullptr);
 
     virtual ~CommandPrompt() override;
 

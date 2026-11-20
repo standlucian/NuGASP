@@ -59,12 +59,17 @@ public:
     static std::shared_ptr<RemoteSession> globalSession();
 
     // Connection lifecycle
-    bool connectToHost(const RemoteProfile &profile, QString *errorMessage = nullptr);
+    bool connectToHost(const RemoteProfile &profile,
+                       QString *errorMessage = nullptr,
+                       bool quietAuthFailure = false);
     void disconnect();
     bool isConnected() const;
 
     // Verification / Testing without altering active session state
-    static bool testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage = nullptr);
+    static bool testConnection(const RemoteProfile &profile,
+                               QString &outDetails,
+                               QString *errorMessage = nullptr,
+                               bool quietAuthFailure = false);
 
     const RemoteProfile& getProfile() const { return m_profile; }
     QString getCurrentRemoteDir() const;

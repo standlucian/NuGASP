@@ -351,14 +351,14 @@ void NuFileDialog::onLocationToggled()
         m_btnRemoteTab->setChecked(true);
         m_btnLocalTab->setChecked(false);
         const RemoteProfile &prof = m_session->getProfile();
-        CommandPrompt::logInfo(logSrc, QString("Switched to Remote: %1@%2 (%3).")
-                                           .arg(prof.user, prof.host, m_currentRemoteDir));
+        CommandPrompt::logDebug(logSrc, QString("Switched to Remote: %1@%2 (%3).")
+                                            .arg(prof.user, prof.host, m_currentRemoteDir));
         loadDirectory(m_currentRemoteDir);
     } else {
         m_isRemoteMode = false;
         m_btnLocalTab->setChecked(true);
         m_btnRemoteTab->setChecked(false);
-        CommandPrompt::logInfo(logSrc, QString("Switched to Local filesystem (%1).").arg(m_currentLocalDir));
+        CommandPrompt::logDebug(logSrc, QString("Switched to Local filesystem (%1).").arg(m_currentLocalDir));
         loadDirectory(m_currentLocalDir);
     }
 }
@@ -637,7 +637,7 @@ void NuFileDialog::onTableItemDoubleClicked(int row, int /*col*/)
 bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLocalPath)
 {
     const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
-    CommandPrompt::logInfo(logSrc, QString("Fetching remote file '%1'...").arg(remotePath));
+    CommandPrompt::logDebug(logSrc, QString("Fetching remote file '%1'...").arg(remotePath));
 
     m_progressBar->setValue(0);
     m_progressBar->setVisible(true);
@@ -680,11 +680,11 @@ void NuFileDialog::onAcceptActionClicked()
             m_selectedRemotePath = m_currentRemoteDir;
             m_selectedPath = m_session->getLocalCachePath(m_currentRemoteDir);
             QDir().mkpath(m_selectedPath);
-            CommandPrompt::logInfo(logSrc, QString("Selected remote directory '%1'.").arg(m_selectedRemotePath));
+            CommandPrompt::logDebug(logSrc, QString("Selected remote directory '%1'.").arg(m_selectedRemotePath));
         } else {
             m_selectedPath = m_currentLocalDir;
             m_selectedRemotePath.clear();
-            CommandPrompt::logInfo(logSrc, QString("Selected directory '%1'.").arg(m_selectedPath));
+            CommandPrompt::logDebug(logSrc, QString("Selected directory '%1'.").arg(m_selectedPath));
         }
         accept();
         return;
@@ -704,13 +704,13 @@ void NuFileDialog::onAcceptActionClicked()
                 ? m_currentRemoteDir + fileName
                 : m_currentRemoteDir + "/" + fileName;
             m_selectedPath = m_session->getLocalCachePath(m_selectedRemotePath);
-            CommandPrompt::logInfo(logSrc, QString("Selected remote save path '%1'.").arg(m_selectedRemotePath));
+            CommandPrompt::logDebug(logSrc, QString("Selected remote save path '%1'.").arg(m_selectedRemotePath));
         } else {
             m_selectedPath = m_currentLocalDir.endsWith('/')
                 ? m_currentLocalDir + fileName
                 : m_currentLocalDir + "/" + fileName;
             m_selectedRemotePath.clear();
-            CommandPrompt::logInfo(logSrc, QString("Selected save path '%1'.").arg(m_selectedPath));
+            CommandPrompt::logDebug(logSrc, QString("Selected save path '%1'.").arg(m_selectedPath));
         }
         QDir().mkpath(QFileInfo(m_selectedPath).absolutePath());
         accept();
@@ -749,7 +749,7 @@ void NuFileDialog::onAcceptActionClicked()
             m_selectedPaths = chosenPaths;
             m_selectedRemotePaths.clear();
         }
-        CommandPrompt::logInfo(
+        CommandPrompt::logDebug(
             logSrc,
             QString("Selected %1 %2 file(s).")
                 .arg(chosenPaths.size())
@@ -779,13 +779,13 @@ void NuFileDialog::onAcceptActionClicked()
             return;
         }
         m_selectedPath = localCached;
-        CommandPrompt::logInfo(
+        CommandPrompt::logDebug(
             logSrc,
             QString("Selected remote file '%1' (cached: %2).").arg(m_selectedRemotePath, m_selectedPath));
     } else {
         m_selectedPath = path;
         m_selectedRemotePath.clear();
-        CommandPrompt::logInfo(logSrc, QString("Selected local file '%1'.").arg(m_selectedPath));
+        CommandPrompt::logDebug(logSrc, QString("Selected local file '%1'.").arg(m_selectedPath));
     }
 
     accept();

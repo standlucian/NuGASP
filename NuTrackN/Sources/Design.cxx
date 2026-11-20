@@ -33,11 +33,15 @@
 #include <QDateTime>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QCoreApplication>
 #include <QMetaObject>
 #include <QPointer>
+#include <QRegularExpression>
 #include <QScrollBar>
+#include <QStandardPaths>
 #include <QTextBlock>
 #include <QTextCursor>
+#include <QTextStream>
 #include <QThread>
 #include "NuFileDialog.h"
 #include <iostream>
@@ -1018,6 +1022,306 @@ CommandPrompt *CommandPrompt::getInstance() {
   return instance;
 }
 
+namespace {
+std::mutex s_logIOMutex;
+bool s_logConfigLoaded = false;
+bool s_loggingShutDown = false;
+CommandPrompt::LogConfig s_logConfig;
+QFile s_logFile;
+QString s_activeLogPath;
+QString s_activeLogCanonical;
+
+QString normalizedDirPath(const QString &dir) {
+  QString d = dir.trimmed();
+  if (d.isEmpty()) {
+    return CommandPrompt::getDefaultLogDirectory();
+  }
+  return QDir::cleanPath(d);
+}
+
+void loadLogConfigLocked() {
+  if (s_logConfigLoaded) return;
+  QSettings settings("NuGASP", "NuTrackN");
+  settings.beginGroup("Logging");
+  s_logConfig.diskLoggingEnabled = settings.value("diskLoggingEnabled", true).toBool();
+  s_logConfig.logDirectory = normalizedDirPath(
+      settings.value("logDirectory", CommandPrompt::getDefaultLogDirectory()).toString());
+  s_logConfig.autoPruneEnabled = settings.value("autoPruneEnabled", false).toBool();
+  s_logConfig.pruneByCount = settings.value("pruneByCount", true).toBool();
+  s_logConfig.maxLogFiles = qBound(1, settings.value("maxLogFiles", 20).toInt(), 1000);
+  s_logConfig.pruneByAge = settings.value("pruneByAge", false).toBool();
+  s_logConfig.maxLogAgeDays = qBound(1, settings.value("maxLogAgeDays", 30).toInt(), 3650);
+  settings.endGroup();
+  s_logConfigLoaded = true;
+}
+
+void saveLogConfigLocked(const CommandPrompt::LogConfig &cfg) {
+  QSettings settings("NuGASP", "NuTrackN");
+  settings.beginGroup("Logging");
+  settings.setValue("diskLoggingEnabled", cfg.diskLoggingEnabled);
+  settings.setValue("logDirectory", cfg.logDirectory);
+  settings.setValue("autoPruneEnabled", cfg.autoPruneEnabled);
+  settings.setValue("pruneByCount", cfg.pruneByCount);
+  settings.setValue("maxLogFiles", cfg.maxLogFiles);
+  settings.setValue("pruneByAge", cfg.pruneByAge);
+  settings.setValue("maxLogAgeDays", cfg.maxLogAgeDays);
+  settings.endGroup();
+}
+
+void closeSessionLogLocked() {
+  if (s_logFile.isOpen()) {
+    QTextStream out(&s_logFile);
+    out << "=== NuTrackN session ended ("
+        << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+        << ") ===\n";
+    out.flush();
+    s_logFile.flush();
+    s_logFile.close();
+  }
+  s_activeLogPath.clear();
+  s_activeLogCanonical.clear();
+}
+
+void openSessionLogLocked() {
+  if (!s_logConfig.diskLoggingEnabled || s_loggingShutDown || s_logFile.isOpen()) {
+    return;
+  }
+  const QString dirPath = normalizedDirPath(s_logConfig.logDirectory);
+  if (!QDir().mkpath(dirPath)) {
+    return;
+  }
+
+  const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+  const qint64 pid = QCoreApplication::applicationPid();
+  QString candidate = QDir(dirPath).filePath(QString("nutrackn_%1_%2.log").arg(stamp).arg(pid));
+  int suffix = 2;
+  while (QFileInfo::exists(candidate)) {
+    candidate = QDir(dirPath).filePath(QString("nutrackn_%1_%2_%3.log").arg(stamp).arg(pid).arg(suffix++));
+  }
+
+  s_logFile.setFileName(candidate);
+  if (!s_logFile.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+    return;
+  }
+
+  const QFileInfo fi(s_logFile);
+  s_activeLogPath = fi.absoluteFilePath();
+  s_activeLogCanonical = fi.canonicalFilePath();
+
+  QTextStream out(&s_logFile);
+  out << "=== NuTrackN session started ("
+      << QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss")
+      << ", PID " << pid << ") ===\n";
+  out.flush();
+  s_logFile.flush();
+}
+
+bool isManagedLogFileName(const QString &fileName) {
+  static const QRegularExpression kLogNameRe("^nutrackn_\\d{8}_\\d{6}(_\\d+)*\\.log$");
+  return kLogNameRe.match(fileName).hasMatch();
+}
+
+bool isSameFileAsActiveLocked(const QFileInfo &fi) {
+  if (s_activeLogPath.isEmpty()) return false;
+  if (fi.absoluteFilePath() == s_activeLogPath) return true;
+  if (!s_activeLogCanonical.isEmpty() && !fi.canonicalFilePath().isEmpty() &&
+      fi.canonicalFilePath() == s_activeLogCanonical) {
+    return true;
+  }
+  return false;
+}
+
+QFileInfoList listManagedLogFilesSortedNewestFirst(const QString &dirPath) {
+  QFileInfoList out;
+  QDir dir(dirPath);
+  if (!dir.exists()) return out;
+
+  const QFileInfoList all = dir.entryInfoList(QDir::Files | QDir::NoDotAndDotDot);
+  for (const QFileInfo &fi : all) {
+    if (isManagedLogFileName(fi.fileName())) {
+      out.push_back(fi);
+    }
+  }
+  std::sort(out.begin(), out.end(), [](const QFileInfo &a, const QFileInfo &b) {
+    if (a.lastModified() != b.lastModified()) {
+      return a.lastModified() > b.lastModified();
+    }
+    return a.fileName() > b.fileName();
+  });
+  return out;
+}
+
+const char* diskLevelTag(CommandPrompt::LogLevel level) {
+  switch (level) {
+    case CommandPrompt::LogLevel::Debug:   return "DEBUG";
+    case CommandPrompt::LogLevel::Info:    return "INFO ";
+    case CommandPrompt::LogLevel::Warning: return "WARN ";
+    case CommandPrompt::LogLevel::Error:   return "ERROR";
+  }
+  return "INFO ";
+}
+} // namespace
+
+QString CommandPrompt::getDefaultLogDirectory() {
+  QString base = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+  if (base.isEmpty()) {
+    base = QDir::homePath() + "/.local/share/NuGASP/NuTrackN";
+  }
+  return QDir::cleanPath(base + "/logs");
+}
+
+void CommandPrompt::initializeFileLogging() {
+  LogConfig cfgCopy;
+  {
+    std::lock_guard<std::mutex> lock(s_logIOMutex);
+    s_loggingShutDown = false;
+    loadLogConfigLocked();
+    if (s_logConfig.diskLoggingEnabled) {
+      openSessionLogLocked();
+    }
+    cfgCopy = s_logConfig;
+  }
+  if (cfgCopy.autoPruneEnabled) {
+    qint64 freed = 0;
+    const int pruned = pruneLogs(cfgCopy, false, &freed);
+    if (pruned > 0) {
+      logDebug("Log", QString("Startup auto-prune removed %1 old log file(s) (%2 bytes freed).")
+                          .arg(pruned)
+                          .arg(freed));
+    }
+  }
+}
+
+void CommandPrompt::shutdownFileLogging() {
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  s_loggingShutDown = true;
+  closeSessionLogLocked();
+}
+
+CommandPrompt::LogConfig CommandPrompt::getLogConfig() {
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  loadLogConfigLocked();
+  return s_logConfig;
+}
+
+void CommandPrompt::setLogConfig(const LogConfig &config) {
+  LogConfig norm = config;
+  norm.logDirectory = normalizedDirPath(norm.logDirectory);
+  norm.maxLogFiles = qBound(1, norm.maxLogFiles, 1000);
+  norm.maxLogAgeDays = qBound(1, norm.maxLogAgeDays, 3650);
+
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  loadLogConfigLocked();
+  const bool dirChanged = (norm.logDirectory != s_logConfig.logDirectory);
+  const bool enabledChanged = (norm.diskLoggingEnabled != s_logConfig.diskLoggingEnabled);
+  s_logConfig = norm;
+  s_logConfigLoaded = true;
+  saveLogConfigLocked(s_logConfig);
+
+  if (enabledChanged || dirChanged || (s_logConfig.diskLoggingEnabled && !s_logFile.isOpen())) {
+    closeSessionLogLocked();
+    if (s_logConfig.diskLoggingEnabled && !s_loggingShutDown) {
+      openSessionLogLocked();
+    }
+  }
+}
+
+QString CommandPrompt::getCurrentLogFilePath() {
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  return s_logFile.isOpen() ? s_activeLogPath : QString();
+}
+
+CommandPrompt::LogDirectoryStats CommandPrompt::getLogDirectoryStats(const QString &dirOverride) {
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  loadLogConfigLocked();
+  const QString dirPath = dirOverride.trimmed().isEmpty() ? s_logConfig.logDirectory : normalizedDirPath(dirOverride);
+  const QFileInfoList files = listManagedLogFilesSortedNewestFirst(dirPath);
+
+  LogDirectoryStats stats;
+  for (const QFileInfo &fi : files) {
+    stats.totalFiles++;
+    stats.totalBytes += fi.size();
+    if (!isSameFileAsActiveLocked(fi)) {
+      stats.oldFiles++;
+    }
+  }
+  return stats;
+}
+
+QStringList CommandPrompt::findPrunableLogs(const LogConfig &config,
+                                            bool clearAllOld,
+                                            qint64 *outTotalBytes) {
+  std::lock_guard<std::mutex> lock(s_logIOMutex);
+  loadLogConfigLocked();
+  const QString dirPath = normalizedDirPath(config.logDirectory);
+  const QFileInfoList allFiles = listManagedLogFilesSortedNewestFirst(dirPath);
+
+  QFileInfoList oldFiles;
+  int activeInDir = 0;
+  for (const QFileInfo &fi : allFiles) {
+    if (isSameFileAsActiveLocked(fi)) {
+      activeInDir = 1;
+    } else {
+      oldFiles.push_back(fi);
+    }
+  }
+
+  std::vector<bool> marked(oldFiles.size(), false);
+  if (clearAllOld) {
+    std::fill(marked.begin(), marked.end(), true);
+  } else {
+    if (config.pruneByCount) {
+      const int maxKeep = qBound(1, config.maxLogFiles, 1000);
+      const int keepOld = std::max(0, maxKeep - activeInDir);
+      for (int i = keepOld; i < oldFiles.size(); ++i) {
+        marked[i] = true;
+      }
+    }
+    if (config.pruneByAge) {
+      const int maxDays = qBound(1, config.maxLogAgeDays, 3650);
+      const QDateTime cutoff = QDateTime::currentDateTime().addDays(-maxDays);
+      for (int i = 0; i < oldFiles.size(); ++i) {
+        if (oldFiles[i].lastModified() < cutoff) {
+          marked[i] = true;
+        }
+      }
+    }
+  }
+
+  QStringList result;
+  qint64 totalBytes = 0;
+  for (int i = 0; i < oldFiles.size(); ++i) {
+    if (marked[i]) {
+      result.push_back(oldFiles[i].absoluteFilePath());
+      totalBytes += oldFiles[i].size();
+    }
+  }
+  if (outTotalBytes) {
+    *outTotalBytes = totalBytes;
+  }
+  return result;
+}
+
+int CommandPrompt::pruneLogs(const LogConfig &config,
+                             bool clearAllOld,
+                             qint64 *outFreedBytes) {
+  const QStringList targets = findPrunableLogs(config, clearAllOld, nullptr);
+  int deletedCount = 0;
+  qint64 freed = 0;
+  for (const QString &path : targets) {
+    QFileInfo fi(path);
+    const qint64 sz = fi.size();
+    if (QFile::remove(path)) {
+      deletedCount++;
+      freed += sz;
+    }
+  }
+  if (outFreedBytes) {
+    *outFreedBytes = freed;
+  }
+  return deletedCount;
+}
+
 void CommandPrompt::appendLogLine(const QString &formatted, const QString &coalesceKey) {
   QTextBlock lastBlock = document()->lastBlock();
   if (!coalesceKey.isEmpty() && !formatted.contains('\n') &&
@@ -1067,10 +1371,30 @@ void CommandPrompt::log(const QString &source,
   const QString formatted = prefix + cleanMsg;
 
   {
-    static std::mutex s_terminalLogMutex;
-    std::lock_guard<std::mutex> lock(s_terminalLogMutex);
-    std::ostream &out = (level == LogLevel::Info) ? std::cout : std::cerr;
-    out << formatted.toStdString() << std::endl;
+    std::lock_guard<std::mutex> lock(s_logIOMutex);
+    loadLogConfigLocked();
+    if (s_logConfig.diskLoggingEnabled && !s_loggingShutDown) {
+      if (!s_logFile.isOpen()) {
+        openSessionLogLocked();
+      }
+      if (s_logFile.isOpen()) {
+        const QString ts = QDateTime::currentDateTime().toString("yyyy-MM-dd HH:mm:ss.zzz");
+        const QString srcTag = source.isEmpty() ? "" : QString("[%1] ").arg(source);
+        const QString diskLine = QString("[%1] [%2] %3%4\n")
+                                     .arg(ts, diskLevelTag(level), srcTag, cleanMsg);
+        s_logFile.write(diskLine.toUtf8());
+        s_logFile.flush();
+      }
+    }
+
+    if (level != LogLevel::Debug) {
+      std::ostream &out = (level == LogLevel::Info) ? std::cout : std::cerr;
+      out << formatted.toStdString() << std::endl;
+    }
+  }
+
+  if (level == LogLevel::Debug) {
+    return;
   }
 
   CommandPrompt *prompt = CommandPrompt::instance;
@@ -1091,6 +1415,10 @@ void CommandPrompt::log(const QString &source,
         },
         Qt::QueuedConnection);
   }
+}
+
+void CommandPrompt::logDebug(const QString &source, const QString &message) {
+  log(source, message, LogLevel::Debug);
 }
 
 void CommandPrompt::logInfo(const QString &source,

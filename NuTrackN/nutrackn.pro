@@ -92,6 +92,7 @@ HEADERS += \
     Include/EfficiencyDialog.h \
     Include/AutoCalibDialog.h \
     Include/MacroDialog.h \
+    Include/LogSettingsDialog.h \
     Include/HelpDialog.h \
     Include/RemoteClient.h \
     Include/RemoteConnectDialog.h \
@@ -125,6 +126,7 @@ SOURCES += \
     Sources/EfficiencyDialog.cxx \
     Sources/AutoCalibDialog.cxx \
     Sources/MacroDialog.cxx \
+    Sources/LogSettingsDialog.cxx \
     Sources/HelpDialog.cxx \
     Sources/RemoteClient.cxx \
     Sources/RemoteConnectDialog.cxx \

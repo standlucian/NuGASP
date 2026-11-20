@@ -62,6 +62,7 @@ int main(int argc, char **argv) {
   app.setApplicationName("NuTrackN");
   app.setApplicationDisplayName("NuTrackN - Gamma Spectroscopy Analysis");
   app.setOrganizationName("NuGASP");
+  CommandPrompt::initializeFileLogging();
   // Initialize standardized typography from Design module (Category 2: Dialogs & App default)
   Design::initializeTypography();
   app.setFont(Design::getDialogFont());
@@ -101,9 +102,10 @@ int main(int argc, char **argv) {
     }
   }
 
-  // Ensure all color and typography settings are synced to disk upon application exit
+  // Ensure all color, typography, and logging state is synced to disk upon application exit
   QObject::connect(&app, &QCoreApplication::aboutToQuit, []() {
     Design::saveSettings();
+    CommandPrompt::shutdownFileLogging();
   });
 
   // Ensure the application exits when the last window is closed

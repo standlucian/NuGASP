@@ -320,6 +320,7 @@ public:
         QString description;
     };
     void openMacroDialog();
+    void openLogSettingsDialog();
     bool executeMacroCommand(const QString &commandToken);
     void executeCommandString(const QString &cmdStr);
     const std::map<int, MacroDefinition>& getMacros() const { return m_macros; }

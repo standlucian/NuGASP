@@ -442,7 +442,8 @@ void RemoteConnectDialog::onTestConnectionClicked()
 
     QString details;
     QString err;
-    bool ok = RemoteSession::testConnection(profile, details, &err);
+    const bool mightPromptPassphrase = (profile.authType == RemoteAuthType::KeyFile && profile.password.isEmpty());
+    bool ok = RemoteSession::testConnection(profile, details, &err, mightPromptPassphrase);
     if (!ok && profile.authType == RemoteAuthType::KeyFile && err.contains("Public Key Auth failed", Qt::CaseInsensitive)) {
         bool askOk = false;
         QString keyPass = QInputDialog::getText(
@@ -451,14 +452,17 @@ void RemoteConnectDialog::onTestConnectionClicked()
                 .arg(QFileInfo(profile.keyFilePath).fileName()),
             QLineEdit::Password, QString(), &askOk);
         if (askOk && !keyPass.isEmpty()) {
-            CommandPrompt::logInfo(
+            CommandPrompt::logDebug(
                 "SSH Test",
                 QString("Retrying key '%1' with passphrase...")
                     .arg(QFileInfo(profile.keyFilePath).fileName()));
             profile.password = keyPass;
-            ok = RemoteSession::testConnection(profile, details, &err);
+            ok = RemoteSession::testConnection(profile, details, &err, false);
         } else {
             CommandPrompt::logWarning("SSH Test", "Key passphrase prompt cancelled.");
+            if (mightPromptPassphrase) {
+                CommandPrompt::logError("SSH Test", err);
+            }
         }
     }
 
@@ -482,7 +486,7 @@ void RemoteConnectDialog::onDisconnectClicked()
     updateSessionStateDisplay();
     m_lblStatus->setStyleSheet("color: #ffb74d;");
     m_lblStatus->setText(tr("SSH session disconnected. NuGASP returned to local mode."));
-    CommandPrompt::logInfo("SSH", "Returned to local filesystem mode.");
+    CommandPrompt::logDebug("SSH", "Returned to local filesystem mode.");
 }
 
 void RemoteConnectDialog::onConnectClicked()
@@ -508,7 +512,8 @@ void RemoteConnectDialog::onConnectClicked()
     qApp->processEvents();
 
     QString errorMsg;
-    bool connected = m_session->connectToHost(profile, &errorMsg);
+    const bool mightPromptPassphrase = (profile.authType == RemoteAuthType::KeyFile && profile.password.isEmpty());
+    bool connected = m_session->connectToHost(profile, &errorMsg, mightPromptPassphrase);
     if (!connected && profile.authType == RemoteAuthType::KeyFile && errorMsg.contains("Public Key Auth failed", Qt::CaseInsensitive)) {
         bool askOk = false;
         QString keyPass = QInputDialog::getText(
@@ -517,14 +522,17 @@ void RemoteConnectDialog::onConnectClicked()
                 .arg(QFileInfo(profile.keyFilePath).fileName()),
             QLineEdit::Password, QString(), &askOk);
         if (askOk && !keyPass.isEmpty()) {
-            CommandPrompt::logInfo(
+            CommandPrompt::logDebug(
                 "SSH",
                 QString("Retrying key '%1' with passphrase...")
                     .arg(QFileInfo(profile.keyFilePath).fileName()));
             profile.password = keyPass;
-            connected = m_session->connectToHost(profile, &errorMsg);
+            connected = m_session->connectToHost(profile, &errorMsg, false);
         } else {
             CommandPrompt::logWarning("SSH", "Key passphrase prompt cancelled.");
+            if (mightPromptPassphrase) {
+                CommandPrompt::logError("SSH", errorMsg);
+            }
         }
     }
     if (!connected) {

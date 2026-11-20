@@ -625,7 +625,7 @@ SpectrumImportDialog::SpectrumImportDialog(const QString &filePath, QWidget *par
             "Spectrum",
             QString("Cannot inspect '%1': %2").arg(fi.fileName(), m_detected.confidenceReason));
     } else {
-        CommandPrompt::logInfo(
+        CommandPrompt::logDebug(
             "Spectrum",
             QString("Inspecting '%1' (%2 bytes) - Auto-Detected: %3")
                 .arg(fi.fileName())

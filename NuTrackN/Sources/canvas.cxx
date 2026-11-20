@@ -14,6 +14,7 @@
 #include "RunByRunManager.h"
 #include "MacroDialog.h"
 #include "IntegralDialog.h"
+#include "LogSettingsDialog.h"
 #include "HelpDialog.h"
 #include "RemoteClient.h"
 #include "RemoteConnectDialog.h"
@@ -415,6 +416,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnMacro, &QPushButton::clicked, this, &QMainCanvas::openMacroDialog);
     outBox->addWidget(btnMacro);
 
+    QPushButton *btnLog = makeButton(tr("LOG"), topContainer, true);
+    btnLog->setToolTip(tr("Diagnostic Log Folder, Auto-Prune Rules & Manual Cleanup"));
+    btnLog->setFixedSize(66, 33);
+    connect(btnLog, &QPushButton::clicked, this, &QMainCanvas::openLogSettingsDialog);
+    outBox->addWidget(btnLog);
+
     QPushButton *btnHelp = makeButton(tr("?"), topContainer, true);
     btnHelp->setToolTip(tr("Help & Command Reference Guide (Shortcut: H, ?, or F1)"));
     btnHelp->setFixedSize(66, 33);
@@ -696,7 +703,7 @@ void QMainCanvas::clicked1()
     // If the dialog was cancelled or no file was chosen, keep the existing spectrum
     // untouched and restore keyboard focus to the spectrum canvas
     if (fileName.isEmpty()) {
-        CommandPrompt::logInfo("Spectrum", "Open spectrum cancelled.");
+        CommandPrompt::logDebug("Spectrum", "Open spectrum cancelled.");
         if (canvas) {
             canvas->setFocus();
         }
@@ -734,7 +741,7 @@ void QMainCanvas::clicked1()
 
     SpectrumImportDialog importDlg(fileName, this);
     if (importDlg.exec() != QDialog::Accepted) {
-        CommandPrompt::logInfo(
+        CommandPrompt::logDebug(
             "Spectrum",
             QString("Import cancelled for '%1'.").arg(QFileInfo(fileName).fileName()));
         if (canvas) {
@@ -1145,6 +1152,13 @@ void QMainCanvas::clearMacro(int macroId)
 void QMainCanvas::openMacroDialog()
 {
     MacroDialog dlg(this, this);
+    dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openLogSettingsDialog()
+{
+    LogSettingsDialog dlg(this);
     dlg.exec();
     if (canvas) canvas->setFocus();
 }

@@ -91,7 +91,9 @@ void RunDownloadWorker::start()
                 emit runProgress(i, total, done, totalBytes);
             },
             &err,
-            [this]() { return m_stopRequested.load(); }
+            [this]() { return m_stopRequested.load(); },
+            false,
+            true
         );
 
         if (ok) {

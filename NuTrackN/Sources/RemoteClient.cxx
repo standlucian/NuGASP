@@ -244,7 +244,7 @@ bool RemoteSession::reconnectIfDropped()
     return false;
 }
 
-bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMessage)
+bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMessage, bool quietAuthFailure)
 {
     QMutexLocker locker(&m_sessionMutex);
     cleanupSocketsAndSession();
@@ -277,7 +277,7 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     } else if (profile.authType == RemoteAuthType::Password) {
         authDesc = "Password";
     }
-    CommandPrompt::logInfo(
+    CommandPrompt::logDebug(
         m_logSource,
         QString("Connecting to %1@%2:%3 (%4)...")
             .arg(profile.user, profile.host)
@@ -425,7 +425,7 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
             authSuccess = true;
         } else if (trySshAgentAuth()) {
             authSuccess = true;
-            CommandPrompt::logInfo(
+            CommandPrompt::logDebug(
                 m_logSource,
                 QString("Key file '%1' declined; authenticated via ssh-agent.")
                     .arg(QFileInfo(keyFile).fileName()));
@@ -435,7 +435,11 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
             const QString err = QString("SSH Public Key Auth failed (%1): %2")
                                     .arg(QFileInfo(keyFile).fileName(), errStr ? errStr : "Access denied");
             if (errorMessage) *errorMessage = err;
-            CommandPrompt::logError(m_logSource, err);
+            if (quietAuthFailure) {
+                CommandPrompt::logDebug(m_logSource, err);
+            } else {
+                CommandPrompt::logError(m_logSource, err);
+            }
         }
     } else if (profile.authType == RemoteAuthType::Password) {
         QByteArray passBytes = profile.password.toUtf8();
@@ -496,12 +500,15 @@ bool RemoteSession::connectToHost(const RemoteProfile &profile, QString *errorMe
     }
     m_currentRemoteDir = sanitizePath(startDir);
 
-    CommandPrompt::logInfo(
-        m_logSource,
-        QString("Connected to %1@%2:%3 (SFTP ready, dir: %4).")
-            .arg(profile.user, profile.host)
-            .arg(targetPort)
-            .arg(m_currentRemoteDir));
+    const QString connectedMsg = QString("Connected to %1@%2:%3 (SFTP ready, dir: %4).")
+                                     .arg(profile.user, profile.host)
+                                     .arg(targetPort)
+                                     .arg(m_currentRemoteDir);
+    if (m_isTestSession) {
+        CommandPrompt::logDebug(m_logSource, connectedMsg);
+    } else {
+        CommandPrompt::logInfo(m_logSource, connectedMsg);
+    }
 
     return true;
 }
@@ -665,7 +672,7 @@ bool RemoteSession::fileExists(const QString &remotePath, RemoteFileInfo *outInf
     return true;
 }
 
-bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage)
+bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDetails, QString *errorMessage, bool quietAuthFailure)
 {
     QElapsedTimer timer;
     timer.start();
@@ -675,7 +682,7 @@ bool RemoteSession::testConnection(const RemoteProfile &profile, QString &outDet
     testSession.m_isTestSession = true;
 
     QString err;
-    if (!testSession.connectToHost(profile, &err)) {
+    if (!testSession.connectToHost(profile, &err, quietAuthFailure)) {
         if (errorMessage) *errorMessage = err;
         return false;
     }
@@ -784,12 +791,10 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
             if (progressCallback) {
                 progressCallback(totalBytes, totalBytes);
             }
-            if (!quietSuccess) {
-                CommandPrompt::logInfo(
-                    "SFTP",
-                    QString("Cache hit for '%1' (%2).")
-                        .arg(cleanRemote, formatTransferSize(totalBytes)));
-            }
+            CommandPrompt::logDebug(
+                "SFTP",
+                QString("Cache hit for '%1' (%2).")
+                    .arg(cleanRemote, formatTransferSize(totalBytes)));
             return true;
         }
     }
@@ -872,12 +877,13 @@ bool RemoteSession::downloadFile(const QString &remotePath, const QString &local
         return false;
     }
 
-    if (!quietSuccess) {
-        CommandPrompt::logInfo(
-            "SFTP",
-            QString("Downloaded '%1' (%2 in %3 ms).")
-                .arg(cleanRemote, formatTransferSize(bytesDone))
-                .arg(timer.elapsed()));
+    const QString dlMsg = QString("Downloaded '%1' (%2 in %3 ms).")
+                              .arg(cleanRemote, formatTransferSize(bytesDone))
+                              .arg(timer.elapsed());
+    if (quietSuccess) {
+        CommandPrompt::logDebug("SFTP", dlMsg);
+    } else {
+        CommandPrompt::logInfo("SFTP", dlMsg);
     }
 
     return true;
