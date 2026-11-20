@@ -1066,8 +1066,9 @@ void QMainCanvas::executeMacro(int macroId)
         return;
     }
 
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Executing Macro %1: \"%2\"\n").arg(macroId).arg(it->second.commandString));
+    CommandPrompt::logDebug(
+        "Macro",
+        QString("Executing Macro #%1: \"%2\"").arg(macroId).arg(it->second.commandString));
 
     executeCommandString(it->second.commandString);
 }
