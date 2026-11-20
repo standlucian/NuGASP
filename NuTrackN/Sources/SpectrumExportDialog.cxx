@@ -10,14 +10,68 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QFileDialog>
+#include <QIntValidator>
 #include <QMessageBox>
 #include <QFileInfo>
 #include <QDir>
 #include "NuFileDialog.h"
+#include "RemoteConnectDialog.h"
 #include <fstream>
 #include <iomanip>
+#include <sstream>
 #include <cmath>
 #include <algorithm>
+
+namespace {
+
+void writeAscii10I9(std::ostream &file, const double *vals, size_t count)
+{
+    int col = 0;
+    for (size_t i = 0; i < count; ++i) {
+        int64_t val = static_cast<int64_t>(std::llround(vals[i]));
+        if (val > 999999999LL)  val = 999999999LL;
+        if (val < -99999999LL)  val = -99999999LL;
+        file << std::setw(9) << val;
+        col++;
+        if (col == 10) {
+            file << "\n";
+            col = 0;
+        }
+    }
+    if (col != 0) {
+        file << "\n";
+    }
+}
+
+void writeBinarySpectrum(std::ostream &file,
+                         SpectrumFormat format,
+                         const std::vector<double> &outData)
+{
+    const size_t n = outData.size();
+    if (format == SpectrumFormat::Float32) {
+        std::vector<float> buf(n);
+        for (size_t i = 0; i < n; ++i) buf[i] = static_cast<float>(outData[i]);
+        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(float));
+    } else if (format == SpectrumFormat::Double64) {
+        file.write(reinterpret_cast<const char*>(outData.data()), n * sizeof(double));
+    } else if (format == SpectrumFormat::ShortInt16) {
+        std::vector<uint16_t> buf(n);
+        for (size_t i = 0; i < n; ++i) {
+            double v = std::max(0.0, std::min(65535.0, std::round(outData[i])));
+            buf[i] = static_cast<uint16_t>(v);
+        }
+        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint16_t));
+    } else { // LongInt32 (default GASPware L)
+        std::vector<uint32_t> buf(n);
+        for (size_t i = 0; i < n; ++i) {
+            double v = std::max(0.0, std::min(4294967295.0, std::round(outData[i])));
+            buf[i] = static_cast<uint32_t>(v);
+        }
+        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint32_t));
+    }
+}
+
+} // namespace
 
 //==============================================================================
 // WriteSpectrumData
@@ -57,6 +111,63 @@ bool WriteSpectrumData(const std::string &filename,
     size_t specBytes = static_cast<size_t>(requestedChannels) * bytesPerCh;
 
     if (format == SpectrumFormat::Ascii) {
+        if (mode == SpectrumExportMode::WriteAtIndex) {
+            const int safeIndex = std::max(0, targetIndex);
+            std::vector<double> allVals;
+            if (QFileInfo::exists(QString::fromStdString(filename))) {
+                std::ifstream inFile(filename);
+                std::string line;
+                while (std::getline(inFile, line)) {
+                    if (line.empty()) continue;
+                    std::size_t firstPos = line.find_first_not_of(" \t\r\n");
+                    if (firstPos == std::string::npos) continue;
+                    char first = line[firstPos];
+                    if (first == '#' || first == '!' || first == ';' || first == '$') continue;
+                    std::istringstream iss(line);
+                    double val = 0.0;
+                    while (iss >> val) {
+                        allVals.push_back(val);
+                    }
+                }
+            }
+
+            const size_t requiredTotal = static_cast<size_t>(safeIndex + 1) * static_cast<size_t>(requestedChannels);
+            if (allVals.size() < requiredTotal) {
+                allVals.resize(requiredTotal, 0.0);
+            }
+            const size_t startOffset = static_cast<size_t>(safeIndex) * static_cast<size_t>(requestedChannels);
+            for (int i = 0; i < requestedChannels; ++i) {
+                allVals[startOffset + static_cast<size_t>(i)] = outData[static_cast<size_t>(i)];
+            }
+
+            std::ofstream outFile(filename, std::ios::out | std::ios::trunc);
+            if (!outFile.is_open()) {
+                if (errorMsg) *errorMsg = QObject::tr("Could not open file for writing:\n%1").arg(QString::fromStdString(filename));
+                return false;
+            }
+            for (size_t offset = 0; offset < allVals.size(); offset += static_cast<size_t>(requestedChannels)) {
+                const size_t chunk = std::min(static_cast<size_t>(requestedChannels), allVals.size() - offset);
+                writeAscii10I9(outFile, allVals.data() + offset, chunk);
+            }
+            if (!outFile.good()) {
+                if (errorMsg) *errorMsg = QObject::tr("Write error occurred while updating ASCII spectrum index #%1.").arg(safeIndex);
+                return false;
+            }
+            return true;
+        }
+
+        bool needLeadingNewline = false;
+        if (mode == SpectrumExportMode::Append) {
+            std::ifstream checkFile(filename, std::ios::binary | std::ios::ate);
+            if (checkFile.is_open() && checkFile.tellg() > 0) {
+                checkFile.seekg(-1, std::ios::end);
+                char lastCh = '\n';
+                if (checkFile.get(lastCh) && lastCh != '\n' && lastCh != '\r') {
+                    needLeadingNewline = true;
+                }
+            }
+        }
+
         std::ios_base::openmode openMode = std::ios::out;
         if (mode == SpectrumExportMode::Append) {
             openMode |= std::ios::app;
@@ -70,22 +181,10 @@ bool WriteSpectrumData(const std::string &filename,
             return false;
         }
 
-        // Fortran 10I9 format: 10 integer counts per line, 9 characters wide each
-        int col = 0;
-        for (int i = 0; i < requestedChannels; ++i) {
-            int64_t val = static_cast<int64_t>(std::llround(outData[i]));
-            if (val > 999999999LL)  val = 999999999LL;
-            if (val < -99999999LL)  val = -99999999LL;
-            file << std::setw(9) << val;
-            col++;
-            if (col == 10) {
-                file << "\n";
-                col = 0;
-            }
-        }
-        if (col != 0) {
+        if (needLeadingNewline) {
             file << "\n";
         }
+        writeAscii10I9(file, outData.data(), outData.size());
 
         if (!file.good()) {
             if (errorMsg) *errorMsg = QObject::tr("Write error occurred while writing ASCII spectrum.");
@@ -126,28 +225,7 @@ bool WriteSpectrumData(const std::string &filename,
         }
 
         file.seekp(targetOffset, std::ios::beg);
-
-        if (format == SpectrumFormat::Float32) {
-            std::vector<float> buf(requestedChannels);
-            for (int i = 0; i < requestedChannels; ++i) buf[i] = static_cast<float>(outData[i]);
-            file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(float));
-        } else if (format == SpectrumFormat::Double64) {
-            file.write(reinterpret_cast<const char*>(outData.data()), outData.size() * sizeof(double));
-        } else if (format == SpectrumFormat::ShortInt16) {
-            std::vector<uint16_t> buf(requestedChannels);
-            for (int i = 0; i < requestedChannels; ++i) {
-                double v = std::max(0.0, std::min(65535.0, std::round(outData[i])));
-                buf[i] = static_cast<uint16_t>(v);
-            }
-            file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint16_t));
-        } else { // LongInt32 (default GASPware L)
-            std::vector<uint32_t> buf(requestedChannels);
-            for (int i = 0; i < requestedChannels; ++i) {
-                double v = std::max(0.0, std::min(4294967295.0, std::round(outData[i])));
-                buf[i] = static_cast<uint32_t>(v);
-            }
-            file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint32_t));
-        }
+        writeBinarySpectrum(file, format, outData);
 
         if (!file.good()) {
             if (errorMsg) *errorMsg = QObject::tr("Write error occurred while updating spectrum index #%1.").arg(targetIndex);
@@ -170,27 +248,7 @@ bool WriteSpectrumData(const std::string &filename,
         return false;
     }
 
-    if (format == SpectrumFormat::Float32) {
-        std::vector<float> buf(requestedChannels);
-        for (int i = 0; i < requestedChannels; ++i) buf[i] = static_cast<float>(outData[i]);
-        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(float));
-    } else if (format == SpectrumFormat::Double64) {
-        file.write(reinterpret_cast<const char*>(outData.data()), outData.size() * sizeof(double));
-    } else if (format == SpectrumFormat::ShortInt16) {
-        std::vector<uint16_t> buf(requestedChannels);
-        for (int i = 0; i < requestedChannels; ++i) {
-            double v = std::max(0.0, std::min(65535.0, std::round(outData[i])));
-            buf[i] = static_cast<uint16_t>(v);
-        }
-        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint16_t));
-    } else { // LongInt32 (default GASPware L)
-        std::vector<uint32_t> buf(requestedChannels);
-        for (int i = 0; i < requestedChannels; ++i) {
-            double v = std::max(0.0, std::min(4294967295.0, std::round(outData[i])));
-            buf[i] = static_cast<uint32_t>(v);
-        }
-        file.write(reinterpret_cast<const char*>(buf.data()), buf.size() * sizeof(uint32_t));
-    }
+    writeBinarySpectrum(file, format, outData);
 
     if (!file.good()) {
         if (errorMsg) *errorMsg = QObject::tr("Write error occurred while exporting binary spectrum.");
@@ -206,9 +264,19 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
                                            const QString &suggestedPath,
                                            SpectrumFormat initialFormat,
                                            int initialLength,
-                                           QWidget *parent)
-    : QDialog(parent), m_data(data)
+                                           QWidget *parent,
+                                           bool initialIsRemote)
+    : QDialog(parent), m_data(data), m_isRemoteSave(initialIsRemote)
 {
+    for (double v : m_data) {
+        if (v < 0.0) {
+            if (!m_hasNegativeCounts || v < m_minCount) {
+                m_minCount = v;
+            }
+            m_hasNegativeCounts = true;
+        }
+    }
+
     setWindowTitle(tr("Export Spectrum (W)"));
     setMinimumWidth(560);
     setFont(Design::getDialogFont());
@@ -220,13 +288,49 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
 
     // Title / Description
     const QFont df = Design::getDialogFont();
-    auto *titleLabel = new QLabel(tr("<b>Export Active Spectrum to Disk</b>"), this);
+    auto *titleLabel = new QLabel(tr("<b>Export Active Spectrum</b>"), this);
     titleLabel->setFont(df);
     titleLabel->setStyleSheet(QString("font-size: %1pt; color: %2; font-family: \"%3\";")
         .arg(df.pointSize() > 0 ? df.pointSize() + 2 : 13)
         .arg(Design::getDialogAccentColor().name())
         .arg(df.family()));
     mainLayout->addWidget(titleLabel);
+
+    // Destination Location Bar (Remote vs Local Switcher)
+    auto *locLayout = new QHBoxLayout();
+    locLayout->setSpacing(6);
+
+    auto *lblLoc = new QLabel(tr("Destination:"), this);
+    lblLoc->setFont(df);
+    locLayout->addWidget(lblLoc);
+
+    const QString tabToggleStyle = QString(
+        "QPushButton:checked { background-color: %1; color: #ffffff; border: 1px solid %1; }"
+    ).arg(Design::getDialogAccentColor().name());
+
+    m_btnRemoteTab = new QPushButton(this);
+    m_btnRemoteTab->setFont(df);
+    m_btnRemoteTab->setCheckable(true);
+    m_btnRemoteTab->setStyleSheet(tabToggleStyle);
+    locLayout->addWidget(m_btnRemoteTab);
+
+    m_btnLocalTab = new QPushButton(tr("💻 Local Filesystem"), this);
+    m_btnLocalTab->setFont(df);
+    m_btnLocalTab->setCheckable(true);
+    m_btnLocalTab->setStyleSheet(tabToggleStyle);
+    locLayout->addWidget(m_btnLocalTab);
+
+    locLayout->addStretch(1);
+
+    m_btnConnectSSH = new QPushButton(tr("SSH Parameters..."), this);
+    m_btnConnectSSH->setFont(df);
+    connect(m_btnConnectSSH, &QPushButton::clicked, this, &SpectrumExportDialog::onConnectSSHClicked);
+    locLayout->addWidget(m_btnConnectSSH);
+
+    connect(m_btnRemoteTab, &QPushButton::clicked, this, &SpectrumExportDialog::onLocationToggled);
+    connect(m_btnLocalTab, &QPushButton::clicked, this, &SpectrumExportDialog::onLocationToggled);
+
+    mainLayout->addLayout(locLayout);
 
     // Grid Form
     auto *formGrid = new QGridLayout();
@@ -236,10 +340,16 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     auto *pathLabel = new QLabel(tr("Output File:"), this);
     m_pathEdit = new QLineEdit(this);
     m_pathEdit->setPlaceholderText(tr("Select destination file..."));
-    if (!suggestedPath.isEmpty()) {
-        m_pathEdit->setText(suggestedPath);
+    const QString initialPath = suggestedPath.trimmed().isEmpty()
+        ? QDir::current().filePath(QStringLiteral("spectrum_out"))
+        : suggestedPath.trimmed();
+    m_pathEdit->setText(initialPath);
+    if (m_isRemoteSave) {
+        m_remoteSavePath = initialPath;
+    } else {
+        m_localSavePath = initialPath;
     }
-    connect(m_pathEdit, &QLineEdit::textChanged, this, &SpectrumExportDialog::onFilePathChanged);
+    connect(m_pathEdit, &QLineEdit::textEdited, this, &SpectrumExportDialog::onFilePathChanged);
 
     m_browseBtn = new QPushButton(tr("Browse..."), this);
     connect(m_browseBtn, &QPushButton::clicked, this, &SpectrumExportDialog::onBrowseClicked);
@@ -279,6 +389,7 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     auto *lengthLabel = new QLabel(tr("Channel Length:"), this);
     m_lengthCombo = new QComboBox(this);
     m_lengthCombo->setEditable(true);
+    m_lengthCombo->setValidator(new QIntValidator(1, 1048576, m_lengthCombo));
 
     int curSize = static_cast<int>(m_data.size());
     if (initialLength > 0) curSize = initialLength;
@@ -301,6 +412,8 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
     m_lengthCombo->setCurrentIndex(m_lengthCombo->findData(curSize));
     connect(m_lengthCombo, QOverload<int>::of(&QComboBox::currentIndexChanged),
             this, &SpectrumExportDialog::onLengthChanged);
+    connect(m_lengthCombo, &QComboBox::currentTextChanged,
+            this, [this](const QString &) { updateSizeEstimate(); });
 
     formGrid->addWidget(lengthLabel, 2, 0);
     formGrid->addWidget(m_lengthCombo, 2, 1);
@@ -330,29 +443,14 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
 
     mainLayout->addLayout(formGrid);
 
-    // Preview / Summary Box
-    auto *infoBox = new QFrame(this);
-    infoBox->setStyleSheet(QString("background-color: %1; border: 1px solid %2; border-radius: 4px; padding: 10px;")
-        .arg(Design::getDialogBackgroundColor().lighter(115).name())
-        .arg(Design::getDialogBackgroundColor().lighter(135).name()));
-    auto *infoLayout = new QVBoxLayout(infoBox);
-    infoLayout->setSpacing(4);
-    infoLayout->setContentsMargins(8, 8, 8, 8);
-
+    // Compact status / warning line (non-redundant info only)
     const int pt = df.pointSize() > 0 ? df.pointSize() : 11;
-    m_summaryLabel = new QLabel(this);
-    m_summaryLabel->setFont(df);
-    m_summaryLabel->setStyleSheet(QString("color: %1; font-weight: bold; font-family: \"%2\"; font-size: %3pt;")
-        .arg(Design::getDialogAccentColor().name(), df.family()).arg(pt));
-    infoLayout->addWidget(m_summaryLabel);
-
     m_previewLabel = new QLabel(this);
+    m_previewLabel->setWordWrap(true);
     m_previewLabel->setFont(df);
-    m_previewLabel->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt;")
+    m_previewLabel->setStyleSheet(QString("color: %1; font-family: \"%2\"; font-size: %3pt; padding: 4px 2px;")
         .arg(Design::getDialogTextColor().name(), df.family()).arg(pt));
-    infoLayout->addWidget(m_previewLabel);
-
-    mainLayout->addWidget(infoBox);
+    mainLayout->addWidget(m_previewLabel);
 
     // Buttons
     auto *btnLayout = new QHBoxLayout();
@@ -369,31 +467,108 @@ SpectrumExportDialog::SpectrumExportDialog(const std::vector<double> &data,
 
     mainLayout->addLayout(btnLayout);
 
+    updateLocationUI();
+    updateSizeEstimate();
+}
+
+void SpectrumExportDialog::updateLocationUI()
+{
+    auto sess = RemoteSession::globalSession();
+    const bool connected = (sess && sess->isConnected());
+    if (connected) {
+        const RemoteProfile &prof = sess->getProfile();
+        m_btnRemoteTab->setText(QString("🌐 Remote: %1@%2").arg(prof.user, prof.host));
+    } else {
+        m_btnRemoteTab->setText(tr("🌐 Remote Server (Offline)"));
+    }
+
+    if (m_isRemoteSave && !connected) {
+        m_isRemoteSave = false;
+        m_remoteSavePath.clear();
+    }
+
+    m_btnRemoteTab->setChecked(m_isRemoteSave);
+    m_btnLocalTab->setChecked(!m_isRemoteSave);
+}
+
+void SpectrumExportDialog::onConnectSSHClicked()
+{
+    auto sess = RemoteSession::globalSession();
+    RemoteConnectDialog dlg(sess, this);
+    if (dlg.exec() == QDialog::Accepted && sess && sess->isConnected()) {
+        m_isRemoteSave = true;
+        const QString currentName = QFileInfo(m_pathEdit->text().trimmed()).fileName();
+        const QString fileName = currentName.isEmpty() ? QStringLiteral("spectrum_out") : currentName;
+        QString remoteDir = sess->getCurrentRemoteDir();
+        if (remoteDir.isEmpty()) remoteDir = sess->getProfile().lastUsedPath;
+        if (remoteDir.isEmpty()) remoteDir = QStringLiteral("/");
+        m_remoteSavePath = remoteDir.endsWith('/') ? (remoteDir + fileName) : (remoteDir + "/" + fileName);
+        m_pathEdit->setText(m_remoteSavePath);
+        CommandPrompt::logDebug("Export", QString("Export destination set to Remote: %1").arg(m_remoteSavePath));
+    }
+    updateLocationUI();
+    updateSizeEstimate();
+}
+
+void SpectrumExportDialog::onLocationToggled()
+{
+    auto sess = RemoteSession::globalSession();
+    if (sender() == m_btnRemoteTab) {
+        if (!sess || !sess->isConnected()) {
+            CommandPrompt::logWarning("Export", "Remote destination selected while SSH is offline; opening SSH connection dialog.");
+            QMessageBox::information(this, tr("SSH Not Connected"),
+                tr("There is currently no active SSH connection.\nPlease configure host parameters and connect."));
+            onConnectSSHClicked();
+            return;
+        }
+        m_isRemoteSave = true;
+        if (m_remoteSavePath.isEmpty()) {
+            const QString currentName = QFileInfo(m_pathEdit->text().trimmed()).fileName();
+            const QString fileName = currentName.isEmpty() ? QStringLiteral("spectrum_out") : currentName;
+            QString remoteDir = sess->getCurrentRemoteDir();
+            if (remoteDir.isEmpty()) remoteDir = sess->getProfile().lastUsedPath;
+            if (remoteDir.isEmpty()) remoteDir = QStringLiteral("/");
+            m_remoteSavePath = remoteDir.endsWith('/') ? (remoteDir + fileName) : (remoteDir + "/" + fileName);
+        }
+        m_pathEdit->setText(m_remoteSavePath);
+        CommandPrompt::logDebug("Export", QString("Switched export destination to Remote: %1").arg(m_remoteSavePath));
+    } else {
+        m_isRemoteSave = false;
+        const QString currentName = QFileInfo(m_pathEdit->text().trimmed()).fileName();
+        const QString fileName = currentName.isEmpty() ? QStringLiteral("spectrum_out") : currentName;
+        if (m_localSavePath.isEmpty() || m_localSavePath == m_remoteSavePath) {
+            m_localSavePath = QDir::current().filePath(fileName);
+        }
+        m_remoteSavePath.clear();
+        m_pathEdit->setText(m_localSavePath);
+        CommandPrompt::logDebug("Export", QString("Switched export destination to Local: %1").arg(m_localSavePath));
+    }
+    updateLocationUI();
     updateSizeEstimate();
 }
 
 void SpectrumExportDialog::onBrowseClicked()
 {
-    QString initialDir;
-    if (!m_pathEdit->text().isEmpty()) {
-        initialDir = QFileInfo(m_pathEdit->text()).absolutePath();
-    }
-
-    QString filter;
-    SpectrumFormat fmt = getSelectedFormat();
-    if (fmt == SpectrumFormat::Ascii) {
-        filter = tr("ASCII Spectra (*.txt *.asc *.dat);;All Files (*)");
-    } else {
-        filter = tr("Binary Spectra (*.spe *.dat);;All Files (*)");
-    }
+    const QString initialTarget = m_pathEdit->text().trimmed();
 
     QString remotePath;
     bool isRemote = false;
-    QString sel = NuFileDialog::getSaveFileName(this, tr("Export Spectrum File"), initialDir, filter, nullptr, &remotePath, &isRemote);
+    QString sel = NuFileDialog::getSaveFileName(
+        this,
+        tr("Export Spectrum File"),
+        initialTarget,
+        QString(),
+        nullptr,
+        &remotePath,
+        &isRemote,
+        m_isRemoteSave ? 1 : 0);
     if (!sel.isEmpty()) {
-        m_pathEdit->setText(sel);
-        m_remoteSavePath = remotePath;
         m_isRemoteSave = isRemote;
+        m_remoteSavePath = isRemote ? remotePath : QString();
+        m_localSavePath = sel;
+        m_pathEdit->setText(isRemote ? remotePath : sel);
+        updateLocationUI();
+        updateSizeEstimate();
     }
 }
 
@@ -418,13 +593,12 @@ void SpectrumExportDialog::onModeChanged(int)
 
 void SpectrumExportDialog::onFilePathChanged(const QString &newText)
 {
-    if (m_isRemoteSave && !m_remoteSavePath.isEmpty() && !newText.trimmed().isEmpty()) {
-        QString newFileName = QFileInfo(newText.trimmed()).fileName();
-        if (!newFileName.isEmpty()) {
-            int lastSlash = m_remoteSavePath.lastIndexOf('/');
-            QString remoteDir = (lastSlash >= 0) ? m_remoteSavePath.left(lastSlash) : "";
-            m_remoteSavePath = remoteDir.isEmpty() ? ("/" + newFileName) : (remoteDir + "/" + newFileName);
-        }
+    const QString trimmed = newText.trimmed();
+    if (m_isRemoteSave) {
+        m_remoteSavePath = trimmed;
+    } else {
+        m_remoteSavePath.clear();
+        m_localSavePath = trimmed;
     }
     updateSizeEstimate();
 }
@@ -435,36 +609,18 @@ void SpectrumExportDialog::updateSizeEstimate()
     SpectrumFormat fmt = getSelectedFormat();
 
     size_t bytesPerCh = 4;
-    QString fmtName;
     switch (fmt) {
-        case SpectrumFormat::Double64:
-            bytesPerCh = 8;
-            fmtName = "Double (64-bit float)";
-            break;
-        case SpectrumFormat::ShortInt16:
-            bytesPerCh = 2;
-            fmtName = "Short (16-bit int)";
-            break;
-        case SpectrumFormat::Float32:
-            bytesPerCh = 4;
-            fmtName = "Float (32-bit float)";
-            break;
-        case SpectrumFormat::Ascii:
-            // 9 chars per number + 1 newline every 10 values
-            bytesPerCh = 0;
-            fmtName = "ASCII (Fortran 10I9)";
-            break;
-        default:
-            bytesPerCh = 4;
-            fmtName = "Long (32-bit int)";
-            break;
+        case SpectrumFormat::Double64:   bytesPerCh = 8; break;
+        case SpectrumFormat::ShortInt16: bytesPerCh = 2; break;
+        case SpectrumFormat::Ascii:      bytesPerCh = 0; break;
+        default:                         bytesPerCh = 4; break;
     }
 
     size_t specBytes = 0;
     if (fmt == SpectrumFormat::Ascii) {
-        size_t fullRows = channels / 10;
-        size_t remainder = channels % 10;
-        specBytes = fullRows * (10 * 9 + 1) + (remainder > 0 ? (remainder * 9 + 1) : 0);
+        size_t fullRows = static_cast<size_t>(channels) / 10U;
+        size_t remainder = static_cast<size_t>(channels) % 10U;
+        specBytes = fullRows * (10U * 9U + 1U) + (remainder > 0U ? (remainder * 9U + 1U) : 0U);
     } else {
         specBytes = static_cast<size_t>(channels) * bytesPerCh;
     }
@@ -473,35 +629,41 @@ void SpectrumExportDialog::updateSizeEstimate()
     if (specBytes < 1024) {
         sizeStr = QString("%1 B").arg(specBytes);
     } else if (specBytes < 1024 * 1024) {
-        sizeStr = QString("%1 KB (%2 bytes)").arg(specBytes / 1024.0, 0, 'f', 1).arg(specBytes);
+        sizeStr = QString("%1 KB").arg(specBytes / 1024.0, 0, 'f', 1);
     } else {
-        sizeStr = QString("%1 MB (%2 bytes)").arg(specBytes / (1024.0 * 1024.0), 0, 'f', 2).arg(specBytes);
+        sizeStr = QString("%1 MB").arg(specBytes / (1024.0 * 1024.0), 0, 'f', 2);
     }
 
-    m_summaryLabel->setText(QString("Spectrum: %1 channels | Format: %2 | Spectrum Size: %3")
-                            .arg(channels).arg(fmtName).arg(sizeStr));
-
-    QString note;
+    QString note = QString("Estimated Size: %1").arg(sizeStr);
     int srcSize = static_cast<int>(m_data.size());
     if (channels < srcSize) {
-        note = QString("Note: Spectrum will be truncated from %1 down to %2 channels.").arg(srcSize).arg(channels);
+        note += QString(" (truncated from %1 ch)").arg(srcSize);
     } else if (channels > srcSize) {
-        note = QString("Note: Spectrum will be padded with zeros from %1 to %2 channels.").arg(srcSize).arg(channels);
-    } else {
-        note = QString("Channels match source spectrum exactly (0 to %1).").arg(channels - 1);
+        note += QString(" (zero-padded from %1 ch)").arg(srcSize);
+    }
+
+    if (m_hasNegativeCounts && (fmt == SpectrumFormat::LongInt32 || fmt == SpectrumFormat::ShortInt16)) {
+        note += QString("\nWarning: Negative counts (min %1) will be clamped to 0 in unsigned integer format; use Float32, Double64, or ASCII to preserve them.")
+                    .arg(m_minCount, 0, 'g', 4);
     }
 
     QString path = m_pathEdit->text().trimmed();
-    if (!path.isEmpty()) {
+    if (!m_isRemoteSave && !path.isEmpty()) {
         QFileInfo fi(path);
         if (fi.exists()) {
             SpectrumExportMode m = getExportMode();
             if (m == SpectrumExportMode::NewOrOverwrite) {
-                note += QString(" [File exists: %1 bytes will be replaced]").arg(fi.size());
+                note += QString("  |  Existing file (%1 B) will be overwritten").arg(fi.size());
             } else if (m == SpectrumExportMode::Append) {
-                note += QString(" [File exists: will append to current %1 bytes]").arg(fi.size());
+                note += QString("  |  Will append to existing file (%1 B)").arg(fi.size());
             } else {
-                note += QString(" [File exists: will overwrite spectrum at index #%1]").arg(m_indexSpin->value());
+                note += QString("  |  Will overwrite spectrum #%1").arg(m_indexSpin->value());
+            }
+            if (m != SpectrumExportMode::NewOrOverwrite && fmt != SpectrumFormat::Ascii &&
+                specBytes > 0 && (fi.size() % static_cast<qint64>(specBytes)) != 0) {
+                note += QString("\nWarning: Existing file size (%1 bytes) is not a multiple of %2 bytes/spectrum.")
+                            .arg(fi.size())
+                            .arg(specBytes);
             }
         }
     }
@@ -512,75 +674,118 @@ void SpectrumExportDialog::onAcceptClicked()
 {
     QString path = m_pathEdit->text().trimmed();
     if (path.isEmpty()) {
+        CommandPrompt::logWarning("Export", "Destination file path cannot be empty.");
         QMessageBox::warning(this, tr("Missing File Path"), tr("Please specify a destination file path."));
         m_pathEdit->setFocus();
         return;
     }
 
-    QFileInfo fi(path);
-    bool targetExists = fi.exists();
+    bool lenOk = false;
+    const QString firstToken = m_lengthCombo->currentText().trimmed().split(' ').first();
+    int requestedLen = firstToken.toInt(&lenOk);
+    if (!lenOk) {
+        const int d = m_lengthCombo->currentData().toInt();
+        if (d > 0) {
+            requestedLen = d;
+            lenOk = true;
+        }
+    }
+    if (!lenOk || requestedLen < 1 || requestedLen > 1048576) {
+        CommandPrompt::logWarning("Export", QString("Invalid export channel length '%1'.").arg(m_lengthCombo->currentText().trimmed()));
+        QMessageBox::warning(
+            this, tr("Invalid Channel Length"),
+            tr("Please enter a valid channel count between 1 and 1,048,576."));
+        m_lengthCombo->setFocus();
+        return;
+    }
+
+    QString writePath = path;
+    bool targetExists = QFileInfo::exists(writePath);
 
     if (m_isRemoteSave && !m_remoteSavePath.isEmpty()) {
         auto sess = RemoteSession::globalSession();
-        if (sess && sess->isConnected()) {
-            path = sess->getLocalCachePath(m_remoteSavePath);
-            m_pathEdit->setText(path);
-            bool remoteExists = sess->fileExists(m_remoteSavePath);
-            targetExists = targetExists || remoteExists;
+        if (!sess || !sess->isConnected()) {
+            const QString err = QString("Cannot export to remote destination '%1': SSH session is not active.").arg(m_remoteSavePath);
+            CommandPrompt::logError("Export", err);
+            QMessageBox::warning(this, tr("SSH Not Connected"), err);
+            return;
+        }
+        writePath = sess->getLocalCachePath(m_remoteSavePath);
+        const bool remoteExists = sess->fileExists(m_remoteSavePath);
+        targetExists = remoteExists;
 
-            // If appending or writing at a specific index on an existing remote file,
-            // synchronize the remote file to the local cache first to prevent data loss!
-            if (remoteExists && getExportMode() != SpectrumExportMode::NewOrOverwrite) {
-                QString syncErr;
-                QString syncedPath;
-                if (!sess->syncRemoteFileToCache(m_remoteSavePath, syncedPath, nullptr, &syncErr, nullptr, false)) {
-                    QMessageBox::critical(this, tr("Remote Sync Failed"),
-                        tr("Could not synchronize existing remote file '%1' before modifying:\n%2")
-                            .arg(m_remoteSavePath, syncErr));
-                    return;
-                }
-                path = syncedPath;
+        // If appending or writing at a specific index on an existing remote file,
+        // synchronize the remote file to the local cache first to prevent data loss!
+        if (remoteExists && getExportMode() != SpectrumExportMode::NewOrOverwrite) {
+            QString syncErr;
+            QString syncedPath;
+            if (!sess->syncRemoteFileToCache(m_remoteSavePath, syncedPath, nullptr, &syncErr, nullptr, false)) {
+                CommandPrompt::logError(
+                    "Export",
+                    QString("Failed to synchronize remote file '%1' before export: %2").arg(m_remoteSavePath, syncErr));
+                QMessageBox::critical(this, tr("Remote Sync Failed"),
+                    tr("Could not synchronize existing remote file '%1' before modifying:\n%2")
+                        .arg(m_remoteSavePath, syncErr));
+                return;
             }
+            writePath = syncedPath;
         }
     }
 
     if (targetExists && getExportMode() == SpectrumExportMode::NewOrOverwrite) {
+        const QString displayTarget = (m_isRemoteSave && !m_remoteSavePath.isEmpty())
+            ? QFileInfo(m_remoteSavePath).fileName()
+            : QFileInfo(writePath).fileName();
         auto reply = QMessageBox::question(
             this, tr("Overwrite File?"),
-            tr("The file \"%1\" already exists.\nDo you want to overwrite it?").arg(QFileInfo(path).fileName()),
+            tr("The file \"%1\" already exists.\nDo you want to overwrite it?").arg(displayTarget),
             QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
         if (reply != QMessageBox::Yes) {
+            CommandPrompt::logDebug("Export", QString("Overwrite declined for '%1'.").arg(displayTarget));
             return;
         }
     }
 
     QString errorMsg;
-    bool ok = WriteSpectrumData(path.toStdString(),
+    bool ok = WriteSpectrumData(writePath.toStdString(),
                                 getSelectedFormat(),
                                 m_data,
-                                getSelectedLength(),
+                                requestedLen,
                                 getExportMode(),
                                 getTargetIndex(),
                                 &errorMsg);
 
     if (!ok) {
+        CommandPrompt::logError("Export", errorMsg);
         QMessageBox::critical(this, tr("Export Failed"), errorMsg);
         return;
     }
 
+    m_localSavePath = writePath;
+
     if (m_isRemoteSave && !m_remoteSavePath.isEmpty()) {
         QString uploadErr;
-        if (!NuFileDialog::finishRemoteSave(path, m_remoteSavePath, &uploadErr, this)) {
+        if (!NuFileDialog::finishRemoteSave(writePath, m_remoteSavePath, &uploadErr, this)) {
+            CommandPrompt::logError("Export", QString("Remote upload failed for '%1': %2").arg(m_remoteSavePath, uploadErr));
             return;
         }
     }
+
+    CommandPrompt::logDebug(
+        "Export",
+        QString("Wrote spectrum file '%1' (format=%2, ch=%3, mode=%4, index=%5, remote=%6).")
+            .arg(writePath, spectrumFormatToString(getSelectedFormat()))
+            .arg(requestedLen)
+            .arg(static_cast<int>(getExportMode()))
+            .arg(getTargetIndex())
+            .arg(m_isRemoteSave ? m_remoteSavePath : QStringLiteral("local")));
 
     accept();
 }
 
 QString SpectrumExportDialog::getSelectedFilePath() const
 {
-    return m_pathEdit->text().trimmed();
+    return m_localSavePath.isEmpty() ? m_pathEdit->text().trimmed() : m_localSavePath;
 }
 
 SpectrumFormat SpectrumExportDialog::getSelectedFormat() const
@@ -591,10 +796,10 @@ SpectrumFormat SpectrumExportDialog::getSelectedFormat() const
 int SpectrumExportDialog::getSelectedLength() const
 {
     bool ok = false;
-    int val = m_lengthCombo->currentText().split(' ').first().toInt(&ok);
-    if (ok && val > 0) return val;
+    int val = m_lengthCombo->currentText().trimmed().split(' ').first().toInt(&ok);
+    if (ok && val >= 1 && val <= 1048576) return val;
     int d = m_lengthCombo->currentData().toInt();
-    if (d > 0) return d;
+    if (d >= 1 && d <= 1048576) return d;
     return static_cast<int>(m_data.size());
 }
 

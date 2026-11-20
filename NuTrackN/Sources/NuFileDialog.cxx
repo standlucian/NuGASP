@@ -18,6 +18,13 @@
 #include <QDir>
 #include <QCollator>
 
+static QString logSourceForMode(NuFileMode mode)
+{
+    if (mode == NuFileMode::OpenSpectrum) return QStringLiteral("OpenSpectrum");
+    if (mode == NuFileMode::OpenMatrix) return QStringLiteral("OpenMatrix");
+    return QStringLiteral("FileDialog");
+}
+
 static QString formatFileSize(qint64 bytes)
 {
     if (bytes < 1024) return QString("%1 B").arg(bytes);
@@ -30,20 +37,37 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
                            const QString &caption,
                            const QString &initialDir,
                            const QString &filter,
-                           QWidget *parent)
+                           QWidget *parent,
+                           int initialRemoteOverride)
     : QDialog(parent), m_mode(mode)
 {
     m_session = RemoteSession::globalSession();
 
-    // Default to Remote if currently connected, otherwise local
-    if (m_session && m_session->isConnected()) {
-        m_isRemoteMode = true;
-    } else {
+    // Respect explicit caller override (0 = Local, 1 = Remote if connected), else default to Remote if connected
+    const bool canRemote = (m_session && m_session->isConnected());
+    if (initialRemoteOverride == 0) {
         m_isRemoteMode = false;
+    } else if (initialRemoteOverride == 1) {
+        m_isRemoteMode = canRemote;
+    } else {
+        m_isRemoteMode = canRemote;
     }
 
     QString defaultFileName;
     if (initialDir.isEmpty()) {
+        m_currentLocalDir = QDir::currentPath();
+    } else if (m_isRemoteMode && m_mode == NuFileMode::SaveFile) {
+        if (initialDir.endsWith('/')) {
+            m_currentRemoteDir = initialDir;
+        } else {
+            const int lastSlash = initialDir.lastIndexOf('/');
+            if (lastSlash >= 0) {
+                m_currentRemoteDir = (lastSlash == 0) ? QStringLiteral("/") : initialDir.left(lastSlash);
+                defaultFileName = initialDir.mid(lastSlash + 1);
+            } else {
+                defaultFileName = initialDir;
+            }
+        }
         m_currentLocalDir = QDir::currentPath();
     } else {
         QFileInfo initInfo(initialDir);
@@ -55,8 +79,10 @@ NuFileDialog::NuFileDialog(NuFileMode mode,
             m_currentLocalDir = (parentPath.isEmpty() || parentPath == ".") ? QDir::currentPath() : parentPath;
         }
     }
-    if (m_session && m_session->isConnected()) {
-        m_currentRemoteDir = m_session->getCurrentRemoteDir();
+    if (canRemote) {
+        if (m_currentRemoteDir.isEmpty()) {
+            m_currentRemoteDir = m_session->getCurrentRemoteDir();
+        }
         if (m_currentRemoteDir.isEmpty()) {
             m_currentRemoteDir = m_session->getProfile().lastUsedPath;
         }
@@ -187,6 +213,10 @@ void NuFileDialog::setupUI(const QString &caption, const QString &initialFilter)
         m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
     } else if (m_mode == NuFileMode::SelectDirectory) {
         m_comboTypeFilter->addItem(tr("Directories Only"), "dirs");
+    } else if (m_mode == NuFileMode::SaveFile && initialFilter.isEmpty()) {
+        lblFilter->hide();
+        m_comboTypeFilter->addItem(tr("All Files (*.*)"), "all");
+        m_comboTypeFilter->hide();
     } else {
         if (!initialFilter.isEmpty()) {
             QStringList filters = initialFilter.split(";;", Qt::SkipEmptyParts);
@@ -337,7 +367,7 @@ void NuFileDialog::onConnectSSHClicked()
 
 void NuFileDialog::onLocationToggled()
 {
-    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    const QString logSrc = logSourceForMode(m_mode);
     if (sender() == m_btnRemoteTab) {
         if (!m_session || !m_session->isConnected()) {
             CommandPrompt::logWarning(logSrc, "Remote location selected while SSH is offline; opening SSH connection dialog.");
@@ -364,7 +394,7 @@ void NuFileDialog::onLocationToggled()
 
 void NuFileDialog::loadDirectory(const QString &dirPath)
 {
-    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    const QString logSrc = logSourceForMode(m_mode);
     m_lblSelectionInfo->setText(tr("Loading directory: %1 ...").arg(dirPath));
     qApp->processEvents();
 
@@ -544,7 +574,7 @@ void NuFileDialog::onNewFolder()
     QString cur = m_editCurrentPath->text().trimmed();
     QString fullPath = cur.endsWith('/') ? cur + folderName : cur + "/" + folderName;
 
-    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    const QString logSrc = logSourceForMode(m_mode);
     if (m_isRemoteMode) {
         QString err;
         if (!m_session->createDirectory(fullPath, &err)) {
@@ -635,7 +665,7 @@ void NuFileDialog::onTableItemDoubleClicked(int row, int /*col*/)
 
 bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLocalPath)
 {
-    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    const QString logSrc = logSourceForMode(m_mode);
     CommandPrompt::logDebug(logSrc, QString("Fetching remote file '%1'...").arg(remotePath));
 
     m_progressBar->setValue(0);
@@ -671,7 +701,7 @@ bool NuFileDialog::downloadRemoteFile(const QString &remotePath, QString &outLoc
 
 void NuFileDialog::onAcceptActionClicked()
 {
-    const QString logSrc = (m_mode == NuFileMode::OpenSpectrum) ? "OpenSpectrum" : "FileDialog";
+    const QString logSrc = logSourceForMode(m_mode);
 
     // Mode 1: Select Directory
     if (m_mode == NuFileMode::SelectDirectory) {
@@ -884,9 +914,10 @@ QString NuFileDialog::getSaveFileName(QWidget *parent,
                                       const QString &filter,
                                       QString * /*selectedFilter*/,
                                       QString *outRemotePath,
-                                      bool *outIsRemote)
+                                      bool *outIsRemote,
+                                      int initialRemoteOverride)
 {
-    NuFileDialog dlg(NuFileMode::SaveFile, caption, dir, filter, parent);
+    NuFileDialog dlg(NuFileMode::SaveFile, caption, dir, filter, parent, initialRemoteOverride);
     if (dlg.exec() != QDialog::Accepted) return QString();
 
     if (outIsRemote) *outIsRemote = dlg.isRemoteSelected();

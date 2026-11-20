@@ -11,6 +11,10 @@
 #include <QDesktopServices>
 #include <QUrl>
 #include <QCoreApplication>
+#include <QAbstractTextDocumentLayout>
+#include <QRegularExpression>
+#include <QScrollBar>
+#include <QTextBlock>
 
 struct ShortcutEntry {
     QString category;
@@ -154,7 +158,33 @@ void HelpDialog::setupUI() {
     manualLayout->setContentsMargins(4, 4, 4, 4);
 
     m_manualBrowser = new QTextBrowser(this);
-    m_manualBrowser->setOpenExternalLinks(true);
+    m_manualBrowser->setOpenLinks(false);
+    connect(m_manualBrowser, &QTextBrowser::anchorClicked, this, [this](const QUrl &url) {
+        if (!url.fragment().isEmpty() && url.scheme().isEmpty()) {
+            const QString targetSlug = url.fragment();
+            static const QRegularExpression kNonSlugRe(
+                QStringLiteral("[^\\w\\- ]"), QRegularExpression::UseUnicodePropertiesOption);
+            QTextDocument *doc = m_manualBrowser->document();
+            for (QTextBlock block = doc->begin(); block.isValid(); block = block.next()) {
+                if (block.blockFormat().headingLevel() > 0) {
+                    QString slug = block.text().toLower();
+                    slug.remove(kNonSlugRe);
+                    slug = slug.trimmed().replace(QLatin1Char(' '), QLatin1Char('-'));
+                    if (slug == targetSlug) {
+                        const qreal y = doc->documentLayout()->blockBoundingRect(block).top();
+                        if (QScrollBar *sb = m_manualBrowser->verticalScrollBar()) {
+                            sb->setValue(static_cast<int>(y));
+                        }
+                        return;
+                    }
+                }
+            }
+        } else if (url.scheme() == QLatin1String("http") ||
+                   url.scheme() == QLatin1String("https") ||
+                   url.scheme() == QLatin1String("mailto")) {
+            QDesktopServices::openUrl(url);
+        }
+    });
     manualLayout->addWidget(m_manualBrowser);
     m_tabs->addTab(tabManual, tr("📖 Full User Manual"));
 

@@ -41,7 +41,8 @@ public:
                           const QString &caption = QString(),
                           const QString &initialDir = QString(),
                           const QString &filter = QString(),
-                          QWidget *parent = nullptr);
+                          QWidget *parent = nullptr,
+                          int initialRemoteOverride = -1);
     ~NuFileDialog() override = default;
 
     bool isRemoteSelected() const { return m_isRemoteMode; }
@@ -85,7 +86,8 @@ public:
                                    const QString &filter = QString(),
                                    QString *selectedFilter = nullptr,
                                    QString *outRemotePath = nullptr,
-                                   bool *outIsRemote = nullptr);
+                                   bool *outIsRemote = nullptr,
+                                   int initialRemoteOverride = -1);
 
     static QString getExistingDirectory(QWidget *parent = nullptr,
                                         const QString &caption = QString(),

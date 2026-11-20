@@ -442,8 +442,12 @@ void MatrixDialog::setupUI()
         radioLayout->addWidget(m_radioProjY);
         radioLayout->addStretch(1);
 
-        connect(m_radioProjX, &QRadioButton::toggled, this, &MatrixDialog::onProjectionSelectionChanged);
-        connect(m_radioProjY, &QRadioButton::toggled, this, &MatrixDialog::onProjectionSelectionChanged);
+        connect(m_radioProjX, &QRadioButton::toggled, this, [this](bool checked) {
+            if (checked) onProjectionSelectionChanged();
+        });
+        connect(m_radioProjY, &QRadioButton::toggled, this, [this](bool checked) {
+            if (checked) onProjectionSelectionChanged();
+        });
 
         selectionLayout->addLayout(radioLayout);
     } else if (m_reader) {
@@ -485,7 +489,10 @@ void MatrixDialog::setupUI()
             this, &MatrixDialog::onHoverInfoChanged);
     previewLayout->addWidget(m_plotPreview, 1);
 
-    connect(m_btnLogScale, &QPushButton::toggled, m_plotPreview, &Matrix1DPreviewWidget::setLogScale);
+    connect(m_btnLogScale, &QPushButton::toggled, this, [this](bool log) {
+        CommandPrompt::logDebug("Matrix", QString("Preview Log Y toggled: %1.").arg(log ? "on" : "off"));
+        if (m_plotPreview) m_plotPreview->setLogScale(log);
+    });
 
     mainLayout->addWidget(grpPreview, 1);
 
@@ -611,6 +618,10 @@ void MatrixDialog::updatePreview()
 
 void MatrixDialog::onProjectionSelectionChanged()
 {
+    const bool useProjY = (m_radioProjY && m_radioProjY->isChecked());
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Selected %1 for preview.").arg(useProjY ? "Projection Y" : "Projection X"));
     updatePreview();
 }
 
@@ -627,21 +638,30 @@ void MatrixDialog::onBackgroundConfigChanged()
     if (!enabled) {
         m_lblBgHelp->setText(tr("Background subtraction disabled. Coincidence cuts will extract raw, unsubtracted slices."));
         saveBackgroundConfig();
+        CommandPrompt::logDebug("Matrix", "Coincidence background subtraction disabled.");
         updatePreview();
         return;
     }
 
     int modeVal = m_comboBgMode->currentData().toInt();
+    QString modeLabel = "Normal/Local";
     if (modeVal == static_cast<int>(MatrixBgMode::Normal)) {
         m_lblBgHelp->setText(tr("Normal/Local background: Estimates local baseline between gate boundaries and subtracts scaled projection."));
     } else if (modeVal == static_cast<int>(MatrixBgMode::Auto)) {
+        modeLabel = "Auto/SNIP";
         m_lblBgHelp->setText(tr("Auto/SNIP background: Non-linear iterative peak-clipping filter stripping continuum background from cut spectrum."));
     } else {
+        modeLabel = "Common/Projection";
         m_lblBgHelp->setText(tr("Common background (GASPware trackn.F): Subtracts total projection scaled by fraction of counts in gate × correction factor: pfacs = (Gate Counts / Total Projection) × %1.")
             .arg(m_spinCorrFactor->value(), 0, 'f', 2));
     }
 
     saveBackgroundConfig();
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Background config updated: mode=%1, factor=%2.")
+            .arg(modeLabel)
+            .arg(m_spinCorrFactor->value(), 0, 'f', 2));
     updatePreview();
 }
 
@@ -697,13 +717,10 @@ void MatrixDialog::onLoadProjectionClicked()
                  (mode == MatrixBgMode::Normal) ? "Normal/Local" :
                  (mode == MatrixBgMode::Auto) ? "Auto/SNIP" : "None";
     }
-    CommandPrompt *prompt = CommandPrompt::getInstance();
-    if (prompt) {
-        prompt->appendPlainText(
-            QString("Matrix loaded: %1. Coincidence background subtraction: %2. Use 'W' to place gate markers.\n")
-                .arg(m_reader->getFileName())
-                .arg(bgDesc));
-    }
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Matrix loaded: %1. Coincidence background subtraction: %2. Use 'W' to place gate markers.")
+            .arg(m_reader->getFileName(), bgDesc));
 
     bool bgEnabled = m_chkEnableBg ? m_chkEnableBg->isChecked() : false;
     bool isAutoBg = (bgEnabled && m_reader->getBackgroundConfig().mode == MatrixBgMode::Auto);
@@ -1021,7 +1038,10 @@ void MatrixGateDialog::setupUI()
             this, &MatrixGateDialog::onHoverInfoChanged);
     previewLayout->addWidget(m_plotPreview, 1);
 
-    connect(m_btnLogScale, &QPushButton::toggled, m_plotPreview, &Matrix1DPreviewWidget::setLogScale);
+    connect(m_btnLogScale, &QPushButton::toggled, this, [this](bool log) {
+        CommandPrompt::logDebug("Matrix", QString("Preview Log Y toggled: %1.").arg(log ? "on" : "off"));
+        if (m_plotPreview) m_plotPreview->setLogScale(log);
+    });
 
     mainLayout->addWidget(grpPreview, 1);
 

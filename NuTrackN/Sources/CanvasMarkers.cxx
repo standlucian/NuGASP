@@ -1183,13 +1183,17 @@ void QMainCanvas::quickEnergyCalibration()
 void QMainCanvas::showMatrixProjection()
 {
     if (!m_currentMatrix || !m_currentMatrix->isOpen()) {
-        CommandPrompt::getInstance()->appendPlainText("Error: No compressed matrix loaded (use Open CM).\n");
+        CommandPrompt::logWarning("Matrix", "No compressed matrix loaded (use Open CM).");
         return;
     }
 
     const std::vector<double> &proj = m_currentMatrix->getProjection();
     QString title = m_currentMatrix->getFileName() + " Projection";
 
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Displaying full matrix projection for '%1' (%2 ch).")
+            .arg(m_currentMatrix->getFileName())
+            .arg(proj.size()));
     loadSpectrumDataToPad(proj, title, false);
-    CommandPrompt::getInstance()->appendPlainText("Loaded full matrix projection.\n");
 }

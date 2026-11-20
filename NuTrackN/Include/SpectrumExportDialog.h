@@ -41,7 +41,8 @@ public:
                                   const QString &suggestedPath = QString(),
                                   SpectrumFormat initialFormat = SpectrumFormat::LongInt32,
                                   int initialLength = 0,
-                                  QWidget *parent = nullptr);
+                                  QWidget *parent = nullptr,
+                                  bool initialIsRemote = false);
     ~SpectrumExportDialog() override = default;
 
     QString getSelectedFilePath() const;
@@ -53,6 +54,8 @@ public:
     int getTargetIndex() const;
 
 private slots:
+    void onLocationToggled();
+    void onConnectSSHClicked();
     void onBrowseClicked();
     void onFormatChanged(int index);
     void onLengthChanged(int index);
@@ -61,10 +64,14 @@ private slots:
     void onAcceptClicked();
 
 private:
+    void updateLocationUI();
     void updateSizeEstimate();
 
     std::vector<double> m_data;
 
+    QPushButton *m_btnRemoteTab{nullptr};
+    QPushButton *m_btnLocalTab{nullptr};
+    QPushButton *m_btnConnectSSH{nullptr};
     QLineEdit   *m_pathEdit{nullptr};
     QPushButton *m_browseBtn{nullptr};
     QComboBox   *m_formatCombo{nullptr};
@@ -72,13 +79,15 @@ private:
     QComboBox   *m_modeCombo{nullptr};
     QSpinBox    *m_indexSpin{nullptr};
     QLabel      *m_indexLabel{nullptr};
-    QLabel      *m_summaryLabel{nullptr};
     QLabel      *m_previewLabel{nullptr};
     QPushButton *m_exportBtn{nullptr};
     QPushButton *m_cancelBtn{nullptr};
 
     QString     m_remoteSavePath;
+    QString     m_localSavePath;
     bool        m_isRemoteSave{false};
+    bool        m_hasNegativeCounts{false};
+    double      m_minCount{0.0};
 };
 
 #endif // SPECTRUMEXPORTDIALOG_H

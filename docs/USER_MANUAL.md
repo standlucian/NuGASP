@@ -27,7 +27,9 @@
     - [3.3 Modern File Dialog (NuFileDialog) & Live Previews](#33-modern-file-dialog-nufiledialog--live-previews)
     - [3.4 Loading Spectra & Multi-Buffer Overlays (Buffers 1–9)](#34-loading-spectra--multi-buffer-overlays-buffers-19)
     - [3.5 Opening 2D Coincidence Matrices (`.cmat`)](#35-opening-2d-coincidence-matrices-cmat)
-    - [3.6 Exporting Processed Data](#36-exporting-processed-data)
+    - [3.6 Exporting Processed Spectra (`OS` / `W` Button)](#36-exporting-processed-spectra-os--w-button)
+    - [3.7 Publication Graphics (`O=` / `Print` Button)](#37-publication-graphics-o--print-button)
+    - [3.8 Calculation Logfiles (`DF` / `ZF`)](#38-calculation-logfiles-df--zf)
 - [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
     - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
     - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
@@ -37,7 +39,7 @@
 - [5. Peak Integration & Region of Interest (ROI) Analysis](#5-peak-integration--region-of-interest-roi-analysis)
     - [5.1 Setting Boundary Markers](#51-setting-boundary-markers)
     - [5.2 Mathematical Formulation of Gross & Net Peak Area](#52-mathematical-formulation-of-gross--net-peak-area)
-    - [5.3 Counting Statistics & Error Propagation](#53-counting-statistics--error-propagation)
+    - [5.3 Counting Statistics, Statistical Moments & Error Propagation](#53-counting-statistics-statistical-moments--error-propagation)
     - [5.4 Marker Management & Clearing](#54-marker-management--clearing)
     - [5.5 Output Report Logging](#55-output-report-logging)
 - [6. Standard Energy & Efficiency Calibration](#6-standard-energy--efficiency-calibration)
@@ -171,6 +173,10 @@ NuTrackN is an actively maintained open-source environment. While the 2.0 releas
 #### 7. In-App Auto-Updater (Future Dream)
 - **Seamless Release Tracking**: Automated, non-intrusive checking against the GitHub Releases API upon application launch to notify researchers of new stable releases and hotfixes.
 - **Zero-Friction In-Place Self-Updating**: One-click download, SHA-256 integrity verification, and binary delta replacement directly within the running application (both for Linux AppImages via AppImageUpdate and macOS DMG/bundle mounts), eliminating manual re-downloads and preserving custom configurations.
+
+#### 8. Session Persistence, Comprehensive Logging & In-App Support
+- **Full Program Logging & Previous State Resumption**: Comprehensive, structured logging of all user actions, calculations, and system events paired with automatic workspace state snapshots—allowing NuTrackN to restore loaded spectra, matrices, grid layout, zoom regions, calibrations, and active settings upon reopening the program.
+- **In-App Feedback & Bug Reporting with Log File Transfers**: Built-in bug report and feature feedback dialog directly inside NuTrackN, with optional one-click attachment and transfer of diagnostic session log files and system/build metadata to aid rapid troubleshooting.
 
 We warmly welcome ideas, feedback, and contributions from experimentalists and spectroscopy laboratories worldwide. If you have suggestions, feature requests, bug reports, or would simply like to send coffee our way, please feel free to open an issue on [GitHub](https://github.com/standlucian/NuGASP) or reach out directly by email at `lucian.stan@nipne.ro`.
 
@@ -660,26 +666,43 @@ NuTrackN natively opens GASPware compressed 2D $\gamma$-$\gamma$ coincidence mat
 - **Inspection & Total Projection (`MatrixDialog` & `Q`)**:
     - Upon opening, NuTrackN parses the compressed matrix header, tile descriptor table, symmetry mode (symmetric vs. asymmetric), axis resolutions, compression ratio, total counts, and 1D projections, then enables **`Gate CM`** and opens **`MatrixDialog`**.
     - Load the **Total Projection** (X or Y axis) onto the active canvas pad directly from **`MatrixDialog`**, or press **`Q`** on the canvas at any time to display the total projection of the active matrix. Any existing energy calibration on the active pad is preserved when inspecting or loading the matrix projection.
+- **Coincidence Background Subtraction Options**:
+    - Before loading the projection, the **Coincidence Background Subtraction** panel lets you enable or disable subtraction, choose a mode (**Normal / Local**, **Auto / SNIP**, or **Common / Projection**), and adjust the **Correction Factor** (with a live `[Auto BG]` baseline preview in **Auto / SNIP** mode). See [Section 9.3](#93-coincidence-gating-cw--background-subtraction-dw) for details.
 - *(Note: Detector stepping (`*1`/`*2`) and run stepping (`*3`/`*4`) are disabled while viewing a 2D matrix. For detailed coincidence gating (`W`, `CW`, `Gate CM`) and background subtraction modes (`DW`), see [Chapter 9: 2D Coincidence Matrix Analysis](#9-2d-coincidence-matrix-analysis).)*
 
 ![NuTrackN Open Compressed Matrix Dialog](images/open_matrix_dialog.png)
 
 ---
 
-### 3.6 Exporting Processed Data
-NuTrackN provides dedicated export facilities for numerical analysis, multi-spectrum writing, reporting, and publication graphics:
+### 3.6 Exporting Processed Spectra (`OS` / `W` Button)
+Press **`OS`** (`O` then `S`) or click the **`W`** toolbar button to open `SpectrumExportDialog` and export the active spectrum on the selected pad. *(Note: Pressing **`W`** directly on the canvas places a coincidence Gate Marker).*
 
-- **Write / Export Spectrum (`W` or Toolbar `W` — `SpectrumExportDialog`)**:
-    - Write the active spectrum (or any loaded buffer `1`–`9`) to disk or directly to a connected remote SFTP server in binary (`LongInt32`, `ShortInt16`, `Float32`, `Double64`) or `ASCII` format, with selectable channel length (`1k` to `64k`, full spectrum, or custom).
-    - **Multi-Spectrum Write Modes**:
-        - **Create New / Overwrite File**: Writes a single-spectrum file (prompting for confirmation if the local or remote file already exists).
-        - **Append as Next Spectrum in File**: Appends the spectrum to the end of an existing chained multi-spectrum file.
-        - **Replace / Write at Specific Index (`#`)**: Replaces or inserts the spectrum at a specific 0-based detector/run slot (`#0`, `#1`, ...) within a multi-spectrum file, automatically zero-padding intermediate slots if needed.
-    - **Remote SFTP Synchronization**: When exporting to a remote destination in **Append** or **Replace at Index (`#`)** mode, NuTrackN automatically synchronizes the existing remote multi-spectrum file into the local cache first, modifies the target spectrum slot, and uploads the updated multi-spectrum file back to the server.
-- **Quick ASCII Table Export (`OS`)**: Export the active spectrum data (channel index, calibrated energy in keV, count value) directly to a clean, space-delimited text file.
-- **Publication Graphics (`O=`)**: Generate a publication-quality vector PostScript (`.ps`) or PDF graphic of the current canvas view, preserving high-DPI fonts and axis lines.
-- **Designate Calculation Logfile (`DF`)**: Specify an output report text file. Once opened, every subsequent peak integration area, centroid, and FWHM calculated with **`CI`** or **`CJ`** is automatically appended to this logfile.
-- **Close Calculation Logfile (`ZF`)**: Cleanly close the active peak calculation logfile.
+- **Destination Switching (`Remote` vs. `Local`)**: The top **Destination** bar clearly shows whether you are exporting to **`💻 Local Filesystem`** or **`🌐 Remote: user@host`** and lets you switch modes or open **`SSH Parameters...`** at any time. NuTrackN auto-generates a default filename (`<name>_out`, or `spectrum_out`), and **`Browse...`** opens `NuFileDialog` in the active Local/Remote mode with **`All Files (*.*)`** so you are not restricted to `.spe` or `.dat` extensions.
+- **Formats & Channel Length**: Choose between **Long (`32-bit Integer`, GASPware `L`)**, **Float (`32-bit Float`, GASPware `R`)**, **Double (`64-bit Float`, GASPware `D`)**, **ASCII Fortran (`10I9`, GASPware `A`)**, or **Short (`16-bit Integer`)**, with standard channel presets (`1k`–`64k`) or any custom channel count (`1`–`1,048,576`). A compact status line reports the estimated file size, truncation/zero-padding, negative-count clamping warnings (when exporting negative counts to unsigned integer formats), and binary alignment warnings.
+- **Multi-Spectrum Write Modes**:
+    - **New / Overwrite File**: Writes a single-spectrum file (prompting for confirmation if the local or remote file already exists).
+    - **Append to File as New Spectrum**: Appends the spectrum to the end of an existing chained multi-spectrum binary or ASCII file.
+    - **Write at Spectrum Index (`#`)**: Replaces or inserts the spectrum at a specific 0-based detector/run slot (`#0`, `#1`, ...) within a multi-spectrum binary or ASCII (`10I9`) file, automatically zero-padding intermediate slots if needed.
+- **Remote SFTP Synchronization**: When exporting to a remote destination in **Append** or **Write at Spectrum Index (`#`)** mode, NuTrackN automatically synchronizes the existing remote multi-spectrum file into the local cache first, modifies the target spectrum slot, and uploads the updated file back to the server.
+
+![NuTrackN Export / Write Spectrum Dialog (SpectrumExportDialog)](images/write_spectra_dialog.png)
+
+---
+
+### 3.7 Publication Graphics (`O=` / `Print` Button)
+Press **`O`** then **`=`** or click the **`Print`** toolbar button to export the current canvas view as **PDF (`.pdf`)**, **PostScript (`.ps`)**, or **PNG (`.png`)** locally or to a remote SSH directory:
+
+- **Default Filename & Formats**: NuTrackN pre-populates `<name>_plot.pdf` (or `spectrum_plot.pdf`) in the active directory; if no known extension (`.pdf`, `.ps`, `.eps`, `.png`, `.svg`) is typed, `.pdf` is appended automatically.
+- **Matches Current Window Graphics**: Exported files preserve NuTrackN's currently configured color settings (canvas background, axis/frame contrast, spectrum colors, and fit/marker overlays) along with screen-matched line widths (`0.75 pt` per `1 px`).
+- *(Note: Additional publication-formatting controls—such as dedicated light/print figure themes, custom page sizing, and layout options—are planned for future releases.)*
+
+---
+
+### 3.8 Calculation Logfiles (`DF` / `ZF`)
+NuTrackN can record peak integration and Gaussian fit outputs directly to a structured calculation report file (separate from the diagnostic session logs described in Chapter 12):
+
+- **Designate Calculation Logfile (`DF` / `DL`)**: Specify an output report file (`.area`, `.txt`, local or remote). Every subsequent peak integration (**`CI`**, **`CJ`**, **`AJ`**) or Gaussian fit (**`CG`**, **`CV`**, **`AG`**) automatically appends formatted tabular results.
+- **Close Calculation Logfile (`ZF` / `ZL`)**: Cleanly flush, close, and (if remote) upload the active peak calculation logfile.
 
 ---
 
@@ -1059,6 +1082,8 @@ To isolate gamma cascades feeding or depopulating a specific nuclear level:
    $$S_{net}(E_2) = S_{gate}(E_2) - \frac{A_{gate}}{A_{bg}} \cdot S_{bg}(E_2)$$
    completely eliminating random Compton coincidences and cleanly revealing the true coincident cascade.
 
+*(TODO — Chapter 9: Document the three coincidence background subtraction modes (**Normal / Local**, **Auto / SNIP**, and **Common / Projection**) and **Correction Factor** in detail when revising Chapter 9.)*
+
 ---
 
 ## 10. Scripting, Macros & Automation
@@ -1174,7 +1199,7 @@ To keep the interactive workspace clean while still capturing deep diagnostics w
   - `Error`: `[Source] ERROR: <message>`
 - **Local Disk Log**: Prepends a millisecond timestamp and fixed-width severity column:
   `[YYYY-MM-DD HH:MM:SS.mmm] [LEVEL] [Source] <message>`
-- **Common Source Tags**: `[SSH]`, `[SSH Test]`, `[SFTP]`, `[Spectrum]`, `[OpenSpectrum]`, `[FileDialog]`, `[Macro]`, and `[Log]`.
+- **Common Source Tags**: `[SSH]`, `[SSH Test]`, `[SFTP]`, `[Spectrum]`, `[OpenSpectrum]`, `[Export]`, `[Matrix]`, `[OpenMatrix]`, `[FileDialog]`, `[Macro]`, and `[Log]`.
 - **Thread-Safe Dispatch**: Background worker threads (such as multi-run batch SFTP downloads) write safely under an internal I/O mutex (`s_logIOMutex`) and marshal in-built console updates onto the main GUI thread via queued Qt events (`Qt::QueuedConnection`).
 
 ---
@@ -1312,7 +1337,7 @@ Please write me
 | **`# +` (Toolbar)** | **Next Spectrum / Run** | Left-click: next detector (`*1`); Right-click: next run (`*3`); Ctrl: Macro 1 / 3 |
 | **`#-` (Toolbar)** | **Prev Spectrum / Run** | Left-click: prev detector (`*2`); Right-click: prev run (`*4`); Ctrl: Macro 2 / 4 |
 | **`OR` / `DR` / `SSH`** | **Remote Data (SSH)** | Open Remote Data Acquisition & SSH Session Manager |
-| **`OS`** | **Output Spectrum** | Export current spectrum data to ASCII / CSV |
+| **`OS`** | **Output Spectrum** | Open Export Spectrum dialog (`W` button; binary or ASCII `10I9`) |
 | **`O=`** | **Output Plot** | Generate vector PostScript / PDF of current view |
 | **`Ctrl + →`** | **Add Column** | Add an additional spectrum display column to canvas |
 | **`Ctrl + ←`** | **Delete Column** | Remove last spectrum display column from canvas |

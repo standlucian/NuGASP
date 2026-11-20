@@ -346,13 +346,20 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     connect(btnW, &QPushButton::clicked, this, &QMainCanvas::clickedW);
     bottomBtnGrid->addWidget(btnW, 0, 1);
 
+    QPushButton *btnPrint = makeButton("Print", topContainer, true);
+    btnPrint->setFixedWidth(66);
+    btnPrint->setFixedHeight(36);
+    btnPrint->setToolTip(tr("Export publication graphics (PDF / PS / PNG) [Shortcut: O+=]"));
+    connect(btnPrint, &QPushButton::clicked, this, &QMainCanvas::printPlot);
+    bottomBtnGrid->addWidget(btnPrint, 0, 2);
+
     btnDec = makeButton("# -", topContainer, true);
     btnDec->setFixedWidth(54);
     btnDec->setFixedHeight(36);
     btnDec->setToolTip(tr("Previous spectrum / run:\nLeft click: Previous detector (*2)\nRight click: Previous run (same detector) (*4)\nCtrl + Left click: Macro 2\nCtrl + Right click: Macro 4"));
     btnDec->installEventFilter(this);
     connect(btnDec, &QPushButton::clicked, this, &QMainCanvas::onSpectrumDecrement);
-    bottomBtnGrid->addWidget(btnDec, 0, 2);
+    bottomBtnGrid->addWidget(btnDec, 0, 3);
 
     btnInc = makeButton("# +", topContainer, true);
     btnInc->setFixedWidth(54);
@@ -360,7 +367,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnInc->setToolTip(tr("Next spectrum / run:\nLeft click: Next detector (*1)\nRight click: Next run (same detector) (*3)\nCtrl + Left click: Macro 1\nCtrl + Right click: Macro 3"));
     btnInc->installEventFilter(this);
     connect(btnInc, &QPushButton::clicked, this, &QMainCanvas::onSpectrumIncrement);
-    bottomBtnGrid->addWidget(btnInc, 0, 3);
+    bottomBtnGrid->addWidget(btnInc, 0, 4);
 
     btnOpenCM = makeButton("Open CM", topContainer, true);
     btnOpenCM->setFixedHeight(36);
@@ -378,7 +385,7 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     btnRemote->setFixedHeight(36);
     btnRemote->setToolTip(tr("Configure parameters and connect to Remote DAQ Computer over SSH/SFTP (Ctrl+Shift+R)."));
     connect(btnRemote, &QPushButton::clicked, this, &QMainCanvas::onOpenRemoteDataClicked);
-    bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 2);
+    bottomBtnGrid->addWidget(btnRemote, 1, 2, 1, 3);
 
     bottomLayout->addLayout(bottomBtnGrid);
 
@@ -934,6 +941,7 @@ void QMainCanvas::clickedW()
 {
     TracknHistogram *trackHist = dynamic_cast<TracknHistogram*>(HijF[SelectedElement_i][SelectedElement_j]);
     if (!trackHist || trackHist->GetNbinsX() <= 0) {
+        CommandPrompt::logWarning("Export", "No active spectrum loaded to export.");
         QMessageBox::information(this, tr("No Spectrum Loaded"),
                                  tr("There is no active spectrum to export.\nPlease load a spectrum first with 'R'."));
         if (canvas) canvas->setFocus();
@@ -942,6 +950,7 @@ void QMainCanvas::clickedW()
 
     std::vector<double> data = trackHist->GetBinData();
     if (data.empty()) {
+        CommandPrompt::logWarning("Export", "Active spectrum contains no channel data to export.");
         QMessageBox::information(this, tr("Empty Spectrum"),
                                  tr("The active spectrum contains no channel data to export."));
         if (canvas) canvas->setFocus();
@@ -949,18 +958,30 @@ void QMainCanvas::clickedW()
     }
 
     QString suggestedPath = m_currentOutputFile;
+    bool suggestedIsRemote = false;
     if (suggestedPath.isEmpty()) {
-        if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+        if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+            QFileInfo rInfo(m_currentRemotePath);
+            QString rDir = rInfo.dir().path();
+            if (rDir == ".") rDir = "";
+            suggestedPath = rDir.isEmpty()
+                ? ("/" + rInfo.baseName() + "_out")
+                : (rDir.endsWith('/') ? rDir + rInfo.baseName() + "_out" : rDir + "/" + rInfo.baseName() + "_out");
+            suggestedIsRemote = true;
+        } else if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
             QFileInfo fi(m_currentSpectrumFile);
-            suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+            suggestedPath = fi.dir().filePath(fi.baseName() + "_out");
         } else if (m_currentMatrix && m_currentMatrix->isOpen() && !m_currentMatrix->getFilePath().isEmpty()) {
             QFileInfo fi(m_currentMatrix->getFilePath());
-            suggestedPath = fi.dir().filePath(fi.baseName() + "_out.spe");
+            suggestedPath = fi.dir().filePath(fi.baseName() + "_out");
+        } else {
+            suggestedPath = QDir::current().filePath(QStringLiteral("spectrum_out"));
         }
     }
 
-    SpectrumExportDialog exportDlg(data, suggestedPath, m_currentSpectrumFormat, trackHist->GetNbinsX(), this);
+    SpectrumExportDialog exportDlg(data, suggestedPath, m_currentSpectrumFormat, trackHist->GetNbinsX(), this, suggestedIsRemote);
     if (exportDlg.exec() != QDialog::Accepted) {
+        CommandPrompt::logDebug("Export", "Export spectrum cancelled.");
         if (canvas) canvas->setFocus();
         return;
     }
@@ -968,7 +989,6 @@ void QMainCanvas::clickedW()
     m_currentOutputFile = exportDlg.getSelectedFilePath();
 
     if (exportDlg.isRemoteSave() && !exportDlg.getSelectedRemotePath().isEmpty()) {
-        m_currentRemotePath = exportDlg.getSelectedRemotePath();
         if (labelOutputFile) {
             QString outName = QString("[Remote] %1").arg(QFileInfo(exportDlg.getSelectedRemotePath()).fileName());
             if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
@@ -976,9 +996,6 @@ void QMainCanvas::clickedW()
             }
             labelOutputFile->setText(QString("-> %1").arg(outName));
         }
-        CommandPrompt::getInstance()->appendPlainText(
-            QString("Exported & uploaded spectrum to remote destination: %1\n")
-                .arg(exportDlg.getSelectedRemotePath()));
     } else {
         if (labelOutputFile) {
             QString outName = QFileInfo(m_currentOutputFile).fileName();
@@ -991,18 +1008,23 @@ void QMainCanvas::clickedW()
 
     QString modeDesc;
     if (exportDlg.getExportMode() == SpectrumExportMode::Append) {
-        modeDesc = "appended";
+        modeDesc = "Appended";
     } else if (exportDlg.getExportMode() == SpectrumExportMode::WriteAtIndex) {
-        modeDesc = QString("written at index #%1").arg(exportDlg.getTargetIndex());
+        modeDesc = QString("Wrote index #%1 of").arg(exportDlg.getTargetIndex());
     } else {
-        modeDesc = "saved";
+        modeDesc = "Saved";
     }
 
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Exported spectrum (%1 channels) %2 to %3\n")
+    const QString fmtName = spectrumFormatToString(exportDlg.getSelectedFormat());
+    const QString targetName = (exportDlg.isRemoteSave() && !exportDlg.getSelectedRemotePath().isEmpty())
+        ? QString("%1 (remote: %2)").arg(QFileInfo(exportDlg.getSelectedRemotePath()).fileName(), exportDlg.getSelectedRemotePath())
+        : QFileInfo(m_currentOutputFile).fileName();
+    CommandPrompt::logInfo(
+        "Export",
+        QString("%1 %2 (%3 ch, %4)")
+            .arg(modeDesc, targetName)
             .arg(exportDlg.getSelectedLength())
-            .arg(modeDesc)
-            .arg(QFileInfo(m_currentOutputFile).fileName()));
+            .arg(fmtName));
 
     if (canvas) {
         canvas->setFocus();
@@ -2346,6 +2368,7 @@ void QMainCanvas::onOpenCMClicked()
         this, tr("Open Compressed Matrix (CM)"), initialDir, &remotePath, &isRemote);
 
     if (fileName.isEmpty()) {
+        CommandPrompt::logDebug("Matrix", "Open matrix cancelled.");
         if (canvas) canvas->setFocus();
         return;
     }
@@ -2362,6 +2385,9 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
     auto candidateMatrix = std::make_shared<MatrixReader>();
     QString errMsg;
     if (!candidateMatrix->open(fileName, &errMsg)) {
+        CommandPrompt::logError(
+            "Matrix",
+            QString("Failed to open '%1': %2").arg(QFileInfo(fileName).fileName(), errMsg));
         QMessageBox::critical(this, tr("Open Matrix Error"), errMsg);
         if (canvas) canvas->setFocus();
         return false;
@@ -2378,6 +2404,29 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
     if (btnGateCM) {
         btnGateCM->setEnabled(true);
     }
+
+    const QString sourceLabel = isRemote
+        ? QString("%1 (remote: %2)").arg(m_currentMatrix->getFileName(), remotePath)
+        : m_currentMatrix->getFileName();
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Opened %1 (%2x%3 ch, %4)")
+            .arg(sourceLabel)
+            .arg(m_currentMatrix->getResolutionX())
+            .arg(m_currentMatrix->getResolutionY())
+            .arg(m_currentMatrix->isSymmetric() ? "symmetric" : "asymmetric"));
+    CommandPrompt::logDebug(
+        "Matrix",
+        QString("Matrix header: version=%1, step=%2x%3, grid=%4x%5 tiles, segsize=%6, size=%7 MB, ratio=%8x, totalCounts=%9")
+            .arg(m_currentMatrix->getVersion())
+            .arg(m_currentMatrix->getStepX())
+            .arg(m_currentMatrix->getStepY())
+            .arg(m_currentMatrix->getNumDivX())
+            .arg(m_currentMatrix->getNumDivY())
+            .arg(m_currentMatrix->getTileSize())
+            .arg(m_currentMatrix->getFileSize() / 1048576.0, 0, 'f', 2)
+            .arg(m_currentMatrix->getCompressionRatio(), 0, 'f', 1)
+            .arg(m_currentMatrix->getTotalCounts()));
 
     TracknHistogram *trackHist = getActiveTracknHistogram();
     bool isCalib = trackHist ? trackHist->IsCalibrated() : false;
@@ -2405,7 +2454,12 @@ bool QMainCanvas::openMatrixFile(const QString &fileName, bool isRemote, const Q
                 }
             });
 
-    dlg.exec();
+    if (dlg.exec() == QDialog::Rejected) {
+        CommandPrompt::logDebug(
+            "Matrix",
+            QString("Closed matrix dialog without loading projection for '%1'.")
+                .arg(m_currentMatrix->getFileName()));
+    }
 
     if (canvas) canvas->setFocus();
     return true;
@@ -2489,7 +2543,9 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
 
     if (!asOverlay) {
         if (!trackHist->LoadFromData(data, title.toStdString())) {
-            std::cerr << "Failed to load spectrum into active histogram: " << title.toStdString() << std::endl;
+            CommandPrompt::logError(
+                "Matrix",
+                QString("Failed to load matrix spectrum '%1' into active histogram.").arg(title));
             return;
         }
 
@@ -2537,12 +2593,11 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
         m_currentSpectrumLength = static_cast<int>(data.size());
         updateAxisStatusLabels();
 
-        CommandPrompt *prompt = CommandPrompt::getInstance();
-        if (prompt) {
-            prompt->appendPlainText(QString("Loaded matrix spectrum: %1 (%2 channels)\n")
-                                        .arg(title)
-                                        .arg(data.size()));
-        }
+        CommandPrompt::logInfo(
+            "Matrix",
+            QString("Loaded %1 (%2 ch)")
+                .arg(title)
+                .arg(data.size()));
     } else {
         TracknHistogram *overlayHist = dynamic_cast<TracknHistogram*>(trackHist->Clone());
         if (!overlayHist) return;
@@ -2574,12 +2629,11 @@ void QMainCanvas::loadSpectrumDataToPad(const std::vector<double> &data, const Q
         canvas->getCanvas()->Modified();
         canvas->getCanvas()->Update();
 
-        CommandPrompt *prompt = CommandPrompt::getInstance();
-        if (prompt) {
-            prompt->appendPlainText(QString("Overlaid matrix gate: %1 (color index %2)\n")
-                                        .arg(title)
-                                        .arg(colorIdx));
-        }
+        CommandPrompt::logInfo(
+            "Matrix",
+            QString("Overlaid matrix gate: %1 (color index %2)")
+                .arg(title)
+                .arg(colorIdx));
     }
 
     updateAxisStatusLabels();
@@ -2618,26 +2672,130 @@ void QMainCanvas::closeIntegralDialog()
 //==============================================================================
 void QMainCanvas::printPlot()
 {
+    if (!canvas || !canvas->getCanvas()) {
+        CommandPrompt::logError("Print", "Canvas is not initialized; cannot export plot.");
+        return;
+    }
+
+    QString suggestedPath;
+    if (m_remoteSession && m_remoteSession->isConnected() && !m_currentRemotePath.isEmpty()) {
+        QFileInfo rInfo(m_currentRemotePath);
+        QString rDir = rInfo.dir().path();
+        if (rDir == ".") rDir = "";
+        const QString base = rInfo.baseName().isEmpty() ? QStringLiteral("spectrum") : rInfo.baseName();
+        suggestedPath = rDir.isEmpty()
+            ? ("/" + base + "_plot.pdf")
+            : (rDir.endsWith('/') ? rDir + base + "_plot.pdf" : rDir + "/" + base + "_plot.pdf");
+    } else if (!m_currentSpectrumFile.isEmpty() && QFileInfo::exists(m_currentSpectrumFile)) {
+        QFileInfo fi(m_currentSpectrumFile);
+        suggestedPath = fi.dir().filePath(fi.baseName() + "_plot.pdf");
+    } else if (m_currentMatrix && m_currentMatrix->isOpen() && !m_currentMatrix->getFilePath().isEmpty()) {
+        QFileInfo fi(m_currentMatrix->getFilePath());
+        suggestedPath = fi.dir().filePath(fi.baseName() + "_plot.pdf");
+    } else {
+        suggestedPath = QDir::current().filePath(QStringLiteral("spectrum_plot.pdf"));
+    }
+
     QString selectedFilter = tr("PDF Files (*.pdf)");
     QString remotePath;
     bool isRemote = false;
     QString fileName = NuFileDialog::getSaveFileName(
-        this, tr("Save Plot as Postscript/PDF"), QString(),
+        this, tr("Save Plot as Postscript/PDF"), suggestedPath,
         tr("PDF Files (*.pdf);;Postscript (*.ps);;PNG Image (*.png)"),
         &selectedFilter, &remotePath, &isRemote);
 
-    if (fileName.isEmpty()) return;
-    
-    if (canvas && canvas->getCanvas()) {
-        canvas->getCanvas()->SaveAs(fileName.toStdString().c_str());
-        if (isRemote && !remotePath.isEmpty()) {
-            QString uploadErr;
-            NuFileDialog::finishRemoteSave(fileName, remotePath, &uploadErr, this);
-            CommandPrompt::getInstance()->appendPlainText(
-                QString("Plot exported & uploaded to remote: %1\n").arg(remotePath));
-        } else {
-            CommandPrompt::getInstance()->appendPlainText("Plot saved to " + fileName + "\n");
+    if (fileName.isEmpty()) {
+        CommandPrompt::logDebug("Print", "Plot export cancelled.");
+        return;
+    }
+
+    auto ensureKnownExt = [](const QString &path) -> QString {
+        const QString lower = path.toLower();
+        if (lower.endsWith(".pdf") || lower.endsWith(".ps") ||
+            lower.endsWith(".eps") || lower.endsWith(".png") ||
+            lower.endsWith(".svg")) {
+            return path;
         }
+        return path + ".pdf";
+    };
+    fileName = ensureKnownExt(fileName);
+    if (isRemote && !remotePath.isEmpty()) {
+        remotePath = ensureKnownExt(remotePath);
+    }
+
+    TCanvas *tc = canvas->getCanvas();
+    const QColor bgColor = Design::getGraphBackgroundColor();
+    const Color_t rootBg = TColor::GetColor(bgColor.name().toUtf8().constData());
+    const Color_t axisCol = (bgColor.lightness() > 130) ? kBlack : kWhite;
+
+    tc->SetFillColor(rootBg);
+    if (tc->GetFrame()) {
+        tc->GetFrame()->SetFillColor(rootBg);
+        tc->GetFrame()->SetLineColor(axisCol);
+    }
+    if (tc->GetListOfPrimitives()) {
+        TIter next(tc->GetListOfPrimitives());
+        TObject *obj = nullptr;
+        while ((obj = next())) {
+            if (obj && obj->InheritsFrom(TPad::Class())) {
+                TPad *pad = static_cast<TPad*>(obj);
+                pad->SetFillColor(rootBg);
+                pad->SetFrameFillColor(rootBg);
+                if (pad->GetFrame()) {
+                    pad->GetFrame()->SetFillColor(rootBg);
+                    pad->GetFrame()->SetLineColor(axisCol);
+                }
+            }
+        }
+    }
+    tc->Modified();
+    tc->Update();
+
+    // Guard LC_NUMERIC="C" so ROOT's TPDF/TPostScript never emits locale commas,
+    // and scale PS/PDF line widths from ROOT's default 3.0x down to 0.75pt/px (1px @ 96dpi)
+    const Float_t prevLineScale = gStyle->GetLineScalePS();
+    gStyle->SetLineScalePS(0.75f);
+    const char *prevLocale = std::setlocale(LC_NUMERIC, nullptr);
+    std::string savedLocale = prevLocale ? prevLocale : "";
+    std::setlocale(LC_NUMERIC, "C");
+    tc->SaveAs(fileName.toStdString().c_str());
+    if (!savedLocale.empty() && savedLocale != "C") {
+        std::setlocale(LC_NUMERIC, savedLocale.c_str());
+    }
+    gStyle->SetLineScalePS(prevLineScale);
+
+    QFileInfo outInfo(fileName);
+    if (!outInfo.exists() || outInfo.size() <= 0) {
+        CommandPrompt::logError("Print",
+            QString("Failed to export plot to '%1' (output file missing or empty).").arg(fileName));
+        return;
+    }
+
+    const qint64 bytes = outInfo.size();
+    const QString sizeStr = (bytes >= 1024 * 1024)
+        ? QString("%1 MB").arg(bytes / (1024.0 * 1024.0), 0, 'f', 2)
+        : QString("%1 KB").arg(bytes / 1024.0, 0, 'f', 1);
+
+    CommandPrompt::logDebug("Print",
+        QString("Exported %1x%2 canvas (%3x%4 grid, bg=%5, lineScalePS=0.75) -> '%6' (%7).")
+            .arg(tc->GetWw()).arg(tc->GetWh())
+            .arg(maxElement_i).arg(maxElement_j)
+            .arg(bgColor.name())
+            .arg(fileName, sizeStr));
+
+    if (isRemote && !remotePath.isEmpty()) {
+        QString uploadErr;
+        if (NuFileDialog::finishRemoteSave(fileName, remotePath, &uploadErr, this)) {
+            CommandPrompt::logInfo("Print",
+                QString("Plot exported & uploaded to remote: '%1' (%2).").arg(remotePath, sizeStr));
+        } else {
+            CommandPrompt::logError("Print",
+                QString("Plot saved locally to '%1', but remote upload to '%2' failed: %3")
+                    .arg(fileName, remotePath, uploadErr));
+        }
+    } else {
+        CommandPrompt::logInfo("Print",
+            QString("Plot saved to '%1' (%2).").arg(fileName, sizeStr));
     }
 }
 

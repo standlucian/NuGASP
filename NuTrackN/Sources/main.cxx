@@ -5,6 +5,8 @@
 #include <QStringList>
 #include <QTimer>
 
+#include <clocale>
+
 #include "Design.h"
 #include "TApplication.h"
 #include "canvas.h"
@@ -60,6 +62,9 @@ int main(int argc, char **argv) {
 
   // Initialize Qt Application
   NuApplication app(argc, argv);
+  // Qt initializes LC_ALL from the system locale; keep LC_NUMERIC in "C" so
+  // ROOT's TPDF/TPostScript/TFormula always format numbers with '.' instead of ','.
+  std::setlocale(LC_NUMERIC, "C");
   app.setApplicationName("NuTrackN");
   app.setApplicationDisplayName("NuTrackN - Gamma Spectroscopy Analysis");
   app.setOrganizationName("NuGASP");

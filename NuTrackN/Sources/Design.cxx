@@ -407,6 +407,38 @@ void setDialogTextColor(const QColor &color) { s_dialogTextColor = color; saveSe
 QColor getDialogAccentColor() { if (!s_typographyInitialized) initializeTypography(); return s_dialogAccentColor; }
 void setDialogAccentColor(const QColor &color) { s_dialogAccentColor = color; saveSettings(); }
 
+static void ensureDialogArrowIcons(const QColor &fgCol, QString &upPath, QString &downPath) {
+  const QString hex = fgCol.name().mid(1);
+  const QString tmp = QDir::tempPath();
+  upPath = tmp + QString("/nutrackn_dlg_arrow_up_%1.png").arg(hex);
+  downPath = tmp + QString("/nutrackn_dlg_arrow_down_%1.png").arg(hex);
+
+  if (!QFile::exists(upPath)) {
+    QPixmap pix(10, 6);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(fgCol);
+    QPolygonF poly;
+    poly << QPointF(1.0, 5.5) << QPointF(9.0, 5.5) << QPointF(5.0, 0.5);
+    p.drawPolygon(poly);
+    pix.save(upPath);
+  }
+  if (!QFile::exists(downPath)) {
+    QPixmap pix(10, 6);
+    pix.fill(Qt::transparent);
+    QPainter p(&pix);
+    p.setRenderHint(QPainter::Antialiasing, true);
+    p.setPen(Qt::NoPen);
+    p.setBrush(fgCol);
+    QPolygonF poly;
+    poly << QPointF(1.0, 0.5) << QPointF(9.0, 0.5) << QPointF(5.0, 5.5);
+    p.drawPolygon(poly);
+    pix.save(downPath);
+  }
+}
+
 QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QColor &fgCol, const QColor &accentCol) {
   const QString family = font.family();
   const int pt = font.pointSize() > 0 ? font.pointSize() : 11;
@@ -418,6 +450,9 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
   const QString panelBg = isDark ? bgCol.lighter(125).name() : bgCol.darker(110).name();
   const QString border = isDark ? bgCol.lighter(160).name() : bgCol.darker(135).name();
   const QString inputBg = isDark ? bgCol.lighter(118).name() : bgCol.lighter(112).name();
+
+  QString upArrowPath, downArrowPath;
+  ensureDialogArrowIcons(fgCol, upArrowPath, downArrowPath);
 
   return QString(
       "QDialog { background-color: %1; color: %2; font-family: \"%3\"; font-size: %4pt; }\n"
@@ -431,7 +466,7 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
       "QComboBox:editable { background-color: %7; color: %2; }\n"
       "QComboBox::drop-down { subcontrol-origin: padding; subcontrol-position: top right; width: 22px; border-left: 1px solid %5; background-color: %8; border-top-right-radius: 3px; border-bottom-right-radius: 3px; }\n"
       "QComboBox::drop-down:hover { background-color: %5; }\n"
-      "QComboBox::down-arrow { width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid %2; margin: auto; }\n"
+      "QComboBox::down-arrow { image: url(%9); width: 10px; height: 6px; }\n"
       "QComboBox QAbstractItemView { background-color: %7; color: %2; selection-background-color: %6; selection-color: #ffffff; border: 1px solid %5; outline: none; padding: 2px; font-family: \"%3\"; font-size: %4pt; }\n"
       "QComboBox QAbstractItemView::item { min-height: 24px; padding: 4px 8px; color: %2; background-color: %7; }\n"
       "QComboBox QAbstractItemView::item:selected, QComboBox QAbstractItemView::item:hover { background-color: %6; color: #ffffff; }\n"
@@ -441,11 +476,11 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
       "QSpinBox::up-button, QDoubleSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 18px; background-color: %8; border-left: 1px solid %5; border-bottom: 1px solid %5; border-top-right-radius: 3px; }\n"
       "QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover { background-color: %5; }\n"
       "QSpinBox::up-button:pressed, QDoubleSpinBox::up-button:pressed { background-color: %6; }\n"
-      "QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid %2; margin: auto; }\n"
+      "QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url(%10); width: 8px; height: 5px; }\n"
       "QSpinBox::down-button, QDoubleSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 18px; background-color: %8; border-left: 1px solid %5; border-bottom-right-radius: 3px; }\n"
       "QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background-color: %5; }\n"
       "QSpinBox::down-button:pressed, QDoubleSpinBox::down-button:pressed { background-color: %6; }\n"
-      "QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 5px solid %2; margin: auto; }\n"
+      "QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url(%9); width: 8px; height: 5px; }\n"
       "QCheckBox, QRadioButton { color: %2; font-family: \"%3\"; font-size: %4pt; spacing: 6px; }\n"
       "QTableWidget { background-color: %8; color: %2; gridline-color: %5; border: 1px solid %5; border-radius: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
       "QHeaderView::section { background-color: %8; color: %6; font-weight: bold; border: 1px solid %5; padding: 4px; font-family: \"%3\"; font-size: %4pt; }\n"
@@ -462,7 +497,7 @@ QString buildDialogStyleSheet(const QFont &font, const QColor &bgCol, const QCol
       "QScrollArea > QWidget { background-color: %1; border: none; }\n"
       "QScrollArea > QWidget > QWidget { background-color: %1; border: none; }\n"
       "QWidget#tabCanvas { background-color: %1; }\n"
-  ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg);
+  ).arg(bg, fg, family).arg(pt).arg(border, accent, inputBg, panelBg, downArrowPath, upArrowPath);
 }
 
 QString getDialogStyleSheet() {

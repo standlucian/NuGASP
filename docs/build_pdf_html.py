@@ -10,8 +10,20 @@ Converts docs/USER_MANUAL.md into docs/USER_MANUAL.html with:
 import os
 import re
 import sys
+import html
 import base64
 import markdown
+
+def github_slug(text):
+    clean = html.unescape(re.sub(r"<[^>]+>", "", text))
+    return re.sub(r"[^\w\- ]", "", clean).strip().lower().replace(" ", "-")
+
+def add_heading_ids(html_text):
+    def repl(m):
+        tag = m.group(1)
+        inner = m.group(2)
+        return f'<h{tag} id="{github_slug(inner)}">{inner}</h{tag}>'
+    return re.sub(r"<h([34])>(.*?)</h\1>", repl, html_text)
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 MD_PATH = os.path.join(SCRIPT_DIR, "USER_MANUAL.md")
@@ -76,7 +88,7 @@ def build_html():
                 count=1,
                 flags=re.MULTILINE
             )
-            ch_html = markdown.markdown(ch_body_tagged, extensions=md_extensions)
+            ch_html = add_heading_ids(markdown.markdown(ch_body_tagged, extensions=md_extensions))
             chapters_html_list.append(f'<section class="chapter-container" id="chapter-{ch_num}">\n{ch_html}\n</section>')
             if ch_num == "2":
                 chapters_html_list.append(
