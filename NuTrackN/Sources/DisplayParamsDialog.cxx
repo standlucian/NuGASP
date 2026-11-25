@@ -61,8 +61,8 @@ void DisplayParamsDialog::setupUI()
     gridHeadroom->addWidget(m_spinLogHeadroom, 1, 1);
     mainLayout->addWidget(grpHeadroom);
 
-    // 2. Grid & Zoom Settings
-    QGroupBox *grpDisplay = new QGroupBox(tr("Canvas Grid & Zoom Navigation"), this);
+    // 2. Canvas Grid Settings
+    QGroupBox *grpDisplay = new QGroupBox(tr("Canvas Grid"), this);
     QGridLayout *gridDisplay = new QGridLayout(grpDisplay);
     gridDisplay->setSpacing(8);
 
@@ -95,12 +95,6 @@ void DisplayParamsDialog::setupUI()
     m_comboGridStyle->addItem(tr("Dotted"), 3);
     m_comboGridStyle->addItem(tr("Solid"), 1);
 
-    QLabel *lblZoom = new QLabel(tr("Default Zoom Width:"), grpDisplay);
-    m_spinZoomWidth = new QSpinBox(grpDisplay);
-    m_spinZoomWidth->setRange(10, 10240);
-    m_spinZoomWidth->setSingleStep(50);
-    m_spinZoomWidth->setSuffix(" ch");
-
     gridDisplay->addWidget(m_chkGridX, 0, 0);
     gridDisplay->addWidget(lblGridDivX, 0, 1);
     gridDisplay->addWidget(m_spinGridDivX, 0, 2);
@@ -113,13 +107,25 @@ void DisplayParamsDialog::setupUI()
     gridDisplay->addWidget(m_spinGridWidth, 2, 1);
     gridDisplay->addWidget(lblGridStyle, 2, 2);
     gridDisplay->addWidget(m_comboGridStyle, 2, 3);
-
-    gridDisplay->addWidget(lblZoom, 3, 0);
-    gridDisplay->addWidget(m_spinZoomWidth, 3, 1, 1, 3);
     mainLayout->addWidget(grpDisplay);
 
+    // 3. Zoom Navigation Settings
+    QGroupBox *grpZoom = new QGroupBox(tr("Zoom Navigation (X / P)"), this);
+    QHBoxLayout *zoomLayout = new QHBoxLayout(grpZoom);
+    zoomLayout->setSpacing(8);
+
+    QLabel *lblZoom = new QLabel(tr("Default Zoom Width (X / P):"), grpZoom);
+    m_spinZoomWidth = new QSpinBox(grpZoom);
+    m_spinZoomWidth->setRange(10, 10240);
+    m_spinZoomWidth->setSingleStep(50);
+    m_spinZoomWidth->setSuffix(" ch");
+    m_spinZoomWidth->setToolTip(tr("Channel width used by X and P when zooming in from an unzoomed spectrum"));
+    zoomLayout->addWidget(lblZoom);
+    zoomLayout->addWidget(m_spinZoomWidth, 1);
+    mainLayout->addWidget(grpZoom);
+
     // 3. Y-Axis Scale Mode (Linear vs Log)
-    QGroupBox *grpScale = new QGroupBox(tr("Y-Axis Scale Function (FUNCCMD)"), this);
+    QGroupBox *grpScale = new QGroupBox(tr("Y-Axis Scale Function"), this);
     QHBoxLayout *scaleLayout = new QHBoxLayout(grpScale);
     m_radioLinearY = new QRadioButton(tr("Normal (Linear)"), grpScale);
     m_radioLogY = new QRadioButton(tr("Logarithmic"), grpScale);
@@ -138,17 +144,17 @@ void DisplayParamsDialog::setupUI()
 
     QLabel *lblXMin = new QLabel(tr("X Min:"), grpRange);
     m_spinXMin = new QDoubleSpinBox(grpRange);
-    m_spinXMin->setRange(0.0, 100000.0);
+    m_spinXMin->setRange(-100000.0, 100000.0);
     m_spinXMin->setDecimals(1);
 
     QLabel *lblXMax = new QLabel(tr("X Max:"), grpRange);
     m_spinXMax = new QDoubleSpinBox(grpRange);
-    m_spinXMax->setRange(1.0, 100000.0);
+    m_spinXMax->setRange(-100000.0, 100000.0);
     m_spinXMax->setDecimals(1);
 
     QLabel *lblYMin = new QLabel(tr("Y Min:"), grpRange);
     m_spinYMin = new QDoubleSpinBox(grpRange);
-    m_spinYMin->setRange(0.0, 1e9);
+    m_spinYMin->setRange(-1e9, 1e9);
     m_spinYMin->setDecimals(1);
 
     QLabel *lblYMax = new QLabel(tr("Y Max:"), grpRange);
@@ -191,7 +197,7 @@ void DisplayParamsDialog::setupUI()
                 m_spinYMin->setValue(0.5);
             }
         } else {
-            m_spinYMin->setRange(0.0, 1e9);
+            m_spinYMin->setRange(-1e9, 1e9);
         }
     });
 
@@ -241,12 +247,12 @@ void DisplayParamsDialog::loadCurrentValues()
         m_spinXMin->setValue(hist->GetXaxis()->GetBinLowEdge(first));
         m_spinXMax->setValue(hist->GetXaxis()->GetBinUpEdge(last));
         double curYMin = hist->GetMinimum();
+        if (curYMin == -1111.0) curYMin = m_radioLogY->isChecked() ? 0.5 : 0.0;
         if (m_radioLogY->isChecked()) {
             m_spinYMin->setRange(0.0001, 1e9);
             if (curYMin < 0.1) curYMin = 0.5;
         } else {
-            m_spinYMin->setRange(0.0, 1e9);
-            if (curYMin < 0.0) curYMin = 0.0;
+            m_spinYMin->setRange(-1e9, 1e9);
         }
         m_spinYMin->setValue(curYMin);
         m_spinYMax->setValue(hist->GetMaximum());
@@ -257,6 +263,8 @@ void DisplayParamsDialog::applySettings()
 {
     if (!m_mainCanvas) return;
 
+    const double prevLinHead = m_mainCanvas->m_autoscaleHeadroomLinear;
+    const double prevLogHead = m_mainCanvas->m_autoscaleHeadroomLog;
     m_mainCanvas->m_autoscaleHeadroomLinear = m_spinLinearHeadroom->value();
     m_mainCanvas->m_autoscaleHeadroomLog    = m_spinLogHeadroom->value();
     m_mainCanvas->m_defaultZoomWidth        = m_spinZoomWidth->value();
@@ -265,10 +273,26 @@ void DisplayParamsDialog::applySettings()
     m_mainCanvas->m_gridLineWidth           = m_spinGridWidth->value();
     m_mainCanvas->m_gridLineStyle           = m_comboGridStyle->currentData().toInt();
 
+    const bool headroomChanged = (std::abs(m_mainCanvas->m_autoscaleHeadroomLinear - prevLinHead) > 1e-6 ||
+                                  std::abs(m_mainCanvas->m_autoscaleHeadroomLog - prevLogHead) > 1e-6);
+
+    TVirtualPad *activePad = nullptr;
+    if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
+        if (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1) {
+            const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
+            activePad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
+        }
+        if (!activePad) activePad = m_mainCanvas->getRootCanvas()->getCanvas();
+    }
+
     const bool wantLog = m_radioLogY->isChecked();
+    const bool logModeChanged = (activePad && (activePad->GetLogy() != 0) != wantLog);
+    if (activePad && logModeChanged) {
+        activePad->SetLogy(wantLog ? 1 : 0);
+    }
+
     double y0 = m_spinYMin->value();
     double y1 = m_spinYMax->value();
-
     if (wantLog) {
         if (y0 <= 0.0) y0 = 0.5;
         if (y1 <= y0) y1 = y0 + 10.0;
@@ -281,27 +305,30 @@ void DisplayParamsDialog::applySettings()
 
         if (x1 > x0) {
             hist->GetXaxis()->SetRangeUser(x0, x1);
+            for (TH1F *overlay : m_mainCanvas->HijC[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j]) {
+                if (overlay && overlay != hist && overlay->GetXaxis()) {
+                    overlay->GetXaxis()->SetRangeUser(x0, x1);
+                }
+            }
         }
-        if (y1 > y0) {
+
+        if (headroomChanged || logModeChanged) {
+            m_mainCanvas->adjustYAxisToVisibleMax(hist);
+            y0 = hist->GetMinimum();
+            y1 = hist->GetMaximum();
+            m_spinYMin->setValue(y0);
+            m_spinYMax->setValue(y1);
+        } else if (y1 > y0) {
             hist->SetMinimum(y0);
             hist->SetMaximum(y1);
             hist->GetYaxis()->SetRangeUser(y0, y1);
+            for (TH1F *overlay : m_mainCanvas->HijC[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j]) {
+                if (!overlay || overlay == hist) continue;
+                overlay->SetMinimum(y0);
+                overlay->SetMaximum(y1);
+                overlay->GetYaxis()->SetRangeUser(y0, y1);
+            }
         }
-
-        for (TH1F *overlay : m_mainCanvas->HijC[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j]) {
-            if (!overlay || overlay == hist) continue;
-            overlay->SetMinimum(y0);
-            overlay->SetMaximum(y1);
-        }
-    }
-
-    TVirtualPad *activePad = nullptr;
-    if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
-        if (m_mainCanvas->maxElement_i > 1 || m_mainCanvas->maxElement_j > 1) {
-            const int padIndex = (m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j;
-            activePad = m_mainCanvas->getRootCanvas()->getCanvas()->GetPad(padIndex);
-        }
-        if (!activePad) activePad = m_mainCanvas->getRootCanvas()->getCanvas();
     }
 
     gStyle->SetGridColor(kGray + 2);
@@ -329,9 +356,6 @@ void DisplayParamsDialog::applySettings()
                 p->cd();
                 p->SetGridx(m_chkGridX->isChecked() ? 1 : 0);
                 p->SetGridy(m_chkGridY->isChecked() ? 1 : 0);
-                if (p == activePad && (p->GetLogy() != 0) != wantLog) {
-                    p->SetLogy(wantLog ? 1 : 0);
-                }
                 if (m_chkGridX->isChecked() || m_chkGridY->isChecked()) {
                     p->RedrawAxis("g");
                 }
@@ -341,14 +365,17 @@ void DisplayParamsDialog::applySettings()
         }
     }
 
+    m_mainCanvas->ColorTheFrameOfTheHistogram();
+    m_mainCanvas->renderPeakLabels(m_mainCanvas->SelectedElement_i, m_mainCanvas->SelectedElement_j);
+    m_mainCanvas->renderPeakSearchLabels(m_mainCanvas->SelectedElement_i, m_mainCanvas->SelectedElement_j);
     if (m_mainCanvas->getRootCanvas() && m_mainCanvas->getRootCanvas()->getCanvas()) {
         m_mainCanvas->getRootCanvas()->getCanvas()->Modified();
         m_mainCanvas->getRootCanvas()->getCanvas()->Update();
     }
     m_mainCanvas->updateAxisStatusLabels();
 
-    CommandPrompt::getInstance()->appendPlainText(
-        QString("Display Parameters updated (DD): Linear Headroom=%1%, Log Headroom=%2%, Grid=[%3,%4] (Divisions: X=%5, Y=%6, Width=%7px), ZoomWidth=%8 ch\n")
+    CommandPrompt::logDebug("Display",
+        QString("Display Parameters updated (DD): LinHead=%1%, LogHead=%2%, Grid=[%3,%4] (Div: X=%5, Y=%6, W=%7px), ZoomW=%8 ch.")
             .arg(m_mainCanvas->m_autoscaleHeadroomLinear, 0, 'f', 1)
             .arg(m_mainCanvas->m_autoscaleHeadroomLog, 0, 'f', 1)
             .arg(m_chkGridX->isChecked() ? "X" : "-")

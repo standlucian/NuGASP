@@ -23,31 +23,50 @@
 //==============================================================================
 void QMainCanvas::zoomTheScreen()
 {
-    // Clear temporary overlay markers before applying zoom
-    clearDrawnObjects();
-
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-    const std::size_t n = zoom_markers.size();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
-    if (n >= 2) {
-        const double low  = std::min(zoom_markers[n - 2], zoom_markers[n - 1]);
-        const double high = std::max(zoom_markers[n - 2], zoom_markers[n - 1]);
-        if (HijF[SelectedElement_i][SelectedElement_j]) {
-            TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
-            hist->GetXaxis()->SetRangeUser(low, high);
-            adjustYAxisToVisibleMax(hist);
+    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    if (!hist) return;
+
+    const std::size_t n = zoom_markers.size();
+    if (n == 0) {
+        CommandPrompt::logWarning("Display", "Place at least one Spacebar marker before pressing E to zoom.");
+        return;
+    }
+
+    double low = 0.0;
+    double high = 0.0;
+    if (n == 1) {
+        TAxis *xAxis = hist->GetXaxis();
+        const double screenLeft = xAxis ? xAxis->GetBinLowEdge(xAxis->GetFirst()) : 0.0;
+        low = screenLeft;
+        high = zoom_markers[0];
+        if (high <= low) {
+            CommandPrompt::logWarning("Display", "Single Spacebar marker must lie to the right of the left screen edge.");
+            return;
         }
     } else {
-        const QString msg = "At least two spacebar markers are required to define a zoom window.\n";
-        std::cout << msg.toStdString();
-        CommandPrompt::getInstance()->appendPlainText(msg);
+        low  = std::min(zoom_markers[n - 2], zoom_markers[n - 1]);
+        high = std::max(zoom_markers[n - 2], zoom_markers[n - 1]);
+        if (high <= low) {
+            CommandPrompt::logWarning("Display", "Zoom markers coincide; cannot zoom to zero width.");
+            return;
+        }
     }
+
+    clearDrawnObjects();
+    hist->GetXaxis()->SetRangeUser(low, high);
+    adjustYAxisToVisibleMax(hist);
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
+    CommandPrompt::logDebug("Display", QString("Zoomed X range to [%1, %2] (E).").arg(low, 0, 'g', 5).arg(high, 0, 'g', 5));
 }
 
 //==============================================================================
@@ -75,7 +94,7 @@ void QMainCanvas::fullX(bool logPrompt)
         canvas->setFocus();
     }
     if (logPrompt) {
-        CommandPrompt::getInstance()->appendPlainText("Horizontal axis unzoomed to full spectrum (FX).\n");
+        CommandPrompt::logDebug("Display", "Horizontal axis unzoomed to full spectrum (FX).");
     }
 }
 
@@ -104,7 +123,7 @@ void QMainCanvas::fullY(bool logPrompt)
         canvas->setFocus();
     }
     if (logPrompt) {
-        CommandPrompt::getInstance()->appendPlainText("Vertical axis autoscaled to visible maximum (FY).\n");
+        CommandPrompt::logDebug("Display", "Vertical axis autoscaled to visible maximum (FY).");
     }
 }
 
@@ -119,7 +138,7 @@ void QMainCanvas::zoomOut()
 {
     fullX(false);
     fullY(false);
-    CommandPrompt::getInstance()->appendPlainText("Full spectrum display restored (FF = FX + FY).\n");
+    CommandPrompt::logDebug("Display", "Full spectrum display restored (FF = FX + FY).");
 }
 
 //==============================================================================
@@ -152,8 +171,14 @@ void QMainCanvas::sameX()
 
             if (isUnzoomed) {
                 targetHist->GetXaxis()->UnZoom();
+                for (TH1F *overlay : HijC[z][g]) {
+                    if (overlay && overlay != targetHist) overlay->GetXaxis()->UnZoom();
+                }
             } else {
                 targetHist->GetXaxis()->SetRangeUser(xMin, xMax);
+                for (TH1F *overlay : HijC[z][g]) {
+                    if (overlay && overlay != targetHist) overlay->GetXaxis()->SetRangeUser(xMin, xMax);
+                }
             }
 
             renderPeakSearchLabels(z, g);
@@ -179,7 +204,7 @@ void QMainCanvas::sameX()
     if (canvas) {
         canvas->setFocus();
     }
-    CommandPrompt::getInstance()->appendPlainText("Applied same X zoom to all display windows (SX).\n");
+    CommandPrompt::logDebug("Display", QString("Applied same X zoom [%1, %2] to all windows (SX).").arg(xMin, 0, 'g', 5).arg(xMax, 0, 'g', 5));
 }
 
 //==============================================================================
@@ -205,15 +230,12 @@ void QMainCanvas::sameY()
     const int activeLogy = activePad ? activePad->GetLogy() : 0;
     double activeMin = activeHist->GetMinimum();
     double activeMax = activeHist->GetMaximum();
-    if (activeMin < 0.0 || activeMin == -1111.0) {
+    if (activeMin == -1111.0 || (activeLogy != 0 && activeMin <= 0.0)) {
         activeMin = (activeLogy != 0) ? 0.5 : 0.0;
     }
     if (activeMax <= activeMin || activeMax == -1111.0) {
         activeMax = activeHist->GetBinContent(activeHist->GetMaximumBin()) * ((activeLogy != 0) ? 1.30 : 1.10);
         if (activeMax <= activeMin) activeMax = activeMin + 10.0;
-    }
-    if (activeLogy != 0 && activeMin <= 0.0) {
-        activeMin = 0.5;
     }
 
     for (int z = 1; z <= maxElement_i; ++z) {
@@ -235,6 +257,7 @@ void QMainCanvas::sameY()
                 if (!overlay || overlay == targetHist) continue;
                 overlay->SetMinimum(activeMin);
                 overlay->SetMaximum(activeMax);
+                overlay->GetYaxis()->SetRangeUser(activeMin, activeMax);
             }
 
             if (pad) {
@@ -258,7 +281,8 @@ void QMainCanvas::sameY()
     if (canvas) {
         canvas->setFocus();
     }
-    CommandPrompt::getInstance()->appendPlainText("Applied same Y scale and mode to all display windows (SY).\n");
+    CommandPrompt::logDebug("Display", QString("Applied same Y scale [%1, %2] (%3) to all windows (SY).")
+        .arg(activeMin, 0, 'g', 5).arg(activeMax, 0, 'g', 5).arg(activeLogy ? "log" : "lin"));
 }
 
 //==============================================================================
@@ -314,21 +338,23 @@ void QMainCanvas::toggleLogY()
             hist->SetMinimum(0.5);
             hist->GetYaxis()->SetRangeUser(0.5, yMax);
             hist->SetMaximum(yMax);
+            for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+                if (!overlay || overlay == hist) continue;
+                overlay->SetMinimum(0.5);
+                overlay->GetYaxis()->SetRangeUser(0.5, yMax);
+                overlay->SetMaximum(yMax);
+            }
         } else {
             const double yMax = localMax * (1.0 + m_autoscaleHeadroomLinear / 100.0);
             hist->SetMinimum(0.0);
             hist->GetYaxis()->SetRangeUser(0.0, yMax);
             hist->SetMaximum(yMax);
-        }
-    }
-
-    // Apply matching minimum to all overlays on this pad
-    for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
-        if (!overlay || overlay == hist) continue;
-        if (newLogy) {
-            overlay->SetMinimum(0.5);
-        } else {
-            overlay->SetMinimum(0.0);
+            for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+                if (!overlay || overlay == hist) continue;
+                overlay->SetMinimum(0.0);
+                overlay->GetYaxis()->SetRangeUser(0.0, yMax);
+                overlay->SetMaximum(yMax);
+            }
         }
     }
 
@@ -341,8 +367,8 @@ void QMainCanvas::toggleLogY()
     pad->Modified();
     pad->Update();
 
-    CommandPrompt::getInstance()->appendPlainText(newLogy ? "Scale set to Logarithmic (L).\n"
-                                                           : "Scale set to Linear (L).\n");
+    CommandPrompt::logDebug("Display",
+        newLogy ? "Scale set to Logarithmic (L)." : "Scale set to Linear (L).");
 
     updateAxisStatusLabels();
     if (canvas) {
@@ -548,20 +574,21 @@ void QMainCanvas::updateAxisStatusLabels()
 void QMainCanvas::translateplusTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-
-    // Remove drawn lines/markers when panning
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
         TAxis *xAxis = hist->GetXaxis();
-        const Int_t first  = xAxis->GetFirst();
-        const Int_t last   = xAxis->GetLast();
-        const Int_t step   = std::max(1, (last - first) / 33);
-        const Int_t maxBin = hist->GetNbinsX();
-        const Int_t newFirst = std::min(maxBin, first + step);
+        const Int_t first    = xAxis->GetFirst();
+        const Int_t last     = xAxis->GetLast();
+        const Int_t span     = std::max(1, last - first);
+        const Int_t step     = std::max(1, span / 33);
+        const Int_t maxBin   = hist->GetNbinsX();
         const Int_t newLast  = std::min(maxBin, last + step);
+        const Int_t newFirst = std::max(1, newLast - span);
         xAxis->SetRange(newFirst, newLast);
+        CommandPrompt::logDebug("Display", QString("Fine pan right: bins [%1, %2].").arg(newFirst).arg(newLast));
     }
 
     ColorTheFrameOfTheHistogram();
@@ -576,24 +603,26 @@ void QMainCanvas::translateplusTheScreen()
 // QMainCanvas::translateminusTheScreen
 //==============================================================================
 // Pans the spectrum display horizontally to the left (toward lower channels)
-// by ~3% of the visible window width. Triggered by the Left Arrow key.
+// by ~3% of the visible window width. Triggered by the Left Arrow key or '<' button.
 //==============================================================================
 void QMainCanvas::translateminusTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-
-    // Remove drawn lines/markers when panning
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
         TAxis *xAxis = hist->GetXaxis();
         const Int_t first    = xAxis->GetFirst();
         const Int_t last     = xAxis->GetLast();
-        const Int_t step     = std::max(1, (last - first) / 33);
+        const Int_t span     = std::max(1, last - first);
+        const Int_t step     = std::max(1, span / 33);
+        const Int_t maxBin   = hist->GetNbinsX();
         const Int_t newFirst = std::max(1, first - step);
-        const Int_t newLast  = std::max(1, last - step);
+        const Int_t newLast  = std::min(maxBin, newFirst + span);
         xAxis->SetRange(newFirst, newLast);
+        CommandPrompt::logDebug("Display", QString("Fine pan left: bins [%1, %2].").arg(newFirst).arg(newLast));
     }
 
     ColorTheFrameOfTheHistogram();
@@ -613,18 +642,21 @@ void QMainCanvas::translateminusTheScreen()
 void QMainCanvas::shiftDisplayLeft75()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
         TAxis *xAxis = hist->GetXaxis();
         const Int_t first    = xAxis->GetFirst();
         const Int_t last     = xAxis->GetLast();
-        const Int_t width    = last - first;
-        const Int_t step     = std::max(1, static_cast<Int_t>(width * 0.75));
+        const Int_t span     = std::max(2, last - first);
+        const Int_t step     = std::max(1, static_cast<Int_t>(span * 0.75));
+        const Int_t maxBin   = hist->GetNbinsX();
         const Int_t newFirst = std::max(1, first - step);
-        const Int_t newLast  = std::max(newFirst + 2, last - step);
+        const Int_t newLast  = std::min(maxBin, newFirst + span);
         xAxis->SetRange(newFirst, newLast);
+        CommandPrompt::logDebug("Display", QString("Shifted display 3/4 left (<): bins [%1, %2].").arg(newFirst).arg(newLast));
     }
 
     ColorTheFrameOfTheHistogram();
@@ -633,7 +665,6 @@ void QMainCanvas::shiftDisplayLeft75()
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
-    CommandPrompt::getInstance()->appendPlainText("Shifted display 3/4 left (<).\n");
 }
 
 //==============================================================================
@@ -645,19 +676,21 @@ void QMainCanvas::shiftDisplayLeft75()
 void QMainCanvas::shiftDisplayRight75()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
         TAxis *xAxis = hist->GetXaxis();
         const Int_t first    = xAxis->GetFirst();
         const Int_t last     = xAxis->GetLast();
-        const Int_t width    = last - first;
-        const Int_t step     = std::max(1, static_cast<Int_t>(width * 0.75));
+        const Int_t span     = std::max(2, last - first);
+        const Int_t step     = std::max(1, static_cast<Int_t>(span * 0.75));
         const Int_t maxBin   = hist->GetNbinsX();
         const Int_t newLast  = std::min(maxBin, last + step);
-        const Int_t newFirst = std::min(newLast - 2, first + step);
-        xAxis->SetRange(std::max(1, newFirst), newLast);
+        const Int_t newFirst = std::max(1, newLast - span);
+        xAxis->SetRange(newFirst, newLast);
+        CommandPrompt::logDebug("Display", QString("Shifted display 3/4 right (>): bins [%1, %2].").arg(newFirst).arg(newLast));
     }
 
     ColorTheFrameOfTheHistogram();
@@ -666,20 +699,19 @@ void QMainCanvas::shiftDisplayRight75()
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
-    CommandPrompt::getInstance()->appendPlainText("Shifted display 3/4 right (>).\n");
 }
 
 //==============================================================================
 // QMainCanvas::translatedownTheScreen
 //==============================================================================
-// Expands the vertical count scale (zooms out vertically by 1.10x).
+// Expands the vertical count scale (zooms out vertically by 1.10x / 1.25x log).
 // Triggered by the Down Arrow key or mouse wheel scroll up.
 //==============================================================================
 void QMainCanvas::translatedownTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TVirtualPad *pad = nullptr;
     if (canvas && canvas->getCanvas()) {
@@ -687,20 +719,35 @@ void QMainCanvas::translatedownTheScreen()
         if (!pad) pad = canvas->getCanvas();
     }
     const bool isLog = (pad && pad->GetLogy() != 0);
-    const double curMin = isLog ? 0.5 : 0.0;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
+        double curMin = hist->GetMinimum();
+        if (curMin == -1111.0 || (isLog && curMin <= 0.0)) {
+            curMin = isLog ? 0.5 : 0.0;
+        }
         double curMax = hist->GetMaximum();
-        if (curMax <= curMin) curMax = 10.0;
+        if (curMax == -1111.0 || curMax <= curMin) curMax = curMin + 10.0;
         const double newMax = isLog ? curMax * 1.25 : curMax * 1.10;
         hist->GetYaxis()->SetRangeUser(curMin, newMax);
         hist->SetMaximum(newMax);
         hist->SetMinimum(curMin);
+
+        for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->GetYaxis()->SetRangeUser(curMin, newMax);
+            overlay->SetMaximum(newMax);
+            overlay->SetMinimum(curMin);
+        }
+        CommandPrompt::logDebug("Display",
+            QString("Expanded Y scale: Y-Min=%1, Y-Max=%2 (%3).")
+                .arg(curMin, 0, 'g', 4).arg(newMax, 0, 'g', 4)
+                .arg(isLog ? "log" : "lin"));
     }
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
@@ -709,14 +756,14 @@ void QMainCanvas::translatedownTheScreen()
 //==============================================================================
 // QMainCanvas::translateupTheScreen
 //==============================================================================
-// Compresses the vertical count scale (zooms in vertically by 1.10x).
-// Triggered by the Up Arrow key or mouse wheel scroll down.
+// Compresses the vertical count scale (zooms in vertically by 1.10x / 1.25x log).
+// Triggered by mouse wheel scroll down.
 //==============================================================================
 void QMainCanvas::translateupTheScreen()
 {
     IdentifyLastClickedHistogram(mousePilgrimX, mousePilgrimY);
-
-    clearDrawnObjects();
+    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
+        SelectedElement_j < 1 || SelectedElement_j >= 12) return;
 
     TVirtualPad *pad = nullptr;
     if (canvas && canvas->getCanvas()) {
@@ -724,23 +771,38 @@ void QMainCanvas::translateupTheScreen()
         if (!pad) pad = canvas->getCanvas();
     }
     const bool isLog = (pad && pad->GetLogy() != 0);
-    const double curMin = isLog ? 0.5 : 0.0;
 
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (hist) {
+        double curMin = hist->GetMinimum();
+        if (curMin == -1111.0 || (isLog && curMin <= 0.0)) {
+            curMin = isLog ? 0.5 : 0.0;
+        }
         double curMax = hist->GetMaximum();
-        if (curMax > (isLog ? curMin + 2.0 : 2.0)) {
+        if (curMax > (isLog ? curMin + 2.0 : curMin + 2.0)) {
             const double newMax = isLog ? curMax / 1.25 : curMax / 1.10;
             if (newMax > curMin + 1.0) {
                 hist->GetYaxis()->SetRangeUser(curMin, newMax);
                 hist->SetMaximum(newMax);
                 hist->SetMinimum(curMin);
+
+                for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+                    if (!overlay || overlay == hist) continue;
+                    overlay->GetYaxis()->SetRangeUser(curMin, newMax);
+                    overlay->SetMaximum(newMax);
+                    overlay->SetMinimum(curMin);
+                }
+                CommandPrompt::logDebug("Display",
+                    QString("Compressed Y scale: Y-Min=%1, Y-Max=%2 (%3).")
+                        .arg(curMin, 0, 'g', 4).arg(newMax, 0, 'g', 4)
+                        .arg(isLog ? "log" : "lin"));
             }
         }
     }
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
@@ -763,8 +825,6 @@ void QMainCanvas::adjustAxisRange(const QString &axisName, bool increase, bool f
     }
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
-
-    clearDrawnObjects();
 
     TAxis *xAxis = hist->GetXaxis();
     if (!xAxis) return;
@@ -824,6 +884,12 @@ void QMainCanvas::adjustAxisRange(const QString &axisName, bool increase, bool f
         hist->GetYaxis()->SetRangeUser(yMin, yMax);
         hist->SetMinimum(yMin);
         hist->SetMaximum(yMax);
+        for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->GetYaxis()->SetRangeUser(yMin, yMax);
+            overlay->SetMinimum(yMin);
+            overlay->SetMaximum(yMax);
+        }
     } else if (axisName == "YMax") {
         if (increase) {
             yMax += shiftFactor * ySpan;
@@ -834,13 +900,25 @@ void QMainCanvas::adjustAxisRange(const QString &axisName, bool increase, bool f
         hist->GetYaxis()->SetRangeUser(yMin, yMax);
         hist->SetMinimum(yMin);
         hist->SetMaximum(yMax);
+        for (TH1F *overlay : HijC[SelectedElement_i][SelectedElement_j]) {
+            if (!overlay || overlay == hist) continue;
+            overlay->GetYaxis()->SetRangeUser(yMin, yMax);
+            overlay->SetMinimum(yMin);
+            overlay->SetMaximum(yMax);
+        }
     }
 
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
+    CommandPrompt::logDebug("Display",
+        QString("Adjusted %1 (%2%3): X=[%4, %5], Y=[%6, %7].")
+            .arg(axisName, increase ? "+" : "-", fineStep ? " fine" : "")
+            .arg(xMin, 0, 'g', 5).arg(xMax, 0, 'g', 5)
+            .arg(yMin, 0, 'g', 5).arg(yMax, 0, 'g', 5));
 }
 
 #include <QInputDialog>
@@ -858,25 +936,33 @@ void QMainCanvas::zoomAroundCursor(Int_t x, Int_t y)
     if (!hist) return;
     
     TAxis *xAxis = hist->GetXaxis();
+    const int nBins = xAxis->GetNbins();
     int currentMin = xAxis->GetFirst();
     int currentMax = xAxis->GetLast();
     int width = currentMax - currentMin;
     
-    if (width >= xAxis->GetNbins() - 2) {
+    if (width >= nBins - 2) {
         width = m_defaultZoomWidth > 0 ? m_defaultZoomWidth : 200;
     }
+    width = std::min(width, std::max(1, nBins - 1));
     
     int newMin = std::max(1, binX - width / 2);
-    int newMax = std::min(xAxis->GetNbins(), binX + width / 2);
+    int newMax = newMin + width;
+    if (newMax > nBins) {
+        newMax = nBins;
+        newMin = std::max(1, newMax - width);
+    }
     
     xAxis->SetRange(newMin, newMax);
     adjustYAxisToVisibleMax(hist);
     
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
+    CommandPrompt::logDebug("Display", QString("Centered zoom at bin %1 -> bins [%2, %3] (X).").arg(binX).arg(newMin).arg(newMax));
 }
 
 //==============================================================================
@@ -906,26 +992,34 @@ void QMainCanvas::goToEnergy()
     
     // Validate bounds
     TAxis *xAxis = hist->GetXaxis();
+    const int nBins = xAxis->GetNbins();
     if (targetBin < 1) targetBin = 1;
-    if (targetBin > xAxis->GetNbins()) targetBin = xAxis->GetNbins();
+    if (targetBin > nBins) targetBin = nBins;
 
     int currentMin = xAxis->GetFirst();
     int currentMax = xAxis->GetLast();
     int width = currentMax - currentMin;
     
-    if (width >= xAxis->GetNbins() - 2) {
+    if (width >= nBins - 2) {
         width = m_defaultZoomWidth > 0 ? m_defaultZoomWidth : 200;
     }
+    width = std::min(width, std::max(1, nBins - 1));
     
     int newMin = std::max(1, targetBin - width / 2);
-    int newMax = std::min(xAxis->GetNbins(), targetBin + width / 2);
+    int newMax = newMin + width;
+    if (newMax > nBins) {
+        newMax = nBins;
+        newMin = std::max(1, newMax - width);
+    }
     
     xAxis->SetRange(newMin, newMax);
     adjustYAxisToVisibleMax(hist);
     
     ColorTheFrameOfTheHistogram();
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
+    renderPeakLabels(SelectedElement_i, SelectedElement_j);
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
     updateAxisStatusLabels();
+    CommandPrompt::logDebug("Display", QString("Jumped to %1 (bin %2) -> bins [%3, %4] (P).").arg(val).arg(targetBin).arg(newMin).arg(newMax));
 }

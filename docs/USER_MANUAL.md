@@ -1,6 +1,6 @@
 # NuTrackN (NuGASP) Official User Manual
 
-**Version 2.0.6** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
+**Version 2.0.7** — *Nuclear Gamma-Ray & Particle Spectroscopy Analysis Environment*  
 **Architecture**: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine  
 **Quick Help Shortcut**: Press **`H`** or **`?`** (or **`F1`**) on the spectrum canvas at any time.
 
@@ -34,9 +34,10 @@
 - [4. Canvas Navigation, Scaling & Real-Time HUD](#4-canvas-navigation-scaling--real-time-hud)
     - [4.1 Display Scales & Vertical Adjustments](#41-display-scales--vertical-adjustments)
     - [4.2 Horizontal Panning & Zooming](#42-horizontal-panning--zooming)
-    - [4.3 Mouse Navigation & Interactive Marker Dragging](#43-mouse-navigation--interactive-marker-dragging)
-    - [4.4 Real-Time HUD Peak Inspector](#44-real-time-hud-peak-inspector)
+    - [4.3 Mouse Navigation & Top Status Header Bar](#43-mouse-navigation--top-status-header-bar)
+    - [4.4 Real-Time HUD Peak Inspector (`Ctrl` Hover)](#44-real-time-hud-peak-inspector-ctrl-hover)
     - [4.5 Multi-Pad Grid Layout & Cross-Pad Synchronization](#45-multi-pad-grid-layout--cross-pad-synchronization)
+    - [4.6 Display Parameters Dialog (`DD`) & Scale Preservation (`DN` / `MN` / `ZN`)](#46-display-parameters-dialog-dd--scale-preservation-dn--mn--zn)
 - [5. Peak Integration & Region of Interest (ROI) Analysis](#5-peak-integration--region-of-interest-roi-analysis)
     - [5.1 Setting Boundary Markers](#51-setting-boundary-markers)
     - [5.2 Mathematical Formulation of Gross & Net Peak Area](#52-mathematical-formulation-of-gross--net-peak-area)
@@ -248,14 +249,14 @@ Under this "copyleft" license, you are free to inspect, run, modify, and redistr
 If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:
 
 > **Text Citation:**  
-> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.6, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
+> L. Stan, *NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment*, Version 2.0.7, Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).
 
 ```bibtex
 @misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.6},
+  version      = {2.0.7},
   institution  = {Horia Hulubei National Institute for R&D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -484,10 +485,10 @@ This 60-second walkthrough introduces the core keyboard workflow and real-time i
         - Press **`Up Arrow`** (or type **`FY`**) to instantly auto-scale the vertical axis to the maximum peak height in the current view.
 5. **Inspect Photopeaks with the Live Zoom HUD (`Ctrl`)**:
     - **Hold `Ctrl`** while hovering your mouse cursor over any photopeak.
-    - The floating **Zoom HUD Peak Inspector** dynamically appears in the canvas corner:
-        - Displays a high-magnification real-time zoomed sub-canvas of the photopeak region centered at the cursor.
-        - Displays the exact cursor channel, centroid, and amplitude counts.
-        - Calculates the local peak width (estimated FWHM in channels) for an instant resolution check.
+    - The floating **Zoom HUD Peak Inspector** dynamically appears in the canvas corner (automatically flipping to the opposite corner if your cursor approaches it):
+        - Displays a real-time $\pm 25$-channel magnified sub-canvas centered at the cursor with a red target reticle (`[ch]`).
+        - Displays the target channel, calibrated energy (when calibrated), and bin counts (`Ch ... | ... cts`).
+        - Overlays active Gaussian fit curves and background baselines (with a `Fit: μ=... σ=...` badge) when hovering over a fitted peak.
     - **Instant 1-Click Peak Fit**: While holding **`Ctrl`**, click the **Left Mouse Button** on a peak to instantly fit a Gaussian curve with baseline subtraction.
     - Release **`Ctrl`** to dismiss the HUD.
 6. **Calculate Peak Area (`I` + `B` $\rightarrow$ `CJ`, or `I` $\rightarrow$ `CI`)**:
@@ -737,56 +738,85 @@ NuTrackN can record peak integration and Gaussian fit outputs directly to a stru
 ## 4. Canvas Navigation, Scaling & Real-Time HUD
 
 ### 4.1 Display Scales & Vertical Adjustments
-- **`L`**: Toggle between **Linear** and **Logarithmic** Y-axis display (automatically clamping log minimum to `0.5` counts and computing peak headroom across both the primary histogram and any overlaid spectra).
-- **`U` / `D`**: Vertically expand or compress the active histogram counts.
+- **`L` (or Toolbar `L`)**: Toggle between **Linear** and **Logarithmic** Y-axis display (automatically clamping log minimum to `0.5` counts and computing peak headroom across both the primary histogram and any overlaid spectra).
+- **`Mouse Wheel` / `↓` (`Down Arrow`)**: Scroll the mouse wheel up (or press **`↓`**) to expand the vertical Y-axis range; scroll down to compress it. Press **`↑`** (`Up Arrow`, or Toolbar **`FY`**) to autoscale Y to the visible peak maximum (`FY`).
 - **`FO`**: Set the vertical axis maximum (Y-Max) directly to the count level under the cursor.
 - **`FU`**: Set the vertical axis minimum (Y-Min) directly to the count level under the cursor.
-- **`MZ`**: Draw a reference baseline line at zero counts.
+- **`MZ`**: Draw a dashed reference baseline line at zero counts (linear scale only; lowers Y-Min slightly below zero if needed so the baseline is visible).
 
 ### 4.2 Horizontal Panning & Zooming
-- **`E` (Expand)**: Zooms the horizontal axis to fit the region between the two most recently placed **`Spacebar`** markers.
-- **`X`**: Centers the view around the current cursor location with 2× magnification.
-- **`<` / `>`**: Pan the visible spectrum window 75% to the left or right.
-- **`FF` (or `FS`)**: Full display reset (both horizontal and vertical axes auto-scale to full dataset, equivalent to `FX` + `FY`).
-- **`FX` / `FY`**: Reset only the horizontal (energy/channel) or vertical (counts, with configurable 10% linear / 30% log headroom above the highest visible peak across all overlays) scale.
-- **`=`**: Redraw and refresh canvas.
+- **`E` (Expand)**: Zooms the horizontal axis using **`Spacebar`** zoom markers:
+    - **Single Marker (First Zoom or After `=` / `ZA`)**: If only **one** `Spacebar` marker is in memory, **`E`** zooms between the **left-hand edge of the visible screen** and that marker.
+    - **Two or More Markers**: Zooms between the **two most recently placed** `Spacebar` markers. Because `Spacebar` markers remain in memory across sequential zooms until cleared by **`=`** or **`ZA`**, placing a single new `Spacebar` marker after an initial zoom and pressing **`E`** pairs your new marker with the previous one.
+- **`X`**: Centers the current horizontal zoom window around the cursor (or zooms to the `Default Zoom Width` configured in **`DD`** when the spectrum is unzoomed).
+- **`P`**: Prompts for a target energy (if calibrated) or channel and centers the horizontal zoom window on that location.
+- **`←` / `→` (`Left` / `Right Arrow`), `Shift + Mouse Wheel`, & Toolbar `<` / `>`**: Fine-pan the visible spectrum window horizontally by ~3% of its current width without changing the zoom width.
+- **`<` / `>` (or `,` / `.`)**: Large horizontal pan—shift the visible spectrum window 75% to the left or right.
+- **`FF` (or `FS`, Toolbar `FF`)**: Full display reset (both horizontal and vertical axes auto-scale to full dataset, equivalent to `FX` + `FY`).
+- **`FX` / `FY` (or Toolbar `FX` / `FY`)**: Reset only the horizontal (energy/channel) or vertical (counts, with configurable 10% linear / 30% log headroom above the highest visible peak across all overlays) scale.
+- **`=` (or Toolbar `=`)**: Clear drawn markers (including `Spacebar` zoom history), fit curves, peak labels, and comparison overlays on the active pad and refresh the display.
 
-### 4.3 Mouse Navigation & Interactive Marker Dragging
-- **Rubber-band Box Zoom**: Left-click and drag a rectangular region over any spectrum feature to zoom directly into that bounding box.
-- **Interactive Marker Dragging**: Left-click and drag any active marker along the spectrum curve to fine-tune integration or fitting limits interactively.
-- **Clickable Axis Labels**: Left-click or right-click (with optional `Ctrl` modifier for fine/coarse stepping) the `X Min`, `X Max`, `Y Min`, or `Y Max` readout boxes on the **top status header bar** to adjust limits in discrete steps.
+### 4.3 Mouse Navigation & Top Status Header Bar
+The **Top Status Header Bar** above the canvas is organized into two rows:
 
-### 4.4 Real-Time HUD Peak Inspector
-Located in the upper right quadrant of the spectrum canvas, the **HUD Inspector** computes real-time statistics for whatever feature the cursor is hovering over:
-- **Cursor Energy & Channel**: Exact interpolated calibration coordinate.
-- **Counts / Bin**: Discrete histogram content $C(ch)$.
-- **Local Centroid**: Moment-calculated peak center within cursor proximity:
-  $$\langle ch \rangle = \frac{\sum_{i \in \text{win}} i \cdot C_i}{\sum_{i \in \text{win}} C_i}$$
-- **Local FWHM**: Instantaneous full-width at half-maximum derived from local variance.
+- **Row 1 — Clickable Axis Limits (`X Min`, `X Max`, `Y Min`, `Y Max`)**: Displays the active pad's visible horizontal and vertical bounds. **Left-Click** any box to increase that limit by **20%**, **Right-Click** to decrease by **20%**, or hold **`Ctrl`** while clicking for fine **2.5%** steps.
+- **Row 2 — Live Cursor Readout (`Channel`, `Energy`, `Counts`, `Y`)**: Displays real-time values for whichever pad the cursor is hovering over:
+    - **`Channel`**: 0-indexed histogram channel under the cursor.
+    - **`Energy`**: Calibrated energy in keV when an energy calibration is active, or the channel number when uncalibrated.
+    - **`Counts`**: Discrete bin content $C(ch)$ of the hovered channel.
+    - **`Y`**: Continuous vertical axis count coordinate at the cursor's vertical position (the exact value applied by **`FO`** and **`FU`**).
+- **Other Mouse Interactions on the Canvas**:
+    - **Mouse Wheel Scaling & Panning**: Scroll vertically to expand or compress the Y-axis count scale; hold **`Shift + Mouse Wheel`** (or scroll horizontally) to fine-pan horizontally (~3%).
+    - **Pad Selection (`Left-Click`)**: Click inside any pad to make it the active pad (updating Row 1's axis limits and the azure pad border).
+    - **1-Click Peak Fit (`Ctrl + Left-Click`)**: Hold **`Ctrl`** and left-click on a photopeak to run an automated single-peak Gaussian fit at that position.
+    - **Context Menu (`Right-Click`)**: Right-click on the canvas to open the **Spectrum Actions** menu (**Add Line**, **Add Column**, **Delete Line**, **Delete Column**, **Refresh Display**).
+
+### 4.4 Real-Time HUD Peak Inspector (`Ctrl` Hover)
+Hold **`Ctrl`** while hovering over the spectrum canvas to display the floating **Zoom HUD** (`QZoomHUD`) in the top-right corner (automatically flipping to the top-left corner if your cursor enters the top-right region):
+
+- **Magnified Sub-Canvas**: Renders a live $\pm 25$-channel view around the cursor channel with a red dashed target reticle (`[ch]`) and 0-indexed window bounds.
+- **Cursor Readout**: Displays **`Ch <ch> (<energy> keV) | <counts> cts`** (or **`Ch <ch> | <counts> cts`** when uncalibrated).
+- **Fit & Baseline Overlay**: When an active Gaussian fit overlaps the window (including **`Ctrl + Left-Click`** 1-click AutoFit or **`CG`/`CV`** fits), overlays the fitted curve and background baseline alongside a **`Fit: μ=... σ=...`** badge.
 
 ### 4.5 Multi-Pad Grid Layout & Cross-Pad Synchronization
-NuTrackN supports flexible multi-pad canvas grids alongside cross-pad axis synchronization across all visible windows:
+NuTrackN supports flexible multi-pad canvas grids (up to **`10 × 10`** sub-pads) alongside cross-pad axis synchronization across all visible windows:
 
 #### Multi-Pad Grid Layout:
 - **`Ctrl + →`**: Add a new display column to the canvas grid.
-- **`Ctrl + ←`**: Remove a display column.
+- **`Ctrl + ←`**: Remove the currently selected display column (shifting remaining columns left).
 - **`Ctrl + ↑`**: Add a new display row.
-- **`Ctrl + ↓`**: Remove a display row.
-- **Pad Selection**: Click inside any sub-window to set it as the active pad (highlighted with an accent border). All keyboard hotkeys, marker placements, and zooms immediately apply to the active pad.
+- **`Ctrl + ↓`**: Remove the currently selected display row (shifting remaining rows up).
+- **Mouse-Only Context Menu (`Right-Click`)**: Right-clicking anywhere on the canvas opens the **Spectrum Actions** menu (**Add Line**, **Add Column**, **Delete Line**, **Delete Column**, and **Refresh Display**) for mouse-only grid management.
+- **Pad Initialization & State Preservation**: Newly added rows or columns initialize with a clean copy of the active pad's histogram (preserving its energy calibration and theme spectrum color), while all existing pads keep their current X/Y zoom ranges, overlays, fit annotations, and linear/logarithmic scale modes.
+- **Pad Selection**: Click inside any sub-window to set it as the active pad (highlighted with an azure accent border). All keyboard hotkeys, marker placements, and zooms apply to the active pad.
 
 #### Cross-Pad & Overlay Synchronization:
-- **`SX`**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
-- **`SY`**: Propagate the active pad's vertical count scale (maximum, minimum, and linear/logarithmic mode) across all visible sub-pads.
+- **`SX` (or Toolbar `SX`)**: Propagate the active pad's horizontal display range (channels or calibrated energy) across all visible sub-pads and their overlaid spectra.
+- **`SY` (or Toolbar `SY`)**: Propagate the active pad's vertical count scale (maximum, minimum—including negative minima—and linear/logarithmic mode) across all visible sub-pads and their overlaid spectra.
+
+### 4.6 Display Parameters Dialog (`DD`) & Scale Preservation (`DN` / `MN` / `ZN`)
+- **Display Parameters Dialog (`DD` — `DisplayParamsDialog`)**: Press **`D`** then **`D`** on the canvas to configure display and grid preferences:
+    - **Autoscale Vertical Headroom (`FY` / `↑` / `FF`)**: Adjust the percentage of empty headroom left above the highest visible peak in **Linear** scale (default: `10.0%`) and **Logarithmic** scale (default: `30.0%`).
+    - **Canvas Grid & Zoom Navigation**: Toggle **Show X Grid** and **Show Y Grid**, customize **X / Y Grid Size (Divisions)** (`2–100`, default: `10`), **Grid Line Width** (`1–5 px`), and **Grid Style** (**Dashed**, **Dotted**, or **Solid**), and set the **Default Zoom Width** (`10–10240 ch`, default: `200 ch`) used by **`X`** and **`P`** when the spectrum is unzoomed.
+    - **Y-Axis Scale Function**: Switch the active pad between **Normal (Linear)** and **Logarithmic** scaling.
+    - **Current Visible Axis Limits**: Inspect or type exact numeric overrides for **`X Min`**, **`X Max`**, **`Y Min`**, and **`Y Max`** (`Apply` / `OK`).
+- **Scale Behavior When Loading a New Spectrum (`DN` / `MN` / `ZN`)**:
+    - **`DN`**: Open a selection prompt to choose between **Auto Scale** and **Preserve Scale** when opening a new spectrum (`N` / **`Read`**).
+    - **`MN`**: Set load behavior directly to **Preserve Scale** (retains the active pad's current horizontal and vertical zoom limits when a new spectrum is loaded).
+    - **`ZN`**: Set load behavior directly to **Auto Scale** (automatically unzooms and scales to the newly loaded spectrum).
 
 ---
 
 ## 5. Peak Integration & Region of Interest (ROI) Analysis
 
 ### 5.1 Setting Boundary Markers
-- **`Spacebar`**: Place generic analysis marker at mouse pointer.
-- **`B`**: Place Background marker (`Blue`).
-- **`I`**: Place Integration boundary marker (`Yellow`).
-- **`[` and `]`**: Convenient left and right boundary placement.
+All interactive markers are placed at the current mouse cursor channel on the active pad (default colors are shown below and can be customized via **`MC`** or **`Ctrl+T`**):
+- **`Spacebar`**: Place generic **Zoom / Calibration marker** (`Cyan`). Used in pairs (or as a single right-hand boundary from the current left screen edge) to zoom with **`E`** ([Section 4.2](#42-horizontal-panning--zooming)), and in pairs for quick 2-point energy calibration (**`CA2`** in [Section 6.2](#62-2-point-linear-energy-calibration-ca--ca2)).
+- **`B`**: Place **Background boundary marker** (`Blue`). Placed in consecutive `[left, right]` pairs; each completed pair shades a hatched background estimation window used by **`CB`**, **`CJ`** ([Section 5.2](#52-mathematical-formulation-of-gross--net-peak-area)), and multi-peak Gaussian fits (**`CG` / `CV`** in [Chapter 7](#7-multi-peak-gaussian-fitting--deconvolution)). Cleared with **`ZB`** and redrawn with **`MB`**.
+- **`I`**: Place **Integration ROI boundary marker** (`Yellow`). Placed in consecutive `[left, right]` pairs around photopeaks for gross (**`CI`**) and net background-subtracted (**`CJ`**) peak integration ([Section 5.2](#52-mathematical-formulation-of-gross--net-peak-area)). Cleared with **`ZI`** and redrawn with **`MI`**.
+- **`R`**: Place **Fitting Range boundary marker** (`Orange-Yellow`). Up to two `R` markers define and shade the active fitting window $[r_{\min}, r_{\max}]$ for polynomial background fits (**`CF`**) and multi-peak Gaussian deconvolution (**`CG` / `CV`** in [Chapter 7](#7-multi-peak-gaussian-fitting--deconvolution)), or quick 2-peak calibration (**`K`**). Cleared with **`ZR`** and redrawn with **`MR`**.
+- **`G` (or `+`)** and **`-`**: Place or remove a **Gaussian Peak Centroid marker** (`Pink`). Pressing **`G`** or **`+`** drops an initial peak centroid seed at the cursor for multi-peak Gaussian fitting (**`CG` / `CV`** in [Chapter 7](#7-multi-peak-gaussian-fitting--deconvolution)); pressing **`-`** deletes the `G` marker closest to the cursor. All `G` markers are cleared with **`ZG`** and redrawn with **`MG`**.
+- **`W`**: Place **Coincidence Gate window marker** (`Magenta`). Placed in `[left, right]` pairs to shade 1D gate intervals for 2D coincidence matrix slicing ([Chapter 9](#9-2d-coincidence-matrices--gating-analysis)). Cleared with **`ZW`** and redrawn with **`MW`**.
 
 ### 5.2 Mathematical Formulation of Gross & Net Peak Area
 Given a photopeak bounded by a pair of integration markers ($ch_{min}$ and $ch_{max}$), let $y_i$ denote the bin content at channel center $x_i$:

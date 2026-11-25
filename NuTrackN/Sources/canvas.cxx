@@ -169,6 +169,12 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     labelX = labelChannel;
     labelY = labelCounts;
 
+    const QString axisTip = tr("Left-Click: +20% | Right-Click: -20% | Ctrl+Click: 2.5% fine step");
+    labelXMin->setToolTip(axisTip);
+    labelXMax->setToolTip(axisTip);
+    labelYMin->setToolTip(axisTip);
+    labelYMax->setToolTip(axisTip);
+
     topGrid->addWidget(labelXMin, 0, 0);
     topGrid->addWidget(labelXMax, 0, 1);
     topGrid->addWidget(labelYMin, 0, 2);
@@ -309,12 +315,14 @@ QMainCanvas::QMainCanvas(QWidget *parent)
     QPushButton *btnLeft = makeButton("<", topContainer, true);
     btnLeft->setFixedWidth(45);
     btnLeft->setFixedHeight(36);
+    btnLeft->setToolTip(tr("Fine pan left ~3% of visible window [Shortcuts: Left Arrow / Shift+Wheel]"));
     connect(btnLeft, &QPushButton::clicked, this, &QMainCanvas::translateminusTheScreen);
     navRow->addWidget(btnLeft);
 
     QPushButton *btnRight = makeButton(">", topContainer, true);
     btnRight->setFixedWidth(45);
     btnRight->setFixedHeight(36);
+    btnRight->setToolTip(tr("Fine pan right ~3% of visible window [Shortcuts: Right Arrow / Shift+Wheel]"));
     connect(btnRight, &QPushButton::clicked, this, &QMainCanvas::translateplusTheScreen);
     navRow->addWidget(btnRight);
 
@@ -867,13 +875,24 @@ void QMainCanvas::clicked1()
     HijF[SelectedElement_i][SelectedElement_j]->Draw();
 
     if (m_loadBehavior == LoadBehavior::PreserveScale && hasPrevScale) {
-        if (wasZoomed) {
+        if (wasZoomed && HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()) {
             HijF[SelectedElement_i][SelectedElement_j]->GetXaxis()->SetRangeUser(prevXMin, prevXMax);
+            for (TH1F *ov : HijC[SelectedElement_i][SelectedElement_j]) {
+                if (ov && ov != HijF[SelectedElement_i][SelectedElement_j] && ov->GetXaxis()) {
+                    ov->GetXaxis()->SetRangeUser(prevXMin, prevXMax);
+                }
+            }
         }
         if (prevYMax > prevYMin) {
             HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(prevYMin, prevYMax);
             HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYMin);
             HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYMax);
+            for (TH1F *ov : HijC[SelectedElement_i][SelectedElement_j]) {
+                if (!ov || ov == HijF[SelectedElement_i][SelectedElement_j]) continue;
+                ov->GetYaxis()->SetRangeUser(prevYMin, prevYMax);
+                ov->SetMinimum(prevYMin);
+                ov->SetMaximum(prevYMax);
+            }
         }
     } else {
         // Autoscale behavior
@@ -1293,6 +1312,16 @@ bool QMainCanvas::executeMacroCommand(const QString &token)
         defineAreaLogFile();
     } else if (t == "ZF" || t == "ZL") {
         closeAreaLogFile();
+    } else if (t == "DD") {
+        openDisplayParamsDialog();
+    } else if (t == "DN") {
+        openLoadBehaviorDialog();
+    } else if (t == "MN") {
+        setLoadBehavior(LoadBehavior::PreserveScale);
+        CommandPrompt::logDebug("Display", "Display behavior set to Preserve Scale (MN).");
+    } else if (t == "ZN") {
+        setLoadBehavior(LoadBehavior::Autoscale);
+        CommandPrompt::logDebug("Display", "Display behavior set to Auto Scale (ZN).");
     } else if (t == "MZ") {
         drawZeroLine();
     } else {
@@ -1953,14 +1982,21 @@ void QMainCanvas::stepRun(int delta)
         }
         labelSpectrumFile->setText(disp);
     }
-    updateAxisStatusLabels();
-
     if (m_loadBehavior == LoadBehavior::PreserveScale) {
         if (wasZoomed && xAxis) {
             xAxis->SetRangeUser(prevXmin, prevXmax);
         }
-        HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYmin);
-        HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYmax);
+        if (prevYmax > prevYmin) {
+            HijF[SelectedElement_i][SelectedElement_j]->GetYaxis()->SetRangeUser(prevYmin, prevYmax);
+            HijF[SelectedElement_i][SelectedElement_j]->SetMinimum(prevYmin);
+            HijF[SelectedElement_i][SelectedElement_j]->SetMaximum(prevYmax);
+            for (TH1F *ov : HijC[SelectedElement_i][SelectedElement_j]) {
+                if (!ov || ov == HijF[SelectedElement_i][SelectedElement_j]) continue;
+                ov->GetYaxis()->SetRangeUser(prevYmin, prevYmax);
+                ov->SetMinimum(prevYmin);
+                ov->SetMaximum(prevYmax);
+            }
+        }
     } else {
         if (wasZoomed && xAxis) {
             xAxis->SetRangeUser(prevXmin, prevXmax);
@@ -1969,6 +2005,7 @@ void QMainCanvas::stepRun(int delta)
             adjustYAxisToVisibleMax(HijF[SelectedElement_i][SelectedElement_j]);
         }
     }
+    updateAxisStatusLabels();
 
     maxValueInHistogram = HijF[SelectedElement_i][SelectedElement_j]->GetBinContent(
         HijF[SelectedElement_i][SelectedElement_j]->GetMaximumBin());
@@ -2904,7 +2941,7 @@ void QMainCanvas::setYMax(double yVal)
             canvas->setFocus();
         }
 
-        CommandPrompt::getInstance()->appendPlainText(QString("Y-Max forced to %1 (FO)\n").arg(yCursorVal));
+        CommandPrompt::logDebug("Display", QString("Y-Max forced to %1 (FO).").arg(yCursorVal));
     }
 }
 
@@ -2959,7 +2996,7 @@ void QMainCanvas::setYMin(double yVal)
             canvas->setFocus();
         }
 
-        CommandPrompt::getInstance()->appendPlainText(QString("Y-Min forced to %1 (FU)\n").arg(yCursorVal));
+        CommandPrompt::logDebug("Display", QString("Y-Min forced to %1 (FU).").arg(yCursorVal));
     }
 }
 
@@ -3213,6 +3250,24 @@ void QMainCanvas::writeAreaLogData(double centroid, double fwhm, double gross, d
 void QMainCanvas::openDisplayParamsDialog() {
     DisplayParamsDialog dlg(this, this);
     dlg.exec();
+    if (canvas) canvas->setFocus();
+}
+
+void QMainCanvas::openLoadBehaviorDialog() {
+    QStringList items;
+    items << tr("Auto Scale") << tr("Preserve Scale");
+    const int currentIdx = (m_loadBehavior == LoadBehavior::PreserveScale) ? 1 : 0;
+    bool ok = false;
+    QString item = QInputDialog::getItem(this, tr("Set Display Behavior"),
+                                         tr("Select behavior on new spectrum:"), items, currentIdx, false, &ok);
+    if (ok && !item.isEmpty()) {
+        if (item == tr("Auto Scale")) {
+            setLoadBehavior(LoadBehavior::Autoscale);
+        } else {
+            setLoadBehavior(LoadBehavior::PreserveScale);
+        }
+        CommandPrompt::logDebug("Display", QString("Display behavior set to %1 (DN).").arg(item));
+    }
     if (canvas) canvas->setFocus();
 }
 

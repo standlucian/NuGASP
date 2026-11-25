@@ -221,24 +221,36 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
     }
     if (!m_mainCanvas) return;
 
-    TH1F *hist = m_mainCanvas->HijF[m_mainCanvas->SelectedElement_i][m_mainCanvas->SelectedElement_j];
+    const int targetI = (m_mainCanvas->PilgrimElement_i >= 1 && m_mainCanvas->PilgrimElement_i <= m_mainCanvas->maxElement_i)
+        ? m_mainCanvas->PilgrimElement_i
+        : m_mainCanvas->SelectedElement_i;
+    const int targetJ = (m_mainCanvas->PilgrimElement_j >= 1 && m_mainCanvas->PilgrimElement_j <= m_mainCanvas->maxElement_j)
+        ? m_mainCanvas->PilgrimElement_j
+        : m_mainCanvas->SelectedElement_j;
+
+    TH1F *hist = (targetI >= 1 && targetI < 12 && targetJ >= 1 && targetJ < 12)
+        ? m_mainCanvas->HijF[targetI][targetJ]
+        : nullptr;
     if (!hist) {
         m_zoomHUD->hide();
         return;
     }
 
-    // Determine target channel at cursor position
+    // Determine target channel at cursor position on the hovered pad without mutating SelectedElement
     int binX = 0;
+    TVirtualPad *hoverPad = fCanvas;
     if (fCanvas) {
-        fCanvas->cd((m_mainCanvas->SelectedElement_i - 1) * m_mainCanvas->maxElement_j + m_mainCanvas->SelectedElement_j);
+        hoverPad = fCanvas->cd((targetI - 1) * m_mainCanvas->maxElement_j + targetJ);
+        if (!hoverPad) hoverPad = fCanvas;
     }
     const std::string objectInfo = hist->GetObjectInfo(mouseX, mouseY);
     const size_t bPos = objectInfo.find("binx=");
     if (bPos != std::string::npos) {
         binX = std::atoi(objectInfo.c_str() + bPos + 5);
     }
-    if (binX < 1 || binX > hist->GetNbinsX()) {
-        binX = m_mainCanvas->getBinFromClick(mouseX, mouseY);
+    if ((binX < 1 || binX > hist->GetNbinsX()) && hoverPad) {
+        const Double_t xCoord = hoverPad->PadtoX(hoverPad->AbsPixeltoX(mouseX));
+        binX = hist->FindBin(xCoord);
     }
     if (binX < 1 || binX > hist->GetNbinsX()) {
         if (width() > 0) {
@@ -262,8 +274,8 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
     std::vector<TF1*> fitFuncs;
     std::vector<TF1*> bkgFuncs;
 
-    int el_i = m_mainCanvas->SelectedElement_i;
-    int el_j = m_mainCanvas->SelectedElement_j;
+    int el_i = targetI;
+    int el_j = targetJ;
     for (TObject *obj : m_mainCanvas->autoFitMarkers[el_i][el_j]) {
         if (TF1 *f = dynamic_cast<TF1*>(obj)) {
             TString fname = f->GetName();
@@ -348,7 +360,30 @@ void QRootCanvas::updateZoomHUD(int mouseX, int mouseY)
             }
             double curX = hist->GetBinCenter(binX);
             if (curX >= fMin && curX <= fMax) {
-                if (f->GetNpar() >= 3) {
+                const TString fname = f->GetName();
+                if (fname == "fullFunction" && f->GetNpar() >= 5) {
+                    const int npar = f->GetNpar();
+                    const bool uncoupled = (m_mainCanvas->m_uncoupleWidths || ((npar - 2) % 3 == 0 && (npar - 3) % 2 != 0));
+                    const int nPeaks = uncoupled ? (npar - 2) / 3 : (npar - 3) / 2;
+                    double bestDist = 1e18;
+                    double bestCent = 0.0, bestSig = 0.0;
+                    for (int p = 0; p < nPeaks; ++p) {
+                        const int cIdx = uncoupled ? (3 + 3 * p) : (4 + 2 * p);
+                        const int sIdx = uncoupled ? (4 + 3 * p) : 2;
+                        if (cIdx < npar && sIdx < npar) {
+                            const double c = f->GetParameter(cIdx);
+                            const double d = std::abs(c - curX);
+                            if (d < bestDist) {
+                                bestDist = d;
+                                bestCent = c;
+                                bestSig = std::abs(f->GetParameter(sIdx));
+                            }
+                        }
+                    }
+                    if (bestDist < 1e17) {
+                        fitInfo = QString("Fit: μ=%1 σ=%2").arg(bestCent, 0, 'f', 1).arg(bestSig, 0, 'f', 1);
+                    }
+                } else if (f->GetNpar() >= 3) {
                     double cent = f->GetParameter(1);
                     double sig = std::abs(f->GetParameter(2));
                     fitInfo = QString("Fit: μ=%1 σ=%2").arg(cent, 0, 'f', 1).arg(sig, 0, 'f', 1);
@@ -515,7 +550,30 @@ void QRootCanvas::showZoomHUDAtChannel(double channel, const QString &fitInfo, i
             if (resolvedFitInfo.isEmpty()) {
                 const double curX = hist->GetBinCenter(binX);
                 if (curX >= fMin && curX <= fMax) {
-                    if (f->GetNpar() >= 3) {
+                    const TString fname = f->GetName();
+                    if (fname == "fullFunction" && f->GetNpar() >= 5) {
+                        const int npar = f->GetNpar();
+                        const bool uncoupled = (m_mainCanvas->m_uncoupleWidths || ((npar - 2) % 3 == 0 && (npar - 3) % 2 != 0));
+                        const int nPeaks = uncoupled ? (npar - 2) / 3 : (npar - 3) / 2;
+                        double bestDist = 1e18;
+                        double bestCent = 0.0, bestSig = 0.0;
+                        for (int p = 0; p < nPeaks; ++p) {
+                            const int cIdx = uncoupled ? (3 + 3 * p) : (4 + 2 * p);
+                            const int sIdx = uncoupled ? (4 + 3 * p) : 2;
+                            if (cIdx < npar && sIdx < npar) {
+                                const double c = f->GetParameter(cIdx);
+                                const double d = std::abs(c - curX);
+                                if (d < bestDist) {
+                                    bestDist = d;
+                                    bestCent = c;
+                                    bestSig = std::abs(f->GetParameter(sIdx));
+                                }
+                            }
+                        }
+                        if (bestDist < 1e17) {
+                            resolvedFitInfo = QString("Fit: μ=%1 σ=%2").arg(bestCent, 0, 'f', 1).arg(bestSig, 0, 'f', 1);
+                        }
+                    } else if (f->GetNpar() >= 3) {
                         const double cent = f->GetParameter(1);
                         const double sig = std::abs(f->GetParameter(2));
                         resolvedFitInfo = QString("Fit: μ=%1 σ=%2").arg(cent, 0, 'f', 1).arg(sig, 0, 'f', 1);
@@ -1011,8 +1069,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_N:
                 // Z + N: Set load behavior to Autoscale
-                if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
-                CommandPrompt::getInstance()->appendPlainText("Display behavior: Auto Scale on new spectrum.\n");
+                if (m_mainCanvas) {
+                    m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
+                    CommandPrompt::logDebug("Display", "Display behavior set to Auto Scale on new spectrum (ZN).");
+                }
                 break;
             case Qt::Key_0:
             case Qt::Key_1:
@@ -1080,8 +1140,10 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                 break;
             case Qt::Key_N:
                 // M + N: Set load behavior to Preserve Scale
-                if (m_mainCanvas) m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
-                CommandPrompt::getInstance()->appendPlainText("Display behavior: Preserve Scale on new spectrum.\n");
+                if (m_mainCanvas) {
+                    m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
+                    CommandPrompt::logDebug("Display", "Display behavior set to Preserve Scale on new spectrum (MN).");
+                }
                 break;
             case Qt::Key_Z:
                 // M + Z: Draw a line at zero counts
@@ -1186,22 +1248,12 @@ void QRootCanvas::keyPressEvent(QKeyEvent *event)
                     m_mainCanvas->defineAreaLogFile();
                 }
                 break;
-            case Qt::Key_N: {
+            case Qt::Key_N:
                 // D + N: Open dialog to set display behavior
                 if (m_mainCanvas) {
-                    QStringList items;
-                    items << "Auto Scale" << "Preserve Scale";
-                    bool ok;
-                    QString item = QInputDialog::getItem(this, "Set Display Behavior",
-                                                         "Select behavior on new spectrum:", items, 0, false, &ok);
-                    if (ok && !item.isEmpty()) {
-                        if (item == "Auto Scale") m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::Autoscale);
-                        else m_mainCanvas->setLoadBehavior(QMainCanvas::LoadBehavior::PreserveScale);
-                        CommandPrompt::getInstance()->appendPlainText("Display behavior set to: " + item + "\n");
-                    }
+                    m_mainCanvas->openLoadBehaviorDialog();
                 }
                 break;
-            }
             case Qt::Key_M:
                 // D + M: Open Macro Dialog
                 emit requestMacroDialog();

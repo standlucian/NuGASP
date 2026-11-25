@@ -156,7 +156,7 @@ void QZoomHUD::paintEvent(QPaintEvent *)
     painter.setFont(readoutFont);
     const int ch = std::max(0, m_targetBin - 1);
     QString readout;
-    if (m_isCalibrated && m_targetEnergy > 0.0) {
+    if (m_isCalibrated) {
         readout = QString("Ch %1 (%2 keV) | %3 cts")
                       .arg(ch)
                       .arg(m_targetEnergy, 0, 'f', 2)
@@ -186,9 +186,11 @@ void QZoomHUD::paintEvent(QPaintEvent *)
     // Horizontal guide line at 50%
     painter.drawLine(QPointF(plotLeft, plotTop + plotH * 0.5), QPointF(plotRight, plotTop + plotH * 0.5));
 
-    // 4. Render spectrum bars / polygon
+    // 4. Render spectrum bars / polygon (clipped strictly inside plotBox)
     const int countBins = static_cast<int>(m_counts.size());
     if (countBins > 1 && m_maxCount > 0.0) {
+        painter.save();
+        painter.setClipRect(plotBox);
         const qreal binW = plotW / static_cast<qreal>(countBins);
 
         QPolygonF poly;
@@ -292,6 +294,7 @@ void QZoomHUD::paintEvent(QPaintEvent *)
                      << QPointF(reticleX + 4.0, plotTop);
             painter.drawPolygon(triangle);
         }
+        painter.restore();
     }
 
     // 8. X-axis channel bounds labels (0-based channels)

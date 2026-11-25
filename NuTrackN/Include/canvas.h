@@ -489,6 +489,8 @@ public slots:
     void setYMax(double yVal);
     void setYMin(double yVal);
     void setLoadBehavior(LoadBehavior behavior) { m_loadBehavior = behavior; }
+    LoadBehavior getLoadBehavior() const { return m_loadBehavior; }
+    void openLoadBehaviorDialog();
 
     // GASPware Compressed Matrix slots & helpers
     void onOpenCMClicked();

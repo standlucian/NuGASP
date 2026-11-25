@@ -61,9 +61,22 @@ void QMainCanvas::AddCulomn()
         sourceHist = dynamic_cast<TracknHistogram*>(HijF[1][1]);
     }
 
+    // Snapshot per-pad LogY state before rootCanvas->Clear() destroys sub-pads
+    int wasLogy[12][12] = {};
+    TCanvas *rootCanvas = canvas->getCanvas();
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            TVirtualPad *p = (maxElement_i > 1 || maxElement_j > 1)
+                ? rootCanvas->GetPad((z - 1) * maxElement_j + g)
+                : rootCanvas;
+            if (p) wasLogy[z][g] = p->GetLogy();
+            peakSearchPrimitives[z][g].clear();
+        }
+    }
+    clearDrawnObjects();
+
     maxElement_j++;
 
-    TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
     const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
@@ -73,20 +86,24 @@ void QMainCanvas::AddCulomn()
     for (int z = 1; z <= maxElement_i; ++z) {
         for (int g = 1; g <= maxElement_j; ++g) {
             const std::string histTitle = "h" + std::to_string(z) + std::to_string(g) + "f";
+            const bool isNewCell = (g == maxElement_j);
 
-            if (g == maxElement_j) {
+            if (isNewCell) {
+                delete HijF[z][g];
+                HijF[z][g] = nullptr;
                 // Initialize the new column cell as a clean TracknHistogram
+                const int baseColor = colors_hist.empty() ? 4 : colors_hist[0];
                 if (sourceHist) {
                     HijF[z][g] = new TracknHistogram(*sourceHist);
                     HijF[z][g]->SetName(histTitle.c_str());
                     HijF[z][g]->SetTitle("");
-                    HijF[z][g]->SetLineColor(4);
+                    HijF[z][g]->SetLineColor(baseColor);
                     while (HijF[z][g]->GetListOfFunctions()->GetSize() > 0) {
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
                     HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0.0, 10240.0);
-                    HijF[z][g]->SetLineColor(4);
+                    HijF[z][g]->SetLineColor(baseColor);
                 }
                 for (auto *h : HijC[z][g]) {
                     delete h;
@@ -97,8 +114,12 @@ void QMainCanvas::AddCulomn()
             if (!HijF[z][g]) continue;
 
             const int padIndex = (z - 1) * maxElement_j + g;
-            rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g], z, g);
+            TVirtualPad *pad = rootCanvas->cd(padIndex);
+            if (!isNewCell && pad) {
+                pad->SetLogy(wasLogy[z][g]);
+            } else {
+                adjustYAxisToVisibleMax(HijF[z][g], z, g);
+            }
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations
@@ -135,6 +156,7 @@ void QMainCanvas::AddCulomn()
 
     rootCanvas->Modified();
     rootCanvas->Update();
+    CommandPrompt::logDebug("Display", QString("Added grid column -> %1x%2.").arg(maxElement_i).arg(maxElement_j));
 }
 
 //==============================================================================
@@ -157,9 +179,21 @@ void QMainCanvas::AddLine()
         sourceHist = dynamic_cast<TracknHistogram*>(HijF[1][1]);
     }
 
+    int wasLogy[12][12] = {};
+    TCanvas *rootCanvas = canvas->getCanvas();
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            TVirtualPad *p = (maxElement_i > 1 || maxElement_j > 1)
+                ? rootCanvas->GetPad((z - 1) * maxElement_j + g)
+                : rootCanvas;
+            if (p) wasLogy[z][g] = p->GetLogy();
+            peakSearchPrimitives[z][g].clear();
+        }
+    }
+    clearDrawnObjects();
+
     maxElement_i++;
 
-    TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
     const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
@@ -169,20 +203,24 @@ void QMainCanvas::AddLine()
     for (int z = 1; z <= maxElement_i; ++z) {
         for (int g = 1; g <= maxElement_j; ++g) {
             const std::string histTitle = "h" + std::to_string(z) + std::to_string(g) + "f";
+            const bool isNewCell = (z == maxElement_i);
 
-            if (z == maxElement_i) {
+            if (isNewCell) {
+                delete HijF[z][g];
+                HijF[z][g] = nullptr;
                 // Initialize the new row cell as a clean TracknHistogram
+                const int baseColor = colors_hist.empty() ? 4 : colors_hist[0];
                 if (sourceHist) {
                     HijF[z][g] = new TracknHistogram(*sourceHist);
                     HijF[z][g]->SetName(histTitle.c_str());
                     HijF[z][g]->SetTitle("");
-                    HijF[z][g]->SetLineColor(4);
+                    HijF[z][g]->SetLineColor(baseColor);
                     while (HijF[z][g]->GetListOfFunctions()->GetSize() > 0) {
                         HijF[z][g]->GetListOfFunctions()->RemoveLast();
                     }
                 } else {
                     HijF[z][g] = new TracknHistogram(histTitle.c_str(), "", 10240, 0.0, 10240.0);
-                    HijF[z][g]->SetLineColor(4);
+                    HijF[z][g]->SetLineColor(baseColor);
                 }
                 for (auto *h : HijC[z][g]) {
                     delete h;
@@ -193,8 +231,12 @@ void QMainCanvas::AddLine()
             if (!HijF[z][g]) continue;
 
             const int padIndex = (z - 1) * maxElement_j + g;
-            rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g], z, g);
+            TVirtualPad *pad = rootCanvas->cd(padIndex);
+            if (!isNewCell && pad) {
+                pad->SetLogy(wasLogy[z][g]);
+            } else {
+                adjustYAxisToVisibleMax(HijF[z][g], z, g);
+            }
             HijF[z][g]->Draw();
 
             // Re-render Gaussian center annotations
@@ -231,6 +273,7 @@ void QMainCanvas::AddLine()
 
     rootCanvas->Modified();
     rootCanvas->Update();
+    CommandPrompt::logDebug("Display", QString("Added grid row -> %1x%2.").arg(maxElement_i).arg(maxElement_j));
 }
 
 //==============================================================================
@@ -275,6 +318,7 @@ void QMainCanvas::IdentifyLastClickedHistogram(Double_t x, Double_t y)
     selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
 
     ColorTheFrameOfTheHistogram();
+    updateAxisStatusLabels();
 }
 
 //==============================================================================
@@ -314,9 +358,6 @@ void QMainCanvas::IdentifyLastPilgrimHistogram(Double_t x, Double_t y)
 
     PilgrimElement_j = std::max(1, std::min(PilgrimElement_j, maxElement_j));
     PilgrimElement_i = std::max(1, std::min(PilgrimElement_i, maxElement_i));
-
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
 }
 
 //==============================================================================
@@ -344,19 +385,22 @@ void QMainCanvas::ColorTheFrameOfTheHistogram()
     canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
 
     if (maxElement_i > 1 || maxElement_j > 1) {
-        const Double_t xFirst = hist->GetXaxis()->GetFirst() - 1;
-        const Double_t xLast  = hist->GetXaxis()->GetLast();
-        const Double_t xMax   = hist->GetXaxis()->GetXmax();
+        TAxis *xAxis = hist->GetXaxis();
+        const Double_t xFirst = xAxis ? xAxis->GetBinLowEdge(xAxis->GetFirst()) : 0.0;
+        const Double_t xLast  = xAxis ? xAxis->GetBinUpEdge(xAxis->GetLast()) : 1.0;
         const Double_t yMax   = hist->GetMaximum();
 
         TVirtualPad *pad = gPad;
         const bool isLog = (pad && pad->GetLogy() != 0);
-        const Double_t yMin = isLog ? (hist->GetMinimum() > 0.0 ? hist->GetMinimum() : 0.5) : 0.0;
+        Double_t yMin = hist->GetMinimum();
+        if (yMin == -1111.0 || (isLog && yMin <= 0.0)) {
+            yMin = isLog ? 0.5 : 0.0;
+        }
 
         lineR = new TLine(xFirst, yMin, xFirst, yMax);
         lineL = new TLine(xLast, yMin, xLast, yMax);
-        lineU = new TLine(hist->GetXaxis()->GetFirst(), yMax, xLast, yMax);
-        lineD = new TLine(0.0, yMin, xMax, yMin);
+        lineU = new TLine(xFirst, yMax, xLast, yMax);
+        lineD = new TLine(xFirst, yMin, xLast, yMin);
 
         const Color_t frameColor = kAzure + 1;
         const Width_t frameWidth = 4;
@@ -391,15 +435,17 @@ void QMainCanvas::ColorTheFrameOfTheHistogram()
 //==============================================================================
 void QMainCanvas::showXYcoord(Double_t x, Double_t y)
 {
-    if (SelectedElement_i < 1 || SelectedElement_i >= 12 ||
-        SelectedElement_j < 1 || SelectedElement_j >= 12) {
+    int targetI = (PilgrimElement_i >= 1 && PilgrimElement_i <= maxElement_i) ? PilgrimElement_i : SelectedElement_i;
+    int targetJ = (PilgrimElement_j >= 1 && PilgrimElement_j <= maxElement_j) ? PilgrimElement_j : SelectedElement_j;
+    if (targetI < 1 || targetI >= 12 || targetJ < 1 || targetJ >= 12) {
         return;
     }
 
-    TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
+    TH1F *hist = HijF[targetI][targetJ];
     if (!hist || !canvas || !canvas->getCanvas()) return;
 
-    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
+    TVirtualPad *pad = canvas->getCanvas()->cd((targetI - 1) * maxElement_j + targetJ);
+    if (!pad) pad = canvas->getCanvas();
     const std::string objectInfo = hist->GetObjectInfo(static_cast<Int_t>(x), static_cast<Int_t>(y));
 
     int binX = 0;
@@ -453,14 +499,23 @@ void QMainCanvas::showXYcoord(Double_t x, Double_t y)
             double energy = tHist->ChannelToEnergy(static_cast<Double_t>(ch));
             labelEnergy->setText(QString("Energy: %1").arg(QString::number(energy, 'f', 2)));
         } else {
-            labelEnergy->setText("Energy: 0.0");
+            labelEnergy->setText(QString("Energy: %1").arg(ch));
         }
     }
     if (labelCounts) {
         labelCounts->setText(QString("Counts: %1").arg(countsStr));
     }
     if (labelCursorY) {
-        labelCursorY->setText(QString("Y: %1").arg(QString::number(y, 'f', 2)));
+        const Double_t cursorY = pad ? pad->PadtoY(pad->AbsPixeltoY(static_cast<Int_t>(y))) : y;
+        QString yStr;
+        if (std::abs(cursorY) <= 100000.0) {
+            yStr = (std::abs(cursorY - std::round(cursorY)) < 1e-5)
+                ? QString::number(static_cast<long long>(std::round(cursorY)))
+                : QString::number(cursorY, 'f', 2);
+        } else {
+            yStr = QString::number(cursorY, 'e', 2);
+        }
+        labelCursorY->setText(QString("Y: %1").arg(yStr));
     }
 
     if (labelX && labelX != labelChannel) {
@@ -483,33 +538,85 @@ void QMainCanvas::DeleteCulomn()
     if (maxElement_j <= 1) return;
     if (!canvas || !canvas->getCanvas()) return;
 
-    const int deletedCol = maxElement_j;
+    int wasLogy[12][12] = {};
+    TCanvas *rootCanvas = canvas->getCanvas();
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            TVirtualPad *p = rootCanvas->GetPad((z - 1) * maxElement_j + g);
+            if (p) wasLogy[z][g] = p->GetLogy();
+            peakSearchPrimitives[z][g].clear();
+        }
+    }
+    clearDrawnObjects();
+
+    const int delCol = std::max(1, std::min(SelectedElement_j, maxElement_j));
+    for (int z = 1; z <= maxElement_i; ++z) {
+        delete HijF[z][delCol];
+        HijF[z][delCol] = nullptr;
+        for (auto *hist : HijC[z][delCol]) {
+            delete hist;
+        }
+        HijC[z][delCol].clear();
+        gaussCenters[z][delCol].clear();
+        gaussCentersHeight[z][delCol].clear();
+        peakSearchCenters[z][delCol].clear();
+        peakSearchHeights[z][delCol].clear();
+        for (auto *obj : autoFitMarkers[z][delCol]) {
+            delete obj;
+        }
+        autoFitMarkers[z][delCol].clear();
+
+        // Shift remaining columns left
+        for (int g = delCol; g < maxElement_j; ++g) {
+            HijF[z][g] = HijF[z][g + 1];
+            HijC[z][g] = std::move(HijC[z][g + 1]);
+            gaussCenters[z][g] = std::move(gaussCenters[z][g + 1]);
+            gaussCentersHeight[z][g] = std::move(gaussCentersHeight[z][g + 1]);
+            peakSearchCenters[z][g] = std::move(peakSearchCenters[z][g + 1]);
+            peakSearchHeights[z][g] = std::move(peakSearchHeights[z][g + 1]);
+            autoFitMarkers[z][g] = std::move(autoFitMarkers[z][g + 1]);
+            wasLogy[z][g] = wasLogy[z][g + 1];
+        }
+        HijF[z][maxElement_j] = nullptr;
+        HijC[z][maxElement_j].clear();
+        gaussCenters[z][maxElement_j].clear();
+        gaussCentersHeight[z][maxElement_j].clear();
+        peakSearchCenters[z][maxElement_j].clear();
+        peakSearchHeights[z][maxElement_j].clear();
+        autoFitMarkers[z][maxElement_j].clear();
+    }
+
     maxElement_j--;
 
     // Keep selection within valid bounds
     if (SelectedElement_j > maxElement_j) {
         SelectedElement_j = maxElement_j;
-        selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
     }
+    selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
 
-    TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
     const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
     rootCanvas->SetFillColor(rootBg);
-    rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
+
+    if (maxElement_i > 1 || maxElement_j > 1) {
+        rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
+    }
 
     for (int z = 1; z <= maxElement_i; ++z) {
         for (int g = 1; g <= maxElement_j; ++g) {
             if (!HijF[z][g]) continue;
 
             const int padIndex = (z - 1) * maxElement_j + g;
-            rootCanvas->cd(padIndex);
-            adjustYAxisToVisibleMax(HijF[z][g], z, g);
+            TVirtualPad *pad = (maxElement_i > 1 || maxElement_j > 1)
+                ? rootCanvas->cd(padIndex)
+                : rootCanvas->cd();
+            if (pad) pad->SetLogy(wasLogy[z][g]);
             HijF[z][g]->Draw();
 
-            // Re-render Gaussian center annotations
+            // Re-render Gaussian center and peak search annotations
             renderPeakLabels(z, g);
+            renderPeakSearchLabels(z, g);
 
             // Re-render overlaid comparison spectra
             for (std::size_t k = 0; k < HijC[z][g].size(); ++k) {
@@ -524,43 +631,25 @@ void QMainCanvas::DeleteCulomn()
             // Re-render auto-fit markers (fit curves, background lines)
             for (auto *obj : autoFitMarkers[z][g]) {
                 if (obj) {
-                    rootCanvas->cd(padIndex);
+                    if (pad) pad->cd();
                     obj->Draw("SAME");
                 }
             }
         }
-
-        // Clean up resources for the deleted column
-        for (auto *hist : HijC[z][deletedCol]) {
-            delete hist;
-        }
-        HijC[z][deletedCol].clear();
-        gaussCenters[z][deletedCol].clear();
-        gaussCentersHeight[z][deletedCol].clear();
-        peakSearchCenters[z][deletedCol].clear();
-        peakSearchHeights[z][deletedCol].clear();
-        for (auto *obj : peakSearchPrimitives[z][deletedCol]) {
-            delete obj;
-        }
-        peakSearchPrimitives[z][deletedCol].clear();
-        for (auto *obj : autoFitMarkers[z][deletedCol]) {
-            delete obj;
-        }
-        autoFitMarkers[z][deletedCol].clear();
     }
 
-    if (maxElement_i > 1 || maxElement_j > 1) {
-        ColorTheFrameOfTheHistogram();
-    }
+    ColorTheFrameOfTheHistogram();
+    updateAxisStatusLabels();
 
     rootCanvas->Modified();
     rootCanvas->Update();
+    CommandPrompt::logDebug("Display", QString("Deleted column %1 -> %2x%3.").arg(delCol).arg(maxElement_i).arg(maxElement_j));
 }
 
 //==============================================================================
 // QMainCanvas::DeleteLine
 //==============================================================================
-// Removes the bottom row of sub-pads from the canvas grid (shortcut: Ctrl + Down).
+// Removes the selected row of sub-pads from the canvas grid (shortcut: Ctrl + Down).
 // Re-divides the ROOT TCanvas into maxElement_j columns by (maxElement_i - 1) rows,
 // frees resources belonging to the removed row, and re-renders remaining spectra.
 //==============================================================================
@@ -569,99 +658,112 @@ void QMainCanvas::DeleteLine()
     if (maxElement_i <= 1) return;
     if (!canvas || !canvas->getCanvas()) return;
 
-    const int deletedRow = maxElement_i;
+    int wasLogy[12][12] = {};
+    TCanvas *rootCanvas = canvas->getCanvas();
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            TVirtualPad *p = rootCanvas->GetPad((z - 1) * maxElement_j + g);
+            if (p) wasLogy[z][g] = p->GetLogy();
+            peakSearchPrimitives[z][g].clear();
+        }
+    }
+    clearDrawnObjects();
+
+    const int delRow = std::max(1, std::min(SelectedElement_i, maxElement_i));
+    for (int g = 1; g <= maxElement_j; ++g) {
+        delete HijF[delRow][g];
+        HijF[delRow][g] = nullptr;
+        for (auto *hist : HijC[delRow][g]) {
+            delete hist;
+        }
+        HijC[delRow][g].clear();
+        gaussCenters[delRow][g].clear();
+        gaussCentersHeight[delRow][g].clear();
+        peakSearchCenters[delRow][g].clear();
+        peakSearchHeights[delRow][g].clear();
+        for (auto *obj : autoFitMarkers[delRow][g]) {
+            delete obj;
+        }
+        autoFitMarkers[delRow][g].clear();
+
+        // Shift remaining rows up
+        for (int z = delRow; z < maxElement_i; ++z) {
+            HijF[z][g] = HijF[z + 1][g];
+            HijC[z][g] = std::move(HijC[z + 1][g]);
+            gaussCenters[z][g] = std::move(gaussCenters[z + 1][g]);
+            gaussCentersHeight[z][g] = std::move(gaussCentersHeight[z + 1][g]);
+            peakSearchCenters[z][g] = std::move(peakSearchCenters[z + 1][g]);
+            peakSearchHeights[z][g] = std::move(peakSearchHeights[z + 1][g]);
+            autoFitMarkers[z][g] = std::move(autoFitMarkers[z + 1][g]);
+            wasLogy[z][g] = wasLogy[z + 1][g];
+        }
+        HijF[maxElement_i][g] = nullptr;
+        HijC[maxElement_i][g].clear();
+        gaussCenters[maxElement_i][g].clear();
+        gaussCentersHeight[maxElement_i][g].clear();
+        peakSearchCenters[maxElement_i][g].clear();
+        peakSearchHeights[maxElement_i][g].clear();
+        autoFitMarkers[maxElement_i][g].clear();
+    }
+
     maxElement_i--;
 
     // Keep selection within valid bounds
     if (SelectedElement_i > maxElement_i) {
         SelectedElement_i = maxElement_i;
-        selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
     }
+    selectedHisto = HijF[SelectedElement_i][SelectedElement_j];
 
-    TCanvas *rootCanvas = canvas->getCanvas();
     rootCanvas->Clear();
     rootCanvas->SetBorderMode(0);
     const Color_t rootBg = TColor::GetColor(Design::getGraphBackgroundColor().name().toUtf8().constData());
     rootCanvas->SetFillColor(rootBg);
 
-    if (maxElement_i == 1 && maxElement_j == 1) {
-        if (HijF[1][1]) {
-            HijF[1][1]->Draw();
-        }
-        // Re-render Gaussian center annotations
-        renderPeakLabels(1, 1);
-        for (std::size_t k = 0; k < HijC[1][1].size(); ++k) {
-            if (HijC[1][1][k]) {
-                if (k < colors_hist.size()) {
-                    HijC[1][1][k]->SetLineColor(colors_hist[k]);
-                }
-                HijC[1][1][k]->Draw("SAME");
-            }
-        }
-        for (auto *obj : autoFitMarkers[1][1]) {
-            if (obj) obj->Draw("SAME");
-        }
-    } else {
-        rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
-
-        for (int z = 1; z <= maxElement_i; ++z) {
-            for (int g = 1; g <= maxElement_j; ++g) {
-                if (!HijF[z][g]) continue;
-
-                const int padIndex = (z - 1) * maxElement_j + g;
-                rootCanvas->cd(padIndex);
-                HijF[z][g]->Draw();
-
-                // Re-render Gaussian center annotations
-                renderPeakLabels(z, g);
-
-                // Re-render overlaid comparison spectra
-                for (std::size_t k = 0; k < HijC[z][g].size(); ++k) {
-                    if (HijC[z][g][k]) {
-                        if (k < colors_hist.size()) {
-                            HijC[z][g][k]->SetLineColor(colors_hist[k]);
-                        }
-                        HijC[z][g][k]->Draw("SAME");
-                    }
-                }
-
-                // Re-render auto-fit markers (fit curves, background lines)
-                for (auto *obj : autoFitMarkers[z][g]) {
-                    if (obj) {
-                        rootCanvas->cd(padIndex);
-                        obj->Draw("SAME");
-                    }
-                }
-            }
-        }
-    }
-
-    // Clean up resources for the deleted row
-    for (int g = 1; g < 12; ++g) {
-        for (auto *hist : HijC[deletedRow][g]) {
-            delete hist;
-        }
-        HijC[deletedRow][g].clear();
-        gaussCenters[deletedRow][g].clear();
-        gaussCentersHeight[deletedRow][g].clear();
-        peakSearchCenters[deletedRow][g].clear();
-        peakSearchHeights[deletedRow][g].clear();
-        for (auto *obj : peakSearchPrimitives[deletedRow][g]) {
-            delete obj;
-        }
-        peakSearchPrimitives[deletedRow][g].clear();
-        for (auto *obj : autoFitMarkers[deletedRow][g]) {
-            delete obj;
-        }
-        autoFitMarkers[deletedRow][g].clear();
-    }
-
     if (maxElement_i > 1 || maxElement_j > 1) {
-        ColorTheFrameOfTheHistogram();
+        rootCanvas->Divide(maxElement_j, maxElement_i, 0, 0, 0);
     }
+
+    for (int z = 1; z <= maxElement_i; ++z) {
+        for (int g = 1; g <= maxElement_j; ++g) {
+            if (!HijF[z][g]) continue;
+
+            const int padIndex = (z - 1) * maxElement_j + g;
+            TVirtualPad *pad = (maxElement_i > 1 || maxElement_j > 1)
+                ? rootCanvas->cd(padIndex)
+                : rootCanvas->cd();
+            if (pad) pad->SetLogy(wasLogy[z][g]);
+            HijF[z][g]->Draw();
+
+            // Re-render Gaussian center and peak search annotations
+            renderPeakLabels(z, g);
+            renderPeakSearchLabels(z, g);
+
+            // Re-render overlaid comparison spectra
+            for (std::size_t k = 0; k < HijC[z][g].size(); ++k) {
+                if (HijC[z][g][k]) {
+                    if (k < colors_hist.size()) {
+                        HijC[z][g][k]->SetLineColor(colors_hist[k]);
+                    }
+                    HijC[z][g][k]->Draw("SAME");
+                }
+            }
+
+            // Re-render auto-fit markers (fit curves, background lines)
+            for (auto *obj : autoFitMarkers[z][g]) {
+                if (obj) {
+                    if (pad) pad->cd();
+                    obj->Draw("SAME");
+                }
+            }
+        }
+    }
+
+    ColorTheFrameOfTheHistogram();
+    updateAxisStatusLabels();
 
     rootCanvas->Modified();
     rootCanvas->Update();
+    CommandPrompt::logDebug("Display", QString("Deleted row %1 -> %2x%3.").arg(delRow).arg(maxElement_i).arg(maxElement_j));
 }
 
 //==============================================================================
