@@ -55,75 +55,127 @@ bool overlapping_markers(const std::vector<Int_t>& markers)
     return false;
 }
 
-// -----------------------------------------------------------------------------
-// Calculates the best-fit linear background (y = slope * x + yIntercept)
-// across all designated background intervals using ordinary least-squares regression.
-// -----------------------------------------------------------------------------
-void get_best_fitted_line(TH1F* histogram,
-                          const std::vector<Int_t>& background_markers,
-                          Double_t& slope,
-                          Double_t& yIntercept)
+static bool solveWeightedLinearBackground(
+    TH1F *histogram,
+    const std::vector<Int_t> &background_markers,
+    BackgroundFitMethod method,
+    Double_t initSlope,
+    Double_t initIntercept,
+    Double_t &slope,
+    Double_t &yIntercept,
+    Double_t *outVarSlope,
+    Double_t *outVarIntercept,
+    Double_t *outCov)
 {
-    slope = 0.0;
-    yIntercept = 0.0;
-
-    if (!histogram || background_markers.empty()) {
-        return;
-    }
-
-    Double_t xMean = 0.0;
-    Double_t yMean = 0.0;
-    std::size_t numberOfPoints = 0;
-
-    // First pass: compute the mean channel (x) and mean count (y) over all background regions
-    for (std::size_t i = 0; i + 1 < background_markers.size(); i += 2) {
-        const Int_t startCh = std::min(background_markers[i], background_markers[i + 1]);
-        const Int_t endCh   = std::max(background_markers[i], background_markers[i + 1]);
-        const Int_t startBin = histogram->FindBin(startCh);
-        const Int_t endBin   = histogram->FindBin(endCh);
-
-        for (Int_t bin = startBin; bin <= endBin; ++bin) {
-            Double_t ch = histogram->GetBinCenter(bin);
-            xMean += ch;
-            yMean += histogram->GetBinContent(bin);
-            ++numberOfPoints;
+    auto weightAt = [&](Double_t ch, Double_t y) -> Double_t {
+        if (method == BackgroundFitMethod::PoissonWLS) {
+            return (y > 0.0) ? (1.0 / y) : 1.0;
         }
-    }
+        if (method == BackgroundFitMethod::ModelWLS) {
+            const Double_t yModel = initSlope * ch + initIntercept;
+            return 1.0 / std::max(yModel, 1.0);
+        }
+        return 1.0;
+    };
 
-    // Guard against empty background intervals
-    if (numberOfPoints == 0) {
-        return;
-    }
-
-    xMean /= static_cast<Double_t>(numberOfPoints);
-    yMean /= static_cast<Double_t>(numberOfPoints);
-
-    // Second pass: compute least-squares slope
-    // slope = sum((x - xMean) * (y - yMean)) / sum((x - xMean)^2)
-    Double_t numerator = 0.0;
-    Double_t denominator = 0.0;
+    Double_t S1 = 0.0;
+    Double_t SX = 0.0;
+    Double_t SY = 0.0;
 
     for (std::size_t i = 0; i + 1 < background_markers.size(); i += 2) {
-        const Int_t startCh = std::min(background_markers[i], background_markers[i + 1]);
-        const Int_t endCh   = std::max(background_markers[i], background_markers[i + 1]);
+        const Int_t startCh  = std::min(background_markers[i], background_markers[i + 1]);
+        const Int_t endCh    = std::max(background_markers[i], background_markers[i + 1]);
         const Int_t startBin = histogram->FindBin(startCh);
         const Int_t endBin   = histogram->FindBin(endCh);
 
         for (Int_t bin = startBin; bin <= endBin; ++bin) {
             const Double_t ch = histogram->GetBinCenter(bin);
+            const Double_t y  = histogram->GetBinContent(bin);
+            const Double_t w  = weightAt(ch, y);
+            S1 += w;
+            SX += w * ch;
+            SY += w * y;
+        }
+    }
+
+    if (S1 <= 0.0) {
+        return false;
+    }
+
+    const Double_t xMean = SX / S1;
+    const Double_t yMean = SY / S1;
+
+    Double_t numerator = 0.0;
+    Double_t denominator = 0.0;
+
+    for (std::size_t i = 0; i + 1 < background_markers.size(); i += 2) {
+        const Int_t startCh  = std::min(background_markers[i], background_markers[i + 1]);
+        const Int_t endCh    = std::max(background_markers[i], background_markers[i + 1]);
+        const Int_t startBin = histogram->FindBin(startCh);
+        const Int_t endBin   = histogram->FindBin(endCh);
+
+        for (Int_t bin = startBin; bin <= endBin; ++bin) {
+            const Double_t ch = histogram->GetBinCenter(bin);
+            const Double_t y  = histogram->GetBinContent(bin);
+            const Double_t w  = weightAt(ch, y);
             const Double_t dx = ch - xMean;
-            numerator += dx * (histogram->GetBinContent(bin) - yMean);
-            denominator += dx * dx;
+            numerator += w * dx * (y - yMean);
+            denominator += w * dx * dx;
         }
     }
 
     if (std::abs(denominator) > 1e-12) {
         slope = numerator / denominator;
         yIntercept = yMean - slope * xMean;
+        if (outVarSlope) *outVarSlope = 1.0 / denominator;
+        if (outVarIntercept) *outVarIntercept = (1.0 / S1) + (xMean * xMean) / denominator;
+        if (outCov) *outCov = -xMean / denominator;
     } else {
-        // Fallback for single-bin or vertical line degeneracy
         slope = 0.0;
         yIntercept = yMean;
+        if (outVarSlope) *outVarSlope = 0.0;
+        if (outVarIntercept) *outVarIntercept = 1.0 / S1;
+        if (outCov) *outCov = 0.0;
+    }
+    return true;
+}
+
+// -----------------------------------------------------------------------------
+// Calculates the linear background (y = slope * x + yIntercept)
+// across all designated background intervals using OLS, 2-pass IRLS, or Poisson WLS.
+// -----------------------------------------------------------------------------
+void get_best_fitted_line(TH1F* histogram,
+                          const std::vector<Int_t>& background_markers,
+                          Double_t& slope,
+                          Double_t& yIntercept,
+                          BackgroundFitMethod method,
+                          Double_t* outVarSlope,
+                          Double_t* outVarIntercept,
+                          Double_t* outCov)
+{
+    slope = 0.0;
+    yIntercept = 0.0;
+    if (outVarSlope) *outVarSlope = 0.0;
+    if (outVarIntercept) *outVarIntercept = 0.0;
+    if (outCov) *outCov = 0.0;
+
+    if (!histogram || background_markers.empty()) {
+        return;
+    }
+
+    if (method == BackgroundFitMethod::ModelWLS) {
+        Double_t initSlope = 0.0, initIntercept = 0.0;
+        if (!solveWeightedLinearBackground(histogram, background_markers, BackgroundFitMethod::OLS,
+                                           0.0, 0.0, initSlope, initIntercept, nullptr, nullptr, nullptr)) {
+            return;
+        }
+        solveWeightedLinearBackground(histogram, background_markers, BackgroundFitMethod::ModelWLS,
+                                      initSlope, initIntercept, slope, yIntercept,
+                                      outVarSlope, outVarIntercept, outCov);
+    } else {
+        solveWeightedLinearBackground(histogram, background_markers, method,
+                                      0.0, 0.0, slope, yIntercept,
+                                      outVarSlope, outVarIntercept, outCov);
     }
 }
 
@@ -138,16 +190,20 @@ void integral_function(TH1F* histogram,
                        const std::vector<Int_t>& background_markers,
                        Double_t& slope,
                        Double_t& addition,
-                       std::vector<IntegratedPeak>* outPeaks)
+                       std::vector<IntegratedPeak>* outPeaks,
+                       bool quiet,
+                       BackgroundFitMethod bgMethod)
 {
     if (outPeaks) {
         outPeaks->clear();
     }
 
     if (!histogram) {
-        const QString errMsg = "Error: Histogram pointer is null in integral_function.";
-        CommandPrompt::getInstance()->appendPlainText(errMsg);
-        std::cerr << errMsg.toStdString() << std::endl;
+        if (!quiet) {
+            const QString errMsg = "Error: Histogram pointer is null in integral_function.";
+            CommandPrompt::getInstance()->appendPlainText(errMsg);
+            std::cerr << errMsg.toStdString() << std::endl;
+        }
         return;
     }
 
@@ -158,52 +214,60 @@ void integral_function(TH1F* histogram,
     // Process background markers if provided
     if (!background_markers.empty()) {
         if (background_markers.size() % 2 != 0) {
-            const QString msg = "Background markers must be placed in pairs (multiples of 2).\n";
-            CommandPrompt::getInstance()->appendPlainText(msg);
-            std::cout << msg.toStdString() << std::endl;
+            if (!quiet) {
+                const QString msg = "Background markers must be placed in pairs (multiples of 2).\n";
+                CommandPrompt::getInstance()->appendPlainText(msg);
+                std::cout << msg.toStdString() << std::endl;
+            }
             return;
         }
 
-        if (overlapping_markers(background_markers)) {
+        if (!quiet && overlapping_markers(background_markers)) {
             const QString warning = "Warning: Some background marker intervals overlap. "
                                     "Check marker positions for accuracy.\n";
             CommandPrompt::getInstance()->appendPlainText(warning);
             std::cout << warning.toStdString() << std::endl;
         }
 
-        get_best_fitted_line(histogram, background_markers, slope, addition);
+        get_best_fitted_line(histogram, background_markers, slope, addition, bgMethod);
     }
 
     // Validate integral markers
     if (integral_markers.empty()) {
-        const QString msg = "Place markers for the integral to be calculated.\n";
-        CommandPrompt::getInstance()->appendPlainText(msg);
-        std::cout << msg.toStdString() << std::endl;
+        if (!quiet) {
+            const QString msg = "Place markers for the integral to be calculated.\n";
+            CommandPrompt::getInstance()->appendPlainText(msg);
+            std::cout << msg.toStdString() << std::endl;
+        }
         return;
     }
 
     if (integral_markers.size() % 2 != 0) {
-        const QString msg = "Integral markers must be placed in pairs (multiples of 2).\n";
-        CommandPrompt::getInstance()->appendPlainText(msg);
-        std::cout << msg.toStdString() << std::endl;
+        if (!quiet) {
+            const QString msg = "Integral markers must be placed in pairs (multiples of 2).\n";
+            CommandPrompt::getInstance()->appendPlainText(msg);
+            std::cout << msg.toStdString() << std::endl;
+        }
         return;
     }
 
-    // Print table header to terminal and GUI command prompt
-    std::cout << std::left
-              << std::setw(10) << "Integral#"
-              << std::setw(10) << "Channel"
-              << std::setw(15) << "Energy"
-              << std::setw(25) << "Area"
-              << std::setw(10) << "Width" << std::endl;
+    if (!quiet) {
+        // Print table header to terminal and GUI command prompt
+        std::cout << std::left
+                  << std::setw(10) << "Integral#"
+                  << std::setw(10) << "Channel"
+                  << std::setw(15) << "Energy"
+                  << std::setw(25) << "Area"
+                  << std::setw(10) << "Width" << std::endl;
 
-    const QString headerRow = QString("%1%2%3%4%5")
-        .arg("Integral#", -10, QChar(' '))
-        .arg("Channel",   -10, QChar(' '))
-        .arg("Energy",    -15, QChar(' '))
-        .arg("Area",      -25, QChar(' '))
-        .arg("Width",     -10, QChar(' '));
-    CommandPrompt::getInstance()->appendPlainText(headerRow);
+        const QString headerRow = QString("%1%2%3%4%5")
+            .arg("Integral#", -10, QChar(' '))
+            .arg("Channel",   -10, QChar(' '))
+            .arg("Energy",    -15, QChar(' '))
+            .arg("Area",      -25, QChar(' '))
+            .arg("Width",     -10, QChar(' '));
+        CommandPrompt::getInstance()->appendPlainText(headerRow);
+    }
 
     const bool hasBackground = !background_markers.empty();
 
@@ -332,11 +396,13 @@ void integral_function(TH1F* histogram,
                             .arg(energy, 0, 'f', 2)
                             .arg(qCeil(energyError * 100));
         } else {
-            energyStr = QString("%1(uncal)").arg(centroid, 0, 'f', 1);
+            energyStr = QString("%1(%2)")
+                            .arg(centroid, 0, 'f', 2)
+                            .arg(qCeil(centroidError * 100));
         }
         const QString areaStr     = QString("%1(%2)")
                                         .arg(area, 0, 'f', 0)
-                                        .arg(qRound(areaError));
+                                        .arg(qCeil(areaError));
         const QString fwhmStr     = QString("%1(%2)")
                                         .arg(widthDisp, 0, 'f', 2)
                                         .arg(qCeil(widthDispError * 100));
@@ -362,24 +428,35 @@ void integral_function(TH1F* histogram,
             outPeaks->push_back(p);
         }
 
-        // Output to terminal
-        std::cout << std::left
-                  << std::setw(10) << numberStr.toStdString()
-                  << std::setw(10) << centroidStr.toStdString()
-                  << std::setw(15) << energyStr.toStdString()
-                  << std::setw(25) << areaStr.toStdString()
-                  << std::setw(10) << fwhmStr.toStdString() << std::endl;
+        if (!quiet) {
+            // Output to terminal
+            std::cout << std::left
+                      << std::setw(10) << numberStr.toStdString()
+                      << std::setw(10) << centroidStr.toStdString()
+                      << std::setw(15) << energyStr.toStdString()
+                      << std::setw(25) << areaStr.toStdString()
+                      << std::setw(10) << fwhmStr.toStdString() << std::endl;
 
-        // Output to application command prompt
-        const QString dataRow = QString("%1%2%3%4%5")
-            .arg(numberStr,   -10, QChar(' '))
-            .arg(centroidStr, -10, QChar(' '))
-            .arg(energyStr,   -15, QChar(' '))
-            .arg(areaStr,     -25, QChar(' '))
-            .arg(fwhmStr,     -10, QChar(' '));
-        CommandPrompt::getInstance()->appendPlainText(dataRow);
+            // Output to application command prompt
+            const QString dataRow = QString("%1%2%3%4%5")
+                .arg(numberStr,   -10, QChar(' '))
+                .arg(centroidStr, -10, QChar(' '))
+                .arg(energyStr,   -15, QChar(' '))
+                .arg(areaStr,     -25, QChar(' '))
+                .arg(fwhmStr,     -10, QChar(' '));
+            CommandPrompt::getInstance()->appendPlainText(dataRow);
+
+            // Record in session disk log
+            CommandPrompt::logDebug(
+                "Integration",
+                QString("%1 Peak #%2: ch=%3, E=%4, Area=%5, FWHM=%6")
+                    .arg(hasBackground ? "CJ" : "CI")
+                    .arg(numberStr, centroidStr, energyStr, areaStr, fwhmStr));
+        }
     }
 
-    std::cout << std::endl;
-    CommandPrompt::getInstance()->appendPlainText("");
+    if (!quiet) {
+        std::cout << std::endl;
+        CommandPrompt::getInstance()->appendPlainText("");
+    }
 }

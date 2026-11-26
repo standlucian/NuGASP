@@ -1302,6 +1302,22 @@ bool QMainCanvas::executeMacroCommand(const QString &token)
         deleteZJMarkers();
     } else if (t == "ZV") {
         deleteZVMarkers();
+    } else if (t == "MA") {
+        showAllMarkers();
+    } else if (t == "MB") {
+        showBackgroundMarkers();
+    } else if (t == "MI") {
+        showIntegralMarkers();
+    } else if (t == "MR") {
+        showRangeMarkers();
+    } else if (t == "MG") {
+        showGaussMarkers();
+    } else if (t == "MW") {
+        showGateMarkers();
+    } else if (t == "MJ") {
+        showMJMarkers();
+    } else if (t == "MV") {
+        showMVMarkers();
     } else if (t == "CW") {
         onGateCMClicked();
     } else if (t == "OS") {

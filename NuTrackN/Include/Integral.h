@@ -35,18 +35,35 @@ Double_t integral_no_background(TH1F *histogram, Double_t &error,
 bool overlapping_markers(const std::vector<Int_t> &markers);
 
 /**
- * @brief Computes the least-squares linear background fit (y = slope * x +
- * yIntercept) over all specified background regions.
+ * @brief Linear background regression weighting scheme.
+ */
+enum class BackgroundFitMethod {
+    OLS = 0,       ///< Unweighted ordinary least squares (unbiased default)
+    ModelWLS = 1,  ///< 2-pass iteratively reweighted LS using fitted model variance
+    PoissonWLS = 2 ///< Raw Poisson inverse-variance weighting w = 1 / max(y, 1)
+};
+
+/**
+ * @brief Computes the linear background fit (y = slope * x + yIntercept)
+ * across all designated background regions using the chosen regression method.
  *
  * @param histogram Pointer to the ROOT 1D histogram.
  * @param background_markers Vector of background marker pairs defining the
  * background intervals.
  * @param slope Reference receiving the calculated slope.
  * @param yIntercept Reference receiving the calculated y-intercept.
+ * @param method Weighting method (OLS, ModelWLS, or PoissonWLS).
+ * @param outVarSlope Optional pointer receiving Var(slope).
+ * @param outVarIntercept Optional pointer receiving Var(yIntercept).
+ * @param outCov Optional pointer receiving Cov(slope, yIntercept).
  */
 void get_best_fitted_line(TH1F *histogram,
                           const std::vector<Int_t> &background_markers,
-                          Double_t &slope, Double_t &yIntercept);
+                          Double_t &slope, Double_t &yIntercept,
+                          BackgroundFitMethod method = BackgroundFitMethod::OLS,
+                          Double_t *outVarSlope = nullptr,
+                          Double_t *outVarIntercept = nullptr,
+                          Double_t *outCov = nullptr);
 
 /**
  * @brief Stores summary results of an integrated peak.
@@ -92,7 +109,9 @@ void integral_function(TH1F *histogram,
                        const std::vector<Int_t> &integral_markers,
                        const std::vector<Int_t> &background_markers,
                        Double_t &slope, Double_t &addition,
-                       std::vector<IntegratedPeak> *outPeaks = nullptr);
+                       std::vector<IntegratedPeak> *outPeaks = nullptr,
+                       bool quiet = false,
+                       BackgroundFitMethod bgMethod = BackgroundFitMethod::OLS);
 
 #endif // INTEGRAL_H
 

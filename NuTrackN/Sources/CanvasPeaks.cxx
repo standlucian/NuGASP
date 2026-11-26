@@ -143,7 +143,7 @@ void QMainCanvas::deletePeakMarkers()
         peakSearchParamsDialog->hide();
     }
 
-    CommandPrompt::getInstance()->appendPlainText("Peak Search markers cleared (Z+P).\n");
+    CommandPrompt::logDebug("Markers", "Cleared peak search markers (ZP).");
 }
 
 //==============================================================================
@@ -159,7 +159,7 @@ void QMainCanvas::showPeakMarkers()
     }
 
     renderPeakSearchLabels(SelectedElement_i, SelectedElement_j);
-    CommandPrompt::getInstance()->appendPlainText("Peak Search markers redrawn (M+P).\n");
+    CommandPrompt::logDebug("Markers", "Redrew peak search markers (MP).");
 }
 
 //==============================================================================

@@ -218,42 +218,24 @@ bool checkGauss(std::vector<Double_t> &gauss_markers, const std::vector<Double_t
 // extracts covariance, computes background integral and error over the fit range,
 // and draws the fitted baseline on the canvas.
 //==============================================================================
-void fitBackgroundHelper(QMainCanvas *mainCanvas)
+void fitBackgroundHelper(QMainCanvas *mainCanvas, bool quiet, BackgroundFitMethod method)
 {
-    TH1F *activeHist = mainCanvas->HijF[mainCanvas->SelectedElement_i][mainCanvas->SelectedElement_j];
-    if (!activeHist || mainCanvas->background_markers.size() < 2) {
+    TH1F *activeHist = mainCanvas ? mainCanvas->HijF[mainCanvas->SelectedElement_i][mainCanvas->SelectedElement_j] : nullptr;
+    if (!activeHist) return;
+    if (mainCanvas->background_markers.size() < 2) {
+        CommandPrompt::logWarning("Integration", "Background fit (CB) requires at least 2 background markers (B).");
         return;
     }
 
-    Double_t minimum = mainCanvas->maxValueInHistogram;
-
-    // Analytical Least Squares Fit (avoids TH1::Fit artifacts with zero bins)
-    Double_t S1 = 0.0, SX = 0.0, SXX = 0.0, SY = 0.0, SXY = 0.0;
-    for (std::size_t i = 0; i < mainCanvas->background_markers.size() / 2; ++i) {
-        const Double_t startCh  = mainCanvas->background_markers[2 * i];
-        const Double_t finishCh = mainCanvas->background_markers[2 * i + 1];
-        const Int_t startBin  = activeHist->FindBin(std::min(startCh, finishCh));
-        const Int_t finishBin = activeHist->FindBin(std::max(startCh, finishCh));
-        for (Int_t b = startBin; b <= finishBin; ++b) {
-            Double_t xx = activeHist->GetBinCenter(b); // Exact channel coordinate
-            Double_t yy = activeHist->GetBinContent(b);
-            Double_t ei = (yy > 0.0) ? (1.0 / yy) : 1.0; // Poisson weighting
-            S1 += ei;
-            SX += xx * ei;
-            SXX += xx * xx * ei;
-            SY += yy * ei;
-            SXY += xx * yy * ei;
-        }
-    }
-
-    Double_t deter = S1 * SXX - SX * SX;
-    if (deter > 0.0) {
-        mainCanvas->backgroundA0 = (SXX * SY - SX * SXY) / deter; // Intercept
-        mainCanvas->backgroundA1 = (S1 * SXY - SX * SY) / deter;  // Slope
-    } else {
-        mainCanvas->backgroundA0 = minimum;
-        mainCanvas->backgroundA1 = 0.0;
-    }
+    Double_t varSlope = 0.0, varIntercept = 0.0, cov = 0.0;
+    get_best_fitted_line(activeHist,
+                         mainCanvas->background_markers,
+                         mainCanvas->backgroundA1,
+                         mainCanvas->backgroundA0,
+                         method,
+                         &varSlope,
+                         &varIntercept,
+                         &cov);
 
     if (mainCanvas->backgroundFunction) {
         // Erase from every pad's autoFitMarkers and pad primitive list before deleting
@@ -304,12 +286,10 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
 
     delete mainCanvas->backgroundCovarianceMatrix;
     mainCanvas->backgroundCovarianceMatrix = new TMatrixD(2, 2);
-    if (deter > 0.0) {
-        (*mainCanvas->backgroundCovarianceMatrix)(0,0) = S1 / deter; // Var(Slope)
-        (*mainCanvas->backgroundCovarianceMatrix)(1,1) = SXX / deter; // Var(Intercept)
-        (*mainCanvas->backgroundCovarianceMatrix)(0,1) = -SX / deter; // Cov
-        (*mainCanvas->backgroundCovarianceMatrix)(1,0) = -SX / deter;
-    }
+    (*mainCanvas->backgroundCovarianceMatrix)(0, 0) = varSlope;
+    (*mainCanvas->backgroundCovarianceMatrix)(1, 1) = varIntercept;
+    (*mainCanvas->backgroundCovarianceMatrix)(0, 1) = cov;
+    (*mainCanvas->backgroundCovarianceMatrix)(1, 0) = cov;
 
     if (mainCanvas->range_markers.size() >= 2) {
         const Double_t r0 = std::min(mainCanvas->range_markers[0], mainCanvas->range_markers[1]);
@@ -325,19 +305,36 @@ void fitBackgroundHelper(QMainCanvas *mainCanvas)
     }
 
     // Draw background line on canvas
-    const Double_t xStart = std::min(mainCanvas->background_markers.front(), mainCanvas->background_markers.back());
-    const Double_t xEnd   = std::max(mainCanvas->background_markers.front(), mainCanvas->background_markers.back());
+    if (mainCanvas->canvas && mainCanvas->canvas->getCanvas()) {
+        mainCanvas->canvas->getCanvas()->cd(
+            (mainCanvas->SelectedElement_i - 1) * mainCanvas->maxElement_j + mainCanvas->SelectedElement_j);
+    }
+    const auto [minBgIt, maxBgIt] = std::minmax_element(
+        mainCanvas->background_markers.begin(), mainCanvas->background_markers.end());
+    const Double_t xStart = *minBgIt;
+    const Double_t xEnd   = *maxBgIt;
     const Double_t yStart = mainCanvas->backgroundA1 * xStart + mainCanvas->backgroundA0;
     const Double_t yEnd   = mainCanvas->backgroundA1 * xEnd   + mainCanvas->backgroundA0;
 
     TLine *backgroundLine = new TLine(xStart, yStart, xEnd, yEnd);
-    backgroundLine->SetLineColor(kBlue);
+    backgroundLine->SetLineColor(TColor::GetColor(Design::getBackgroundMarkerColor().name().toUtf8().constData()));
     backgroundLine->SetLineWidth(2);
     backgroundLine->Draw("same");
     mainCanvas->listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
     mainCanvas->canvas->getCanvas()->Modified();
     mainCanvas->canvas->getCanvas()->Update();
+
+    const QString bkgMsg = QString("Linear background fit (CB): y = %1*x + %2 over [%3, %4].")
+        .arg(mainCanvas->backgroundA1, 0, 'g', 5)
+        .arg(mainCanvas->backgroundA0, 0, 'g', 5)
+        .arg(xStart, 0, 'f', 0)
+        .arg(xEnd, 0, 'f', 0);
+    if (quiet) {
+        CommandPrompt::logDebug("Integration", bkgMsg);
+    } else {
+        CommandPrompt::logInfo("Integration", bkgMsg);
+    }
 }
 
 //==============================================================================
@@ -1009,7 +1006,7 @@ void runMultiPeakFit(QMainCanvas *mainCanvas)
         mainCanvas->backgroundA0 = mainCanvas->m_bkgInterceptVal;
     } else if (hasExplicitBkg) {
         // Fit linear background over marked background regions and draw baseline
-        fitBackgroundHelper(mainCanvas);
+        fitBackgroundHelper(mainCanvas, true, mainCanvas->getBackgroundFitMethod());
         mainCanvas->m_bkgSlopeVal = mainCanvas->backgroundA1;
         mainCanvas->m_bkgInterceptVal = mainCanvas->backgroundA0;
     } else {
@@ -1688,6 +1685,17 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
         mainCanvas->chkFixBackground->setToolTip("Lock background slope and intercept during fit");
         bkgLayout->addWidget(mainCanvas->chkFixBackground);
 
+        QHBoxLayout *bkgMethodRow = new QHBoxLayout();
+        QLabel *lblBkgMethod = new QLabel("Init Method:", bkgGroup);
+        mainCanvas->comboBkgMethod = new QComboBox(bkgGroup);
+        mainCanvas->comboBkgMethod->setFocusPolicy(Qt::NoFocus);
+        mainCanvas->comboBkgMethod->addItem("OLS (Default)", static_cast<int>(BackgroundFitMethod::OLS));
+        mainCanvas->comboBkgMethod->addItem("2-Pass IRLS", static_cast<int>(BackgroundFitMethod::ModelWLS));
+        mainCanvas->comboBkgMethod->addItem("Poisson WLS (1/y)", static_cast<int>(BackgroundFitMethod::PoissonWLS));
+        bkgMethodRow->addWidget(lblBkgMethod);
+        bkgMethodRow->addWidget(mainCanvas->comboBkgMethod, 1);
+        bkgLayout->addLayout(bkgMethodRow);
+
         QGridLayout *grid = new QGridLayout();
         grid->setContentsMargins(0, 2, 0, 0);
         grid->setHorizontalSpacing(8);
@@ -1766,6 +1774,13 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
             if (mainCanvas->spinBkgIntercept) {
                 mainCanvas->spinBkgIntercept->setEnabled(checked);
             }
+            restartDebounceTimer();
+        });
+
+        QObject::connect(mainCanvas->comboBkgMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), mainCanvas, [mainCanvas, restartDebounceTimer](int idx) {
+            if (idx < 0 || !mainCanvas->comboBkgMethod) return;
+            mainCanvas->setBackgroundFitMethod(
+                static_cast<BackgroundFitMethod>(mainCanvas->comboBkgMethod->itemData(idx).toInt()));
             restartDebounceTimer();
         });
 
@@ -2119,6 +2134,13 @@ void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, cons
     }
 
     mainCanvas->fitParamsDialog->setWindowTitle(title);
+
+    if (mainCanvas->comboBkgMethod) {
+        mainCanvas->comboBkgMethod->blockSignals(true);
+        const int methodIdx = mainCanvas->comboBkgMethod->findData(static_cast<int>(mainCanvas->getBackgroundFitMethod()));
+        if (methodIdx >= 0) mainCanvas->comboBkgMethod->setCurrentIndex(methodIdx);
+        mainCanvas->comboBkgMethod->blockSignals(false);
+    }
 
     // Auto-resize the dialog to content
     if (mainCanvas->fitParamsBrowser) {

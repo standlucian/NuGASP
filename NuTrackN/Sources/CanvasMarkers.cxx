@@ -37,7 +37,9 @@ static inline TVirtualPad* activateSelectedPadAndGetMarkerYBounds(
     }
     const bool isLog = (pad && pad->GetLogy() != 0);
 
-    yMaxOut = hist ? (hist->GetMaximum() * 1.05) : 100.0;
+    const Double_t histVisMax = hist ? hist->GetMaximum() : 0.0;
+    const Double_t histFullMax = hist ? hist->GetBinContent(hist->GetMaximumBin()) : 0.0;
+    yMaxOut = std::max(histVisMax, histFullMax) * 1.25;
     if (yMaxOut <= 0.0) {
         yMaxOut = isLog ? 10.0 : 100.0;
     }
@@ -49,6 +51,26 @@ static inline TVirtualPad* activateSelectedPadAndGetMarkerYBounds(
         yMinOut = (hMin != -1111.0 && hMin < 0.0) ? hMin : 0.0;
     }
     return pad;
+}
+
+static inline void drawShadedMarkerInterval(
+    Double_t x1,
+    Double_t x2,
+    Double_t yMin,
+    Double_t yMax,
+    Color_t color,
+    Style_t fillStyle,
+    TList &drawnObjects)
+{
+    const Double_t minX = std::min(x1, x2);
+    const Double_t maxX = std::max(x1, x2);
+    TBox *area = new TBox(minX, yMin, maxX, yMax);
+    area->SetFillColor(color);
+    area->SetFillStyle(fillStyle);
+    area->SetLineColor(color);
+    area->SetLineWidth(0);
+    area->Draw("same");
+    drawnObjects.Add(area);
 }
 
 #include <iostream>
@@ -174,15 +196,17 @@ void QMainCanvas::areaFunction()
 // if no background markers exist, gracefully falls back to gross peak integration.
 // Labels peak index above peak centroid on the canvas.
 //==============================================================================
-void QMainCanvas::areaFunctionWithBackground(bool openDialog, bool logResult)
+void QMainCanvas::areaFunctionWithBackground(bool openDialog, bool logResult, bool quiet)
 {
     TH1F *hist = HijF[SelectedElement_i][SelectedElement_j];
     if (!hist) return;
 
     if (integral_markers.empty()) {
-        const QString msg = "Place markers with 'I' for the integral to be calculated.\n";
-        CommandPrompt::getInstance()->appendPlainText(msg);
-        std::cout << msg.toStdString();
+        if (!quiet) {
+            const QString msg = "Place markers with 'I' for the integral to be calculated.\n";
+            CommandPrompt::getInstance()->appendPlainText(msg);
+            std::cout << msg.toStdString();
+        }
         return;
     }
 
@@ -192,12 +216,17 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog, bool logResult)
                       background_markers,
                       slope,
                       addition,
-                      &peaks);
+                      &peaks,
+                      quiet,
+                      m_bgFitMethod);
+
+    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
 
     // If background markers exist, draw background baseline
-    if (!background_markers.empty() && background_markers.size() >= 2) {
-        const Double_t xStart = background_markers.front();
-        const Double_t xEnd   = background_markers.back();
+    if (background_markers.size() >= 2) {
+        const auto [minIt, maxIt] = std::minmax_element(background_markers.begin(), background_markers.end());
+        const Double_t xStart = *minIt;
+        const Double_t xEnd   = *maxIt;
         TLine *backgroundLine = new TLine(xStart, slope * xStart + addition,
                                           xEnd,   slope * xEnd   + addition);
         backgroundLine->SetLineColor(toMarkerColor(Design::getBackgroundMarkerColor()));
@@ -207,7 +236,6 @@ void QMainCanvas::areaFunctionWithBackground(bool openDialog, bool logResult)
     }
 
     // Render peak index labels on the canvas above peak centroids
-    canvas->getCanvas()->cd((SelectedElement_i - 1) * maxElement_j + SelectedElement_j);
     for (const auto &peak : peaks) {
         Int_t bin = hist->FindBin(peak.centroid);
         Double_t peakY = hist->GetBinContent(bin);
@@ -323,20 +351,11 @@ void QMainCanvas::addBackgroundMarker(Int_t x, Int_t y)
     backgroundLine->Draw("same");
     listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
-    // When completing a pair, draw baseline and hatched region
+    // When completing a pair, shade the background interval
     if (background_markers.size() % 2 == 0) {
-        const Int_t leftBin = background_markers[background_markers.size() - 2];
-        TLine *bottomBackgroundLine = new TLine(leftBin, yMin, ch, yMin);
-        bottomBackgroundLine->SetLineColor(bgCol);
-        bottomBackgroundLine->SetLineWidth(2);
-        bottomBackgroundLine->Draw("same");
-        listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
-
-        TBox *backgroundArea = new TBox(leftBin, yMin, ch, yMax);
-        backgroundArea->SetFillColor(bgCol);
-        backgroundArea->SetFillStyle(3545);
-        backgroundArea->Draw("same");
-        listOfObjectsDrawnOnScreen.Add(backgroundArea);
+        drawShadedMarkerInterval(
+            background_markers[background_markers.size() - 2],
+            ch, yMin, yMax, bgCol, 3003, listOfObjectsDrawnOnScreen);
     }
 
     canvas->getCanvas()->Modified();
@@ -387,6 +406,12 @@ void QMainCanvas::addIntegralMarker(Int_t x, Int_t y)
     integralLine->SetLineWidth(2);
     integralLine->Draw("same");
     listOfObjectsDrawnOnScreen.Add(integralLine);
+
+    if (integral_markers.size() % 2 == 0) {
+        drawShadedMarkerInterval(
+            integral_markers[integral_markers.size() - 2],
+            ch, yMin, yMax, intCol, 3005, listOfObjectsDrawnOnScreen);
+    }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
@@ -493,6 +518,7 @@ void QMainCanvas::clearTheScreen()
 void QMainCanvas::deleteBackgroundMarkers()
 {
     background_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared background markers (ZB).");
 }
 
 //==============================================================================
@@ -503,6 +529,7 @@ void QMainCanvas::deleteBackgroundMarkers()
 void QMainCanvas::deleteIntegralMarkers()
 {
     integral_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared integration markers (ZI).");
 }
 
 //==============================================================================
@@ -512,11 +539,15 @@ void QMainCanvas::deleteIntegralMarkers()
 //==============================================================================
 void QMainCanvas::deleteAllMarkers()
 {
-    deleteBackgroundMarkers();
-    deleteIntegralMarkers();
-    deleteRangeMarkers();
-    deleteGaussMarkers();
-    deleteGateMarkers();
+    background_markers.clear();
+    integral_markers.clear();
+    range_markers.clear();
+    gauss_markers.clear();
+    gate_markers.clear();
+    spacebar_markers.clear();
+    zoom_markers.clear();
+    puncte_calib2p.clear();
+    CommandPrompt::logDebug("Markers", "Cleared all stored markers (ZA).");
 }
 
 //==============================================================================
@@ -545,26 +576,17 @@ void QMainCanvas::showBackgroundMarkers()
         backgroundLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(backgroundLine);
 
-        // When completing a pair, redraw baseline and hatched box
+        // When completing a pair, redraw shaded interval
         if (i % 2 == 1) {
-            TLine *bottomBackgroundLine = new TLine(background_markers[i - 1], yMin,
-                                                    background_markers[i], yMin);
-            bottomBackgroundLine->SetLineColor(bgCol);
-            bottomBackgroundLine->SetLineWidth(2);
-            bottomBackgroundLine->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(bottomBackgroundLine);
-
-            TBox *backgroundArea = new TBox(background_markers[i - 1], yMin,
-                                            background_markers[i], yMax);
-            backgroundArea->SetFillColor(bgCol);
-            backgroundArea->SetFillStyle(3545);
-            backgroundArea->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(backgroundArea);
+            drawShadedMarkerInterval(
+                background_markers[i - 1], background_markers[i],
+                yMin, yMax, bgCol, 3003, listOfObjectsDrawnOnScreen);
         }
     }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+    CommandPrompt::logDebug("Markers", QString("Redrew %1 background marker(s) (MB).").arg(background_markers.size()));
 }
 
 //==============================================================================
@@ -591,17 +613,24 @@ void QMainCanvas::showIntegralMarkers()
         integralLine->SetLineWidth(2);
         integralLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(integralLine);
+
+        if (i % 2 == 1) {
+            drawShadedMarkerInterval(
+                integral_markers[i - 1], integral_markers[i],
+                yMin, yMax, intCol, 3005, listOfObjectsDrawnOnScreen);
+        }
     }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+    CommandPrompt::logDebug("Markers", QString("Redrew %1 integration marker(s) (MI).").arg(integral_markers.size()));
 }
 
 //==============================================================================
 // QMainCanvas::showAllMarkers
 //==============================================================================
-// Redraws all stored markers (background, integral, range, and Gauss) on the
-// canvas (shortcut: 'M + A').
+// Redraws all stored markers (background, integral, range, Gauss, and gate) on
+// the canvas (shortcut: 'M + A').
 //==============================================================================
 void QMainCanvas::showAllMarkers()
 {
@@ -610,6 +639,7 @@ void QMainCanvas::showAllMarkers()
     showRangeMarkers();
     showGaussMarkers();
     showGateMarkers();
+    CommandPrompt::logDebug("Markers", "Redrew all stored markers (MA).");
 }
 
 //==============================================================================
@@ -652,20 +682,11 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
         rangeLine->Draw("same");
         listOfObjectsDrawnOnScreen.Add(rangeLine);
 
-        // If pair is complete, draw baseline and shaded region
+        // If pair is complete, shade the fit range interval
         if (range_markers.size() % 2 == 0) {
-            const Int_t leftBin = static_cast<Int_t>(std::round(range_markers[range_markers.size() - 2]));
-            TLine *bottomRangeLine = new TLine(leftBin, yMin, ch, yMin);
-            bottomRangeLine->SetLineColor(rangeCol);
-            bottomRangeLine->SetLineWidth(2);
-            bottomRangeLine->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
-
-            TBox *rangeArea = new TBox(leftBin, yMin, ch, yMax);
-            rangeArea->SetFillColor(rangeCol);
-            rangeArea->SetFillStyle(3545);
-            rangeArea->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(rangeArea);
+            drawShadedMarkerInterval(
+                range_markers[range_markers.size() - 2],
+                ch, yMin, yMax, rangeCol, 3004, listOfObjectsDrawnOnScreen);
         }
 
         canvas->getCanvas()->Modified();
@@ -690,6 +711,7 @@ void QMainCanvas::addRangeMarker(Int_t x, Int_t y)
 void QMainCanvas::deleteRangeMarkers()
 {
     range_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared fit range markers (ZR).");
 }
 
 //==============================================================================
@@ -719,24 +741,15 @@ void QMainCanvas::showRangeMarkers()
         listOfObjectsDrawnOnScreen.Add(rangeLine);
 
         if (i % 2 == 1) {
-            TLine *bottomRangeLine = new TLine(range_markers[i - 1], yMin,
-                                               range_markers[i], yMin);
-            bottomRangeLine->SetLineColor(rangeCol);
-            bottomRangeLine->SetLineWidth(2);
-            bottomRangeLine->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(bottomRangeLine);
-
-            TBox *rangeArea = new TBox(range_markers[i - 1], yMin,
-                                       range_markers[i], yMax);
-            rangeArea->SetFillColor(rangeCol);
-            rangeArea->SetFillStyle(3545);
-            rangeArea->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(rangeArea);
+            drawShadedMarkerInterval(
+                range_markers[i - 1], range_markers[i],
+                yMin, yMax, rangeCol, 3004, listOfObjectsDrawnOnScreen);
         }
     }
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+    CommandPrompt::logDebug("Markers", QString("Redrew %1 fit range marker(s) (MR).").arg(range_markers.size()));
 }
 
 //==============================================================================
@@ -783,6 +796,7 @@ void QMainCanvas::addGaussMarker(Int_t x, Int_t y)
 void QMainCanvas::deleteGaussMarkers()
 {
     gauss_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared Gaussian peak markers (ZG).");
 }
 
 //==============================================================================
@@ -814,6 +828,7 @@ void QMainCanvas::showGaussMarkers()
 
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+    CommandPrompt::logDebug("Markers", QString("Redrew %1 Gaussian peak marker(s) (MG).").arg(gauss_markers.size()));
 }
 
 //==============================================================================
@@ -856,23 +871,11 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
     gateLine->Draw("same");
     listOfObjectsDrawnOnScreen.Add(gateLine);
 
-    // When completing a pair, draw baseline and hatched region
+    // When completing a pair, shade the coincidence gate interval
     if (gate_markers.size() % 2 == 0) {
-        const Int_t leftBin = static_cast<Int_t>(std::round(gate_markers[gate_markers.size() - 2]));
-        const Int_t minB = std::min(leftBin, ch);
-        const Int_t maxB = std::max(leftBin, ch);
-
-        TLine *bottomGateLine = new TLine(minB, yMin, maxB, yMin);
-        bottomGateLine->SetLineColor(gateCol);
-        bottomGateLine->SetLineWidth(2);
-        bottomGateLine->Draw("same");
-        listOfObjectsDrawnOnScreen.Add(bottomGateLine);
-
-        TBox *gateArea = new TBox(minB, yMin, maxB, yMax);
-        gateArea->SetFillColor(gateCol);
-        gateArea->SetFillStyle(3354);
-        gateArea->Draw("same");
-        listOfObjectsDrawnOnScreen.Add(gateArea);
+        drawShadedMarkerInterval(
+            gate_markers[gate_markers.size() - 2],
+            ch, yMin, yMax, gateCol, 3006, listOfObjectsDrawnOnScreen);
     }
 
     canvas->getCanvas()->Modified();
@@ -893,9 +896,7 @@ void QMainCanvas::addGateMarker(Int_t x, Int_t y)
 void QMainCanvas::deleteGateMarkers()
 {
     gate_markers.clear();
-    const QString msg = "Coincidence gate markers cleared ('Z + W').\n";
-    CommandPrompt::getInstance()->appendPlainText(msg);
-    std::cout << msg.toStdString();
+    CommandPrompt::logDebug("Markers", "Cleared coincidence gate markers (ZW).");
 }
 
 //==============================================================================
@@ -925,29 +926,15 @@ void QMainCanvas::showGateMarkers()
         listOfObjectsDrawnOnScreen.Add(gateLine);
 
         if (i % 2 == 1) {
-            const Int_t minB = static_cast<Int_t>(std::round(std::min(gate_markers[i - 1], gate_markers[i])));
-            const Int_t maxB = static_cast<Int_t>(std::round(std::max(gate_markers[i - 1], gate_markers[i])));
-
-            TLine *bottomGateLine = new TLine(minB, yMin, maxB, yMin);
-            bottomGateLine->SetLineColor(gateCol);
-            bottomGateLine->SetLineWidth(2);
-            bottomGateLine->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(bottomGateLine);
-
-            TBox *gateArea = new TBox(minB, yMin, maxB, yMax);
-            gateArea->SetFillColor(gateCol);
-            gateArea->SetFillStyle(3354);
-            gateArea->Draw("same");
-            listOfObjectsDrawnOnScreen.Add(gateArea);
+            drawShadedMarkerInterval(
+                gate_markers[i - 1], gate_markers[i],
+                yMin, yMax, gateCol, 3006, listOfObjectsDrawnOnScreen);
         }
     }
 
-    const QString msg = "Redrawing coincidence gate markers ('M + W').\n";
-    CommandPrompt::getInstance()->appendPlainText(msg);
-    std::cout << msg.toStdString();
-
     canvas->getCanvas()->Modified();
     canvas->getCanvas()->Update();
+    CommandPrompt::logDebug("Markers", QString("Redrew %1 coincidence gate marker(s) (MW).").arg(gate_markers.size()));
 }
 
 //==============================================================================
@@ -1061,11 +1048,13 @@ void QMainCanvas::autoIntegrationAtCursor(Int_t x, Int_t y)
 //==============================================================================
 void QMainCanvas::showMJMarkers()
 {
-    clearDrawnObjects();
     showBackgroundMarkers();
     showIntegralMarkers();
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+    CommandPrompt::logDebug("Markers", "Redrew integration markers (MJ).");
 }
 
 //==============================================================================
@@ -1073,12 +1062,14 @@ void QMainCanvas::showMJMarkers()
 //==============================================================================
 void QMainCanvas::showMVMarkers()
 {
-    clearDrawnObjects();
     showBackgroundMarkers();
     showRangeMarkers();
     showGaussMarkers();
-    canvas->getCanvas()->Modified();
-    canvas->getCanvas()->Update();
+    if (canvas && canvas->getCanvas()) {
+        canvas->getCanvas()->Modified();
+        canvas->getCanvas()->Update();
+    }
+    CommandPrompt::logDebug("Markers", "Redrew Gaussian fit markers (MV).");
 }
 
 //==============================================================================
@@ -1088,14 +1079,9 @@ void QMainCanvas::showMVMarkers()
 //==============================================================================
 void QMainCanvas::deleteZJMarkers()
 {
-    deleteBackgroundMarkers();
-    deleteIntegralMarkers();
-    clearDrawnObjects();
-    if (canvas && canvas->getCanvas()) {
-        canvas->getCanvas()->Modified();
-        canvas->getCanvas()->Update();
-    }
-    CommandPrompt::getInstance()->appendPlainText("Background and Integral markers deleted (ZJ).\n");
+    background_markers.clear();
+    integral_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared Background and Integral markers (ZJ).");
 }
 
 //==============================================================================
@@ -1105,15 +1091,10 @@ void QMainCanvas::deleteZJMarkers()
 //==============================================================================
 void QMainCanvas::deleteZVMarkers()
 {
-    deleteBackgroundMarkers();
-    deleteRangeMarkers();
-    deleteGaussMarkers();
-    clearDrawnObjects();
-    if (canvas && canvas->getCanvas()) {
-        canvas->getCanvas()->Modified();
-        canvas->getCanvas()->Update();
-    }
-    CommandPrompt::getInstance()->appendPlainText("Background, Range, and Gauss markers deleted (ZV).\n");
+    background_markers.clear();
+    range_markers.clear();
+    gauss_markers.clear();
+    CommandPrompt::logDebug("Markers", "Cleared Background, Range, and Gauss markers (ZV).");
 }
 
 //==============================================================================

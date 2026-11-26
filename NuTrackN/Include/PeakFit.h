@@ -66,7 +66,9 @@ bool checkGauss(std::vector<Double_t> &gauss_markers, const std::vector<Double_t
  *
  * @param mainCanvas Pointer to the main application window.
  */
-void fitBackgroundHelper(QMainCanvas *mainCanvas);
+#include "Integral.h"
+
+void fitBackgroundHelper(QMainCanvas *mainCanvas, bool quiet = false, BackgroundFitMethod method = BackgroundFitMethod::OLS);
 
 /**
  * @brief Identifies the peak apex and determines optimal fit boundaries using 3-point smoothing.

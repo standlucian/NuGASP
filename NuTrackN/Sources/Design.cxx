@@ -292,9 +292,10 @@ QFont getButtonFont() {
 
 QFont getPromptFont() {
   if (!s_typographyInitialized) initializeTypography();
-  QFont pFont = s_buttonPromptFont;
-  int pt = pFont.pointSize() > 0 ? pFont.pointSize() : 11;
-  pFont.setPointSize(pt + 2); // 2pt larger for terminal readout readability
+  int pt = s_buttonPromptFont.pointSize() > 0 ? s_buttonPromptFont.pointSize() : 11;
+  QFont pFont("DejaVu Sans Mono", pt + 1);
+  pFont.setStyleHint(QFont::Monospace);
+  pFont.setFixedPitch(true);
   pFont.setBold(false);
   return pFont;
 }
@@ -2326,7 +2327,7 @@ void AppearanceDialog::setupUI() {
       m_curPeak = QColor("#e11d48");
       m_curZoom = QColor("#0284c7");
       m_curBgMarker = QColor("#2563eb");
-      m_curIntegral = QColor("#d97706");
+      m_curIntegral = QColor("#ffff00");
       m_curRange = QColor("#ea580c");
       m_curGauss = QColor("#9333ea");
       m_curGate = QColor("#b91c1c");

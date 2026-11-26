@@ -299,7 +299,7 @@ class QMainCanvas : public QWidget
 
    friend void runAutoFit(QMainCanvas *mainCanvas, int x, int y);
    friend void runMultiPeakFit(QMainCanvas *mainCanvas);
-   friend void fitBackgroundHelper(QMainCanvas *mainCanvas);
+   friend void fitBackgroundHelper(QMainCanvas *mainCanvas, bool quiet, BackgroundFitMethod method);
    friend void showFitParametersDialog(QMainCanvas *mainCanvas, const QString &title, const QString &htmlContent, const std::vector<FittedPeakData> &peaks);
    friend void showPeakSearchParamsDialog(QMainCanvas *mainCanvas, double sigma, double threshold, const std::vector<DetectedPeak> &peaks, double xMin, double xMax);
    friend class QRootCanvas;
@@ -384,7 +384,10 @@ public slots:
    void clicked1();
    void clickedW();
    void areaFunction();
-   void areaFunctionWithBackground(bool openDialog = true, bool logResult = true);
+   BackgroundFitMethod getBackgroundFitMethod() const { return m_bgFitMethod; }
+  void setBackgroundFitMethod(BackgroundFitMethod method) { m_bgFitMethod = method; }
+
+  void areaFunctionWithBackground(bool openDialog = true, bool logResult = true, bool quiet = false);
    void handle_root_events();
    void autoFit(int, int);
    void clearTheScreen();
@@ -588,11 +591,13 @@ protected:
     QTextBrowser *fitParamsBrowser = nullptr;
     QCheckBox *chkUncoupleWidths = nullptr;
     QCheckBox *chkFixBackground = nullptr;
+    QComboBox *comboBkgMethod = nullptr;
     QDoubleSpinBox *spinBkgSlope = nullptr;
     QDoubleSpinBox *spinBkgIntercept = nullptr;
     QTimer *bkgDebounceTimer = nullptr;
     bool m_uncoupleWidths{false};
     bool m_bkgFixed{false};
+    BackgroundFitMethod m_bgFitMethod{BackgroundFitMethod::OLS};
     double m_bkgSlopeVal{0.0};
     double m_bkgInterceptVal{0.0};
     double m_bkgStepVal{0.0};

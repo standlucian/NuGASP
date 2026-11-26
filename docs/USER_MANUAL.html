@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NuTrackN User Manual (Version 2.0.7)</title>
+  <title>NuTrackN User Manual (Version 2.0.8)</title>
   
   <!-- KaTeX for rendering formulas -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
@@ -342,7 +342,7 @@
           color: #64748b;
         }
         @bottom-right {
-          content: "NuTrackN User Manual (v2.0.7)";
+          content: "NuTrackN User Manual (v2.0.8)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;
@@ -359,7 +359,7 @@
           color: #64748b;
         }
         @bottom-left {
-          content: "NuTrackN User Manual (v2.0.7)";
+          content: "NuTrackN User Manual (v2.0.8)";
           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
           font-size: 8pt;
           color: #94a3b8;
@@ -513,7 +513,7 @@
   <div class="container">
     <div class="title-page">
 <h1>NuTrackN (NuGASP) Official User Manual</h1>
-<p><strong>Version 2.0.7</strong> — <em>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</em><br />
+<p><strong>Version 2.0.8</strong> — <em>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</em><br />
 <strong>Architecture</strong>: Modern C++17 / Qt5 Core + CERN ROOT Scientific Graphics Engine<br />
 <strong>Quick Help Shortcut</strong>: Press <strong><code>H</code></strong> or <strong><code>?</code></strong> (or <strong><code>F1</code></strong>) on the spectrum canvas at any time.</p>
 </div>
@@ -521,7 +521,7 @@
 <div class="inside-cover-page">
   <div class="colophon">
     <div class="colophon-title">NuTrackN Official User Manual</div>
-    <div class="colophon-meta">Release Version 2.0.7 (2026 Edition)</div>
+    <div class="colophon-meta">Release Version 2.0.8 (2026 Edition)</div>
 
     <div class="colophon-block">
       <strong>Nuclear Gamma-Ray &amp; Particle Spectroscopy Analysis Environment</strong><br>
@@ -542,7 +542,7 @@
 
     <div class="colophon-block">
       <strong>Standard Academic Citation:</strong><br>
-      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.7, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
+      L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.8, IFIN-HH / NIPNE, GitHub: <a href="https://github.com/standlucian/NuGASP">standlucian/NuGASP</a> (2026).
     </div>
 
     <div class="colophon-notice">
@@ -594,10 +594,10 @@
 </ul>
 </li>
 <li><a href="#5-peak-integration--region-of-interest-roi-analysis">5. Peak Integration &amp; Region of Interest (ROI) Analysis</a><ul>
-<li><a href="#51-setting-boundary-markers">5.1 Setting Boundary Markers</a></li>
-<li><a href="#52-mathematical-formulation-of-gross--net-peak-area">5.2 Mathematical Formulation of Gross &amp; Net Peak Area</a></li>
-<li><a href="#53-counting-statistics-statistical-moments--error-propagation">5.3 Counting Statistics, Statistical Moments &amp; Error Propagation</a></li>
-<li><a href="#54-marker-management--clearing">5.4 Marker Management &amp; Clearing</a></li>
+<li><a href="#51-placing-interactive-analysis-markers-spacebar-b-i-r-g-w">5.1 Placing Interactive Analysis Markers (<code>Spacebar</code>, <code>B</code>, <code>I</code>, <code>R</code>, <code>G</code>, <code>W</code>)</a></li>
+<li><a href="#52-marker-management--clearing">5.2 Marker Management &amp; Clearing</a></li>
+<li><a href="#53-interactive-peak-integration-workflows-aj-cj-ci-cb--int-dialog">5.3 Interactive Peak Integration Workflows (<code>AJ</code>, <code>CJ</code>, <code>CI</code>, <code>CB</code> &amp; <code>Int</code> Dialog)</a></li>
+<li><a href="#54-mathematical-formulation-statistical-moments--error-propagation">5.4 Mathematical Formulation, Statistical Moments &amp; Error Propagation</a></li>
 <li><a href="#55-output-report-logging">5.5 Output Report Logging</a></li>
 </ul>
 </li>
@@ -858,13 +858,13 @@ NuTrackN keyboard commands are executed directly on the interactive spectrum can
 <p>If you use NuTrackN for spectral analysis, coincidence matrix slicing, or gain alignment in scientific publications, master's theses, or doctoral dissertations, please cite the software as:</p>
 <blockquote>
 <p><strong>Text Citation:</strong><br />
-L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.7, Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).</p>
+L. Stan, <em>NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment</em>, Version 2.0.8, Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH / NIPNE), GitHub repository: https://github.com/standlucian/NuGASP (2026).</p>
 </blockquote>
 <pre><code class="language-bibtex">@misc{stan_nutrackn_2026,
   author       = {Stan, Lucian},
   title        = {{NuTrackN: Modern Nuclear Gamma-Ray and Particle Spectroscopy Analysis Environment}},
   year         = {2026},
-  version      = {2.0.7},
+  version      = {2.0.8},
   institution  = {Horia Hulubei National Institute for R&amp;D in Physics and Nuclear Engineering (IFIN-HH)},
   publisher    = {GitHub},
   howpublished = {\url{https://github.com/standlucian/NuGASP}}
@@ -1460,46 +1460,82 @@ Because raw binary and ASCII spectrum files do not contain format headers, the <
 <section class="chapter-container" id="chapter-5">
 <h2 id="5-peak-integration--region-of-interest-roi-analysis" class="chapter-heading">5. Peak Integration & Region of Interest (ROI) Analysis</h2>
 
-<h3 id="51-setting-boundary-markers">5.1 Setting Boundary Markers</h3>
-<p>All interactive markers are placed at the current mouse cursor channel on the active pad (default colors are shown below and can be customized via <strong><code>MC</code></strong> or <strong><code>Ctrl+T</code></strong>):
-- <strong><code>Spacebar</code></strong>: Place generic <strong>Zoom / Calibration marker</strong> (<code>Cyan</code>). Used in pairs (or as a single right-hand boundary from the current left screen edge) to zoom with <strong><code>E</code></strong> (<a href="#42-horizontal-panning--zooming">Section 4.2</a>), and in pairs for quick 2-point energy calibration (<strong><code>CA2</code></strong> in <a href="#62-2-point-linear-energy-calibration-ca--ca2">Section 6.2</a>).
-- <strong><code>B</code></strong>: Place <strong>Background boundary marker</strong> (<code>Blue</code>). Placed in consecutive <code>[left, right]</code> pairs; each completed pair shades a hatched background estimation window used by <strong><code>CB</code></strong>, <strong><code>CJ</code></strong> (<a href="#52-mathematical-formulation-of-gross--net-peak-area">Section 5.2</a>), and multi-peak Gaussian fits (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-multi-peak-gaussian-fitting--deconvolution">Chapter 7</a>). Cleared with <strong><code>ZB</code></strong> and redrawn with <strong><code>MB</code></strong>.
-- <strong><code>I</code></strong>: Place <strong>Integration ROI boundary marker</strong> (<code>Yellow</code>). Placed in consecutive <code>[left, right]</code> pairs around photopeaks for gross (<strong><code>CI</code></strong>) and net background-subtracted (<strong><code>CJ</code></strong>) peak integration (<a href="#52-mathematical-formulation-of-gross--net-peak-area">Section 5.2</a>). Cleared with <strong><code>ZI</code></strong> and redrawn with <strong><code>MI</code></strong>.
-- <strong><code>R</code></strong>: Place <strong>Fitting Range boundary marker</strong> (<code>Orange-Yellow</code>). Up to two <code>R</code> markers define and shade the active fitting window $[r_{\min}, r_{\max}]$ for polynomial background fits (<strong><code>CF</code></strong>) and multi-peak Gaussian deconvolution (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-multi-peak-gaussian-fitting--deconvolution">Chapter 7</a>), or quick 2-peak calibration (<strong><code>K</code></strong>). Cleared with <strong><code>ZR</code></strong> and redrawn with <strong><code>MR</code></strong>.
-- <strong><code>G</code> (or <code>+</code>)</strong> and <strong><code>-</code></strong>: Place or remove a <strong>Gaussian Peak Centroid marker</strong> (<code>Pink</code>). Pressing <strong><code>G</code></strong> or <strong><code>+</code></strong> drops an initial peak centroid seed at the cursor for multi-peak Gaussian fitting (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-multi-peak-gaussian-fitting--deconvolution">Chapter 7</a>); pressing <strong><code>-</code></strong> deletes the <code>G</code> marker closest to the cursor. All <code>G</code> markers are cleared with <strong><code>ZG</code></strong> and redrawn with <strong><code>MG</code></strong>.
-- <strong><code>W</code></strong>: Place <strong>Coincidence Gate window marker</strong> (<code>Magenta</code>). Placed in <code>[left, right]</code> pairs to shade 1D gate intervals for 2D coincidence matrix slicing (<a href="#9-2d-coincidence-matrices--gating-analysis">Chapter 9</a>). Cleared with <strong><code>ZW</code></strong> and redrawn with <strong><code>MW</code></strong>.</p>
-<h3 id="52-mathematical-formulation-of-gross--net-peak-area">5.2 Mathematical Formulation of Gross &amp; Net Peak Area</h3>
+<h3 id="51-placing-interactive-analysis-markers-spacebar-b-i-r-g-w">5.1 Placing Interactive Analysis Markers (<code>Spacebar</code>, <code>B</code>, <code>I</code>, <code>R</code>, <code>G</code>, <code>W</code>)</h3>
+<p>All interactive markers are placed at the current mouse cursor channel on the active pad. Marker colors follow the active theme and can be customized via <strong><code>MC</code></strong> or <strong><code>Ctrl+T</code></strong>. Completed intervals for <strong><code>B</code></strong>, <strong><code>I</code></strong>, <strong><code>R</code></strong>, and <strong><code>W</code></strong> use distinct non-masking micro-stipple patterns (<code>dots</code>, <code>\</code>, <code>/</code>, <code>|</code>) so overlapping regions (such as background windows inside a fit range) remain simultaneously visible:</p>
+<ul>
+<li><strong><code>Spacebar</code></strong>: Place generic <strong>Zoom / Calibration marker</strong>. Used in pairs (or as a single right-hand boundary from the current left screen edge) to zoom with <strong><code>E</code></strong> (<a href="#42-horizontal-panning--zooming">Section 4.2</a>), and in pairs for 2-point energy calibration via the <strong><code>Cal2P</code></strong> toolbar button (<a href="#62-fast-2-point-calibration-routine-k">Section 6.2</a>).</li>
+<li><strong><code>B</code></strong>: Place <strong>Background boundary marker</strong>. Placed in consecutive <code>[left, right]</code> pairs; each completed pair shades a micro-stippled background estimation window used by <strong><code>CB</code></strong>, <strong><code>CJ</code></strong> (<a href="#53-interactive-peak-integration-workflows-aj-cj-ci-cb--int-dialog">Section 5.3</a>), and multi-peak Gaussian fits (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-advanced-peak-fitting--multiplet-deconvolution">Chapter 7</a>). Cleared with <strong><code>ZB</code></strong> and redrawn with <strong><code>MB</code></strong>.</li>
+<li><strong><code>I</code></strong>: Place <strong>Integration ROI boundary marker</strong>. Placed in consecutive <code>[left, right]</code> pairs (shading the ROI interval) around photopeaks for gross (<strong><code>CI</code></strong>) and net background-subtracted (<strong><code>CJ</code></strong>) peak integration (<a href="#53-interactive-peak-integration-workflows-aj-cj-ci-cb--int-dialog">Section 5.3</a>). Cleared with <strong><code>ZI</code></strong> and redrawn with <strong><code>MI</code></strong>.</li>
+<li><strong><code>R</code></strong>: Place <strong>Fitting Range boundary marker</strong>. Up to two <code>R</code> markers define and shade the active <code>[left, right]</code> fitting window for multi-peak Gaussian deconvolution (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-advanced-peak-fitting--multiplet-deconvolution">Chapter 7</a>) or quick 2-peak calibration via the <strong><code>K</code></strong> shortcut (<a href="#62-fast-2-point-calibration-routine-k">Section 6.2</a>). Cleared with <strong><code>ZR</code></strong> and redrawn with <strong><code>MR</code></strong>.</li>
+<li><strong><code>G</code> (or <code>+</code>)</strong> and <strong><code>-</code></strong>: Place or remove a <strong>Gaussian Peak Centroid marker</strong>. Pressing <strong><code>G</code></strong> or <strong><code>+</code></strong> drops an initial peak centroid seed at the cursor for multi-peak Gaussian fitting (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-advanced-peak-fitting--multiplet-deconvolution">Chapter 7</a>); pressing <strong><code>-</code></strong> deletes the <code>G</code> marker closest to the cursor. All <code>G</code> markers are cleared with <strong><code>ZG</code></strong> and redrawn with <strong><code>MG</code></strong>.</li>
+<li><strong><code>W</code></strong>: Place <strong>Coincidence Gate window marker</strong>. Placed in <code>[left, right]</code> pairs to shade 1D gate intervals for 2D coincidence matrix slicing (<a href="#93-coincidence-gating-cw--background-subtraction-dw">Section 9.3</a>). Cleared with <strong><code>ZW</code></strong> and redrawn with <strong><code>MW</code></strong>.</li>
+</ul>
+<h3 id="52-marker-management--clearing">5.2 Marker Management &amp; Clearing</h3>
+<ul>
+<li><strong><code>ZA</code></strong>: Clear all stored markers (<code>Spacebar</code>, <code>B</code>, <code>I</code>, <code>R</code>, <code>G</code>, <code>W</code>) from memory.</li>
+<li><strong><code>ZB</code> / <code>ZI</code> / <code>ZR</code> / <code>ZG</code> / <code>ZW</code></strong>: Clear only background (<code>B</code>), integration (<code>I</code>), fit range (<code>R</code>), Gaussian peak (<code>G</code>), or coincidence gate (<code>W</code>) markers from memory.</li>
+<li><strong><code>ZJ</code> / <code>ZV</code></strong>: Clear integration-set (<code>B</code> + <code>I</code>) or fit-set (<code>B</code> + <code>R</code> + <code>G</code>) markers from memory.</li>
+<li><strong><code>MA</code></strong>: Redraw <strong>all</strong> stored markers (<code>B</code>, <code>I</code>, <code>R</code>, <code>G</code>, <code>W</code>) on the canvas if they were previously erased visually with <strong><code>=</code></strong>.</li>
+<li><strong><code>MB</code> / <code>MI</code> / <code>MR</code> / <code>MG</code> / <code>MW</code></strong>: Redraw only background (<code>B</code>), integration (<code>I</code>), fit range (<code>R</code>), Gaussian peak (<code>G</code>), or coincidence gate (<code>W</code>) markers.</li>
+<li><strong><code>MJ</code> / <code>MV</code></strong>: Redraw the integration set (<code>B</code> + <code>I</code>) or Gaussian fit set (<code>B</code> + <code>R</code> + <code>G</code>).</li>
+<li><strong><code>MP</code> / <code>ZP</code></strong>: Show or clear automated peak-search (<code>CP</code>) labels (<code>ZP</code> immediately hides peak-search labels and its parameter window).</li>
+</ul>
+<p><em>(Note: <code>Z*</code> marker commands—<code>ZA</code>, <code>ZB</code>, <code>ZI</code>, <code>ZR</code>, <code>ZG</code>, <code>ZW</code>, <code>ZJ</code>, and <code>ZV</code>—clear the stored marker vectors from memory without erasing the drawn lines or shaded boxes on the canvas; press </em><em><code>=</code></em><em> to refresh and clear the screen.)</em></p>
+<h3 id="53-interactive-peak-integration-workflows-aj-cj-ci-cb--int-dialog">5.3 Interactive Peak Integration Workflows (<code>AJ</code>, <code>CJ</code>, <code>CI</code>, <code>CB</code> &amp; <code>Int</code> Dialog)</h3>
+<p>NuTrackN supports four complementary ROI integration workflows, from single-key automated peak extraction to manual multi-interval integration:</p>
+<ol>
+<li><strong>1-Key Auto-Integration at Cursor (<code>AJ</code>)</strong>:<ul>
+<li>Hover the mouse cursor anywhere near a photopeak and press <strong><code>AJ</code></strong>.</li>
+<li>NuTrackN locates the smoothed local peak apex, walks down both flanks to the valley minima, automatically places left/right <strong><code>B</code></strong> background sidebands and <strong><code>I</code></strong> integration boundaries, computes the net area, draws the baseline and <code>[1]</code> peak label on the canvas, and opens the live <strong><code>Integration Parameters</code></strong> dialog.</li>
+</ul>
+</li>
+<li><strong>Manual Net Integration (<code>CJ</code> or <code>Int</code> Toolbar Button)</strong>:<ul>
+<li>Place one or more <strong><code>B</code></strong> pairs on flat background regions flanking the peak(s), then place <strong><code>I</code></strong> pair(s) around the photopeak(s) to integrate.</li>
+<li>Press <strong><code>CJ</code></strong> (or click <strong><code>Int</code></strong> on the toolbar) to fit the linear baseline across all <code>B</code> intervals, subtract it bin-by-bin inside each <code>I</code> ROI, print the formatted summary table (<code>Integral#</code>, <code>Channel</code>, <code>Energy</code>, <code>Area</code>, <code>Width</code>) to the output console, and open <strong><code>Integration Parameters</code></strong>. <em>(If no <code>B</code> markers are set, <code>CJ</code> / <code>Int</code> gracefully falls back to gross integration with zero background.)</em></li>
+</ul>
+</li>
+<li><strong>Gross Integration Without Background (<code>CI</code>)</strong>:<ul>
+<li>Place <strong><code>I</code></strong> boundary pair(s) and press <strong><code>CI</code></strong> to compute the raw gross counts ($G$) and Poisson error ($\sqrt{G}$) without background subtraction or opening the dialog.</li>
+</ul>
+</li>
+<li><strong>Standalone Background Baseline Preview (<code>CB</code>)</strong>:<ul>
+<li>Place <strong><code>B</code></strong> pair(s) and press <strong><code>CB</code></strong> to compute and draw the linear baseline (using the unbiased <strong>OLS</strong> default) across the selected background span without running peak integration.</li>
+</ul>
+</li>
+<li><strong>Live Fine-Tuning (<code>Integration Parameters</code> Dialog)</strong>:<ul>
+<li>Opened automatically by <strong><code>CJ</code></strong>, <strong><code>AJ</code></strong>, and <strong><code>Int</code></strong>, this non-stealing floating dialog lets you adjust <strong>Background Left</strong>, <strong>Integration Region</strong>, and <strong>Background Right</strong> channel spinboxes (<code>0</code>–<code>100000</code>), choose the <strong>Background Method</strong> (<strong>OLS (Unbiased Default)</strong>, <strong>2-Pass IRLS (Model WLS)</strong>, or <strong>Poisson WLS (<code>1/y</code>)</strong>), and inspect the updated shaded canvas regions, baseline, and <strong>Results</strong> (<strong>Gross Area</strong>, <strong>Background</strong>, <strong>Net Area</strong>, <strong>Centroid</strong>, <strong>FWHM</strong>) in real time.</li>
+<li>When multiple <strong><code>I</code></strong> pairs (multi-peak integration) or more than two <strong><code>B</code></strong> pairs are defined, compact dropdown selectors appear inside <strong>Integration Region</strong> (<code>Peak #1</code>, <code>Peak #2</code>, ...) and <strong>Background Right</strong> (<code>Bg #2</code>, <code>Bg #3</code>, ...) so you can switch between and live-edit any region individually.</li>
+<li>Clicking anywhere outside the dialog (on the canvas) or closing it dismisses it; if you made any adjustments, the final result is printed to the console and logged (including to an active <code>DF</code> / <code>Rec</code> calculation logfile).</li>
+</ul>
+</li>
+</ol>
+<p><img alt="Net Peak Integration with Background Sidebands and Integration Parameters Dialog" src="images/CB%20Integral%20and%20Dialog.png" /></p>
+<h3 id="54-mathematical-formulation-statistical-moments--error-propagation">5.4 Mathematical Formulation, Statistical Moments &amp; Error Propagation</h3>
 <p>Given a photopeak bounded by a pair of integration markers ($ch_{min}$ and $ch_{max}$), let $y_i$ denote the bin content at channel center $x_i$:</p>
 <ol>
 <li>
 <p><strong>Gross Integrated Area ($G$)</strong>:
-   Calculated by the <strong><code>CI</code></strong> command without baseline subtraction:
+   Calculated by <strong><code>CI</code></strong> (and reported alongside net area by <strong><code>CJ</code></strong> / <strong><code>AJ</code></strong>) without baseline subtraction:
    $$G = \sum_{i = ch_{min}}^{ch_{max}} y_i$$</p>
 </li>
 <li>
-<p><strong>Least-Squares Linear Background Estimation (<code>CB</code> / <code>CJ</code>)</strong>:
-   Background markers (<strong><code>B</code></strong>) are placed in consecutive pairs $[b_{1,\text{left}}, b_{1,\text{right}}], [b_{2,\text{left}}, b_{2,\text{right}}], \dots$ defining arbitrary background intervals on either side of the peak(s). Across all $N_{bg}$ channels enclosed by these background marker pairs, NuTrackN performs <strong>ordinary least-squares (OLS) linear regression</strong> to determine the best-fit baseline:
-   $$B(x) = m \cdot x + c$$
-   where the slope $m$ and intercept $c$ are evaluated from the background sample means $(\bar{x}, \bar{y})$:
-   $$m = \frac{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})(y_k - \bar{y})}{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})^2}, \quad c = \bar{y} - m \cdot \bar{x}$$</p>
+<p><strong>Linear Background Estimation (<code>CB</code>, <code>CJ</code> &amp; <code>CV</code> Shared Regression Engine)</strong>:
+   Background markers (<strong><code>B</code></strong>) are placed in consecutive pairs $[b_{1,\text{left}}, b_{1,\text{right}}], [b_{2,\text{left}}, b_{2,\text{right}}], \dots$ defining arbitrary background intervals on either side of the peak(s). Across all $N_{bg}$ channels enclosed by these background marker pairs, <strong><code>CB</code></strong>, <strong><code>CJ</code> / <code>AJ</code></strong>, and <strong><code>CV</code> / <code>CG</code></strong> share the exact same linear regression solver $B(x) = m \cdot x + c$, with <strong>OLS</strong> as the default and three selectable weighting schemes in the <strong><code>CJ</code></strong> and <strong><code>CV</code> / <code>CG</code></strong> dialogs:</p>
+<ul>
+<li><strong>OLS (Unbiased Default, $w_k = 1$)</strong>: Equal weighting across all selected background channels—free of Neyman's low-count downward bias:
+  $$m = \frac{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})(y_k - \bar{y})}{\sum_{k=1}^{N_{bg}} (x_k - \bar{x})^2}, \quad c = \bar{y} - m \cdot \bar{x}$$</li>
+<li><strong>2-Pass IRLS (Model WLS, $w_k = 1 / \max(m_0 x_k + c_0, 1)$)</strong>: Pass 1 computes an initial OLS baseline $(m_0, c_0)$; Pass 2 applies inverse-variance weights using the <strong>smooth fitted line</strong> rather than noisy raw bin counts, preserving optimal weighting on steep Compton backgrounds without low-count downward bias.</li>
+<li><strong>Poisson WLS ($w_k = 1 / \max(y_k, 1)$)</strong>: Classical inverse-variance weighting using raw bin counts $y_k$. <em>(Note: at very low counts, downward fluctuations receive higher weight, which can bias the baseline slightly low by $\sim 1$ count/bin.)</em></li>
+</ul>
 </li>
 <li>
-<p><strong>Net Peak Area ($N$)</strong>:
-   Calculated by the <strong><code>CJ</code></strong> command (or automatically at the cursor via <strong><code>AJ</code></strong>) by subtracting the interpolated linear background $b_i = m \cdot x_i + c$ bin-by-bin across each pair of integration markers:
-   $$N \equiv M_0 = \sum_{i = ch_{min}}^{ch_{max}} (y_i - b_i) = \sum_{i = ch_{min}}^{ch_{max}} y_{\text{net}, i}$$</p>
-</li>
-</ol>
-<h3 id="53-counting-statistics-statistical-moments--error-propagation">5.3 Counting Statistics, Statistical Moments &amp; Error Propagation</h3>
-<p>NuTrackN implements the authentic Xtrackn / GASPware statistical moment and variance propagation algorithm relative to the interval midpoint $x_{\text{mid}} = \frac{1}{2}(ch_{min} + ch_{max})$. Let $w_i = x_i - x_{\text{mid}}$ be the centered channel offset:</p>
-<ol>
-<li>
-<p><strong>Net Moments ($M_0, M_1, M_2$) and Variance Moments ($D_0, D_1, D_2, D_4$)</strong>:
-   For each bin $i$ in the integration window, the gross Poisson variance is $\sigma^2(y_i) = \max(y_i, 1)$ and the background variance contribution is $\sigma^2(b_i) = \max(b_i, 0)$, yielding a per-bin net variance $v_i = \max(y_i, 1) + \max(b_i, 0)$. The moments are accumulated as:
+<p><strong>Net Peak Area ($N$) &amp; Statistical Moments ($M_0, M_1, M_2$, $D_0, D_1, D_2, D_4$)</strong>:
+   Subtracting the interpolated baseline $b_i = m \cdot x_i + c$ bin-by-bin across each <strong><code>I</code></strong> interval yields $y_{\text{net}, i} = y_i - b_i$. Relative to the interval midpoint $x_{\text{mid}} = \frac{1}{2}(ch_{min} + ch_{max})$ with centered offset $w_i = x_i - x_{\text{mid}}$ and per-bin net variance $v_i = \max(y_i, 1) + \max(b_i, 0)$, NuTrackN evaluates the authentic Xtrackn / GASPware moments:
    $$M_k = \sum_{i = ch_{min}}^{ch_{max}} y_{\text{net}, i} \, w_i^k \quad (k = 0, 1, 2), \qquad D_n = \sum_{i = ch_{min}}^{ch_{max}} v_i \, w_i^n \quad (n = 0, 1, 2, 4)$$</p>
 </li>
 <li>
-<p><strong>Net Area Uncertainty ($\sigma_N$)</strong>:
-   $$\sigma_N = \sqrt{D_0} = \sqrt{\sum_{i = ch_{min}}^{ch_{max}} \left(\max(y_i, 1) + \max(b_i, 0)\right)}$$</p>
+<p><strong>Net Area &amp; Uncertainty ($N = M_0$, $\sigma_N$)</strong>:
+   $$N = \sum_{i = ch_{min}}^{ch_{max}} (y_i - b_i), \qquad \sigma_N = \sqrt{D_0} = \sqrt{\sum_{i = ch_{min}}^{ch_{max}} \left(\max(y_i, 1) + \max(b_i, 0)\right)}$$</p>
 </li>
 <li>
 <p><strong>First-Moment Centroid ($Ch_0$) &amp; Uncertainty ($\sigma_{Ch_0}$)</strong>:
@@ -1514,23 +1550,17 @@ Because raw binary and ASCII spectrum files do not contain format headers, the <
 </li>
 <li>
 <p><strong>Spectroscopic Bracketed Uncertainty Formatting</strong>:
-   Results printed to the output console and terminal log use standard nuclear spectroscopy parenthetical notation for the least significant digits—for example, an energy of <code>1332.49(5)</code> keV denotes $1332.49 \pm 0.05\text{ keV}$, and an area of <code>14520(135)</code> denotes $14520 \pm 135\text{ counts}$.</p>
+   Results printed to the output console and terminal log use standard nuclear spectroscopy parenthetical notation for the least significant digits—for example, an energy of <code>1332.49(5)</code> keV denotes $1332.49 \pm 0.05\text{ keV}$, and an area of <code>14520(135)</code> denotes $14520 \pm 135\text{ counts}$. All displayed uncertainties (both in the console table and in the <code>Integration Parameters</code> dialog) are <strong>conservatively rounded up</strong> to the last displayed digit (so a small non-zero error such as $0.0001\text{ ch}$ displays as <code>0.01 ch</code> / <code>(1)</code> rather than <code>0.00</code>).</p>
 </li>
 </ol>
-<h3 id="54-marker-management--clearing">5.4 Marker Management &amp; Clearing</h3>
-<ul>
-<li><strong><code>ZA</code></strong>: Erase all active markers from the canvas.</li>
-<li><strong><code>ZB</code></strong>: Erase only background (<code>B</code>) markers.</li>
-<li><strong><code>ZI</code></strong>: Erase only integration (<code>I</code>) markers.</li>
-<li><strong><code>ZR</code></strong>: Erase only fit range (<code>R</code>) markers.</li>
-<li><strong><code>ZG</code></strong>: Erase only Gaussian peak (<code>G</code>) markers.</li>
-<li><strong><code>ZW</code></strong>: Erase only coincidence gate (<code>W</code>) markers.</li>
-<li><strong><code>ZJ</code> / <code>ZV</code></strong>: Erase auto-integration (<code>AJ</code>) or multi-fit (<code>CV</code>) markers.</li>
-<li><strong><code>MP</code> / <code>ZP</code></strong>: Show or clear automated peak-search (<code>CP</code>) labels.</li>
-<li><strong><code>MI</code> / <code>MJ</code></strong>: Re-display and highlight integration markers.</li>
-</ul>
+<div class="alert alert-note"><div class="alert-title">NOTE</div>
+<p><strong>Legacy Xtrackn Error-Propagation Approximations</strong>: To preserve exact numerical compatibility with classic Xtrackn / GASPware, two standard approximations apply in the ROI moment formulas above:<br />
+<strong>(1)</strong> The per-bin background variance term $\sigma^2(b_i) = \max(b_i, 0)$ treats the subtracted background across the ROI as having variance $\sum b_i$ (equivalent to $N_{\text{bg}} \approx N_{\text{ROI}}$—slightly conservative when $N_{\text{bg}} > N_{\text{ROI}}$ and slightly optimistic if the <code>B</code> windows are narrower than the <code>I</code> window).<br />
+<strong>(2)</strong> The $\sigma(\text{FWHM})$ expression omits the off-center covariance cross-term between $M_2/M_0$ and $\delta x = M_1/M_0$ (which vanishes when the peak is centered in the ROI, $\delta x = 0$).<br />
+For publication-grade uncertainties on asymmetric or overlapping peaks, use the full maximum-likelihood Gaussian fit (<strong><code>CG</code> / <code>CV</code></strong> in <a href="#7-advanced-peak-fitting--multiplet-deconvolution">Chapter 7</a>).</p>
+</div>
 <h3 id="55-output-report-logging">5.5 Output Report Logging</h3>
-<p>Use <strong><code>DF</code></strong> to open a destination logfile. Every subsequent integration (<strong><code>CI</code></strong> / <strong><code>CJ</code></strong>) or peak fit (<strong><code>CG</code></strong> / <strong><code>CV</code></strong>) automatically appends a formatted entry containing timestamp, centroid, FWHM, gross counts, net counts, and statistical error. Use <strong><code>ZF</code></strong> to close the file.</p>
+<p>Use <strong><code>DF</code></strong> (or alias <strong><code>DL</code></strong>, or the checkable <strong><code>Rec</code></strong> toolbar button) to open a destination calculation logfile (prompting <strong>Append / Overwrite / Cancel</strong> if the target file already exists). Every subsequent integration (<strong><code>CI</code></strong>, <strong><code>CJ</code></strong>, <strong><code>AJ</code></strong>) or peak fit (<strong><code>CG</code></strong>, <strong><code>CV</code></strong>, <strong><code>AG</code></strong>) automatically appends a formatted tabular row (<code>Spectrum</code>, <code>Centroid</code>, <code>Width</code>, <code>Gross</code>, <code>Net</code>, <code>Bg</code>, <code>dNet</code>) under a timestamped session header. Use <strong><code>ZF</code></strong> (or <strong><code>ZL</code></strong>, or click <strong><code>● Rec</code></strong> again) to close the file. For full file format and workflow details, see <a href="#38-calculation-logfiles-df--zf--rec-button">Section 3.8: Calculation Logfiles</a>.</p>
 <p><em>(Note: <code>DF</code>/<code>ZF</code> writes tabular physics calculation results to a user-specified report file. Application status messages, SSH/SFTP diagnostics, and per-session disk logs are managed separately via the </em><em><code>LOG</code></em><em> button; see <a href="#12-diagnostic-logging-output-console--log-management">Chapter 12</a>.)</em></p>
 <hr />
 </section>
